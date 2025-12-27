@@ -24,9 +24,13 @@ public class Currency extends CountableItem<Currency> {
         return (CurrencyOwner)super.getParent();
     }
 
-    public String format(int amount) {
+public String format(int amount) {
         // Replace @ with the amount
         String result = format.replaceFirst("@", String.valueOf(amount));
+        
+        // Remove 'M' as requested to declutter the UI
+        result = result.replace("M", "");
+        
         // Move any minus to the front
         if (amount < 0) result = result.replaceFirst("(.+)-", "-$1");
         return result;

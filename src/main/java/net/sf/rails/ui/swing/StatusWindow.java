@@ -14,9 +14,14 @@ import java.io.File;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import net.sf.rails.game.CompanyManager;
+import net.sf.rails.game.PublicCompany;
+import java.util.stream.Collectors;
 
 import javax.swing.*;
 import javax.swing.filechooser.FileFilter;
+
+import rails.game.action.*;
 
 import net.sf.rails.util.Util;
 import org.apache.commons.lang3.StringUtils;
@@ -42,96 +47,170 @@ import net.sf.rails.ui.swing.elements.RailsIcon;
 import net.sf.rails.util.GameLoader;
 import rails.game.action.*;
 import rails.game.correct.CorrectionModeAction;
+import rails.game.correct.CorrectionType;
+import rails.game.correct.TrainCorrectionAction;
+import net.sf.rails.ui.swing.elements.ActionButton; // Ensure this is imported
+import net.sf.rails.ui.swing.elements.RailsIcon; // Ensure this is imported
 
+import java.io.InputStream;
+import java.util.Properties;
+
+import rails.game.correct.ClosePrivate;
+import net.sf.rails.game.Company;
+import net.sf.rails.game.CompanyType;
+import net.sf.rails.game.PrivateCompany;
+import net.sf.rails.game.TrainType;
+import net.sf.rails.game.Phase;
+import net.sf.rails.game.Closeable;
+import net.sf.rails.game.TrainManager;
+import net.sf.rails.game.PhaseManager;
+import net.sf.rails.ui.swing.hexmap.HexHighlightMouseListener;
+import net.sf.rails.algorithms.NetworkAdapter;
+import net.sf.rails.algorithms.NetworkGraph;
+import net.sf.rails.algorithms.RevenueAdapter;
+import net.sf.rails.game.RailsRoot;
 
 /**
  * This is the Window used for displaying nearly all of the rails.game status.
  * This is also from where the ORWindow and StartRoundWindow are triggered.
  */
-public class StatusWindow extends JFrame implements ActionListener, KeyListener, ActionPerformer {
+public class StatusWindow extends JFrame implements ActionListener, ActionPerformer {
     private static final long serialVersionUID = 1L;
-
     protected static final String QUIT_CMD = "Quit";
-
     protected static final String NEW_CMD = "New";
-
     protected static final String LOAD_CMD = "Load";
-
     protected static final String SAVE_CMD = "Save";
-
     protected static final String RELOAD_CMD = "Reload";
-
     protected static final String AUTOSAVELOAD_CMD = "AutoSaveLoad";
-
     protected static final String SAVESTATUS_CMD = "SaveGameStatus";
-
     protected static final String SAVEREPORT_CMD = "SaveReportFile";
-
     protected static final String EXPORT_CMD = "Export";
-
-    protected static final String UNDO_CMD = "Undo";
-
+    protected static final String UNDO_CMD = "Undo"; // 
     protected static final String FORCED_UNDO_CMD = "Undo!";
-
     protected static final String REDO_CMD = "Redo";
-
+    protected static final String MAP_ZOOM_IN_CMD = "MapZoomIn";
+    protected static final String MAP_ZOOM_OUT_CMD = "MapZoomOut";
     public static final String MARKET_CMD = "Market";
+    public static final String AI_MOVE_CMD = "AIMove"; //
+    protected static final String CORRECT_STOCK_CMD = "CorrectStock";
 
+    protected static final String REM_TILES_CMD = "RemTiles";
+    protected static final String SHOW_MAP_CMD = "ShowMap";
+    protected static final String MAP_FIT_CMD = "MapFit";
+
+    protected static final String TOGGLE_PAUSE_CMD = "TogglePause";
     protected static final String MAP_CMD = "Map";
-
     protected static final String REPORT_CMD = "Report";
-
     protected static final String CONFIG_CMD = "Config";
-
     protected static final String BUY_CMD = "Buy";
-
     protected static final String SELL_CMD = "Sell";
-
     protected static final String DONE_CMD = "Done";
-
     protected static final String PASS_CMD = "Pass";
     protected static final String AUTOPASS_CMD = "Autopass";
+    protected static final String SHOW_PHASES_CMD = "ShowPhases";
+    protected static final String REFRESH_NETWORK_CMD = "RefreshNetwork";
 
     protected JPanel buttonPanel;
-
     protected GameStatus gameStatus;
-
     protected ActionButton passButton;
     protected ActionButton autopassButton;
-
     protected GameUIManager gameUIManager;
-
     protected RoundFacade currentRound;
-
     protected PossibleActions possibleActions;
     protected PossibleAction immediateAction = null;
-
     protected JPanel pane = new JPanel(new BorderLayout());
-
     private JMenuBar menuBar;
-
     private JMenu fileMenu, optMenu, moveMenu, moderatorMenu, specialMenu, correctionMenu, developerMenu;
+    ActionMenuItem undoItem;
 
-    private ActionMenuItem undoItem;
-    private ActionMenuItem forcedUndoItem;
-    private ActionMenuItem redoItem;
-    private ActionMenuItem redoItem2;
+    ActionMenuItem redoItem;
+    protected static final String FONT_INCREASE_CMD = "FontIncrease";
+    protected static final String FONT_DECREASE_CMD = "FontDecrease";
+    // protected JLabel lastActionLabel;
+    protected JLabel currentActorLabel;
+    protected Font activityFont;
+    // Added for Header Timer
+    protected JLabel gameTimeLabel;
+    protected javax.swing.Timer uiRefreshTimer;
+
+    protected String buildTimestamp = "Dev Build"; // Stores the build time
+    private JScrollPane gameStatusPane; // <--- ADD THIS
+    protected static final String CORRECT_SHARES_CMD = "CorrectShares";
+
+    protected JPanel dynamicButtonPanel; // Panel for "Sell 1x", "Sell 2x", etc.
+    // In StatusWindow.java (Near other static final commands, e.g., line 50)
+
+    // In StatusWindow.java (Declaration section, near passButton/autopassButton)
+    protected ActionButton aiButton;
+    protected ActionButton pauseButton;
+
+    // --- START FIX: Structural Change Detection (Corrected Path) ---
+    private String lastCompanySignature = null;
+
+    private void checkStructureChange() {
+        if (gameUIManager == null || gameUIManager.getGameManager() == null)
+            return;
+
+        // 1. Build a "Signature" of the current public companies
+        // FIX: Access CompanyManager via getRoot()
+        String currentSignature = "";
+        try {
+            List<PublicCompany> comps = gameUIManager.getGameManager()
+                    .getRoot() // <--- ADDED THIS
+                    .getCompanyManager()
+                    .getAllPublicCompanies();
+
+            currentSignature = comps.stream()
+                    .filter(c -> !c.isClosed())
+                    .map(c -> c.getId())
+                    .collect(Collectors.joining(","));
+        } catch (Exception e) {
+            // Safety fallback if Root or CompanyManager isn't ready
+            return;
+        }
+
+        // 2. Initialize on first run (Startup)
+        // We assume 'init()' has already set up the grid correctly for the start state.
+        if (lastCompanySignature == null) {
+            lastCompanySignature = currentSignature;
+            return;
+        }
+
+        // 3. Compare and Recreate if needed
+        if (!currentSignature.equals(lastCompanySignature)) {
+            log.info("StatusWindow: Structure change detected ({} -> {}). Recreating Dashboard.",
+                    lastCompanySignature, currentSignature);
+            gameStatus.recreate();
+            lastCompanySignature = currentSignature;
+        } else {
+            // 4. Standard Refresh
+            gameStatus.refreshDashboard();
+        }
+    }
 
     private static final Logger log = LoggerFactory.getLogger(StatusWindow.class);
 
-    public void initMenu() {
-        menuBar = new JMenuBar();
-        fileMenu = new JMenu(LocalText.getText("FILE"));
-        optMenu = new JMenu(LocalText.getText("OPTIONS"));
-        moveMenu = new JMenu(LocalText.getText("MOVE"));
-        moderatorMenu = new JMenu(LocalText.getText("MODERATOR"));
-        specialMenu = new JMenu(LocalText.getText("SPECIAL"));
+    private JMenu infoMenu;
+    private JMenu companiesMenu;
+    private JMenu trainsMenu;
+    private JMenu phasesMenu;
+    private JMenu networkMenu;
 
+    // ... (existing imports and class definition) ...
+
+    // ... (lines of unchanged context code) ...
+
+    // --- START FIX ---
+    public void initMenu() {
+
+        menuBar = new JMenuBar();
+
+        // --- 1. FILE MENU ---
+        fileMenu = new JMenu(LocalText.getText("FILE"));
         fileMenu.setMnemonic(KeyEvent.VK_F);
-        optMenu.setMnemonic(KeyEvent.VK_O);
-        moveMenu.setMnemonic(KeyEvent.VK_V);
-        moderatorMenu.setMnemonic(KeyEvent.VK_M);
-        specialMenu.setMnemonic(KeyEvent.VK_S);
+
+        // Get the cross-platform shortcut key (Cmd on Mac, Ctrl on Windows/Linux)
+        int shortcutMask = Toolkit.getDefaultToolkit().getMenuShortcutKeyMaskEx();
 
         ActionMenuItem actionMenuItem = new ActionMenuItem(NEW_CMD);
         actionMenuItem.setActionCommand(NEW_CMD);
@@ -173,15 +252,13 @@ public class StatusWindow extends JFrame implements ActionListener, KeyListener,
         menuItem.setEnabled(true);
         fileMenu.add(menuItem);
 
-        // export menu item
-        //        exportItem = new ActionMenuItem(LocalText.getText("EXPORT"));
-        //        exportItem.setActionCommand(EXPORT_CMD);
-        //        exportItem.addActionListener(this);
-        //        exportItem.setEnabled(true);
-        //        exportItem.setPossibleAction(new GameAction(GameAction.EXPORT));
-        //        fileMenu.add(exportItem);
-        //        fileMenu.addSeparator();
-
+        // Moved Config to File Menu
+        menuItem = new JCheckBoxMenuItem(LocalText.getText("CONFIG"));
+        menuItem.setName(CONFIG_CMD);
+        menuItem.setActionCommand(CONFIG_CMD);
+        menuItem.setMnemonic(KeyEvent.VK_C);
+        menuItem.addActionListener(this);
+        fileMenu.add(menuItem);
 
         menuItem = new JMenuItem(LocalText.getText("QUIT"));
         menuItem.setActionCommand(QUIT_CMD);
@@ -192,19 +269,14 @@ public class StatusWindow extends JFrame implements ActionListener, KeyListener,
 
         menuBar.add(fileMenu);
 
-        menuItem = new JMenuItem(LocalText.getText("SET_SCALE"));
-        menuItem.setMnemonic(KeyEvent.VK_S);
-        menuItem.addActionListener(this);
-        menuItem.setEnabled(false); // XXX: Setting to disabled until we
-        // implement this
-        optMenu.add(menuItem);
+        // --- 2. VIEW MENU (Formerly Options) ---
+        optMenu = new JMenu(LocalText.getText("VIEW", "View"));
+        optMenu.setMnemonic(KeyEvent.VK_V);
 
-        optMenu.addSeparator();
-
+        // Window Toggles
         menuItem = new JCheckBoxMenuItem(LocalText.getText("MARKET"));
         menuItem.setName(MARKET_CMD);
         menuItem.setActionCommand(MARKET_CMD);
-        menuItem.setMnemonic(KeyEvent.VK_K);
         menuItem.setAccelerator(KeyStroke.getKeyStroke(KeyEvent.VK_K, ActionEvent.CTRL_MASK));
         menuItem.addActionListener(this);
         optMenu.add(menuItem);
@@ -212,7 +284,6 @@ public class StatusWindow extends JFrame implements ActionListener, KeyListener,
         menuItem = new JCheckBoxMenuItem(LocalText.getText("MAP"));
         menuItem.setName(MAP_CMD);
         menuItem.setActionCommand(MAP_CMD);
-        menuItem.setMnemonic(KeyEvent.VK_M);
         menuItem.setAccelerator(KeyStroke.getKeyStroke(KeyEvent.VK_M, ActionEvent.CTRL_MASK));
         menuItem.addActionListener(this);
         optMenu.add(menuItem);
@@ -220,68 +291,177 @@ public class StatusWindow extends JFrame implements ActionListener, KeyListener,
         menuItem = new JCheckBoxMenuItem(LocalText.getText("REPORT"));
         menuItem.setName(REPORT_CMD);
         menuItem.setActionCommand(REPORT_CMD);
-        menuItem.setMnemonic(KeyEvent.VK_R);
         menuItem.addActionListener(this);
         optMenu.add(menuItem);
 
-        menuItem = new JCheckBoxMenuItem(LocalText.getText("CONFIG"));
-        menuItem.setName(CONFIG_CMD);
-        menuItem.setActionCommand(CONFIG_CMD);
-        menuItem.setMnemonic(KeyEvent.VK_C);
+        optMenu.addSeparator();
+
+        // Map Settings
+        menuItem = new JCheckBoxMenuItem(LocalText.getText("HEX_NAMES"));
+        menuItem.setName("ToggleHexNames");
+        menuItem.setActionCommand("TOGGLE_HEX_NAMES");
+        menuItem.addActionListener(this);
+        optMenu.add(menuItem);
+
+        menuItem = new JCheckBoxMenuItem(LocalText.getText("HEX_NUMBERS"));
+        menuItem.setName("ToggleHexNumbers");
+        menuItem.setActionCommand("TOGGLE_HEX_NUMBERS");
+        menuItem.addActionListener(this);
+        optMenu.add(menuItem);
+
+        optMenu.addSeparator();
+
+        // Font Settings
+        menuItem = new JMenuItem(LocalText.getText("IncreaseFont"));
+        menuItem.setActionCommand(FONT_INCREASE_CMD);
+        menuItem.setAccelerator(KeyStroke.getKeyStroke(KeyEvent.VK_EQUALS, shortcutMask));
+        menuItem.addActionListener(this);
+        optMenu.add(menuItem);
+
+        menuItem = new JMenuItem(LocalText.getText("DecreaseFont"));
+        menuItem.setActionCommand(FONT_DECREASE_CMD);
+        menuItem.setAccelerator(KeyStroke.getKeyStroke(KeyEvent.VK_MINUS, shortcutMask));
         menuItem.addActionListener(this);
         optMenu.add(menuItem);
 
         menuBar.add(optMenu);
 
-        undoItem = new ActionMenuItem(LocalText.getText("UNDO"));
+        // --- 3. MAP ZOOM MENU ---
+        JMenu zoomMenu = new JMenu(LocalText.getText("MapZoom", "Map Zoom"));
+        zoomMenu.setMnemonic(KeyEvent.VK_Z);
+
+        // In
+        JMenuItem item = new JMenuItem(LocalText.getText("ZoomIn", "In"));
+        item.setActionCommand(MAP_ZOOM_IN_CMD);
+        item.setAccelerator(KeyStroke.getKeyStroke(KeyEvent.VK_PLUS, ActionEvent.CTRL_MASK));
+        item.addActionListener(this);
+        zoomMenu.add(item);
+
+        // Out
+        item = new JMenuItem(LocalText.getText("ZoomOut", "Out"));
+        item.setActionCommand(MAP_ZOOM_OUT_CMD);
+        item.setAccelerator(KeyStroke.getKeyStroke(KeyEvent.VK_MINUS, ActionEvent.CTRL_MASK));
+        item.addActionListener(this);
+        zoomMenu.add(item);
+
+        zoomMenu.addSeparator();
+
+        // Fit Options
+        item = new JMenuItem(LocalText.getText("FitWindow", "Fit to window"));
+        item.setActionCommand(MAP_FIT_CMD);
+        item.setAccelerator(KeyStroke.getKeyStroke(KeyEvent.VK_0, ActionEvent.CTRL_MASK));
+        item.addActionListener(this);
+        zoomMenu.add(item);
+
+        item = new JMenuItem(LocalText.getText("FitWidth", "Fit to width"));
+        item.setActionCommand("MapFitWidth");
+        item.addActionListener(this);
+        zoomMenu.add(item);
+
+        item = new JMenuItem(LocalText.getText("FitHeight", "Fit to height"));
+        item.setActionCommand("MapFitHeight");
+        item.addActionListener(this);
+        zoomMenu.add(item);
+
+        menuBar.add(zoomMenu);
+
+        // --- 4. CHARTS MENU ---
+        JMenu chartMenu = new JMenu(LocalText.getText("CHARTS", "Charts"));
+
+        // Add the new Player Worth Chart
+        JMenuItem worthChartItem = gameUIManager.getMenuChart();
+        chartMenu.add(worthChartItem);
+
+        // Add the Game End Report
+        JMenuItem gameEndReportItem = gameUIManager.getMenuGameEndReport();
+        chartMenu.add(gameEndReportItem);
+        // Add the Company Payout Chart
+        JMenuItem companyPayoutChartItem = gameUIManager.getMenuCompanyPayoutChart();
+        chartMenu.add(companyPayoutChartItem);
+
+        JMenuItem multiplierChartItem = gameUIManager.getMenuMultiplierChart();
+        chartMenu.add(multiplierChartItem);
+
+
+        
+        menuBar.add(chartMenu);
+
+        // --- 5. ACTIONS MENU (Formerly Move) ---
+        moveMenu = new JMenu(LocalText.getText("ACTIONS", "Actions"));
+// CONSOLIDATED UNDO ITEM (Mapped to potentially " Undo" actions)
+undoItem = new ActionMenuItem(LocalText.getText("UNDO"));
         undoItem.setName(LocalText.getText("UNDO"));
-        undoItem.setActionCommand(UNDO_CMD);
+        undoItem.setActionCommand(UNDO_CMD); 
         undoItem.setMnemonic(KeyEvent.VK_U);
         undoItem.setAccelerator(KeyStroke.getKeyStroke(KeyEvent.VK_Z, ActionEvent.CTRL_MASK));
         undoItem.addActionListener(this);
         undoItem.setEnabled(false);
         moveMenu.add(undoItem);
 
+
         redoItem = new ActionMenuItem(LocalText.getText("REDO"));
         redoItem.setName(LocalText.getText("REDO"));
         redoItem.setActionCommand(REDO_CMD);
         redoItem.setMnemonic(KeyEvent.VK_R);
-        redoItem.setAccelerator(KeyStroke.getKeyStroke(KeyEvent.VK_R, ActionEvent.CTRL_MASK));
+        // Use proper shortcut mask for Redo as well
+        redoItem.setAccelerator(KeyStroke.getKeyStroke(KeyEvent.VK_R, shortcutMask));
         redoItem.addActionListener(this);
         redoItem.setEnabled(false);
         moveMenu.add(redoItem);
 
         menuBar.add(moveMenu);
 
-        forcedUndoItem = new ActionMenuItem(LocalText.getText("FORCED_UNDO"));
-        forcedUndoItem.setName(LocalText.getText("FORCED_UNDO"));
-        forcedUndoItem.setActionCommand(FORCED_UNDO_CMD);
-        forcedUndoItem.setMnemonic(KeyEvent.VK_F);
-        forcedUndoItem.addActionListener(this);
-        forcedUndoItem.setEnabled(false);
-        moderatorMenu.add(forcedUndoItem);
-
-        redoItem2 = new ActionMenuItem(LocalText.getText("REDO"));
-        redoItem2.setName(LocalText.getText("REDO"));
-        redoItem2.setActionCommand(REDO_CMD);
-        redoItem2.setMnemonic(KeyEvent.VK_R);
-        redoItem2.addActionListener(this);
-        redoItem2.setEnabled(false);
-        moderatorMenu.add(redoItem2);
-
-        correctionMenu = new JMenu(LocalText.getText("CorrectionMainMenu"));
-        correctionMenu.setName(LocalText.getText("CorrectionMainMenu"));
-        correctionMenu.setMnemonic(KeyEvent.VK_C);
-        correctionMenu.setEnabled(false);
-        moderatorMenu.add(correctionMenu);
-
-        menuBar.add(moderatorMenu);
-
-        specialMenu.setBackground(Color.YELLOW); // Normally not seen
-        // because menu is not
-        // opaque
+        // --- 6. SPECIAL MENU (Dynamic) ---
+        // CRITICAL FIX: Initialize specialMenu before using it!
+        specialMenu = new JMenu(LocalText.getText("SPECIAL"));
+        specialMenu.setBackground(Color.YELLOW);
         menuBar.add(specialMenu);
 
+        // --- 7. INFO MENU ---
+        JMenu infoMenu = new JMenu(LocalText.getText("INFO", "Info"));
+        infoMenu.setMnemonic(KeyEvent.VK_I);
+
+        // Remaining Tiles
+        JMenuItem remTilesItem = new JMenuItem(LocalText.getText("REMAINING_TILES", "Remaining tiles"));
+        remTilesItem.setActionCommand(net.sf.rails.ui.swing.ORPanel.REM_TILES_CMD);
+        remTilesItem.addActionListener(this);
+        infoMenu.add(remTilesItem);
+
+        // Submenus (Content added in updateInfoMenu)
+        companiesMenu = new JMenu(LocalText.getText("COMPANIES", "Companies"));
+        infoMenu.add(companiesMenu);
+
+        trainsMenu = new JMenu(LocalText.getText("TRAINS", "Trains"));
+        infoMenu.add(trainsMenu);
+
+        phasesMenu = new JMenu(LocalText.getText("PHASES", "Phases"));
+        infoMenu.add(phasesMenu);
+
+        networkMenu = new JMenu(LocalText.getText("NETWORK_INFO", "Network Info"));
+        JMenuItem refreshItem = new JMenuItem(LocalText.getText("RefreshNetwork", "Refresh Network"));
+        refreshItem.setActionCommand(REFRESH_NETWORK_CMD);
+        refreshItem.addActionListener(this);
+        networkMenu.add(refreshItem);
+        infoMenu.add(networkMenu);
+
+        menuBar.add(infoMenu);
+
+        // moderatorMenu = new JMenu(LocalText.getText("MODERATOR"));
+        // moderatorMenu.setMnemonic(KeyEvent.VK_M);
+
+    
+
+               // ---7. CORRECTION MENU ---
+
+correctionMenu = new JMenu(LocalText.getText("CorrectionMainMenu"));
+        correctionMenu.setName(LocalText.getText("CorrectionMainMenu"));
+        correctionMenu.setMnemonic(KeyEvent.VK_C);
+        correctionMenu.setEnabled(true);
+        // menuBar.add(moderatorMenu);
+        menuBar.add(correctionMenu); // Add as a top-level menu item
+
+
+        // --- 9. DEVELOPER (Conditional) ---
         if (Config.isDevelop()) {
             developerMenu = new JMenu("Developer");
             developerMenu.setName("Developer");
@@ -308,7 +488,7 @@ public class StatusWindow extends JFrame implements ActionListener, KeyListener,
             menuItem.addActionListener(this);
             menuItem.setEnabled(true);
             developerMenu.add(menuItem);
-       }
+        }
 
         setJMenuBar(menuBar);
 
@@ -317,103 +497,11 @@ public class StatusWindow extends JFrame implements ActionListener, KeyListener,
         }
     }
 
-    public void init(GameUIManager gameUIManager) {
-        this.gameUIManager = gameUIManager;
-        this.possibleActions = gameUIManager.getGameManager().getPossibleActions();
-
-        String gameStatusClassName = gameUIManager.getClassName(GuiDef.ClassName.GAME_STATUS);
-        try {
-            Class<? extends GameStatus> gameStatusClass =
-                    Class.forName(gameStatusClassName).asSubclass(GameStatus.class);
-            gameStatus = gameStatusClass.newInstance();
-        } catch (Exception e) {
-            log.error("Cannot instantiate class {}", gameStatusClassName, e);
-            System.exit(1);
-        }
-
-        gameStatus.init(this, gameUIManager);
-        // put gameStatus into a JScrollPane
-        JScrollPane gameStatusPane = new JScrollPane(gameStatus);
-
-        buttonPanel = new JPanel();
-
-        passButton = new ActionButton(RailsIcon.PASS);
-        passButton.setMnemonic(KeyEvent.VK_P);
-        buttonPanel.add(passButton);
-        passButton.setActionCommand(DONE_CMD);
-        passButton.addActionListener(this);
-
-        autopassButton = new ActionButton(RailsIcon.AUTOPASS);
-        autopassButton.setMnemonic(KeyEvent.VK_A);
-        buttonPanel.add(autopassButton);
-        autopassButton.setActionCommand(AUTOPASS_CMD);
-        autopassButton.addActionListener(this);
-
-        setSize(800, 300);
-
-        buttonPanel.setBorder(BorderFactory.createEtchedBorder());
-        buttonPanel.setOpaque(false);
-
-        setTitle(LocalText.getText("GAME_STATUS_TITLE"));
-        pane.setLayout(new BorderLayout());
-        initMenu();
-        pane.add(gameStatusPane, BorderLayout.CENTER);
-        pane.add(buttonPanel, BorderLayout.SOUTH);
-        pane.setOpaque(true);
-        setContentPane(pane);
-        gameUIManager.setMeVisible(this, true);
-        setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
-
-        gameStatus.addKeyListener(this);
-        buttonPanel.addKeyListener(this);
-        addKeyListener(this);
-
-        setDefaultCloseOperation(WindowConstants.DO_NOTHING_ON_CLOSE);
-        final JFrame frame = this;
-        final GameUIManager guiMgr = gameUIManager;
-        addWindowListener(new WindowAdapter() {
-            @Override
-            public void windowClosing(WindowEvent e) {
-                if (GameUIManager.confirmQuit(frame)) {
-                    frame.dispose();
-                    guiMgr.terminate();
-                }
-            }
-        });
-        addComponentListener(new ComponentAdapter() {
-            @Override
-            public void componentMoved(ComponentEvent e) {
-                guiMgr.getWindowSettings().set(frame);
-            }
-
-            @Override
-            public void componentResized(ComponentEvent e) {
-                guiMgr.getWindowSettings().set(frame);
-            }
-        });
-
-        if (Desktop.isDesktopSupported() && Desktop.getDesktop().isSupported(Desktop.Action.APP_QUIT_HANDLER)) {
-            Desktop.getDesktop().setQuitHandler((quitEvent, quitResponse) -> {
-                if (GameUIManager.confirmQuit(frame)) {
-                    frame.dispose();
-                    guiMgr.terminate();
-                    quitResponse.performQuit();
-                } else {
-                    quitResponse.cancelQuit();
-                }
-            });
-        }
-
-        gameUIManager.packAndApplySizing(this);
-    }
-
     public void initGameActions() {
         // Check the local Undo/Redo menu items,
         // which must always be up-to-date.
         undoItem.setEnabled(false);
-        forcedUndoItem.setEnabled(false);
         redoItem.setEnabled(false);
-        redoItem2.setEnabled(false);
         // SAVE, RELOAD, AUTOSAVELOAD are always enabled
     }
 
@@ -423,18 +511,14 @@ public class StatusWindow extends JFrame implements ActionListener, KeyListener,
             for (GameAction na : gameActions) {
                 switch (na.getMode()) {
                     case UNDO:
+                    case FORCED_UNDO:
                         undoItem.setEnabled(true);
                         undoItem.setPossibleAction(na);
                         break;
-                    case FORCED_UNDO:
-                        forcedUndoItem.setEnabled(true);
-                        forcedUndoItem.setPossibleAction(na);
-                        break;
+
                     case REDO:
                         redoItem.setEnabled(true);
                         redoItem.setPossibleAction(na);
-                        redoItem2.setEnabled(true);
-                        redoItem2.setPossibleAction(na);
                         break;
                     default:
                         break;
@@ -443,30 +527,57 @@ public class StatusWindow extends JFrame implements ActionListener, KeyListener,
         }
     }
 
+
+    // --- PINPOINT CHANGE: Replace the existing setCorrectionMenu method ---
     public void setCorrectionMenu() {
-        // Update the correction  menu
+        // Reset the menu
         correctionMenu.removeAll();
-        correctionMenu.setEnabled(false);
+        correctionMenu.setEnabled(true);
 
-        // currently only shows CorrectionModeActions
-        List<CorrectionModeAction> corrections = possibleActions.getType(CorrectionModeAction.class);
+        // 1. Get currently active correction modes from the engine
+        List<CorrectionModeAction> activeModes = possibleActions.getType(CorrectionModeAction.class);
 
-        if (corrections != null && !corrections.isEmpty()) {
-            for (CorrectionModeAction a : corrections) {
-                ActionCheckBoxMenuItem item = new ActionCheckBoxMenuItem(
-                        LocalText.getText(a.getCorrectionName()));
-                item.addActionListener(this);
-                item.addPossibleAction(a);
-                item.setEnabled(true);
-                item.setSelected(a.isActive());
-                correctionMenu.add(item);
+        // 2. Iterate over ALL defined CorrectionTypes to build the menu dynamically
+        for (CorrectionType type : CorrectionType.values()) {
+            
+            boolean isActive = false;
+            // Check if this specific type is currently active in the engine
+            if (activeModes != null) {
+                for (CorrectionModeAction a : activeModes) {
+                    if (a.getCorrectionType() == type && a.isActive()) {
+                        isActive = true;
+                        break;
+                    }
+                }
             }
-            correctionMenu.setEnabled(true);
+
+            // Create a new action to toggle this mode (click flips the boolean)
+            CorrectionModeAction toggleAction = new CorrectionModeAction(
+                    gameUIManager.getRoot(), 
+                    type, 
+                    isActive 
+            );
+
+            ActionCheckBoxMenuItem item = new ActionCheckBoxMenuItem(LocalText.getText(type.name()));
+            item.addActionListener(this);
+            item.addPossibleAction(toggleAction); 
+            item.setSelected(isActive);
+            item.setEnabled(true);
+            
+            correctionMenu.add(item);
         }
     }
 
+
+
     public boolean setupFor(RoundFacade round) {
         currentRound = round;
+        // We must call refreshDashboard/recreate here to ensure the UI
+        // reflects the new list of companies (M2, M4, etc. closed) BEFORE
+        // initCashCorrectionActions runs its button-clearing loop.
+        if (gameStatus != null) {
+            gameStatus.refreshDashboard();
+        }
 
         if (round instanceof StartRound) {
             disableCheckBoxMenuItem(MAP_CMD);
@@ -479,155 +590,18 @@ public class StatusWindow extends JFrame implements ActionListener, KeyListener,
             disableCheckBoxMenuItem(MARKET_CMD);
         }
 
-        // correction actions always possible
-        return gameStatus.initCashCorrectionActions();
+        // Initialize BOTH Cash and Train actions
+        // Note: These methods are defined in GameStatus.java, we just call them here.
+        boolean c = gameStatus.initCashCorrectionActions();
+        boolean t = gameStatus.initTrainCorrectionActions();
+        // Include Stock Correction Mode in the override check
+
+        // Return true if EITHER mode is active.
+        // This tells the UI manager to keep the Status Window visible.
+        return c || t;
     }
 
-    @Override
-    public void updateStatus(boolean myTurn) {
-        passButton.setEnabled(false);
-        autopassButton.setEnabled(false);
-
-        if (!(currentRound instanceof StockRound || currentRound instanceof EndOfGameRound)) {
-            log.debug("early return: {}", currentRound);
-            return;
-        }
-
-        if (!myTurn) {
-            gameStatus.initTurn(getCurrentPlayer().getIndex(), false);
-            return;
-        }
-
-        // Moved here from StatusWindow_1856. It's getting generic...
-        if (possibleActions.contains(DiscardTrain.class)) {
-            immediateAction = possibleActions.getType(DiscardTrain.class).get(0);
-            return;
-        }
-
-        // Set window title
-        // We cannot cope here with all lower Round subclasses,
-        // so give these a chance to provide a title.
-        String title = currentRound.getOwnWindowTitle();
-        if (Util.hasValue(title)) {
-            setTitle(title);
-        } else if (currentRound instanceof TreasuryShareRound) {
-            setTitle(LocalText.getText(
-                    "TRADE_TREASURY_SHARES_TITLE",
-                    ((TreasuryShareRound) currentRound).getOperatingCompany().getId(),
-                    String.valueOf(gameUIManager.getGameManager().getORId())));
-            gameStatus.initTurn(-1, true);
-
-        } else if ((currentRound instanceof ShareSellingRound)) {
-            setTitle(LocalText.getText(
-                    "EMERGENCY_SHARE_SELLING_TITLE",
-                    (((ShareSellingRound) currentRound).getCompanyNeedingCash().getId())));
-            gameStatus.initTurn(getCurrentPlayer().getIndex(), true);
-            gameStatus.setPriorityPlayer(gameUIManager.getPriorityPlayer().getIndex());
-
-            int cash =
-                    ((ShareSellingRound) currentRound).getRemainingCashToRaise();
-            JOptionPane.showMessageDialog(this, LocalText.getText(
-                    "YouMustRaiseCash", getCurrentPlayer(),
-                    gameUIManager.format(cash)), "",
-                    JOptionPane.OK_OPTION);
-        } else if (currentRound instanceof StockRound && !updateGameSpecificSettings()) {
-
-            setTitle(LocalText.getText(
-                    "STOCK_ROUND_TITLE",
-                    String.valueOf(((StockRound) currentRound).getStockRoundNumber())));
-            gameStatus.initTurn(getCurrentPlayer().getIndex(), true);
-            gameStatus.setPriorityPlayer(gameUIManager.getPriorityPlayer().getIndex());
-        }
-
-        // New special action handling
-        List<ActionMenuItem> specialActionItems = new ArrayList<ActionMenuItem>();
-
-        // Special properties
-        List<UseSpecialProperty> sps =
-                possibleActions.getType(UseSpecialProperty.class);
-        for (ActionMenuItem item : specialActionItems) {
-            item.removeActionListener(this);
-        }
-        specialMenu.removeAll();
-        specialActionItems.clear();
-        for (UseSpecialProperty sp : sps) {
-            ActionMenuItem item = new ActionMenuItem(sp.toMenu());
-            item.addActionListener(this);
-            item.setEnabled(false);
-            item.addPossibleAction(sp);
-            item.setEnabled(true);
-            specialActionItems.add(item);
-            specialMenu.add(item);
-        }
-
-        // Request turn
-        if (possibleActions.contains(RequestTurn.class)) {
-            for (RequestTurn action : possibleActions.getType(RequestTurn.class)) {
-                ActionMenuItem item = new ActionMenuItem(action.toMenu());
-                item.addActionListener(this);
-                item.setEnabled(false);
-                item.addPossibleAction(action);
-                item.setEnabled(true);
-                specialActionItems.add(item);
-                specialMenu.add(item);
-            }
-        }
-
-        // Adjust price manually
-        if (possibleActions.contains(AdjustSharePrice.class)) {
-            for (AdjustSharePrice action : possibleActions.getType(AdjustSharePrice.class)) {
-                ActionMenuItem item = new ActionMenuItem(action.toMenu());
-                item.addActionListener(this);
-                item.setEnabled(false);
-                item.addPossibleAction(action);
-                item.setEnabled(true);
-                specialActionItems.add(item);
-                specialMenu.add(item);
-            }
-        }
-
-        // Must Special menu be enabled?
-        boolean enabled = specialActionItems.size() > 0;
-        specialMenu.setOpaque(enabled);
-        specialMenu.setEnabled(enabled);
-        specialMenu.repaint();
-
-        List<NullAction> inactiveItems = possibleActions.getType(NullAction.class);
-        if (inactiveItems != null) {
-            for (NullAction na : inactiveItems) {
-                switch (na.getMode()) {
-                    case PASS:
-                        passButton.setRailsIcon(RailsIcon.PASS);
-                        passButton.setEnabled(true);
-                        passButton.setActionCommand(PASS_CMD);
-                        passButton.setMnemonic(KeyEvent.VK_P);
-                        passButton.setPossibleAction(na);
-                        break;
-                    case DONE:
-                        passButton.setRailsIcon(RailsIcon.DONE);
-                        passButton.setEnabled(true);
-                        passButton.setActionCommand(DONE_CMD);
-                        passButton.setMnemonic(KeyEvent.VK_D);
-                        passButton.setPossibleAction(na);
-                        break;
-                    case AUTOPASS:
-                        autopassButton.setEnabled(true);
-                        autopassButton.setPossibleAction(na);
-                        break;
-                    default:
-                        break;
-                }
-            }
-        }
-
-        if (currentRound instanceof EndOfGameRound) endOfGame();
-
-        pack();
-
-        toFront();
-    }
-
-    public void disableButtons () {
+    public void disableButtons() {
         passButton.setEnabled(false);
         autopassButton.setEnabled(false);
     }
@@ -673,7 +647,19 @@ public class StatusWindow extends JFrame implements ActionListener, KeyListener,
             executedAction = actions.get(0);
         }
 
-        if (command.equals(BUY_CMD)) {
+        // ++ ADD PAUSE BUTTON HANDLING ++
+        if (command.equals(TOGGLE_PAUSE_CMD)) {
+            if (gameUIManager.isTimerPaused()) {
+                gameUIManager.resumeTimer();
+                pauseButton.setText("Pause"); // Replaced LocalText.getText()
+                pauseButton.setRailsIcon(RailsIcon.PAUSE);
+            } else {
+                gameUIManager.pauseTimer();
+                pauseButton.setText("Resume"); // Replaced LocalText.getText()
+                pauseButton.setRailsIcon(RailsIcon.RESUME);
+            }
+
+        } else if (command.equals(BUY_CMD)) {
             process(executedAction);
         } else if (command.equals(SELL_CMD)) {
             process(executedAction);
@@ -691,13 +677,13 @@ public class StatusWindow extends JFrame implements ActionListener, KeyListener,
             // Not sure where this should be handled.
             // Will proably also be accessible from OR instances,
             // so let GameUIManager handle it.
-            gameUIManager.adjustSharePrice((AdjustSharePrice)executedAction);
+            gameUIManager.adjustSharePrice((AdjustSharePrice) executedAction);
 
         } else if (command.equals(QUIT_CMD)) {
             gameUIManager.terminate();
-        } else if ( command.equals(NEW_CMD) ) {
+        } else if (command.equals(NEW_CMD)) {
             // TODO
-        } else if ( command.equals(LOAD_CMD) ) {
+        } else if (command.equals(LOAD_CMD)) {
             // TODO: does this really belong here?
             String saveDirectory = Config.get("save.directory");
             JFileChooser jfc = new JFileChooser();
@@ -719,7 +705,7 @@ public class StatusWindow extends JFrame implements ActionListener, KeyListener,
                 // close the existing game
 
                 final File selectedFile = jfc.getSelectedFile();
-                //start in new thread so that swing thread is not used for game setup
+                // start in new thread so that swing thread is not used for game setup
                 new Thread(() -> {
                     // close the existing game (which ironically will include us
                     gameUIManager.closeGame();
@@ -728,42 +714,107 @@ public class StatusWindow extends JFrame implements ActionListener, KeyListener,
                 }).start();
             }
         } else if (command.equals(REPORT_CMD)) {
-            gameUIManager.reportWindow.setVisible(((JMenuItem) actor.getSource()).isSelected());
-            gameUIManager.reportWindow.scrollDown();
+            // Logic: If Checkbox, toggle. If Button (Info Menu), force Show.
+            boolean show = true;
+            if (actor.getSource() instanceof JCheckBoxMenuItem) {
+                show = ((JCheckBoxMenuItem) actor.getSource()).isSelected();
+            }
+            gameUIManager.reportWindow.setVisible(show);
+            if (show)
+                gameUIManager.reportWindow.scrollDown();
+
         } else if (command.equals(MARKET_CMD)) {
-            gameUIManager.stockChartWindow.setVisible(((JMenuItem) actor.getSource()).isSelected());
+            boolean show = true;
+            if (actor.getSource() instanceof JCheckBoxMenuItem) {
+                show = ((JCheckBoxMenuItem) actor.getSource()).isSelected();
+            }
+            gameUIManager.stockChartWindow.setVisible(show);
+
         } else if (command.equals(MAP_CMD)) {
-            gameUIManager.orWindow.setVisible(((JMenuItem) actor.getSource()).isSelected());
+            boolean show = true;
+            if (actor.getSource() instanceof JCheckBoxMenuItem) {
+                show = ((JCheckBoxMenuItem) actor.getSource()).isSelected();
+            }
+            gameUIManager.orWindow.setVisible(show);
+
         } else if (command.equals(CONFIG_CMD)) {
-            gameUIManager.configWindow.setVisible(((JMenuItem) actor.getSource()).isSelected());
+            boolean show = true;
+            if (actor.getSource() instanceof JCheckBoxMenuItem) {
+                show = ((JCheckBoxMenuItem) actor.getSource()).isSelected();
+            }
+            gameUIManager.configWindow.setVisible(show);
+
         } else if (command.equals(AUTOSAVELOAD_CMD)) {
             gameUIManager.autoSaveLoadGame();
         } else if (command.equals(SAVESTATUS_CMD)) {
             gameUIManager.saveGameStatus();
-        } else if ( command.equals("Save Logs")) {
+        } else if (command.equals("Save Logs")) {
             gameUIManager.saveLogs();
         } else if (command.equals(SAVEREPORT_CMD)) {
             gameUIManager.saveReportFile();
-        } else if (executedAction == null) {
-            
+        } else if (command.equals(AI_MOVE_CMD)) {
+
+            // ++ ADD CASE FOR NEW OR BUTTON ++
+            // log.info("AI_MOVE_CMD detected by StatusWindow. Delegating to
+            // GameUIManager.");
+            enableAIButton(false); // Disable button immediately
+            gameUIManager.performAIMove(); // Call the central AI handler
+      
+        } else if (command.equals(FONT_INCREASE_CMD)) { // <-- Reroutes to adjustGlobalFontScale
+            gameUIManager.adjustGlobalFontScale(0.1);
+        } else if (command.equals(FONT_DECREASE_CMD)) { // <-- Reroutes to adjustGlobalFontScale
+            gameUIManager.adjustGlobalFontScale(-0.1);
+        } else if (command.equals(MAP_ZOOM_IN_CMD)) {
+            gameUIManager.zoomMap(true); // Call zoom in
+        } else if (command.equals(MAP_ZOOM_OUT_CMD)) {
+            gameUIManager.zoomMap(false); // Call zoom out
+        } else if (command.equals(MAP_FIT_CMD)) {
+            gameUIManager.fitMapToWindow(); // Call fit
+        } else if (command.equals("MapFitWidth")) {
+            gameUIManager.fitMapToWidth(); // Need to add this
+
+        } else if (command.equals("MapFitHeight")) {
+            gameUIManager.fitMapToHeight(); // Need to add this
+
+        } else if (command.equals(FONT_INCREASE_CMD)) {
+            gameUIManager.adjustGlobalFontScale(0.1);
+        } else if (command.equals(FONT_DECREASE_CMD)) {
+            gameUIManager.adjustGlobalFontScale(-0.1);
+
+        } else if (command.equals(REM_TILES_CMD) || command.equals(ORPanel.REM_TILES_CMD)) {
+
+            // ARCHITECTURAL FIX: Route through ORUIManager
+            if (gameUIManager.getORUIManager() != null) {
+                // Pass the correct command string "RemainingTiles" defined in ORPanel
+                gameUIManager.getORUIManager().processAction(ORPanel.REM_TILES_CMD, null, this);
+            } else {
+                log.info("StatusWindow: ORUIManager is null (not in OR?). Cannot open Tiles window.");
+            }
+            return;
+        }
+
+        else if (executedAction == null) {
+
         } else if (executedAction instanceof GameAction) {
             switch (((GameAction) executedAction).getMode()) {
-            case SAVE:
-                gameUIManager.saveGame((GameAction) executedAction);
-                break;
-            case RELOAD:
-                gameUIManager.reloadGame((GameAction) executedAction);
-                break;
-            case EXPORT:
-                gameUIManager.exportGame((GameAction) executedAction);
-                break;
-            default:
-                process(executedAction);
-                break;
+                case SAVE:
+                    gameUIManager.saveGame((GameAction) executedAction);
+                    break;
+                case RELOAD:
+                    gameUIManager.reloadGame((GameAction) executedAction);
+                    break;
+                case EXPORT:
+                    gameUIManager.exportGame((GameAction) executedAction);
+                    break;
+                default:
+                    process(executedAction);
+                    break;
             }
-        } else {
+        }
+
+        else {
             // Unknown action, let UIManager catch it
-            process (executedAction);
+            process(executedAction);
         }
     }
 
@@ -779,13 +830,22 @@ public class StatusWindow extends JFrame implements ActionListener, KeyListener,
 
     @Override
     public boolean processImmediateAction() {
-        if (immediateAction instanceof DiscardTrain) {
-            // Make a local copy and discard the original,
-            // so that it's not going to loop.
-            DiscardTrain nextAction = (DiscardTrain) immediateAction;
-            immediateAction = null;
-            gameUIManager.discardTrains (nextAction);
-        }
+        // [BUG FIX #172 / #204 START]
+        // This 'if' block was intercepting the generic DiscardTrain action
+        // and triggering the old modal dialog via gameUIManager.discardTrains().
+        // By removing it, the DiscardTrain actions are now allowed to pass
+        // through to the normal PossibleActions list, where they will be
+        // handled by ORUIManager and rendered as dynamic buttons in ORPanel.
+        /*
+         * if (immediateAction instanceof DiscardTrain) {
+         * // Make a local copy and discard the original,
+         * // so that it's not going to loop.
+         * DiscardTrain nextAction = (DiscardTrain) immediateAction;
+         * immediateAction = null;
+         * gameUIManager.discardTrains(nextAction);
+         * }
+         */
+        // [BUG FIX #172 / #204 END]
         return true;
     }
 
@@ -827,11 +887,11 @@ public class StatusWindow extends JFrame implements ActionListener, KeyListener,
     }
 
     public void finishRound() {
-        setTitle(LocalText.getText("GAME_STATUS_TITLE"));
-        //Fixes the behaviour that closed Minors didnt
-        //vanish from the display after the end of a forced
-        //Formationround in 1835
-        //Martin 19.7.2017
+        setTitle(LocalText.getText("GAME_STATUS_TITLE") + " - " + buildTimestamp);
+        // Fixes the behaviour that closed Minors didnt
+        // vanish from the display after the end of a forced
+        // Formationround in 1835
+        // Martin 19.7.2017
         // Erik 10.10.2020: However, this somehow completely blanks the
         // StatusWindow in SOH, each time treasury share selling in the first
         // OR step completes. I haven't been able to find the cause.
@@ -842,15 +902,12 @@ public class StatusWindow extends JFrame implements ActionListener, KeyListener,
         passButton.setEnabled(false);
     }
 
-    /**
-     * End of Game processing
-     */
     public void endOfGame() {
-        //        setVisible(true);
-        //        gameUIManager.reportWindow.setVisible(true);
-        //        gameUIManager.stockChart.setVisible(true);
+        // setVisible(true);
+        // gameUIManager.reportWindow.setVisible(true);
+        // gameUIManager.stockChart.setVisible(true);
 
-        setTitle(LocalText.getText("EoGTitle"));
+        setTitle(LocalText.getText("EoGTitle") + " - " + buildTimestamp);
 
         // Enable Passbutton
         passButton.setEnabled(true);
@@ -859,54 +916,820 @@ public class StatusWindow extends JFrame implements ActionListener, KeyListener,
         gameUIManager.orWindow.finish();
     }
 
-    public Player getCurrentPlayer () {
+    public Player getCurrentPlayer() {
         return gameUIManager.getCurrentPlayer();
     }
 
-    public void endOfGameReport() {
+    public void updatePlayerOrder(List<String> newPlayerNames) {
+        gameStatus.updatePlayerOrder(newPlayerNames);
+    }
 
-        GameManager gm = gameUIManager.getGameManager();
+    /**
+     * Enables or disables the AI OR Move button based on game state.
+     * 
+     * @param enable Generally true if the button should be considered, false
+     *               otherwise.
+     */
+    public void enableAIButton(boolean enable) {
+        if (aiButton != null) {
+            aiButton.setEnabled(true);
+        }
+    }
 
-        if (gm.getGameOverReportedUI())
+    private void setupHotkeys() {
+        // Define a name for our action
+        String CONFIRM_ACTION_KEY = "confirmAction";
+
+        // Create the Action (Necessary for 'Enter' key mapping, though only used for
+        // PASS/DONE)
+        AbstractAction confirmAction = new AbstractAction() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                // Check for the "Pass" or "Done" button (passButton)
+                if (passButton != null && passButton.isEnabled()) {
+                    passButton.doClick(); // Clicks the visible button (PASS or DONE)
+                    return;
+                }
+            }
+        };
+
+        // Get the InputMap for the root pane when it's in a focused window
+        InputMap inputMap = this.getRootPane().getInputMap(JComponent.WHEN_IN_FOCUSED_WINDOW);
+
+        // Get the ActionMap for the root pane
+        ActionMap actionMap = this.getRootPane().getActionMap();
+        int MASK = Toolkit.getDefaultToolkit().getMenuShortcutKeyMaskEx();
+
+        // --- 1. System Hotkeys (Required for basic functionality/Moderator) ---
+
+        // RETURN (Enter): Retained only for the Stock Round Pass/Done button logic
+        inputMap.put(KeyStroke.getKeyStroke(KeyEvent.VK_ENTER, 0), CONFIRM_ACTION_KEY);
+        actionMap.put(CONFIRM_ACTION_KEY, confirmAction);
+
+        // RETURN (Enter) and 'P': Map to the Pass/Done button
+        inputMap.put(KeyStroke.getKeyStroke(KeyEvent.VK_ENTER, 0), CONFIRM_ACTION_KEY);
+        inputMap.put(KeyStroke.getKeyStroke(KeyEvent.VK_P, 0), CONFIRM_ACTION_KEY);
+        actionMap.put(CONFIRM_ACTION_KEY, confirmAction);
+
+        // --- 4. Font Scaling Hotkeys (+ / -) ---
+        String FONT_INC = "fontIncrease";
+        String FONT_DEC = "fontDecrease";
+
+        // Increase: Equals (=), Shift+Equals (+), and Numpad Add (+)
+        inputMap.put(KeyStroke.getKeyStroke(KeyEvent.VK_EQUALS, 0), FONT_INC);
+        inputMap.put(KeyStroke.getKeyStroke(KeyEvent.VK_ADD, 0), FONT_INC);
+
+        actionMap.put(FONT_INC, new AbstractAction() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                if (gameUIManager != null)
+                    gameUIManager.adjustGlobalFontScale(0.1);
+            }
+        });
+
+        // Decrease: Minus (-) and Numpad Subtract (-)
+        inputMap.put(KeyStroke.getKeyStroke(KeyEvent.VK_MINUS, 0), FONT_DEC);
+        inputMap.put(KeyStroke.getKeyStroke(KeyEvent.VK_SUBTRACT, 0), FONT_DEC);
+
+        actionMap.put(FONT_DEC, new AbstractAction() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                if (gameUIManager != null)
+                    gameUIManager.adjustGlobalFontScale(-0.1);
+            }
+        });
+
+        
+    }
+
+    public void init(GameUIManager gameUIManager) {
+        this.gameUIManager = gameUIManager;
+        this.possibleActions = gameUIManager.getGameManager().getPossibleActions();
+
+        String gameStatusClassName = gameUIManager.getClassName(GuiDef.ClassName.GAME_STATUS);
+        try {
+            Class<? extends GameStatus> gameStatusClass = Class.forName(gameStatusClassName)
+                    .asSubclass(GameStatus.class);
+            gameStatus = gameStatusClass.newInstance();
+        } catch (Exception e) {
+            log.error("Cannot instantiate class {}", gameStatusClassName, e);
+            System.exit(1);
+        }
+
+        gameStatus.init(this, gameUIManager);
+        gameStatusPane = new JScrollPane(gameStatus); // <--- ASSIGN TO FIELD
+
+        // --- BUTTONS (SOUTH) ---
+        buttonPanel = new JPanel();
+
+
+        aiButton = new ActionButton(RailsIcon.AI_MOVE);
+        aiButton.setActionCommand(AI_MOVE_CMD);
+        aiButton.setToolTipText("Let AI make the next Operating Round move");
+        aiButton.addActionListener(this);
+        aiButton.setEnabled(true);
+        aiButton.setVisible(true);
+
+        passButton = new ActionButton(RailsIcon.PASS);
+        passButton.setMnemonic(KeyEvent.VK_P);
+        passButton.setActionCommand(DONE_CMD);
+        passButton.addActionListener(this);
+
+        autopassButton = new ActionButton(RailsIcon.AUTOPASS);
+        autopassButton.setMnemonic(KeyEvent.VK_A);
+        autopassButton.setActionCommand(AUTOPASS_CMD);
+        autopassButton.addActionListener(this);
+
+        pauseButton = new ActionButton(RailsIcon.PAUSE);
+        pauseButton.setText("Pause");
+        pauseButton.setToolTipText("Pause/Resume the player timer");
+        pauseButton.setActionCommand(TOGGLE_PAUSE_CMD);
+        pauseButton.addActionListener(this);
+        pauseButton.setEnabled(true);
+        pauseButton.setVisible(true);
+
+        // Add buttons to panel
+        buttonPanel.add(pauseButton);
+        buttonPanel.add(aiButton);
+        buttonPanel.add(passButton);
+
+        setSize(800, 300);
+        buttonPanel.setBorder(BorderFactory.createEtchedBorder());
+        buttonPanel.setOpaque(false);
+
+        String loadedBuildTime = "Dev Build";
+        try (InputStream input = StatusWindow.class.getClassLoader().getResourceAsStream("version.properties")) {
+            if (input != null) {
+                Properties prop = new Properties();
+                prop.load(input);
+                loadedBuildTime = prop.getProperty("buildTimestamp", loadedBuildTime);
+            }
+        } catch (Exception ex) {
+        }
+
+        this.buildTimestamp = loadedBuildTime;
+        setTitle(LocalText.getText("GAME_STATUS_TITLE") + " - " + buildTimestamp);
+
+        pane.setLayout(new BorderLayout());
+        initMenu();
+
+        // --- ACTIVITY PANEL (TOP) ---
+        JPanel activityPanel = new JPanel(new BorderLayout());
+        activityPanel.setBorder(BorderFactory.createCompoundBorder(
+                BorderFactory.createEtchedBorder(),
+                BorderFactory.createEmptyBorder(5, 5, 5, 5)));
+        activityPanel.setOpaque(true);
+        activityPanel.setBackground(Color.WHITE);
+
+        activityFont = new Font("Arial", Font.PLAIN, 16);
+        currentActorLabel = new JLabel(" Thinking: ...");
+        currentActorLabel.setFont(activityFont.deriveFont(Font.BOLD, 18f));
+        currentActorLabel.setOpaque(true);
+        currentActorLabel.setBackground(Color.WHITE);
+        currentActorLabel.setForeground(Color.BLACK);
+        currentActorLabel.setPreferredSize(new Dimension(800, 100));
+        activityPanel.add(currentActorLabel, BorderLayout.CENTER);
+
+        // 1. Initialize Game Time Label (Points 1, 3, 4)
+        gameTimeLabel = new JLabel("00:00:00");
+        // Point 4: Font must be at least twice the size (Standard is ~11-12, so 24+)
+        gameTimeLabel.setFont(new Font("SansSerif", Font.BOLD, 24));
+        gameTimeLabel.setForeground(Color.BLACK);
+        gameTimeLabel.setHorizontalAlignment(SwingConstants.RIGHT);
+        gameTimeLabel.setBorder(BorderFactory.createEmptyBorder(0, 10, 0, 10)); // Padding
+        
+        // Point 1: Add to EAST of the same panel to keep on same line
+        activityPanel.add(gameTimeLabel, BorderLayout.EAST);
+
+        // 2. Setup UI Timer
+        if (uiRefreshTimer != null && uiRefreshTimer.isRunning()) {
+            uiRefreshTimer.stop();
+        }
+        uiRefreshTimer = new javax.swing.Timer(1000, new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                refreshTimeLabel();
+            }
+        });
+        uiRefreshTimer.start();
+
+
+        pane.add(activityPanel, BorderLayout.NORTH); // Text on Top
+        pane.add(gameStatusPane, BorderLayout.CENTER); // Table in Center
+
+        // Bottom Container
+        JPanel southContainer = new JPanel(new BorderLayout(10, 0));
+        southContainer.setBorder(BorderFactory.createEtchedBorder());
+        southContainer.add(buttonPanel, BorderLayout.WEST);
+
+        dynamicButtonPanel = new JPanel();
+        dynamicButtonPanel.setLayout(new FlowLayout(FlowLayout.LEFT));
+        dynamicButtonPanel.setOpaque(false);
+        southContainer.add(dynamicButtonPanel, BorderLayout.CENTER);
+
+        pane.add(southContainer, BorderLayout.SOUTH); // Buttons on Bottom
+
+        pane.setOpaque(true);
+        setContentPane(pane);
+        gameUIManager.setMeVisible(this, true);
+        setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+        setupHotkeys();
+
+        // --- FIX: ENFORCE MINIMUM SIZE ---
+        this.setMinimumSize(new Dimension(800, 400));
+        // --------------------------------
+
+        final JFrame frame = this;
+        final GameUIManager guiMgr = gameUIManager;
+        addWindowListener(new WindowAdapter() {
+            @Override
+            public void windowClosing(WindowEvent e) {
+                if (GameUIManager.confirmQuit(frame)) {
+                    frame.dispose();
+                    guiMgr.terminate();
+                }
+            }
+        });
+        addComponentListener(new ComponentAdapter() {
+            @Override
+            public void componentMoved(ComponentEvent e) {
+                guiMgr.getWindowSettings().set(frame);
+            }
+
+            @Override
+            public void componentResized(ComponentEvent e) {
+                guiMgr.getWindowSettings().set(frame);
+            }
+        });
+
+        gameUIManager.packAndApplySizing(this);
+    }
+
+    /**
+     * Provides GameStatus access to the panel that holds dynamic SR/IR buttons.
+     * 
+     * @return The dynamic button panel.
+     */
+    public JPanel getDynamicButtonPanel() {
+        return dynamicButtonPanel;
+    }
+
+    private void refreshTimeLabel() {
+        if (gameUIManager == null || gameUIManager.getGameManager() == null) return;
+        
+        String timeText = "00:00:00";
+        String colorHex = "#000000"; // Black
+
+        if (gameUIManager.isTimerPaused()) {
+            timeText = "PAUSED";
+            colorHex = "#FF0000"; // Red
+        } else {
+            Player p = gameUIManager.getCurrentPlayer();
+            if (p != null) {
+                int val = p.getTimeBankModel().value();
+                int absVal = Math.abs(val);
+                timeText = String.format("%s: %s%02d:%02d", 
+                        p.getName(),
+                        (val < 0 ? "-" : ""), 
+                        absVal / 60, 
+                        absVal % 60);
+                
+                if (val < 0) colorHex = "#FF0000"; // Red
+            } else {
+                net.sf.rails.game.GameManager gm = gameUIManager.getGameManager();
+                gm.incrementTotalGameTime();
+                timeText = gm.getFormattedGameTime();
+            }
+        }
+
+        // Render: Large Time on top, Small Metadata on bottom
+        // Font size 6 is roughly 24pt (Large), size 3 is ~12pt (Small)
+        String html = String.format("<html><div align='right'>" +
+                "<font size='6' color='%s'><b>%s</b></font><br>" +
+                "<font size='4' color='gray'>%s</font>" +
+                "</div></html>", 
+                colorHex, timeText, currentMetadata);
+
+        if (gameTimeLabel != null) {
+            gameTimeLabel.setText(html);
+            gameTimeLabel.repaint();
+        }
+    }
+
+    private String currentMetadata = ""; 
+
+    public void updateMetadata(String meta) {
+        this.currentMetadata = meta;
+        // Force an immediate update so it doesn't lag by 1 second
+        refreshTimeLabel(); 
+    }
+
+    @Override
+    public void updateStatus(boolean myTurn) {
+
+        // 1. Fetch the latest list of possible actions (Undo, Redo, etc.)
+        if (gameUIManager.getGameManager() != null) {
+            this.possibleActions = gameUIManager.getGameManager().getPossibleActions();
+        }
+
+        // Register the Global Hotkey Manager
+        KeyboardFocusManager.getCurrentKeyboardFocusManager().addKeyEventDispatcher(new GlobalHotkeyManager(gameUIManager));
+        
+        // 2. Reset the menu items to disabled
+        initGameActions();
+
+        // 3. Enable them if the new actions list contains Undo/Redo
+        setGameActions();
+
+        // 4. Rebuild Correction Menu
+        setCorrectionMenu();
+        setSpecialMenu(); // Restore the Special Menu population logic
+        updateInfoMenu(); // Rebuild the lists
+
+        passButton.setEnabled(false);
+        autopassButton.setEnabled(false);
+
+        // Crash-Proof Dashboard Sync ---
+        try {
+            // 1. Normal Update
+            if (gameStatus != null) {
+                gameStatus.refreshDashboard(); // This calls recreate() internally if structure changed
+            }
+            // Always push the Priority Deal state to the UI, regardless of Round Type.
+            if (gameUIManager.getPriorityPlayer() != null) {
+                gameStatus.setPriorityPlayer(gameUIManager.getPriorityPlayer().getIndex());
+            } else {
+                gameStatus.setPriorityPlayer(-1);
+            }
+
+            // 2. Highlight Logic
+            if (!myTurn) {
+                gameStatus.initTurn(getCurrentPlayer().getIndex(), false);
+            } else if (currentRound instanceof StockRound
+                    || currentRound instanceof StartRound
+                    || currentRound instanceof ShareSellingRound
+                    || currentRound instanceof TreasuryShareRound) {
+
+                gameStatus.initTurn(getCurrentPlayer().getIndex(), true);
+            }
+
+        } catch (Exception e) {
+            // 3. DESYNC DETECTED
+            log.warn("StatusWindow: Dashboard Desync detected ({}). Attempting Hard Reset...",
+                    e.getClass().getSimpleName());
+
+            try {
+                // 4. HARD RESET: Destroy old instance, create NEW instance
+                if (gameStatus != null) {
+                   
+                    // 1. Snapshot timing data before recreation
+                    // NOTE: This relies on GameStatus.java having getLastPlayerTimes()
+                    int[] savedTimes = gameStatus.getLastPlayerTimes();
+
+                    // Create fresh instance via Reflection
+                    Class<? extends GameStatus> clazz = gameStatus.getClass();
+                    gameStatus = clazz.getDeclaredConstructor().newInstance();
+
+                    // Initialize it
+                    gameStatus.init(this, gameUIManager);
+                    
+                    // 2. Restore timing data if needed
+                    // NOTE: This relies on GameStatus.java having setLastPlayerTimes()
+                    if (savedTimes != null) {
+                        gameStatus.setLastPlayerTimes(savedTimes);
+                    }
+
+                    
+
+                    // Hot-swap it into the UI
+                    if (gameStatusPane != null) {
+                        gameStatusPane.setViewportView(gameStatus);
+                    }
+
+                    // 5. Retry Logic on the FRESH instance
+                    if (!myTurn) {
+                        gameStatus.initTurn(getCurrentPlayer().getIndex(), false);
+                    } else {
+                        if (currentRound instanceof StockRound
+                                || currentRound instanceof ShareSellingRound
+                                || currentRound instanceof TreasuryShareRound) {
+                            int priority = -1;
+                            if (gameUIManager.getPriorityPlayer() != null) {
+                                priority = gameUIManager.getPriorityPlayer().getIndex();
+                            }
+                            gameStatus.initTurn(getCurrentPlayer().getIndex(), true);
+                            if (priority >= 0)
+                                gameStatus.setPriorityPlayer(priority);
+                        }
+                    }
+                    log.info("StatusWindow: Hard Reset successful. UI restored.");
+                }
+            } catch (Exception ex) {
+                // 6. FAIL SAFE: If Hard Reset fails, keep game running without dashboard
+                // highlights
+                log.error("StatusWindow: Hard Reset failed. Dashboard may be static.", ex);
+            }
+        }
+
+
+        // 1. Highlight Logic
+        if (!myTurn) {
+            gameStatus.initTurn(getCurrentPlayer().getIndex(), false);
+        } else {
+            // FIX: Unconditionally call initTurn for the active player.
+            // Previously, this checked for StockRound/StartRound but skipped OperatingRound,
+            // causing Privates and Fixed Income to vanish when it was your turn to operate.
+            gameStatus.initTurn(getCurrentPlayer().getIndex(), true);
+        }
+
+        // --- STOCK ROUND / START ROUND LOGIC ---
+        Player currentPlayer = getCurrentPlayer();
+        String activityText = "Thinking: " + currentPlayer.getName();
+
+        if (currentRound instanceof StockRound) {
+            float certCount = currentPlayer.getPortfolioModel().getCertificateCount();
+            int certLimit = gameUIManager.getGameManager().getPlayerCertificateLimit(currentPlayer);
+            if (certCount > certLimit) {
+                activityText = "!! " + currentPlayer.getName() + " MUST SELL shares (Over Limit " + certCount + "/"
+                        + certLimit + ")";
+            }
+        }
+
+        updateActivityPanel(activityText);
+
+        boolean enableSRButton = (currentRound instanceof StockRound) && myTurn;
+        enableAIButton(enableSRButton);
+
+        String customTitle = currentRound.getOwnWindowTitle();
+        if (Util.hasValue(customTitle)) {
+            setTitle(customTitle + " - " + buildTimestamp);
+        }
+
+        if (currentRound instanceof TreasuryShareRound) {
+            if (!Util.hasValue(customTitle)) {
+                setTitle(LocalText.getText(
+                        "TRADE_TREASURY_SHARES_TITLE",
+                        ((TreasuryShareRound) currentRound).getOperatingCompany().getId(),
+                        String.valueOf(gameUIManager.getGameManager().getORId())) + " - " + buildTimestamp);
+            }
+        } else if ((currentRound instanceof ShareSellingRound)) {
+            if (!Util.hasValue(customTitle)) {
+                setTitle(LocalText.getText(
+                        "EMERGENCY_SHARE_SELLING_TITLE",
+                        (((ShareSellingRound) currentRound).getCompanyNeedingCash().getId())) + " - " + buildTimestamp);
+            }
+            int cash = ((ShareSellingRound) currentRound).getRemainingCashToRaise();
+            JOptionPane.showMessageDialog(this, LocalText.getText(
+                    "YouMustRaiseCash", getCurrentPlayer(),
+                    gameUIManager.format(cash)), "",
+                    JOptionPane.OK_OPTION);
+
+        } else if (currentRound instanceof StockRound) {
+            if (!Util.hasValue(customTitle)) {
+                setTitle(LocalText.getText(
+                        "STOCK_ROUND_TITLE",
+                        String.valueOf(((StockRound) currentRound).getStockRoundNumber())) + " - " + buildTimestamp);
+            }
+        }
+
+        if (dynamicButtonPanel != null) {
+            dynamicButtonPanel.removeAll();
+        }
+
+        List<NullAction> inactiveItems = possibleActions.getType(NullAction.class);
+
+        if (inactiveItems != null) {
+            for (NullAction na : inactiveItems) {
+                switch (na.getMode()) {
+                    case PASS:
+                        passButton.setRailsIcon(RailsIcon.PASS);
+                        passButton.setEnabled(true);
+                        passButton.setActionCommand(PASS_CMD);
+                        passButton.setMnemonic(KeyEvent.VK_P);
+                        passButton.setPossibleAction(na);
+                        break;
+                    case DONE:
+                        passButton.setRailsIcon(RailsIcon.DONE);
+                        passButton.setEnabled(true);
+                        passButton.setActionCommand(DONE_CMD);
+                        passButton.setMnemonic(KeyEvent.VK_D);
+                        passButton.setPossibleAction(na);
+                        break;
+                    case AUTOPASS:
+                        autopassButton.setEnabled(true);
+                        autopassButton.setPossibleAction(na);
+                        break;
+                    default:
+                        break;
+                }
+            }
+        }
+
+        gameStatus.setBackground(UIManager.getColor("Panel.background"));
+        gameStatus.setOpaque(false);
+        gameStatus.repaint();
+
+        if (currentRound instanceof EndOfGameRound)
+            endOfGame();
+
+        gameUIManager.packAndApplySizing(this);
+        // Use invokeLater to reclaim focus after potential 'focus stealing' by ORWindow
+        // updates.
+        // This ensures our request runs AFTER other windows have finished their layout
+        // churn.
+        SwingUtilities.invokeLater(() -> {
+// Focus Management:
+            // We yield focus if we are in a Start Round (Auction) OR an Operating Round (Map).
+            // We only aggressively grab focus during Stock Rounds or related phases.
+
+            boolean startIsActive = gameUIManager.isStartRoundActive();
+            boolean orIsActive = (currentRound instanceof OperatingRound);
+
+            // Only grab focus if NEITHER the Start Round NOR the OR is active.
+            if (!startIsActive && !orIsActive) {
+                toFront();
+                if (myTurn) {
+                    requestFocusInWindow();
+                }
+            }
+
+        });
+    }
+
+    /**
+     * Populates the "Special" menu with UseSpecialProperty and ClosePrivate
+     * actions.
+     * Restores functionality for closing privates (1835) and other special
+     * abilities.
+     */
+    public void setSpecialMenu() {
+        specialMenu.removeAll();
+        boolean hasItems = false;
+
+        if (possibleActions != null) {
+            List<PossibleAction> actions = possibleActions.getList();
+
+            for (PossibleAction pa : actions) {
+                // Check for Special Properties (Generic)
+                if (pa instanceof UseSpecialProperty) {
+                    UseSpecialProperty usp = (UseSpecialProperty) pa;
+                    // Use the text from the special property itself
+                    ActionMenuItem item = new ActionMenuItem(usp.getSpecialProperty().toMenu());
+                    item.setPossibleAction(usp);
+                    item.addActionListener(this);
+                    specialMenu.add(item);
+                    hasItems = true;
+                }
+                // Check for Close Private Actions (Specific to 1835/1837)
+                else if (pa instanceof ClosePrivate) {
+                    ClosePrivate cp = (ClosePrivate) pa;
+                    ActionMenuItem item = new ActionMenuItem(cp.getInfo());
+                    item.setPossibleAction(cp);
+                    item.addActionListener(this);
+                    specialMenu.add(item);
+                    hasItems = true;
+                }
+            }
+        }
+
+        // Enable and highlight if we found items
+        specialMenu.setEnabled(hasItems);
+        if (hasItems) {
+            specialMenu.setBackground(Color.YELLOW);
+        } else {
+            specialMenu.setBackground(null);
+        }
+    }
+
+    public void updateActivityPanel(String fullHtmlText) {
+        if (currentActorLabel != null) {
+            // Logic is now centralized in GameUIManager. 
+            // We just render what we are given.
+            currentActorLabel.setText(fullHtmlText);
+        }
+    }
+
+
+    public void updateInfoMenu() {
+        if (gameUIManager == null || gameUIManager.getGameManager() == null)
             return;
-        else
-            gm.setGameOverReportedUI(true);
 
-        JOptionPane.showMessageDialog(this,
-                LocalText.getText("EoGPressButton"),
-                LocalText.getText("EoGFinalRanking"),
-                JOptionPane.PLAIN_MESSAGE
-        );
+        // 1. Remaining Tiles (Always present)
+        // (Handled in initMenu, static item)
+
+        // 2. Build Dynamic Sub-Menus
+        buildCompaniesMenu();
+        buildTrainsMenu();
+        buildPhasesMenu();
+        buildNetworkMenu();
+    }
 
 
-        if (!Config.isDevelop()) {
-            // show game report line by line
-            List<String> gameReport = gm.getGameReport();
-            Collections.reverse(gameReport);
-            StringBuilder report = new StringBuilder();
-            for (String s:gameReport) {
-                report.insert(0, s + "\n");
-                JOptionPane.showMessageDialog(this,
-                        report,
-                        LocalText.getText("EoGFinalRanking"),
-                        JOptionPane.PLAIN_MESSAGE
-                );
+    protected void buildCompaniesMenu() {
+        companiesMenu.removeAll();
+
+        // Add Market Shortcut
+        JMenuItem marketItem = new JMenuItem(LocalText.getText("StockMarket", "Stock Market"));
+        marketItem.setActionCommand(MARKET_CMD);
+        marketItem.addActionListener(this);
+        companiesMenu.add(marketItem);
+        companiesMenu.addSeparator();
+
+        // Build Hierarchical Menu
+        CompanyManager cm = gameUIManager.getGameManager().getRoot().getCompanyManager();
+        List<CompanyType> comps = cm.getCompanyTypes();
+        JMenu menu, item;
+
+        for (CompanyType type : comps) {
+            menu = new JMenu(LocalText.getText(type.getId()));
+            companiesMenu.add(menu);
+
+            for (Company comp : type.getCompanies()) {
+                item = new JMenu(comp.getId());
+                JMenuItem menuItem = new JMenuItem(comp.getInfoText());
+
+                // Add Highlighting Listener if ORUIManager is available
+                // (Allows hovering over menu to light up tokens on map)
+                if (gameUIManager.getORUIManager() != null) {
+                    if (comp instanceof PrivateCompany) {
+                        HexHighlightMouseListener.addMouseListener(menuItem,
+                                gameUIManager.getORUIManager(), (PrivateCompany) comp, true);
+                        HexHighlightMouseListener.addMouseListener(item,
+                                gameUIManager.getORUIManager(), (PrivateCompany) comp, true);
+                    } else if (comp instanceof PublicCompany) {
+                        HexHighlightMouseListener.addMouseListener(menuItem,
+                                gameUIManager.getORUIManager(), (PublicCompany) comp, true);
+                        HexHighlightMouseListener.addMouseListener(item,
+                                gameUIManager.getORUIManager(), (PublicCompany) comp, true);
+                    }
+                }
+
+                item.add(menuItem);
+                menu.add(item);
             }
         }
     }
 
-    @Override
-    public void keyReleased(KeyEvent e) {}
+    protected void buildTrainsMenu() {
+        trainsMenu.removeAll();
 
-    @Override
-    public void keyPressed(KeyEvent e) {}
+        // Add Report Shortcut
+        JMenuItem reportItem = new JMenuItem(LocalText.getText("TrainReport", "Train Report"));
+        reportItem.setActionCommand(REPORT_CMD);
+        reportItem.addActionListener(this);
+        trainsMenu.add(reportItem);
+        trainsMenu.addSeparator();
 
-    @Override
-    public void keyTyped(KeyEvent e) {}
+        TrainManager tm = gameUIManager.getRoot().getTrainManager();
+        List<TrainType> types = tm.getTrainTypes();
+        JMenu item;
 
-    public void updatePlayerOrder(List<String> newPlayerNames) {
-       gameStatus.updatePlayerOrder(newPlayerNames);
+        for (TrainType type : types) {
+            item = new JMenu(LocalText.getText("N_Train", type.getName()));
+            item.add(new JMenuItem(type.getInfo()));
+            trainsMenu.add(item);
+        }
     }
 
+    protected void buildPhasesMenu() {
+        phasesMenu.removeAll();
+
+        PhaseManager pm = gameUIManager.getRoot().getPhaseManager();
+        List<Phase> phases = pm.getPhases();
+        JMenu item;
+        StringBuffer b = new StringBuffer("<html>");
+
+        for (Phase phase : phases) {
+            b.setLength(6);
+            appendInfoText(b, LocalText.getText("PhaseTileColours", phase.getTileColoursString()));
+            appendInfoText(b, LocalText.getText("PhaseNumberOfORs", phase.getNumberOfOperatingRounds()));
+            appendInfoText(b, LocalText.getText("PhaseOffBoardStep", phase.getOffBoardRevenueStep()));
+            appendInfoText(b, LocalText.getText("PhaseTrainLimitStep", phase.getTrainLimitStep()));
+            if (phase.doPrivatesClose()) {
+                appendInfoText(b, LocalText.getText("PhaseClosesAllPrivates"));
+            }
+            if (phase.getClosedObjects() != null) {
+                for (Closeable object : phase.getClosedObjects()) {
+                    if (Util.hasValue(object.getClosingInfo())) {
+                        appendInfoText(b,
+                                LocalText.getText("PhaseRemoves", Util.lowerCaseFirst(object.getClosingInfo())));
+                    }
+                }
+            }
+            if (Util.hasValue(phase.getInfo())) {
+                appendInfoText(b, phase.getInfo());
+            }
+
+            // Mark current phase
+
+boolean isCurrent = phase.equals(gameUIManager.getRoot().getPhaseManager().getCurrentPhase());
+            String prefix = isCurrent ? "> " : "";
+                        item = new JMenu(prefix + LocalText.getText("PhaseX", phase.toText()));
+            item.add(new JMenuItem(b.toString()));
+            phasesMenu.add(item);
+        }
+
+        phasesMenu.addSeparator();
+        JMenuItem detailsItem = new JMenuItem("Show Details...");
+        detailsItem.setActionCommand(SHOW_PHASES_CMD);
+        detailsItem.addActionListener(this);
+        phasesMenu.add(detailsItem);
+    }
+
+    protected void buildNetworkMenu() {
+        networkMenu.removeAll();
+
+        JMenuItem refreshItem = new JMenuItem(LocalText.getText("RefreshNetwork", "Refresh Network"));
+        refreshItem.setActionCommand(REFRESH_NETWORK_CMD);
+        refreshItem.addActionListener(this);
+        networkMenu.add(refreshItem);
+        networkMenu.addSeparator();
+
+        boolean route_highlight = gameUIManager.getGameParameterAsBoolean(GuiDef.Parm.ROUTE_HIGHLIGHT);
+        boolean revenue_suggest = gameUIManager.getGameParameterAsBoolean(GuiDef.Parm.REVENUE_SUGGEST);
+
+        if (!route_highlight && !revenue_suggest)
+            return;
+
+        // Developer Graph
+        if (route_highlight && Config.isDevelop()) {
+            JMenuItem item = new JMenuItem("Network");
+            item.addActionListener(this);
+            item.setActionCommand(REFRESH_NETWORK_CMD); // Re-uses the refresh command to trigger listener logic
+            // Note: We handle the specific "Network" string check in execution
+            networkMenu.add(item);
+        }
+
+        if (revenue_suggest) {
+            CompanyManager cm = gameUIManager.getGameManager().getRoot().getCompanyManager();
+            for (PublicCompany comp : cm.getAllPublicCompanies()) {
+                if (!comp.hasFloated() || comp.isClosed())
+                    continue;
+                JMenuItem item = new JMenuItem(comp.getId());
+                item.addActionListener(this);
+                // We use a custom action command or handle via item text
+                item.setActionCommand("SHOW_NETWORK_GRAPH");
+                networkMenu.add(item);
+            }
+        }
+    }
+
+    private void appendInfoText(StringBuffer b, String text) {
+        if (text == null || text.length() == 0)
+            return;
+        if (b.length() > 6)
+            b.append("<br>");
+        b.append(text);
+    }
+
+    protected void executeNetworkInfo(String companyName) {
+        RailsRoot root = gameUIManager.getRoot();
+
+        // Safety check: Needs ORUIManager for map interaction
+        if (gameUIManager.getORUIManager() == null || gameUIManager.getORUIManager().getMap() == null) {
+            log.info("Cannot display Network Graph: Map is not initialized.");
+            return;
+        }
+
+        if (companyName.equals("Network")) {
+            NetworkAdapter network = NetworkAdapter.create(root);
+            NetworkGraph mapGraph = network.getMapGraph();
+            mapGraph.optimizeGraph();
+            JFrame mapWindow = mapGraph.visualize("Optimized Map Network");
+            // StatusWindow doesn't track open windows to close them, relying on user to
+            // close
+        } else {
+            CompanyManager cm = root.getCompanyManager();
+            PublicCompany company = cm.getPublicCompany(companyName);
+            if (company == null)
+                return;
+
+            if (Config.getBoolean("map.route.window.display", true)) {
+                NetworkAdapter network = NetworkAdapter.create(root);
+                NetworkGraph routeGraph = network.getRevenueGraph(company, new ArrayList<>());
+                routeGraph.visualize("Route Network for " + company);
+            }
+
+            // Calculate Revenue and Show Dialog
+            RevenueAdapter ra = RevenueAdapter.createRevenueAdapter(root, company,
+                    root.getPhaseManager().getCurrentPhase());
+            ra.initRevenueCalculator(true);
+            int revenueValue = ra.calculateRevenue();
+
+            try {
+                ra.drawOptimalRunAsPath(gameUIManager.getORUIManager().getMap());
+            } catch (Exception e) {
+            }
+
+            JOptionPane.showMessageDialog(this,
+                    LocalText.getText("NetworkInfoDialogMessage", company.getId(),
+                            gameUIManager.format(revenueValue)),
+                    LocalText.getText("NetworkInfoDialogTitle", company.getId()),
+                    JOptionPane.INFORMATION_MESSAGE);
+
+            // Cleanup paths after dialog closes
+            gameUIManager.getORUIManager().getMap().setTrainPaths(null);
+        }
+    }
 
 }

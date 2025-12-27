@@ -1,10 +1,12 @@
 package net.sf.rails.game;
 
+// Add this if not present
 import net.sf.rails.common.*;
 import net.sf.rails.common.parser.Configurable;
 import net.sf.rails.common.parser.ConfigurationException;
 import net.sf.rails.common.parser.Configure;
 import net.sf.rails.common.parser.Tag;
+import net.sf.rails.game.GameManager.TimeConsequence;
 import net.sf.rails.game.PlayerManager.PlayerOrderModel;
 import net.sf.rails.game.financial.*;
 import net.sf.rails.game.model.PortfolioModel;
@@ -19,6 +21,8 @@ import net.sf.rails.ui.swing.GameUIManager;
 import net.sf.rails.util.GameLoader;
 import net.sf.rails.util.GameSaver;
 import net.sf.rails.util.Util;
+import java.io.IOException; // Add this
+import java.io.Serializable;
 
 import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
@@ -33,9 +37,15 @@ import java.io.IOException;
 import java.io.PrintWriter;
 import java.nio.file.Path;
 import java.nio.file.Files;
+import java.io.BufferedReader;
+import java.io.FileReader;
 import java.util.*;
 
+import javax.swing.JFrame;
+
 import com.google.common.collect.ComparisonChain;
+import net.sf.rails.game.ai.snapshot.JsonStateSerializer;
+import java.io.IOException; // Add this
 
 /**
  * This class manages the playing rounds by supervising all implementations of
@@ -55,7 +65,6 @@ public class GameManager extends RailsManager implements Configurable, Owner {
     public static final String ARCHIVE_DIRECTORY = "save.archive.dir";
     public static final String ARCHIVE_KEEP_COUNT = "save.archive.keep_count";
 
-
     protected Class<? extends StockRound> stockRoundClass = StockRound.class;
     protected Class<? extends OperatingRound> operatingRoundClass = OperatingRound.class;
     protected Class<? extends ShareSellingRound> shareSellingRoundClass = ShareSellingRound.class;
@@ -74,6 +83,16 @@ public class GameManager extends RailsManager implements Configurable, Owner {
 
     protected String gameName;
     protected int currentNumberOfOperatingRounds = 1;
+    private transient GameUIManager gameUIManager;
+
+    public void setGameUIManager(GameUIManager gameUIManager) {
+        this.gameUIManager = gameUIManager;
+    }
+
+    public GameUIManager getGameUIManager() {
+        return this.gameUIManager;
+    }
+
     protected boolean skipFirstStockRound = false;
     protected boolean showCompositeORNumber = true;
 
@@ -81,8 +100,67 @@ public class GameManager extends RailsManager implements Configurable, Owner {
     protected boolean gameEndsWithBankruptcy = false;
     protected int gameEndsWhenBankHasLessOrEqual = 0;
     protected GameEnd gameEndWhen = GameEnd.UNDEFINED;
+    private int absoluteActionCounter = 0;
 
     protected boolean dynamicOperatingOrder = true;
+
+    // Member variables to support reload "look-ahead"
+    private transient List<PossibleAction> actionsBeingReloaded = null;
+    private transient int reloadActionIndex = 0;
+
+    // Replaced single major increment with Phase-Specific increments
+    protected int timeMgmtYellowIncrement = 35; // Default "Hardcore/Championship" start
+    protected int timeMgmtGreenIncrement = 70; // The "Green Wall" adjustment
+    protected int timeMgmtBrownIncrement = 35; // Late game speed up
+
+    public void setTimeMgmtYellowIncrement(int seconds) {
+        this.timeMgmtYellowIncrement = seconds;
+    }
+
+    public int getTimeMgmtYellowIncrement() {
+        return this.timeMgmtYellowIncrement;
+    }
+
+    public void setTimeMgmtGreenIncrement(int seconds) {
+        this.timeMgmtGreenIncrement = seconds;
+    }
+
+    public int getTimeMgmtGreenIncrement() {
+        return this.timeMgmtGreenIncrement;
+    }
+
+    public void setTimeMgmtBrownIncrement(int seconds) {
+        this.timeMgmtBrownIncrement = seconds;
+    }
+
+    public int getTimeMgmtBrownIncrement() {
+        return this.timeMgmtBrownIncrement;
+    }
+
+    // Deprecated but kept for compatibility (redirects to Yellow/Standard)
+    public void setTimeMgmtMajorCoIncrement(int seconds) {
+        this.timeMgmtYellowIncrement = seconds;
+    }
+
+    public int getTimeMgmtMajorCoIncrement() {
+        return this.timeMgmtYellowIncrement;
+    }
+
+    /**
+     * A transient field to tell the 'processOnReload' hook where to
+     * save state snapshot files. If null, logging is disabled.
+     */
+    private transient File logOutputDirectory = null;
+
+    /**
+     * Injects an output directory to enable state-snapshot logging
+     * during a replay.
+     * 
+     * @param directory The directory to save state_XXXX.json files.
+     */
+    public void setLogOutputDirectory(File directory) {
+        this.logOutputDirectory = directory;
+    }
 
     /**
      * Will only be set during game reload
@@ -92,6 +170,14 @@ public class GameManager extends RailsManager implements Configurable, Owner {
     protected final EnumMap<GameDef.Parm, Object> gameParameters = new EnumMap<>(GameDef.Parm.class);
 
     /**
+     * Calculate the worth of a private company for player net-worth/bankruptcy.
+     * Default behavior is the base price (face value).
+     */
+    public int getPrivateWorth(PrivateCompany priv) {
+        return priv.getBasePrice();
+    }
+
+    /**
      * Current round should not be set here but from within the Round classes.
      * This is because in some cases the round has already changed to another
      * one when the constructor terminates. Example: if the privates have not
@@ -99,7 +185,7 @@ public class GameManager extends RailsManager implements Configurable, Owner {
      * privates payout and then immediately starts a new Start Round.
      */
     protected final GenericState<RoundFacade> currentRound = new GenericState<>(this, "currentRound");
-    private GenericState<RoundFacade> interruptedRound = new GenericState<> (this, "interruptedRound");
+    private GenericState<RoundFacade> interruptedRound = new GenericState<>(this, "interruptedRound");
 
     protected final IntegerState startRoundNumber = IntegerState.create(this, "startRoundNumber");
     protected final IntegerState stockRoundNumber = IntegerState.create(this, "srNumber");
@@ -107,15 +193,20 @@ public class GameManager extends RailsManager implements Configurable, Owner {
     protected final IntegerState absoluteORNumber = IntegerState.create(this, "absoluteORNUmber");
     protected final IntegerState relativeORNumber = IntegerState.create(this, "relativeORNumber");
     protected final IntegerState numOfORs = IntegerState.create(this, "numOfORs");
+    // This tracks the limit valid for the CURRENT set of Operating Rounds.
+    // It prevents Phase changes (which update numOfORs immediately) from
+    // extending the current cycle unexpectedly.
+    protected final IntegerState operatingRoundLimit = IntegerState.create(this, "operatingRoundLimit", 1);
 
     protected int maxRounds; // For SOH
 
-    /** The previous OR or SR, excluding all merge rounds.
-     * Needed in 1837 when merge Rounds occur */
+    /**
+     * The previous OR or SR, excluding all merge rounds.
+     * Needed in 1837 when merge Rounds occur
+     */
     protected GenericState<Round> currentSRorOR = new GenericState<>(this, "prevMainRound");
 
     protected final BooleanState firstAllPlayersPassed = new BooleanState(this, "firstAllPlayersPassed");
-
 
     /**
      * GameOver pending, a last OR or set of ORs must still be completed
@@ -140,8 +231,7 @@ public class GameManager extends RailsManager implements Configurable, Owner {
 
     protected PossibleActions possibleActions = PossibleActions.create();
 
-    protected final ArrayListState<PossibleAction> executedActions
-            = new ArrayListState<>(this, "executedActions");
+    protected final ArrayListState<PossibleAction> executedActions = new ArrayListState<>(this, "executedActions");
 
     /**
      * Special properties that can be used by other players or companies
@@ -150,23 +240,28 @@ public class GameManager extends RailsManager implements Configurable, Owner {
     protected Portfolio<SpecialProperty> commonSpecialProperties = null;
 
     /**
-     * indicates that the recoverySave already issued a warning, avoids displaying several warnings
+     * indicates that the recoverySave already issued a warning, avoids displaying
+     * several warnings
      */
     protected boolean recoverySaveWarning = true;
 
     /**
      * Flag to skip a subsequent Done action (if present) during reloading.
-     * <br>This is a fix to maintain backwards compatibility when redundant
+     * <br>
+     * This is a fix to maintain backwards compatibility when redundant
      * actions are skipped in new code versions (such as the bypassing of
      * a treasury trading step if it cannot be executed).
-     * <br>This flag must be reset after processing <i>any</i> action (not just Done).
+     * <br>
+     * This flag must be reset after processing <i>any</i> action (not just Done).
      */
     protected boolean skipNextDone = false;
     /**
      * Step that must be in effect to do an actual Done skip during reloading.
-     * <br> This is to ensure that Done actions in different OR steps are
+     * <br>
+     * This is to ensure that Done actions in different OR steps are
      * considered separately.
      */
+
     protected GameDef.OrStep skippedStep = null;
 
     // storage to replace static class variables
@@ -175,7 +270,7 @@ public class GameManager extends RailsManager implements Configurable, Owner {
     protected Map<String, Integer> storageIds = new HashMap<>();
 
     private int revenueSpinnerIncrement = 10;
-    //Used for Storing the PublicCompany to be Founded by a formationround
+    // Used for Storing the PublicCompany to be Founded by a formationround
     private PublicCompany nationalToFound;
 
     private final Map<PublicCompany, Player> NationalFormStartingPlayer = new HashMap<>();
@@ -183,11 +278,377 @@ public class GameManager extends RailsManager implements Configurable, Owner {
     protected PlayerOrderModel playerNamesModel;
 
     /**
+     * Stores player worth snapshots at the end of each major round.
+     * Key: RoundID (e.g., "OR_1.1", "SR_1", "End"). Value: Map<PlayerID, Worth>.
+     */
+    protected final GenericState<LinkedHashMap<String, Map<String, Double>>> playerWorthHistory = new GenericState<>(
+            this, "playerWorthHistory");
+
+    /**
+     * Simple DTO to hold historical state for the UI table.
+     */
+    public static class PlayerAssetSnapshot implements Serializable {
+        private static final long serialVersionUID = 1L;
+        public int cash;
+        public Map<String, Integer> sharePercents = new HashMap<>(); // Key: CompanyID, Value: %
+        public Map<String, Integer> holdingValues = new HashMap<>(); // Key: CompanyID, Value: $
+    }
+
+    /**
+     * Stores detailed asset snapshots for the detailed table in the Worth Chart.
+     * Key: RoundID. Value: Map<PlayerName, PlayerAssetSnapshot>.
+     */
+    protected final GenericState<LinkedHashMap<String, Map<String, PlayerAssetSnapshot>>> playerAssetHistory = new GenericState<>(
+            this, "playerAssetHistory");
+
+    /**
+     * Stores cumulative company payouts snapshots.
+     * Key: RoundID. Value: Map<CompanyID, CumulativePayout>.
+     */
+    protected final GenericState<LinkedHashMap<String, Map<String, Integer>>> companyPayoutHistory = new GenericState<>(
+            this, "companyPayoutHistory");
+    /**
+     * Tracks the running total of payouts for each company (Current State).
+     */
+    protected final GenericState<Map<String, Integer>> cumulativeCompanyPayouts = new GenericState<>(
+            this, "cumulativeCompanyPayouts");
+
+    /**
+     * Stores instantaneous (per-round) company payouts.
+     * Key: RoundID. Value: Map<CompanyID, PayoutInThisRound>.
+     */
+    protected final GenericState<LinkedHashMap<String, Map<String, Integer>>> instantaneousPayoutHistory = new GenericState<>(
+            this, "instantaneousPayoutHistory");
+
+    protected final GenericState<Map<String, Integer>> currentRoundPayouts = new GenericState<>(
+            this, "currentRoundPayouts");
+
+    /**
+     * Flag used to track if any CorrectionModeAction is currently active (e.g.,
+     * Cash, Train).
+     */
+    protected final BooleanState isCorrectionModeActive = new BooleanState(this, "isCorrectionModeActive");
+
+    public BooleanState getCorrectionModeActiveModel() {
+        return isCorrectionModeActive;
+    }
+
+    // ++ START TIME MANAGEMENT ++
+    protected boolean timeManagementEnabled = true;
+    protected int timeMgmtStartingSeconds = 300;
+    protected int timeMgmtShareRoundIncrement = 60;
+    protected int timeMgmtMajorCoIncrement = 30;
+    // A standard HashSet (NOT a State object) ensures this memory persists
+    // even when the game state rolls back via Undo.
+    private final Set<String> awardedBonuses = new HashSet<>();
+    // 1. Add Variable and Accessors
+    protected int timeMgmtUndoPenalty = 10; // Minor (Self)
+    protected int timeMgmtMajorUndoPenalty = 30; // Major (Disruption) -- NEW
+
+    public void setTimeMgmtMajorUndoPenalty(int seconds) {
+        this.timeMgmtMajorUndoPenalty = seconds;
+    }
+
+    public int getTimeMgmtMajorUndoPenalty() {
+        return this.timeMgmtMajorUndoPenalty;
+    }
+
+    public void setTimeMgmtUndoPenalty(int seconds) {
+        this.timeMgmtUndoPenalty = seconds;
+    }
+
+    public int getTimeMgmtUndoPenalty() {
+        return this.timeMgmtUndoPenalty;
+    }
+
+    /**
+     * Championship Time Management System ("Reset & Penalize")
+     * * Implements fair time accounting for "Disruptor vs. Victim" scenarios (e.g.,
+     * Player A undoes Player B's turn).
+     *
+     * 1. VICTIM PROTECTION (Time Machine):
+     * Standard `changeStack.undo()` rolls back the entire game state, including all
+     * Player TimeBanks.
+     * - Effect: The innocent victim (Player B) has their clock reset to the exact
+     * moment before the disruption.
+     * - Rationale: Thinking time spent on the invalidated future is "refunded" as
+     * it is now irrelevant.
+     *
+     * 2. DISRUPTOR PENALTY:
+     * The player initiating the UNDO/FORCED_UNDO is identified as the 'Disruptor'.
+     * - Action: After the rollback, `timeMgmtUndoPenalty` is subtracted from the
+     * Disruptor's *restored* time.
+     * - Result: The Disruptor pays for the hesitation/correction, ensuring net time
+     * loss for them.
+     *
+     * 3. ANTI-FARMING (Persistent Registry):
+     * Time bonuses (e.g., +30s per OR turn) are tracked in the `awardedBonuses`
+     * Set.
+     * - Mechanism: This Set is transient/persistent and NOT managed by ChangeStack
+     * (does not roll back).
+     * - Result: If the game state reverts and a player starts their turn a second
+     * time, the registry
+     * detects the duplicate Key (RoundID:Player) and denies the bonus, preventing
+     * infinite time generation.
+     */
+
+    /**
+     * Grants a time bonus to a player, ensuring it is only awarded once per
+     * specific turn context.
+     * Prevents "farming" time by undoing/redoing the start of a turn.
+     */
+    public void grantTimeBonus(Player player, String roundId, int amount) {
+        if (isReloading()) return; // Block bonuses during reload
+
+        if (player == null || amount <= 0)
+            return;
+
+        // Create a unique key: "RoundID:PlayerName" (e.g., "OR_1.1:Bjoern" or
+        // "SR_1:Bjoern")
+        String key = roundId + ":" + player.getName();
+
+        if (awardedBonuses.contains(key)) {
+            // Optional: Log skipped bonuses at DEBUG level to reduce clutter, or INFO for
+            // audit
+            // log.debug("[TIME-AUDIT] Bonus SKIPPED for {}. Key '{}' exists.",
+            // player.getId(), key);
+            return;
+        }
+
+        // Grant Bonus & Mark as Awarded
+        player.getTimeBankModel().add(amount);
+        awardedBonuses.add(key);
+        triggerUITimeFlash(player, amount);
+        // --- CENTRAL LOGGING ---
+        // log.info("[TIME-AUDIT] BONUS: +{}s to {} (New Total: {}). Reason: {}",
+        // amount, player.getId(), player.getTimeBankModel().value(), key);
+    }
+
+    /**
+     * Safely triggers the player timer's flash effect by accessing the UI chain
+     * using the directly-wired GameUIManager instance. Replaces the unreliable
+     * reflection method.
+     */
+    private void triggerUITimeFlash(Player p, int amount) {
+        if (p == null || gameUIManager == null || gameUIManager.getStatusWindow() == null)
+            return;
+
+        try {
+            // Access GameStatus instance via StatusWindow
+            Object gameStatus = gameUIManager.getStatusWindow().getGameStatus();
+
+            // Method signature: updatePlayerTimeWithFlash(int playerIndex, int newTime, int
+            // amountChanged)
+            java.lang.reflect.Method updateMethod = gameStatus.getClass().getMethod(
+                    "updatePlayerTimeWithFlash", int.class, int.class, int.class);
+
+            // Invoke the method: (PlayerIndex, NewTotalTime, AmountChanged)
+            updateMethod.invoke(gameStatus,
+                    p.getIndex(),
+                    p.getTimeBankModel().value(),
+                    amount);
+        } catch (Exception e) {
+            log.warn("Failed to trigger UI Time Flash (Direct Call Failed)", e);
+        }
+    }
+
+    // --- PERSISTENT STATE FIELDS ---
+    protected final GenericState<Double> timeMgmtOperatorMultiplier = new GenericState<>(this, "OperatorMultiplier");
+    protected final GenericState<String> timeMgmtOperatorName = new GenericState<>(this, "OperatorName");
+    // Persistent Global Game Timer (in seconds)
+    protected final IntegerState totalGameTime = IntegerState.create(this, "totalGameTime");
+
+    private boolean isPaused = false;
+
+    public boolean isGamePaused() {
+        return isPaused;
+    }
+
+    public void setGamePaused(boolean paused) {
+        this.isPaused = paused;
+    }
+
+    public void incrementTotalGameTime() {
+        if (!isPaused) {
+            totalGameTime.add(1);
+
+            // Force time deduction for Prussian Formation Round (skipped by standard UI
+            // timer)
+            if (isTimeManagementEnabled() && getCurrentRound() != null) {
+                String rName = getCurrentRound().getClass().getSimpleName();
+                if (rName.contains("Prussian")) {
+                    Player active = getCurrentPlayer();
+                    if (active != null) {
+                        active.getTimeBankModel().add(-1);
+                    }
+                }
+            }
+        }
+    }
+
+    public String getFormattedGameTime() {
+        int totalSeconds = totalGameTime.value();
+        int hours = totalSeconds / 3600;
+        int minutes = (totalSeconds % 3600) / 60;
+        int seconds = totalSeconds % 60;
+        return String.format("%02d:%02d:%02d", hours, minutes, seconds);
+    }
+
+    // --- PUBLIC SETTERS (Using .set() for state) ---
+    public void setTimeManagementEnabled(boolean enabled) {
+        this.timeManagementEnabled = enabled;
+    }
+
+    public void setTimeMgmtStartingSeconds(int seconds) {
+        this.timeMgmtStartingSeconds = seconds;
+    }
+
+    public void setTimeMgmtShareRoundIncrement(int seconds) {
+        this.timeMgmtShareRoundIncrement = seconds;
+    }
+
+
+    public void setTimeMgmtOperatorName(String name) {
+        this.timeMgmtOperatorName.set(name);
+        // BACKUP: Save to global config
+        Config.set("time.operator.name", name);
+    }
+
+    public void setTimeMgmtOperatorMultiplier(double multiplier) {
+        this.timeMgmtOperatorMultiplier.set(multiplier);
+        // BACKUP: Save to global config
+        Config.set("time.operator.multiplier", String.valueOf(multiplier));
+    }
+
+    public String getTimeMgmtOperatorName() {
+        String val = this.timeMgmtOperatorName.value();
+        if (val != null && !val.isEmpty())
+            return val;
+
+        // BACKUP: Read from global config
+        return Config.get("time.operator.name", "");
+    }
+
+    // --- PUBLIC GETTERS (Using .value() for state) ---
+    public boolean isTimeManagementEnabled() {
+        return this.timeManagementEnabled;
+    }
+
+    /**
+     * DYNAMIC PHASE BONUS
+     * Returns the time bonus based on the CURRENT Game Phase.
+     * This implements the "Green Wall" logic where the Green phase grants more time.
+     */
+public int getOrTimeBonus() {
+        Phase phase = getRoot().getPhaseManager().getCurrentPhase();
+        
+        // Fallback if phase is null
+        if (phase == null) return getTimeMgmtYellowIncrement();
+
+        // Use toText() instead of getName()
+        String phaseName = phase.toText().toLowerCase();
+        
+        // Logic for 1835 Phases
+        // Phase 1 is usually Yellow. Phase 2 starts Green. Phase 3+ is Brown.
+        if (phaseName.contains("2") || phaseName.contains("green")) {
+            return getTimeMgmtGreenIncrement();
+        } else if (phaseName.contains("3") || phaseName.contains("brown") || phaseName.contains("gray")) {
+            return getTimeMgmtBrownIncrement();
+        }
+        
+        // Default to Yellow (Early Game)
+        return getTimeMgmtYellowIncrement();
+    }
+
+
+    public int getTimeMgmtStartingSeconds() {
+        return this.timeMgmtStartingSeconds;
+    }
+
+    public int getTimeMgmtShareRoundIncrement() {
+        return this.timeMgmtShareRoundIncrement;
+    }
+
+
+    public double getTimeMgmtOperatorMultiplier() {
+        Double val = this.timeMgmtOperatorMultiplier.value();
+        if (val != null)
+            return val;
+
+        // BACKUP: Read from global config
+        String configVal = Config.get("time.operator.multiplier");
+        if (configVal != null) {
+            try {
+                return Double.parseDouble(configVal);
+            } catch (NumberFormatException e) {
+            }
+        }
+        return 1.5;
+    }
+
+
+    public int getCurrentActionCount() {
+        return absoluteActionCounter;
+    }
+
+    private void initializePlayerTimeBanks() {
+        for (Player player : getRoot().getPlayerManager().getPlayers()) {
+            int startTime = this.timeMgmtStartingSeconds;
+
+            // Use the safe getters
+            String opName = getTimeMgmtOperatorName();
+            double opMult = getTimeMgmtOperatorMultiplier();
+
+            if (Util.hasValue(opName) &&
+                    player.getId().trim().equalsIgnoreCase(opName.trim())) {
+
+                startTime = (int) (startTime * opMult);
+                log.info("TIME: Applied Operator Bonus (x{}) to player '{}'",
+                        opMult, player.getId());
+            }
+
+            player.getTimeBankModel().set(startTime);
+        }
+    }
+
+    // Add this enum definition inside the GameManager class
+    public enum TimeConsequence {
+        NONE("Do nothing"), // Default
+        SUBTRACT_FINAL_SCORE("Subtract from final score"),
+        SUBTRACT_IMMEDIATE_CASH("Subtract immediately from cash");
+
+        private final String description;
+
+        TimeConsequence(String description) {
+            this.description = description;
+        }
+
+        public String getDescription() {
+            return LocalText.getText(this.name()); // Use enum name as key for LocalText
+        }
+
+        public static TimeConsequence fromDescription(String description) {
+            for (TimeConsequence consequence : values()) {
+                if (consequence.getDescription().equals(description)) {
+                    return consequence;
+                }
+            }
+            return NONE; // Default fallback
+        }
+
+        @Override
+        public String toString() {
+            return getDescription(); // Make ComboBox display the localized description
+        }
+    }
+
+    // ... inside GameManager class body ...
+
+    /**
      * To register the step number of subsequent company releases
      * (i.e. making companies available, as in 1835 and 1837).
      */
-    protected final IntegerState companyReleaseStep =
-            IntegerState.create (this, "releaseStep", 0);
+    protected final IntegerState companyReleaseStep = IntegerState.create(this, "releaseStep", 0);
 
     /**
      * @return the revenueSpinnerIncrement
@@ -196,7 +657,7 @@ public class GameManager extends RailsManager implements Configurable, Owner {
         return revenueSpinnerIncrement;
     }
 
-    private IntegerState actionCount = IntegerState.create (this, "actionCount");
+    private IntegerState actionCount = IntegerState.create(this, "actionCount");
 
     public GameManager(RailsRoot parent, String id) {
         super(parent, id);
@@ -225,22 +686,18 @@ public class GameManager extends RailsManager implements Configurable, Owner {
         Tag gameParmTag = tag.getChild("GameParameters");
         if (gameParmTag != null) {
 
-
             // StockRound class and other properties
             Tag srTag = gameParmTag.getChild("StockRound");
             if (srTag != null) {
                 // FIXME: Rails 2.0, move this to some default .xml!
-                String srClassName =
-                        srTag.getAttributeAsString("class", "net.sf.rails.game.financial.StockRound");
+                String srClassName = srTag.getAttributeAsString("class", "net.sf.rails.game.financial.StockRound");
                 try {
-                    stockRoundClass =
-                            Class.forName(srClassName).asSubclass(StockRound.class);
+                    stockRoundClass = Class.forName(srClassName).asSubclass(StockRound.class);
                 } catch (ClassNotFoundException e) {
                     throw new ConfigurationException("Cannot find class "
                             + srClassName, e);
                 }
-                String stockRoundSequenceRuleString =
-                        srTag.getAttributeAsString("sequence");
+                String stockRoundSequenceRuleString = srTag.getAttributeAsString("sequence");
                 if (Util.hasValue(stockRoundSequenceRuleString)) {
                     if ("SellBuySell".equalsIgnoreCase(stockRoundSequenceRuleString)) {
                         setGameParameter(GameDef.Parm.STOCK_ROUND_SEQUENCE,
@@ -254,9 +711,8 @@ public class GameManager extends RailsManager implements Configurable, Owner {
                     }
                 }
 
-                skipFirstStockRound =
-                        srTag.getAttributeAsBoolean("skipFirst",
-                                skipFirstStockRound);
+                skipFirstStockRound = srTag.getAttributeAsBoolean("skipFirst",
+                        skipFirstStockRound);
 
                 for (String ruleTagName : srTag.getChildren().keySet()) {
                     switch (ruleTagName) {
@@ -284,12 +740,10 @@ public class GameManager extends RailsManager implements Configurable, Owner {
             Tag orTag = gameParmTag.getChild("OperatingRound");
             if (orTag != null) {
                 // FIXME: Rails 2.0, move this to some default .xml!
-                String orClassName =
-                        orTag.getAttributeAsString("class", "net.sf.rails.game.OperatingRound");
+                String orClassName = orTag.getAttributeAsString("class", "net.sf.rails.game.OperatingRound");
                 try {
-                    operatingRoundClass =
-                            Class.forName(orClassName).asSubclass(
-                                    OperatingRound.class);
+                    operatingRoundClass = Class.forName(orClassName).asSubclass(
+                            OperatingRound.class);
                 } catch (ClassNotFoundException e) {
                     throw new ConfigurationException("Cannot find class "
                             + orClassName, e);
@@ -339,11 +793,10 @@ public class GameManager extends RailsManager implements Configurable, Owner {
             Tag ssrTag = gameParmTag.getChild("ShareSellingRound");
             if (ssrTag != null) {
                 // FIXME: Rails 2.0, move this to some default .xml!
-                String ssrClassName =
-                        ssrTag.getAttributeAsString("class", "net.sf.rails.game.financial.ShareSellingRound");
+                String ssrClassName = ssrTag.getAttributeAsString("class",
+                        "net.sf.rails.game.financial.ShareSellingRound");
                 try {
-                    shareSellingRoundClass =
-                            Class.forName(ssrClassName).asSubclass(ShareSellingRound.class);
+                    shareSellingRoundClass = Class.forName(ssrClassName).asSubclass(ShareSellingRound.class);
                 } catch (ClassNotFoundException e) {
                     throw new ConfigurationException("Cannot find class "
                             + ssrClassName, e);
@@ -353,11 +806,10 @@ public class GameManager extends RailsManager implements Configurable, Owner {
             // TreasuryShareRound class
             Tag tsrTag = gameParmTag.getChild("TreasuryShareRound");
             if (tsrTag != null) {
-                String tsrClassName =
-                        tsrTag.getAttributeAsString("class", "net.sf.rails.game.financial.TreasuryShareRound");
+                String tsrClassName = tsrTag.getAttributeAsString("class",
+                        "net.sf.rails.game.financial.TreasuryShareRound");
                 try {
-                    treasuryShareRoundClass =
-                            Class.forName(tsrClassName).asSubclass(TreasuryShareRound.class);
+                    treasuryShareRoundClass = Class.forName(tsrClassName).asSubclass(TreasuryShareRound.class);
                 } catch (ClassNotFoundException e) {
                     throw new ConfigurationException("Cannot find class "
                             + tsrClassName, e);
@@ -398,27 +850,24 @@ public class GameManager extends RailsManager implements Configurable, Owner {
             }
         }
 
-
         /* End of rails.game criteria */
         Tag endOfGameTag = tag.getChild("EndOfGame");
         if (endOfGameTag != null) {
             Tag forcedSellingTag = endOfGameTag.getChild("ForcedSelling");
             if (forcedSellingTag != null) {
-                forcedSellingCompanyDump =
-                        forcedSellingTag.getAttributeAsBoolean("CompanyDump", true);
+                forcedSellingCompanyDump = forcedSellingTag.getAttributeAsBoolean("CompanyDump", true);
             }
             if (endOfGameTag.getChild("Bankruptcy") != null) {
                 gameEndsWithBankruptcy = true;
             }
             Tag bankBreaksTag = endOfGameTag.getChild("BankBreaks");
             if (bankBreaksTag != null) {
-                gameEndsWhenBankHasLessOrEqual =
-                        bankBreaksTag.getAttributeAsInteger("limit",
-                                gameEndsWhenBankHasLessOrEqual);
+                gameEndsWhenBankHasLessOrEqual = bankBreaksTag.getAttributeAsInteger("limit",
+                        gameEndsWhenBankHasLessOrEqual);
                 String attr = bankBreaksTag.getAttributeAsString("finish");
-                if ( "setOfORs".equalsIgnoreCase(attr)) {
+                if ("setOfORs".equalsIgnoreCase(attr)) {
                     gameEndWhen = GameEnd.AFTER_SET_OF_ORS;
-                } else if ( "currentOR".equalsIgnoreCase(attr)) {
+                } else if ("currentOR".equalsIgnoreCase(attr)) {
                     gameEndWhen = GameEnd.AFTER_THIS_OR;
                 }
             }
@@ -428,9 +877,9 @@ public class GameManager extends RailsManager implements Configurable, Owner {
             Tag maxPriceTag = endOfGameTag.getChild("MaxPriceReached");
             if (maxPriceTag != null) {
                 String attr = maxPriceTag.getAttributeAsString("finish");
-                if ( "setOfORs".equalsIgnoreCase(attr)) {
+                if ("setOfORs".equalsIgnoreCase(attr)) {
                     gameEndWhen = GameEnd.AFTER_SET_OF_ORS;
-                } else if ( "currentOR".equalsIgnoreCase(attr)) {
+                } else if ("currentOR".equalsIgnoreCase(attr)) {
                     gameEndWhen = GameEnd.AFTER_THIS_OR;
                 }
             }
@@ -487,7 +936,8 @@ public class GameManager extends RailsManager implements Configurable, Owner {
             // StartRoundWindow class
             Tag startRoundWindowTag = guiClassesTag.getChild("StartRoundWindow");
             if (startRoundWindowTag != null) {
-                startRoundWindowClassName = startRoundWindowTag.getAttributeAsString("class", startRoundWindowClassName);
+                startRoundWindowClassName = startRoundWindowTag.getAttributeAsString("class",
+                        startRoundWindowClassName);
                 // Check instantiatability (not sure if this belongs here)
                 Configure.canClassBeInstantiated(startRoundWindowClassName);
             }
@@ -495,7 +945,8 @@ public class GameManager extends RailsManager implements Configurable, Owner {
     }
 
     /* WARNING: required but never never called */
-    public void finishConfiguration(RailsRoot root) {}
+    public void finishConfiguration(RailsRoot root) {
+    }
 
     public void init() {
         showCompositeORNumber = !"simple".equalsIgnoreCase(Config.get("or.number_format"));
@@ -504,6 +955,14 @@ public class GameManager extends RailsManager implements Configurable, Owner {
     public void startGame() {
         setGuiParameters();
         getRoot().getCompanyManager().initStartPackets(this);
+
+        // ++ START TIME MANAGEMENT ++
+        // This new method will read the settings and populate each player's time bank
+        if (isTimeManagementEnabled()) {
+            initializePlayerTimeBanks();
+        }
+        // ++ END TIME MANAGEMENT ++
+
         beginStartRound();
     }
 
@@ -519,16 +978,21 @@ public class GameManager extends RailsManager implements Configurable, Owner {
         CompanyManager cm = getRoot().getCompanyManager();
 
         for (PublicCompany company : cm.getAllPublicCompanies()) {
-            if (company.hasParPrice()) guiParameters.put(GuiDef.Parm.HAS_ANY_PAR_PRICE, true);
-            if (company.canBuyPrivates()) guiParameters.put(GuiDef.Parm.CAN_ANY_COMPANY_BUY_PRIVATES, true);
-            if (company.canHoldOwnShares()) guiParameters.put(GuiDef.Parm.CAN_ANY_COMPANY_HOLD_OWN_SHARES, true);
-            if (company.getMaxNumberOfLoans() != 0) guiParameters.put(GuiDef.Parm.HAS_ANY_COMPANY_LOANS, true);
-            if (company.getShareUnitSizes().size() > 1) guiParameters.put(GuiDef.Parm.HAS_GROWING_NUMBER_OF_SHARES, true);
-            if (company.hasBonds()) guiParameters.put(GuiDef.Parm.HAS_BONDS, true);
+            if (company.hasParPrice())
+                guiParameters.put(GuiDef.Parm.HAS_ANY_PAR_PRICE, true);
+            if (company.canBuyPrivates())
+                guiParameters.put(GuiDef.Parm.CAN_ANY_COMPANY_BUY_PRIVATES, true);
+            if (company.canHoldOwnShares())
+                guiParameters.put(GuiDef.Parm.CAN_ANY_COMPANY_HOLD_OWN_SHARES, true);
+            if (company.getMaxNumberOfLoans() != 0)
+                guiParameters.put(GuiDef.Parm.HAS_ANY_COMPANY_LOANS, true);
+            if (company.getShareUnitSizes().size() > 1)
+                guiParameters.put(GuiDef.Parm.HAS_GROWING_NUMBER_OF_SHARES, true);
+            if (company.hasBonds())
+                guiParameters.put(GuiDef.Parm.HAS_BONDS, true);
         }
 
-        loop:
-        for (PrivateCompany company : cm.getAllPrivateCompanies()) {
+        loop: for (PrivateCompany company : cm.getAllPrivateCompanies()) {
             for (SpecialProperty sp : company.getSpecialProperties()) {
                 if (sp instanceof SpecialBonusTokenLay || sp instanceof SellBonusToken) {
                     guiParameters.put(GuiDef.Parm.DO_BONUS_TOKENS_EXIST, true);
@@ -565,35 +1029,50 @@ public class GameManager extends RailsManager implements Configurable, Owner {
     }
 
     public void setInterruptedRound(RoundFacade interruptedRound) {
-        this.interruptedRound.set (interruptedRound);
+        this.interruptedRound.set(interruptedRound);
     }
 
     public RoundFacade getInterruptedRound() {
         return interruptedRound.value();
     }
 
-    /*
-    public PossibleAction getSavedAction() {
-        RoundFacade interruptedRound = getInterruptedRound();
-        if (interruptedRound != null
-                && interruptedRound instanceof OperatingRound) {
-            return ((OperatingRound)interruptedRound).savedAction;
-        } else {
-            return null;
-        }
-    }*/
+    private int loopGuardActionId = -1;
+    private int loopGuardCounter = 0;
 
     public void nextRound(Round round) {
+
+        // Infinite Loop Guard ---
+        // Check if we are cycling rounds without processing actions.
+        // We MUST disable this check during reload/replay, because the action counter
+        // logic behaves differently and speed is high, causing false positives.
+        if (!isReloading()) {
+            if (this.absoluteActionCounter == loopGuardActionId) {
+                loopGuardCounter++;
+                if (loopGuardCounter > 20) {
+                    String error = "CRITICAL: Infinite Loop detected in Round Transition. \n" +
+                            "The Game Engine is cycling rounds without accepting input. \n" +
+                            "Last Round: " + (round != null ? round.getId() : "null");
+                    log.error(error);
+                    DisplayBuffer.add(this, error);
+                    // Throwing RuntimeException breaks the loop and prevents the UI hang
+                    throw new RuntimeException(error);
+                }
+            } else {
+                loopGuardActionId = this.absoluteActionCounter;
+                loopGuardCounter = 0;
+            }
+        }
+
         if (round instanceof StartRound) {
-            if (((StartRound) round).getStartPacket().areAllSold()) { //This start Round was completed
+            if (((StartRound) round).getStartPacket().areAllSold()) { // This start Round was completed
                 StartPacket nextStartPacket = getRoot().getCompanyManager().getNextUnfinishedStartPacket();
                 if (nextStartPacket == null) {
                     if (skipFirstStockRound) {
-                        Phase currentPhase =
-                                getRoot().getPhaseManager().getCurrentPhase();
+                        Phase currentPhase = getRoot().getPhaseManager().getCurrentPhase();
                         if (currentPhase.getNumberOfOperatingRounds() != numOfORs.value()) {
                             numOfORs.set(currentPhase.getNumberOfOperatingRounds());
                         }
+                        operatingRoundLimit.set(numOfORs.value());
                         log.info("Phase={} ORs={}", currentPhase.toText(), numOfORs);
 
                         // Create a new OperatingRound (never more than one Stock Round)
@@ -612,12 +1091,15 @@ public class GameManager extends RailsManager implements Configurable, Owner {
             }
         } else if (round instanceof StockRound) {
             Phase currentPhase = getRoot().getPhaseManager().getCurrentPhase();
-            if (currentPhase == null) log.error("Current Phase is null??", new Exception(""));
-            numOfORs.set(currentPhase.getNumberOfOperatingRounds());
-            log.debug("Phase={} ORs={}", currentPhase.toText(), numOfORs);
+            if (currentPhase == null)
+                // log.error("Current Phase is null??", new Exception(""));
+                numOfORs.set(currentPhase.getNumberOfOperatingRounds());
+            // log.debug("Phase={} ORs={}", currentPhase.toText(), numOfORs);
 
             // Create a new OperatingRound (never more than one Stock Round)
             // OperatingRound.resetRelativeORNumber();
+            capturePlayerWorthSnapshot(round.getId());
+            captureCompanyPayoutSnapshot(round.getId());
             relativeORNumber.set(0);
             startOperatingRound(true);
 
@@ -626,15 +1108,22 @@ public class GameManager extends RailsManager implements Configurable, Owner {
 
                 finishGame();
 
-            } else if (relativeORNumber.value() < numOfORs.value()) {
+                // Use operatingRoundLimit instead of numOfORs to prevent mid-cycle extension
+            } else if (relativeORNumber.value() < operatingRoundLimit.value()) {
                 // There will be another OR
+                capturePlayerWorthSnapshot(round.getId());
+                captureCompanyPayoutSnapshot(round.getId());
                 startOperatingRound(true);
             } else if (getRoot().getCompanyManager().getNextUnfinishedStartPacket() != null) {
                 beginStartRound();
             } else {
+                // Before starting the new Stock Round
+                capturePlayerWorthSnapshot(round.getId());
+                captureCompanyPayoutSnapshot(round.getId());
                 if (gameOverPending.value() && gameEndWhen == GameEnd.AFTER_SET_OF_ORS) {
                     finishGame();
                 } else {
+
                     ((OperatingRound) round).checkForeignSales();
                     startStockRound();
                 }
@@ -666,8 +1155,10 @@ public class GameManager extends RailsManager implements Configurable, Owner {
     }
 
     /**
-     * Stub, to be overridden if companies can run before the Start Packet has been completely sold
-     * (as in 1835). Also see further comments at the overriding method in GameManager_18Scan.
+     * Stub, to be overridden if companies can run before the Start Packet has been
+     * completely sold
+     * (as in 1835). Also see further comments at the overriding method in
+     * GameManager_18Scan.
      *
      * @return true if companies can run regardless. Default false.
      */
@@ -677,28 +1168,38 @@ public class GameManager extends RailsManager implements Configurable, Owner {
 
     protected void startStockRound() {
         stockRoundNumber.add(1);
+        clearStatusMessage(); // Reset Blue Text
         StockRound sr = createRound(stockRoundClass, "SR_" + stockRoundNumber.value());
-        currentSRorOR.set (sr);
+        currentSRorOR.set(sr);
 
-        // For debugging only: check where the certs are.
-        if (log.isDebugEnabled() && stockRoundNumber.value() == 1) {
-            for (PublicCompany comp : this.getAllPublicCompanies()) {
-                for (PublicCertificate cert : comp.certificates) {
-                    log.debug("{} cert {} owned by {}", comp.getId(), cert.getId(), cert.getOwner());
-                }
-            }
+        // Update numOfORs before the OR cycle starts
+        Phase currentPhase = getRoot().getPhaseManager().getCurrentPhase();
+        if (currentPhase != null) {
+            numOfORs.set(currentPhase.getNumberOfOperatingRounds());
+            operatingRoundLimit.set(numOfORs.value());
         }
 
+        // log.info("[STATE] Starting Stock Round {}", stockRoundNumber.value()); //
+        // 'essential logging' keep!
+
+        if (isTimeManagementEnabled()) {
+            Player priorityPlayer = getRoot().getPlayerManager().getPriorityPlayer();
+            if (priorityPlayer != null) {
+                priorityPlayer.getTimeBankModel().add(this.timeMgmtShareRoundIncrement);
+                triggerUITimeFlash(priorityPlayer, this.timeMgmtShareRoundIncrement);
+            }
+        }
         sr.start();
     }
 
     protected void startOperatingRound(boolean operate) {
-        log.debug("Operating round started with operate-flag={}", operate);
+        // log.debug("Operating round started with operate-flag={}", operate);
         String orId;
+        clearStatusMessage(); // Reset Blue Text
         if (operate) {
             absoluteORNumber.add(1);
             if (showCompositeORNumber) {
-                relativeORNumber.add (1);
+                relativeORNumber.add(1);
                 orId = "OR_" + stockRoundNumber.value() + "." + relativeORNumber.value();
             } else {
                 orId = "OR_" + absoluteORNumber.value();
@@ -708,18 +1209,34 @@ public class GameManager extends RailsManager implements Configurable, Owner {
             orId = "OR_0." + relativeORNumber.value();
         }
         OperatingRound or = createRound(operatingRoundClass, orId);
-        //if (operate) absoluteORNumber.add(1);
-        currentSRorOR.set (or);
+        // if (operate) absoluteORNumber.add(1);
+        currentSRorOR.set(or);
+        // Explicitly record private company revenue at the start of the OR.
+        // This ensures the Payout Chart captures fixed income (e.g. PfB's 15M).
+        if (operate) {
+            recordPrivateRevenue();
+        }
+
+        // log.info("[STATE] Starting Operating Round {} (Abs: {}, Rel: {})", orId,
+        // absoluteORNumber.value(), relativeORNumber.value()); // 'essential logging'
+        // keep!
         or.start();
     }
 
-    // FIXME: We need an ID!
-    protected <T extends RoundFacade> T createRound(String roundClassName, String id) {
+    public <T extends RoundFacade> T createRound(String roundClassName, String id) {
+        // log.error("--- GM.createRound(String, String) CALLED. ClassName: {}, ID: {}",
+        // roundClassName, id);
         T round = null;
         try {
-            round = Configure.create((Class<T>) StartRound.class, roundClassName, GameManager.class, this, id);
+            // 1. Load the class object from the string name
+            Class<? extends RoundFacade> roundClass = Class.forName(roundClassName).asSubclass(RoundFacade.class);
+
+            // 2. Call Configure.create with the specific CLASS object,
+            // not the abstract StartRound.class
+            round = Configure.create((Class<T>) roundClass, GameManager.class, this, id);
+
         } catch (Exception e) {
-            log.error("Cannot instantiate class {}", StartRound.class.getName(), e);
+            log.error("Cannot instantiate class {}", roundClassName, e); // Use the variable
             System.exit(1);
         }
         setRound(round);
@@ -727,7 +1244,9 @@ public class GameManager extends RailsManager implements Configurable, Owner {
     }
 
     // FIXME: We need an ID!
-    protected <T extends RoundFacade> T createRound(Class<T> roundClass, String id) {
+    public <T extends RoundFacade> T createRound(Class<T> roundClass, String id) {
+        // log.error("--- GM.createRound(Class, String) CALLED. Class: {}, ID: {}",
+        // roundClass.getName(), id);
         T round = null;
         try {
             round = Configure.create(roundClass, GameManager.class, this, id);
@@ -780,6 +1299,29 @@ public class GameManager extends RailsManager implements Configurable, Owner {
         return numOfORs.toText();
     }
 
+    public void setNumberOfOperatingRounds(int number) {
+        // Use currentSRorOR instead of currentRound.
+        // In 1835, buying a 5-train triggers the PFR (Prussian Formation Round)
+        // immediately.
+        // If we check currentRound, it sees PFR (not an OperatingRound) and allows the
+        // update.
+        // currentSRorOR remembers we are in an Operating context regardless of
+        // interruptions.
+        if (currentSRorOR.value() instanceof OperatingRound) {
+            log.info("GameManager: Phase changed OR count to {}, but ignoring update until next Stock Round.", number);
+            return;
+        }
+
+        if (numOfORs.value() != number) {
+            log.info("GameManager: Updating OR Count to {}", number);
+            numOfORs.set(number);
+        }
+    }
+
+    public int getNumberOfOperatingRounds() {
+        return numOfORs.value();
+    }
+
     public int getStartRoundNumber() {
         return startRoundNumber.value();
     }
@@ -789,18 +1331,19 @@ public class GameManager extends RailsManager implements Configurable, Owner {
     }
 
     public void startShareSellingRound(Player player, int cashToRaise,
-                                       PublicCompany cashNeedingCompany, boolean problemDumpOtherCompanies) {
+            PublicCompany cashNeedingCompany, boolean problemDumpOtherCompanies) {
 
         interruptedRound.set(getCurrentRound());
 
         // An id based on interruptedRound and company id
-        String id = "SSR_" + getInterruptedRound().getId() + "_" + cashNeedingCompany.getId()+"_"+cashToRaise;
+        String id = "SSR_" + getInterruptedRound().getId() + "_" + cashNeedingCompany.getId() + "_" + cashToRaise;
 
         // check if other companies can be dumped
         createRound(shareSellingRoundClass, id).start(
                 getInterruptedRound(), player, cashToRaise, cashNeedingCompany,
                 !problemDumpOtherCompanies || forcedSellingCompanyDump);
-        // the last parameter indicates if the dump of other companies is allowed, either this is explicit or
+        // the last parameter indicates if the dump of other companies is allowed,
+        // either this is explicit or
         // the action does not require that check
     }
 
@@ -810,118 +1353,283 @@ public class GameManager extends RailsManager implements Configurable, Owner {
         createRound(treasuryShareRoundClass, id).start(getInterruptedRound());
     }
 
+    /**
+     * Central processing method for game actions.
+     * 
+     * @param action The action to process.
+     * @return True if the action was successful, false otherwise.
+     */
     public boolean process(PossibleAction action) {
-        boolean result = true;
+        // log.debug("process({})", action); // Existing log
 
         getRoot().getReportManager().getDisplayBuffer().clear();
+
+        // Capture the active entity (Player or Company) BEFORE processing the action.
+        // We will compare this with the "After" state to detect if the turn has ended.
+        RoundFacade roundBefore = getCurrentRound();
+        Object actorBefore = getCurrentPlayer();
+
+        // If we are in an Operating Round, the "Actor" is the Company, not the Player.
+        if (roundBefore instanceof OperatingRound) {
+            // We access the operatingCompany state directly, similar to logActionTaken
+            // logic
+            actorBefore = ((OperatingRound) roundBefore).operatingCompany.value();
+        }
+
+        // If the batch logger tool has set an output directory,
+        // save a snapshot of the current state *before* processing the action.
+        if (this.logOutputDirectory != null) {
+            try {
+                // Use the existing actionCount state to number the files
+                String filename = String.format("state_%05d.json", actionCount.value());
+                File outputFile = new File(this.logOutputDirectory, filename);
+
+                // Use the EXISTING, WORKING serialize method.
+                net.sf.rails.game.ai.snapshot.JsonStateSerializer.serialize(this, outputFile.getAbsolutePath());
+            } catch (Exception e) {
+                // Don't stop the replay, just log the capture error.
+                log.error("BatchLogGenerator FAILED to save state snapshot", e);
+            }
+        }
+
         guiHints.clearVisibilityHints();
         ChangeStack changeStack = getRoot().getStateManager().getChangeStack();
         boolean startGameAction = false;
 
-        logActionTaken (action);
+        logActionTaken(action); // Your existing logging
+        boolean isBuyTrainAction = action instanceof BuyTrain;
+
+        boolean result = false; // Initialize result to false
 
         if (action instanceof NullAction && ((NullAction) action).getMode() == NullAction.Mode.START_GAME) {
-            // Skip processing at game start after Load.
-            // We're only here to create PossibleActions.
             startGameAction = true;
+            result = true; // START_GAME action is considered successful for flow control
+            // Do not increment counter for START_GAME meta-action
+            // log.debug(">>> GameManager processing START_GAME action - counter remains
+            // {}", this.absoluteActionCounter);
         } else if (action != null) {
-            // Should never be null.
-            // EV: actually, it is null if the StartRound needs no user interaction.
-            // Example: Steam Over Holland, when privates are just dealt out randomly.
+            action.setActed(); // Seems fine here
 
-            action.setActed(); // Duplicate?
-
-            // Check player
+            // Validation checks (Keep these)
             String actionPlayerName = action.getPlayerName();
             String currentPlayerName = getCurrentPlayer().getId();
             if (!actionPlayerName.equals(currentPlayerName)) {
                 DisplayBuffer.add(this, LocalText.getText("WrongPlayer", actionPlayerName, currentPlayerName));
-                return false;
+                return false; // Return early, DO NOT count
             }
-
-            // Check if the action is allowed
             if (!possibleActions.validate(action)) {
                 DisplayBuffer.add(this, LocalText.getText("ActionNotAllowed", action.toString()));
-                return false;
+                return false; // Return early, DO NOT count
             }
 
-            if (action instanceof GameAction) {
-                // Process undo/redo centrally
-                GameAction gameAction = (GameAction) action;
-                result = processGameActions(gameAction);
-            } else {
-                // All other actions: process per round
-                result = processCorrectionActions(action)
-                        || getCurrentRound().process(action);
-                if (result && action.hasActed()) {
-                    executedActions.add(action);
+            // Process the action within try-catch
+            try {
+                if (action instanceof GameAction) {
+                    GameAction gameAction = (GameAction) action;
+                    result = processGameActions(gameAction); // Assume this handles Undo/Redo counting if necessary
+                    // Typically Undo/Redo might not increment the main counter, depends on rules.
+                    // If they SHOULD count, increment here:
+                    // if (result) { this.absoluteActionCounter++; }
+                } else {
+                    boolean correctionHandled = processCorrectionActions(action);
+                    if (correctionHandled) {
+                        result = true;
+                    } else if (getCurrentRound() != null) {
+                        result = getCurrentRound().process(action);
+                    } else {
+                        // log.error("Action {} could not be processed: No current round and not a
+                        // correction.", action);
+                        result = false;
+                    }
                 }
+
+                // Increment counter ONLY on successful processing of non-GameAction types
+                if (result && !(action instanceof GameAction)) {
+                    this.absoluteActionCounter++;
+                    log.debug(">>> GameManager successfully processed action #{}: {}", this.absoluteActionCounter,
+                            action);
+
+                    if (action.hasActed()) { // Consider if action.hasActed() check is still needed here
+                        executedActions.add(action);
+                    }
+                    updatePayoutTracker(action);
+                    // Hook the new logging logic here, immediately after a successful,
+                    // non-GameAction execution
+                    logAction(action);
+
+                } else if (!result) { // Log failure if not already handled by exceptions
+
+                }
+            } catch (Exception e) {
+                log.error("!!! Exception during GameManager.process for action {} !!!", action, e);
+                result = false; // Ensure result is false on exception
+                // Do NOT increment counter on exception
             }
 
+        } else { // Handle null action case
+            result = true; // Assuming null action means success/continue flow
+            // Do NOT increment counter for null action
+        }
+
+        // BuyTrain post-logging (Keep this)
+        if (isBuyTrainAction) {
+
+            BuyTrain buyTrainAction = (BuyTrain) action;
+            if (buyTrainAction.getCompany() instanceof PublicCompany) {
+                PublicCompany company = (PublicCompany) buyTrainAction.getCompany();
+            }
         }
 
         possibleActions.clear();
 
-        // Note: round may have changed!
-        getCurrentRound().setPossibleActions();
+        // Allow action generation if game is active OR if we are in the End Round (to
+        // allow Undo)
+        boolean allowActionGeneration = !isGameOver() || (getCurrentRound() instanceof EndOfGameRound);
 
-        // TODO: SetPossibleAction can contain state changes (like initTurn)
-        // Remove that and move closing the ChangeStack after the processing of the action
-        if (result && !(action instanceof GameAction) && !(startGameAction)) {
-            changeStack.close(action);
-        }
+        if (allowActionGeneration) { // Check game over state OR EndOfGameRound
 
-        // only pass available => execute automatically
-        if (!isGameOver() && possibleActions.containsOnlyPass()) {
-            log.debug("{} may only pass", getCurrentPlayer().getId());
-            result = process(possibleActions.getList().get(0));
-        }
+            getCurrentRound().setPossibleActions();
 
-        // TODO: Check if this still works as it moved above the close of the ChangeStack
-        // to have a ChangeSet open to initialize the CorrectionManagers
-        if (!isGameOver()) setCorrectionActions();
+            // Close change stack *after* successful processing, *before* auto-pass or
+            // adding Undo/Redo
+            if (result && !(action instanceof GameAction) && !(startGameAction)) {
+                changeStack.close(action);
+                // Autosave logic: Only save if the Round changed OR the Active Actor changed.
+                // This indicates a "Full Move" (e.g. Player passed priority, or Company
+                // finished operating).
+                RoundFacade roundAfter = getCurrentRound();
+                Object actorAfter = getCurrentPlayer();
 
-        // Add the Undo/Redo possibleActions here.
-        if (changeStack.isUndoPossible(getCurrentPlayer())) {
-            possibleActions.add(new GameAction(getRoot(), GameAction.Mode.UNDO));
-        }
-        if (changeStack.isUndoPossible()) {
-            possibleActions.add(new GameAction(getRoot(), GameAction.Mode.FORCED_UNDO));
-        }
-        if (changeStack.isRedoPossible()) {
-            possibleActions.add(new GameAction(getRoot(), GameAction.Mode.REDO));
-        }
+                if (roundAfter instanceof OperatingRound) {
+                    actorAfter = ((OperatingRound) roundAfter).operatingCompany.value();
+                }
 
-        // logging of game actions activated
-        log.debug ("Action result: {}", result);
-        for (PossibleAction pa : possibleActions.getList()) {
-            log.info("{}", pa);
-        }
+                boolean roundChanged = (roundBefore != roundAfter);
+                // Check for actor change (null-safe)
+                boolean actorChanged = (actorBefore == null && actorAfter != null) ||
+                        (actorBefore != null && !actorBefore.equals(actorAfter));
+
+                if (roundChanged || actorChanged) {
+                    recoverySave();
+                }
+
+                // We use a config flag to turn this on/off
+                if (Config.getBoolean("ai.save.state.on.move", false)) {
+                    // Ensure the logs/state directory exists
+                    File stateDir = new File("logs/state");
+                    if (!stateDir.exists()) {
+                        stateDir.mkdirs();
+                    }
+
+                    try {
+                        String filename = String.format("logs/state/state_%05d.json", this.absoluteActionCounter);
+                        JsonStateSerializer.serialize(this, filename);
+                    } catch (IOException e) {
+                        // log.error("Failed to save state snapshot for move {}",
+                        // this.absoluteActionCounter, e);
+                    }
+                }
+            }
+
+            // // Auto-pass logic
+            // if (!isGameOver() && possibleActions.containsOnlyPass()) {
+            // // log.info("Player {} may only pass, processing automatically.",
+            // // getCurrentPlayer().getId()); // Use INFO for auto actions
+            // // Make sure the recursive call doesn't cause stack overflow if pass logic is
+            // // flawed
+            // boolean passResult = process(possibleActions.getList().get(0));
+            // // If the auto-pass fails for some reason, the original 'result' might be
+            // // misleading.
+            // // Decide how to handle passResult if needed, otherwise 'result' refers to
+            // the
+            // // original action.
+            // return passResult; // Return result of the pass action
+            // }
+
+            // Add correction actions
+            if (!isGameOver()) // Check again in case auto-pass ended the game
+                setCorrectionActions();
+
+            boolean undoPossible = changeStack.isUndoPossible(getCurrentPlayer());
+
+            // Add Undo/Redo actions
+            // if (changeStack.isUndoPossible(getCurrentPlayer())) {
+            // possibleActions.add(new GameAction(getRoot(), GameAction.Mode.UNDO));
+            // }
+            if (changeStack.isUndoPossible()) { // Forced Undo? Check if logic is distinct
+                possibleActions.add(new GameAction(getRoot(), GameAction.Mode.FORCED_UNDO));
+            }
+            if (changeStack.isRedoPossible()) {
+                possibleActions.add(new GameAction(getRoot(), GameAction.Mode.REDO));
+            }
+        } // End if (!isGameOver()) block
 
         return result;
     }
 
-    protected void logActionTaken (PossibleAction action) {
+    protected void logActionTaken(PossibleAction action) {
         if (action instanceof NullAction
-                && ((NullAction)action).getMode() == NullAction.Mode.START_GAME)    {
+                && ((NullAction) action).getMode() == NullAction.Mode.START_GAME) {
             log.info("*** Action -1: {}", action);
         } else {
+            // Generate a concise summary for common actions
+            String summary;
+            if (action instanceof LayTile) {
+                LayTile lt = (LayTile) action;
+                summary = String.format("Lays tile %s on %s", lt.getLaidTile().getId(), lt.getChosenHex().getId());
+            } else if (action instanceof BuyCertificate) {
+                BuyCertificate bc = (BuyCertificate) action;
+                summary = String.format("Buys %d%% %s for %s", bc.getSharePerCertificate(), bc.getCompany().getId(),
+                        bc.getPrice());
+            } else if (action instanceof BuyTrain) {
+                BuyTrain bt = (BuyTrain) action;
+                String trainName = bt.getTrain() != null ? bt.getTrain().getName().split("_")[0] : "?";
+                summary = String.format("Buys %s train for %d", trainName, bt.getPricePaid());
+            } else if (action instanceof BuyStartItem) {
+                String item = action.toString().contains("startItem=")
+                        ? action.toString().split("startItem=")[1].split(",")[0]
+                        : "Start Item";
+                summary = "Buys " + item;
+
+                // Add SetDividend formatting ---
+            } else if (action instanceof SetDividend) {
+                SetDividend sd = (SetDividend) action;
+                String type = "Unknown";
+
+                // Map integer constants to readable strings
+                if (sd.getRevenueAllocation() == SetDividend.PAYOUT)
+                    type = "Payout";
+                else if (sd.getRevenueAllocation() == SetDividend.WITHHOLD)
+                    type = "Withhold";
+                else if (sd.getRevenueAllocation() == SetDividend.SPLIT)
+                    type = "Split";
+
+                summary = String.format("Revenue %d (%s)", sd.getActualRevenue(), type);
+
+            } else if (action instanceof NullAction) {
+                summary = ((NullAction) action).getMode().toString();
+            } else {
+                summary = action.toString();
+            }
+
             if (getCurrentRound() instanceof OperatingRound) {
-                //OperatingRound thisOR = (OperatingRound) getCurrentRound();
+                OperatingRound thisOR = (OperatingRound) getCurrentRound();
                 String actor;
                 if (action instanceof PossibleORAction) {
                     PossibleORAction orAction = (PossibleORAction) action;
-                    actor = orAction.getCompanyName()
-                            + "(" + orAction.getPlayerName() + ")";
+                    // Safety check for null company ---
+                    if (orAction.getCompany() != null) {
+                        actor = orAction.getCompanyName() + "(" + orAction.getPlayerName() + ")";
+                    } else {
+                        actor = orAction.getPlayerName();
+                    }
                 } else {
                     actor = action.getPlayerName();
                 }
-                log.info("*** Action {} by {}: {}", actionCount.value(),
-                        //thisOR.getCompAndPresName(thisOR.operatingCompany.value()),
-                        actor,
-                        action);
+                log.info("Move {}: [{}] {}", actionCount.value(), actor, summary);
             } else {
-                log.info("*** Action {} by {}: {}", actionCount.value(), action.getPlayerName(), action);
+                log.info("Move {}: [{}] {}", actionCount.value(),
+                        action.getPlayerName(), summary);
             }
             actionCount.add(1);
         }
@@ -933,13 +1641,20 @@ public class GameManager extends RailsManager implements Configurable, Owner {
      */
     private void setCorrectionActions() {
 
-        // If any Correction is active
+        // 1. Check if ANY Correction Manager is currently active.
+        boolean anyCorrectionActive = false;
         for (CorrectionType ct : EnumSet.allOf(CorrectionType.class)) {
             CorrectionManager cm = getCorrectionManager(ct);
             if (cm.isActive()) {
-                possibleActions.clear();
+                anyCorrectionActive = true;
+                break;
             }
+        }
 
+        // 2. If a correction is active, clear the normal game actions.
+        if (anyCorrectionActive) {
+            possibleActions.clear();
+            log.info("[CORRECTION-FIX] Active Correction Mode detected. Clearing all normal game actions.");
         }
 
         // Correction Actions
@@ -969,6 +1684,10 @@ public class GameManager extends RailsManager implements Configurable, Owner {
 
         ChangeStack changeStack = getRoot().getStateManager().getChangeStack();
         int index = gameAction.getmoveStackIndex();
+
+        // The player initiating the action is the one who should pay the penalty.
+        String disruptorName = gameAction.getPlayerName();
+
         switch (gameAction.getMode()) {
             case SAVE:
                 result = save(gameAction);
@@ -976,18 +1695,74 @@ public class GameManager extends RailsManager implements Configurable, Owner {
             case RELOAD:
                 result = reload(gameAction);
                 break;
+
             case UNDO:
-                changeStack.undo();
-                result = true;
-                break;
             case FORCED_UNDO:
+// --- START FIX: Robust Penalty Logic ---
+
+                // 1. BLIND THE UI (Pre-Undo)
+                if (gameUIManager != null && getCurrentPlayer() != null) {
+                    gameUIManager.resetTimeHistory(getCurrentPlayer().getIndex());
+                }
+
+                // 2. CAPTURE STATE BEFORE UNDO
+                Player playerBefore = getCurrentPlayer();
+
+                // 3. EXECUTE UNDO (Restores state, including Victim's time)
                 if (index == -1) {
                     changeStack.undo();
                 } else {
                     changeStack.undo(index);
                 }
+
+                // 4. CAPTURE STATE AFTER UNDO
+                Player playerAfter = getCurrentPlayer();
+
+                if (gameUIManager != null && playerAfter != null) {
+                    // Sync UI to the restored time immediately
+                    int restoredTime = playerAfter.getTimeBankModel().value();
+                    gameUIManager.setPlayerTimeAfterUndo(playerAfter.getIndex(), restoredTime);
+                }
+
+                // 5. APPLY "DISRUPTOR vs VICTIM" PENALTY LOGIC
+                if (isTimeManagementEnabled() && !isGamePaused()) {
+                    int penaltyAmount = 0;
+                    String penaltyType = "";
+
+                    // LOGIC:
+                    // If playerBefore == playerAfter: I am undoing my own recent move. (Self-Correction)
+                    // If playerBefore != playerAfter: I undid back into the previous player's turn. (Disruption)
+                    
+                    if (playerBefore != null && playerAfter != null) {
+                        if (playerBefore.equals(playerAfter)) {
+                            // Minor Penalty for fixing your own math
+                            penaltyAmount = timeMgmtUndoPenalty;
+                            penaltyType = "Self-Correction";
+                        } else {
+                            // Major Penalty for disrupting the flow / going back a player
+                            // 'playerAfter' is the one who is now active (the Disruptor who went back)
+                            penaltyAmount = timeMgmtMajorUndoPenalty;
+                            penaltyType = "Disruption";
+                        }
+                    }
+
+                    // Apply and Flash
+                    if (playerAfter != null && penaltyAmount > 0) {
+
+                        // A. Apply Penalty to the restored time
+                        playerAfter.getTimeBankModel().add(-penaltyAmount);
+                        log.info("[TIME] {} Undo. Penalizing {}: -{}s", penaltyType, playerAfter.getName(),
+                                penaltyAmount);
+
+                        // B. FORCE RED FLASH (Uses the final time AFTER penalty)
+                        triggerUITimeFlash(playerAfter, -penaltyAmount);
+                    }
+                }
+
                 result = true;
                 break;
+
+
             case REDO:
                 if (index == -1) {
                     changeStack.redo();
@@ -999,67 +1774,16 @@ public class GameManager extends RailsManager implements Configurable, Owner {
             case EXPORT:
                 result = export(gameAction);
                 break;
+            case LOAD:
+                break;
+            case NEW:
+                break;
+
+            default:
+                break;
         }
 
         return result;
-    }
-
-    public boolean processOnReload(PossibleAction action) {
-        getRoot().getReportManager().getDisplayBuffer().clear();
-
-       // Log possible actions (normally this is outcommented)
-        for (PossibleAction a : possibleActions.getList()) {
-            log.info("{}", a);
-        }
-
-        logActionTaken (action);
-
-        // Allow but negate spurious NullAction (usually Skip)
-        if (action instanceof NullAction
-                && !possibleActions.contains(NullAction.class)) {
-            return true;
-        }
-
-        // New in Rails2.0: Check if the action is allowed
-        if (!possibleActions.validate(action)) {
-            DisplayBuffer.add(this, LocalText.getText("ActionNotAllowed",
-                    action.toString()));
-            return false;
-        }
-
-        // FOR BACKWARDS COMPATIBILITY
-        boolean doProcess = true;
-        if (skipNextDone) {
-            if (action instanceof NullAction
-                    && ((NullAction) action).getMode() == NullAction.Mode.DONE) {
-                if (currentRound.value() instanceof OperatingRound
-                        && ((OperatingRound) currentRound.value()).getStep() == skippedStep) {
-                    doProcess = false;
-                }
-            }
-        }
-        skipNextDone = false;
-        skippedStep = null;
-
-        ChangeStack changeStack = getRoot().getStateManager().getChangeStack();
-
-        if (doProcess && !processCorrectionActions(action) && !getCurrentRound().process(action)) {
-            String msg = "Player " + action.getPlayerName() + "'s action \""
-                    + action + "\"\n  in " + getCurrentRound().getRoundName()
-                    + " is considered invalid by the game engine";
-            log.error(msg);
-            DisplayBuffer.add(this, msg);
-            return false;
-        }
-        executedActions.add(action);
-
-        possibleActions.clear();
-        getCurrentRound().setPossibleActions();
-        changeStack.close(action);
-
-        if (!isGameOver()) setCorrectionActions();
-
-        return true;
     }
 
     public void finishLoading() {
@@ -1071,11 +1795,42 @@ public class GameManager extends RailsManager implements Configurable, Owner {
      * Uses filePath defined in save.recovery.filepath
      */
     protected void recoverySave() {
-        if (Config.get("save.recovery.active", "yes").equalsIgnoreCase("no")) return;
+        if (Config.get("save.recovery.active", "yes").equalsIgnoreCase("no"))
+            return;
+
+        // Determine directory (default to 'autosave' if not configured)
+        String path = Config.get("save.recovery.filepath");
+        File dir;
+        if (Util.hasValue(path)) {
+            dir = new File(path).getParentFile();
+        } else {
+            dir = new File("autosave");
+        }
+        if (dir == null)
+            dir = new File(".");
+        if (!dir.exists())
+            dir.mkdirs();
+
+        // Generate filename using the official persistent move counter (actionCount)
+        // instead of the transient absoluteActionCounter.
+        String filename = String.format("autosave_%05d.rails", actionCount.value());
+        File saveFile = new File(dir, filename);
 
         GameSaver gameSaver = new GameSaver(getRoot().getGameData(), executedActions.view());
         try {
-            gameSaver.autoSave();
+            // Save the new file
+            gameSaver.saveGame(saveFile);
+
+            // Delete old autosave files to keep only the latest
+            File[] oldFiles = dir.listFiles(
+                    (d, name) -> name.startsWith("autosave_") && name.endsWith(".rails") && !name.equals(filename));
+
+            if (oldFiles != null) {
+                for (File f : oldFiles) {
+                    // f.delete();
+                }
+            }
+
             recoverySaveWarning = false;
         } catch (IOException e) {
             // suppress warning after first occurrence
@@ -1092,6 +1847,8 @@ public class GameManager extends RailsManager implements Configurable, Owner {
         File file = new File(saveAction.getFilepath());
         try {
             gameSaver.saveGame(file);
+            // Save the exact clock times to a sidecar file
+            saveTimeData(file);
         } catch (IOException e) {
             DisplayBuffer.add(this, LocalText.getText("SaveFailed", e.getMessage()));
             log.error("save failed", e);
@@ -1099,61 +1856,61 @@ public class GameManager extends RailsManager implements Configurable, Owner {
         }
 
         boolean archive = Config.getBoolean(ARCHIVE_ENABLED, false);
-        if ( archive ) {
+        if (archive) {
             int count = Config.getInt(ARCHIVE_KEEP_COUNT, 5);
-            if ( count < 1 ) {
+            if (count < 1) {
                 count = 1;
             }
 
             String archiveDir = Config.get(ARCHIVE_DIRECTORY);
-            if ( StringUtils.isBlank(archiveDir) ) {
+            if (StringUtils.isBlank(archiveDir)) {
                 // default to "archive"
                 archiveDir = "archive";
             }
-            if ( ! archiveDir.startsWith(File.separator) ) {
+            if (!archiveDir.startsWith(File.separator)) {
                 // it should be relative to the current saved files
                 archiveDir = file.getParent() + File.separator + archiveDir;
             }
-            log.debug("archiving old saved game files to {}", archiveDir);
+            // log.debug("archiving old saved game files to {}", archiveDir);
 
             File archiveDirFile = new File(archiveDir);
-            if ( ! archiveDirFile.exists() ) {
+            if (!archiveDirFile.exists()) {
                 // create it
                 try {
-                    Files.createDirectories(Path.of(archiveDir,File.separator,"dummy"));
-                }
-                catch (IOException e) {
-                    log.warn("Unable to create archive directory {}", archiveDir, e);
+                    Files.createDirectories(Path.of(archiveDir, File.separator, "dummy"));
+                } catch (IOException e) {
+                    // log.warn("Unable to create archive directory {}", archiveDir, e);
                     archive = false;
                 }
-            } else if ( archiveDirFile.exists() && ! archiveDirFile.isDirectory() ) {
-                log.warn("Archive directory doesn't seem to be a directory?");
+            } else if (archiveDirFile.exists() && !archiveDirFile.isDirectory()) {
+                // log.warn("Archive directory doesn't seem to be a directory?");
                 archive = false;
             }
 
-            if ( archive ) {
+            if (archive) {
                 // iterate through files in current directory
                 SortedSet<File> files = new TreeSet<>((a, b) -> ComparisonChain.start()
                         .compare(b.lastModified(), a.lastModified())
                         .result());
 
                 for (File entry : file.getParentFile().listFiles()) {
-                    if (entry.isFile() ) {
+                    if (entry.isFile()) {
                         String ext = StringUtils.substringAfterLast(entry.getName(), ".");
                         boolean doInclude = GameUIManager.DEFAULT_SAVE_EXTENSION.equals(ext);
                         // TODO: verify it matches out expected file name format
-                        if ( doInclude ) {
+                        if (doInclude) {
                             files.add(entry);
                         }
                     }
                 }
-                if ( files.size() > count ) {
-                    File[] fileList = files.toArray(new File[]{});
-                    for ( int i = count; i < fileList.length; i++ ) {
+                if (files.size() > count) {
+                    File[] fileList = files.toArray(new File[] {});
+                    for (int i = count; i < fileList.length; i++) {
                         File toMove = fileList[i];
                         File destFile = new File(archiveDir + File.separator + toMove.getName());
-                        if ( ! toMove.renameTo(destFile) ) {
-                            log.warn("Unable to archive {} to {}", toMove.getName(), destFile.getAbsolutePath());
+                        if (!toMove.renameTo(destFile)) {
+                            // log.warn("Unable to archive {} to {}", toMove.getName(),
+                            // destFile.getAbsolutePath());
                         }
                     }
                 }
@@ -1166,8 +1923,13 @@ public class GameManager extends RailsManager implements Configurable, Owner {
      * tries to reload the current game
      * executes the additional action(s)
      */
+    // ... (lines of unchanged context code) ...
+    /**
+     * tries to reload the current game
+     * executes the additional action(s)
+     */
     protected boolean reload(GameAction reloadAction) {
-        log.debug("Reloading started");
+        // log.debug("Reloading started");
 
         /* Use gameLoader to load the game data */
         GameLoader gameLoader = new GameLoader();
@@ -1177,66 +1939,120 @@ public class GameManager extends RailsManager implements Configurable, Owner {
             return false;
         }
 
-        log.debug("Starting to compare loaded actions");
+        // CRITICAL: Reset time penalties on reload (replaying log should be
+        // penalty-free)
+        for (Player player : getRoot().getPlayerManager().getPlayers()) {
+            player.getTimePenaltyModel().set(0);
+        }
 
-        /* gameLoader actions get compared to the executed actions of the current game */
+        // log.debug("Starting to compare loaded actions");
+
+        /*
+         * gameLoader actions get compared to the executed actions of the current game
+         */
         List<PossibleAction> savedActions = gameLoader.getActions();
 
         setReloading(true);
 
+        // This is the fix for the save/load crash [cite: 570-572].
+        // We must clean up all *active round references* in the GameManager
+        // to clear 'transient' fields of stale data *before* we replay any actions.
+
+        log.info("Reload: Cleaning up transient state for all loaded rounds...");
+
+        // Clean up the current round
+        RoundFacade loadedRound = getCurrentRound();
+        if (loadedRound instanceof OperatingRound) {
+            ((OperatingRound) loadedRound).resetTransientStateOnLoad();
+        } else if (loadedRound instanceof StockRound) {
+            ((StockRound) loadedRound).resetTransientStateOnLoad();
+        }
+
+        // Clean up the interrupted round
+        RoundFacade interrupted = getInterruptedRound();
+        if (interrupted instanceof OperatingRound) {
+            ((OperatingRound) interrupted).resetTransientStateOnLoad();
+        } else if (interrupted instanceof StockRound) {
+            ((StockRound) interrupted).resetTransientStateOnLoad();
+        }
+
+        // Clean up the other round references
+        if (this.currentSRorOR.value() instanceof OperatingRound) {
+            ((OperatingRound) this.currentSRorOR.value()).resetTransientStateOnLoad();
+        } else if (this.currentSRorOR.value() instanceof StockRound) {
+            ((StockRound) this.currentSRorOR.value()).resetTransientStateOnLoad();
+        }
+
+        // Store the list and index for getNextActionFromLog()
+        this.actionsBeingReloaded = savedActions;
+
         // Check size
         if (savedActions.size() < executedActions.size()) {
-            log.warn("found {} actions in new file but have executed {}", savedActions.size(), executedActions.size());
-            log.debug("last executed action: {}", executedActions.get(executedActions.size() - 1));
-            for ( int i = executedActions.size() - 1, j = 5; i >= 0 && j >= 0; i--, j-- ) {
-                log.debug("executed {}: {}", i, executedActions.get(i));
-            }
-            log.debug("last loaded action: {}", savedActions.get(savedActions.size() - 1));
-            for ( int i = savedActions.size() -  1, j = 5; i >= 0 && j >= 0; i--, j-- ) {
-                log.debug("loaded {}: {}", i, savedActions.get(i));
-            }
+            // log.warn("found {} actions in new file but have executed {}",
+            // savedActions.size(), executedActions.size());
+            // log.debug("last executed action: {}",
+            // executedActions.get(executedActions.size() - 1));
+            // for (int i = executedActions.size() - 1, j = 5; i >= 0 && j >= 0; i--, j--) {
+            // log.debug("executed {}: {}", i, executedActions.get(i));
+            // }
+            // log.debug("last loaded action: {}", savedActions.get(savedActions.size() -
+            // 1));
+            // for (int i = savedActions.size() - 1, j = 5; i >= 0 && j >= 0; i--, j--) {
+            // log.debug("loaded {}: {}", i, savedActions.get(i));
+            // }
 
             DisplayBuffer.add(this, LocalText.getText("LOAD_FAILED_MESSAGE",
                     "loaded file has less actions than current game"));
+            this.actionsBeingReloaded = null; // Cleanup
             return false;
         }
 
         // Check action identity
-        int index = 0;
-        // save off the current # of executed actions as it will grow as we execute newly loaded
+        this.reloadActionIndex = 0; // <-- USE MEMBER VARIABLE
+        // save off the current # of executed actions as it will grow as we execute
+        // newly loaded
         int executedActionsCount = executedActions.size();
         PossibleAction executedAction;
         try {
-            for (PossibleAction savedAction : savedActions) {
-                if (index < executedActionsCount) {
-                    executedAction = executedActions.get(index);
+            // for (PossibleAction savedAction : savedActions) { // <-- DELETE
+            for (this.reloadActionIndex = 0; this.reloadActionIndex < savedActions.size(); this.reloadActionIndex++) {
+                PossibleAction savedAction = savedActions.get(this.reloadActionIndex);
+                if (this.reloadActionIndex < executedActionsCount) { // <-- USE MEMBER
+                    executedAction = executedActions.get(this.reloadActionIndex); // <-- USE MEMBER
                     if (!savedAction.equalsAsAction(executedAction)) {
-                        log.warn("loaded action {} is not the same as expected game action {}", savedAction, executedAction);
+                        // log.warn("loaded action {} is not the same as expected game action {}",
+                        // savedAction,
+                        // executedAction);
                         DisplayBuffer.add(this, LocalText.getText("LoadFailed",
                                 "loaded action \"" + savedAction
                                         + "\"<br>   is not same as game action \"" + executedAction.toString()
                                         + "\""));
+                        this.actionsBeingReloaded = null; // <-- CLEANUP
                         return false;
                     }
                 } else {
-                    if (index == executedActionsCount) {
-                        log.info("Finished comparing old actions, starting to process new actions");
+                    if (this.reloadActionIndex == executedActionsCount) { // <-- USE MEMBER
+                        // log.info("Finished comparing old actions, starting to process new actions");
                     }
                     // Found a new action: execute it
                     if (!processOnReload(savedAction)) {
                         log.error("Reload interrupted");
                         DisplayBuffer.add(this, LocalText.getText("LoadFailed",
                                 " loaded action \"" + savedAction.toString() + "\" is invalid"));
+                        this.actionsBeingReloaded = null; // <-- CLEANUP
                         break;
                     }
                 }
-                index++;
             }
         } catch (Exception e) {
             log.error("Reload failed", e);
             DisplayBuffer.add(this, LocalText.getText("LoadFailed", e.getMessage()));
+            this.actionsBeingReloaded = null; // <-- CLEANUP
             return false;
         }
+
+        // Cleanup after reload finishes
+        this.actionsBeingReloaded = null;
 
         setReloading(false);
         finishLoading();
@@ -1245,8 +2061,63 @@ public class GameManager extends RailsManager implements Configurable, Owner {
         // FIXME (Rails2.0): CommentItems have to be replaced
         // ReportBuffer.setCommentItems(gameLoader.getComments());
 
-        log.info("Reloading finished");
+
+        // 1. Restore the exact times from the sidecar file (if it exists)
+        loadTimeData(new File(filepath));
+
+        // 2. Force Pause so players can orient themselves before the clock ticks
+        if (isTimeManagementEnabled()) {
+            setGamePaused(true);
+            log.info("[TIME] Game reloaded. Exact times restored. Timer auto-paused.");
+        }
+
+
         return true;
+    }
+
+    /**
+     * Records fixed revenue for private companies at the start of an OR.
+     * This handles the "Silent Payouts" that do not generate SetDividend actions.
+     */
+    protected void recordPrivateRevenue() {
+        for (PrivateCompany priv : getAllPrivateCompanies()) {
+            // Only record if the private is active (not closed) and owned by a
+            // player/company (not Bank/Null).
+            if (!priv.isClosed() && priv.getOwner() != null && !(priv.getOwner() instanceof Bank)) {
+
+                Phase currentPhase = getCurrentPhase();
+
+                // Get revenue specific to the current phase (returns int)
+                int rev = priv.getRevenueByPhase(currentPhase);
+
+                if (rev > 0) {
+                    String id = priv.getId();
+
+                    // 1. Update Cumulative Payouts
+                    Map<String, Integer> cumulative = cumulativeCompanyPayouts.value();
+                    if (cumulative == null)
+                        cumulative = new HashMap<>();
+                    else
+                        cumulative = new HashMap<>(cumulative); // Copy-on-write
+
+                    int newCumulative = cumulative.getOrDefault(id, 0) + rev;
+                    cumulative.put(id, newCumulative);
+                    cumulativeCompanyPayouts.set(cumulative);
+
+                    // 2. Update Instantaneous (Round) Payouts
+                    Map<String, Integer> current = currentRoundPayouts.value();
+                    if (current == null)
+                        current = new HashMap<>();
+                    else
+                        current = new HashMap<>(current);
+
+                    int newCurrent = current.getOrDefault(id, 0) + rev;
+                    current.put(id, newCurrent);
+                    currentRoundPayouts.set(current);
+
+                }
+            }
+        }
     }
 
     protected boolean export(GameAction exportAction) {
@@ -1260,8 +2131,7 @@ public class GameManager extends RailsManager implements Configurable, Owner {
             for (MapHex hex : getRoot().getMapManager().getHexes()) {
                 pw.println(hex.getId() + "," + hex.getCurrentTile().toText() + ","
                         + hex.getCurrentTileRotation() + ","
-                        + hex.getOrientationName(hex.getCurrentTileRotation())
-                );
+                        + hex.getOrientationName(hex.getCurrentTileRotation()));
             }
             pw.close();
             result = true;
@@ -1279,15 +2149,38 @@ public class GameManager extends RailsManager implements Configurable, Owner {
     }
 
     public void finishShareSellingRound(boolean resume) {
-        setRound(getInterruptedRound());
-        guiHints.setCurrentRoundType(getInterruptedRound().getClass());
+        // 1. Get the round to resume
+        RoundFacade roundToResume = getInterruptedRound();
+
+        // 2. Clear the global state field
+        setInterruptedRound(null);
+
+        // 3. Restore the current round
+        setRound(roundToResume);
+
+        // getInterruptedRound() is now null, so we must use 'roundToResume'.
+        if (roundToResume != null) {
+            guiHints.setCurrentRoundType(roundToResume.getClass());
+        } else {
+            log.error("finishShareSellingRound: roundToResume is null! Cannot restore UI hints.");
+        }
+
         guiHints.setVisibilityHint(GuiDef.Panel.STOCK_MARKET, false);
         guiHints.setActivePanel(GuiDef.Panel.MAP);
-        if (resume) getCurrentRound().resume();
+
+        if (resume && getCurrentRound() != null)
+            getCurrentRound().resume();
     }
 
     public void finishTreasuryShareRound() {
-        setRound(getInterruptedRound());
+        // Get the round to resume and *then* clear the state field
+        RoundFacade roundToResume = getInterruptedRound();
+        setInterruptedRound(null);
+        setRound(roundToResume);
+        // setRound(getInterruptedRound());
+        log.info("[FLOW] Resuming Interrupted Round (from TreasuryShareRound): {}",
+                getInterruptedRound().getRoundName()); // 'essential logging' keep!
+
         guiHints.setCurrentRoundType(getInterruptedRound().getClass());
         guiHints.setVisibilityHint(GuiDef.Panel.STOCK_MARKET, false);
         guiHints.setActivePanel(GuiDef.Panel.MAP);
@@ -1300,25 +2193,27 @@ public class GameManager extends RailsManager implements Configurable, Owner {
      * taking the pool limit into account.<br>
      * Note: the complex 1841 rules cannot easily be included here,
      * these probably will need a subclass.
-     * @param company The company possibly holding shares.
+     * 
+     * @param company     The company possibly holding shares.
      * @param cashToRaise A required cash value (an emergency train price).
      *                    If zero, just the total share value is returned.
      * @return The potential yield of selling treasury shares.
      */
-    protected int getSellableSharesValue (PublicCompany company, int cashToRaise,
-                                          boolean dumpAllowed) {
+    protected int getSellableSharesValue(PublicCompany company, int cashToRaise,
+            boolean dumpAllowed) {
 
-        if (company == null || !company.hasStarted() || company.isClosed()) return 0;
+        if (company == null || !company.hasStarted() || company.isClosed())
+            return 0;
 
         int value = 0;
         PortfolioModel pool = getRoot().getBank().getPool().getPortfolioModel();
 
         // Note every company's pool space in number of shares.
-        Map <PublicCompany, Integer> poolSpace = new HashMap<>();
+        Map<PublicCompany, Integer> poolSpace = new HashMap<>();
         for (PublicCompany comp : getAllPublicCompanies()) {
             poolSpace.put(comp,
                     getParmAsInt(GameDef.Parm.POOL_SHARE_LIMIT) / comp.getShareUnit()
-                    - pool.getShares(comp));
+                            - pool.getShares(comp));
         }
 
         // Treasury shares
@@ -1336,7 +2231,8 @@ public class GameManager extends RailsManager implements Configurable, Owner {
                     // For now, assume that all treasury certs are single shares.
                     // Calculate how many certs we should sell.
                     while (++numberToSell * sharePrice < cashToRaise
-                            && numberToSell < numberAvailable) {}
+                            && numberToSell < numberAvailable) {
+                    }
                 } else {
                     // Count all shares
                     numberToSell = numberAvailable;
@@ -1346,7 +2242,7 @@ public class GameManager extends RailsManager implements Configurable, Owner {
                 numberToSell = Math.min(numberToSell, space);
                 value += numberToSell * sharePrice;
                 // Subtract from pool space
-                poolSpace.put (company, space - numberToSell);
+                poolSpace.put(company, space - numberToSell);
             }
         }
 
@@ -1354,32 +2250,46 @@ public class GameManager extends RailsManager implements Configurable, Owner {
 
         value += player.getCash();
         /*
-        if (player != null) {
-            Map<PublicCompany, PublicCertificate> certsMap =
-            for (PublicCompany comp : certsMap.keySet()) {
-                for (PublicCertificate cert : certsMap.get (comp))
-            }
-        }*/
+         * if (player != null) {
+         * Map<PublicCompany, PublicCertificate> certsMap =
+         * for (PublicCompany comp : certsMap.keySet()) {
+         * for (PublicCertificate cert : certsMap.get (comp))
+         * }
+         * }
+         */
 
         return value;
     }
 
-
+    // ... (lines of unchanged context code) ...
     public void registerPlayerBankruptcy(Player player) {
         endedByBankruptcy.set(true);
-        String message =
-                LocalText.getText("PlayerIsBankrupt",
-                        player.getId());
+        String message = LocalText.getText("PlayerIsBankrupt",
+                player.getId());
         ReportBuffer.add(this, message);
         DisplayBuffer.add(this, message);
-        if (gameEndsWithBankruptcy) {
-            finishGame();
-        } else {
-            processPlayerBankruptcy();
+
+        // House Rule: End game immediately instead of attempting player elimination
+        // (Rule 5.5.4.13)
+        String warningMsg = "Game Over by Bankruptcy (House Rule):\n" +
+                "Strict 1835 rules would eliminate the player and continue the game.\n" +
+                "This implementation ends the game here for stability.";
+
+        ReportBuffer.add(this, warningMsg);
+
+        // Show warning dialog if UI is active
+        if (!java.awt.GraphicsEnvironment.isHeadless()) {
+            javax.swing.JOptionPane.showMessageDialog(null,
+                    warningMsg,
+                    "Game Over (House Rule)",
+                    javax.swing.JOptionPane.WARNING_MESSAGE);
         }
+
+        finishGame();
+
     }
 
-    public void registerCompanyBankruptcy (PublicCompany company) {
+    public void registerCompanyBankruptcy(PublicCompany company) {
         OperatingRound or = (OperatingRound) getInterruptedRound();
         String message = LocalText.getText("CompanyIsBankrupt",
                 company.getId());
@@ -1412,7 +2322,8 @@ public class GameManager extends RailsManager implements Configurable, Owner {
         List<PublicCompany> presidencies = new ArrayList<>();
         Map<PublicCompany, Player> newPresidencies = new HashMap<>();
         for (PublicCertificate cert : bpf.getCertificates()) {
-            if (cert.isPresidentShare()) presidencies.add(cert.getCompany());
+            if (cert.isPresidentShare())
+                presidencies.add(cert.getCompany());
         }
         for (PublicCompany company : presidencies) {
             // Check if the presidency is dumped onto someone
@@ -1439,7 +2350,7 @@ public class GameManager extends RailsManager implements Configurable, Owner {
                 // Games needing it must override the method called here!
                 newPresident = processCompanyAfterPlayerBankruptcy(bankrupter, company);
             }
-            newPresidencies.put (company, newPresident);
+            newPresidencies.put(company, newPresident);
         }
 
         // Dump all remaining shares to pool
@@ -1454,7 +2365,7 @@ public class GameManager extends RailsManager implements Configurable, Owner {
             }
         }
 
-        //bankrupter.setBankrupt(); // this is a duplicate
+        // bankrupter.setBankrupt(); // this is a duplicate
 
         // Finish the share selling round
         if (getCurrentRound() instanceof ShareSellingRound) {
@@ -1463,8 +2374,9 @@ public class GameManager extends RailsManager implements Configurable, Owner {
     }
 
     /**
-     *  Should only be called by processPlayerBankruptcy().
-     * @param player The player having gone bankrupt
+     * Should only be called by processPlayerBankruptcy().
+     * 
+     * @param player  The player having gone bankrupt
      * @param company The company that caused the player going bankrupt
      * @return The new president, if any; else null
      */
@@ -1484,6 +2396,12 @@ public class GameManager extends RailsManager implements Configurable, Owner {
         String msg = LocalText.getText("BankIsBrokenDisplayText", msgContinue);
         DisplayBuffer.add(this, msg);
         addToNextPlayerMessages(msg, true);
+        if (!java.awt.GraphicsEnvironment.isHeadless()) {
+            javax.swing.JOptionPane.showMessageDialog(null,
+                    msg,
+                    "Bank Broken!",
+                    javax.swing.JOptionPane.WARNING_MESSAGE);
+        }
     }
 
     public void registerMaxedSharePrice(PublicCompany company, StockSpace space) {
@@ -1507,6 +2425,10 @@ public class GameManager extends RailsManager implements Configurable, Owner {
     protected void finishGame() {
         gameOver.set(true);
 
+        // Capture final worth (labeled "End")
+        capturePlayerWorthSnapshot("End");
+        captureCompanyPayoutSnapshot("End");
+
         String message = LocalText.getText("GameOver");
         ReportBuffer.add(this, message);
 
@@ -1515,15 +2437,238 @@ public class GameManager extends RailsManager implements Configurable, Owner {
 
         ReportBuffer.add(this, "");
 
-        List<String> gameReport = getGameReport();
-        for (String s : gameReport)
-            ReportBuffer.add(this, s);
+        // Trigger the Final Ranking Window (Player Value Window)
+        // We use invokeLater to ensure it stacks correctly on the EDT and gains focus,
+        // preventing the "unresponsive window" issue caused by race conditions with
+        // other dialogs.
+        if (!java.awt.GraphicsEnvironment.isHeadless()) {
+            javax.swing.SwingUtilities.invokeLater(() -> displayWorthChart(null));
+        }
 
-        // activate gameReport for UI
-        setGameOverReportedUI(false);
+        // Create the round and get a reference to it
+        RoundFacade endRound = createRound(EndOfGameRound.class, "EndOfGameRound");
 
-        // FIXME: This will not work, as it will create duplicated IDs
-        createRound(EndOfGameRound.class, "EndOfGameRound");
+        // Immediately call setPossibleActions() on the new round to trigger
+        // the dialog box. We must also populate correction/undo actions
+        // to prevent the UI from getting stuck if the dialog is closed.
+        possibleActions.clear();
+        endRound.setPossibleActions();
+        setCorrectionActions(); // Add corrections (e.g., Undo/Redo)
+
+        ChangeStack changeStack = getRoot().getStateManager().getChangeStack();
+        // if (changeStack.isUndoPossible(getCurrentPlayer())) {
+        // possibleActions.add(new GameAction(getRoot(), GameAction.Mode.UNDO));
+        // }
+        if (changeStack.isUndoPossible()) {
+            possibleActions.add(new GameAction(getRoot(), GameAction.Mode.FORCED_UNDO));
+        }
+        if (changeStack.isRedoPossible()) {
+            possibleActions.add(new GameAction(getRoot(), GameAction.Mode.REDO));
+        }
+
+    }
+
+    protected void capturePlayerWorthSnapshot(String roundId) {
+        // Ensure the map is initialized
+        LinkedHashMap<String, Map<String, Double>> history = playerWorthHistory.value();
+        if (history == null) {
+            history = new LinkedHashMap<>();
+        }
+
+        Map<String, Double> snapshot = new HashMap<>();
+        List<Player> players = getRoot().getPlayerManager().getPlayers();
+
+        // Calculate worth for all players
+        for (Player player : players) {
+            snapshot.put(player.getId(), (double) player.getWorth());
+        }
+
+        // Only log if we have not already logged this ID (e.g. from an interruption)
+        if (!history.containsKey(roundId)) {
+            history.put(roundId, snapshot);
+            playerWorthHistory.set(history); // Update the state object
+        }
+        LinkedHashMap<String, Map<String, PlayerAssetSnapshot>> assetHistory = playerAssetHistory.value();
+        if (assetHistory == null)
+            assetHistory = new LinkedHashMap<>();
+
+        Map<String, PlayerAssetSnapshot> roundAssets = new HashMap<>();
+
+        for (Player p : players) {
+            PlayerAssetSnapshot asset = new PlayerAssetSnapshot();
+            asset.cash = p.getCash();
+
+            // Record shares for all public companies
+            for (PublicCompany comp : getAllPublicCompanies()) {
+                int share = p.getPortfolioModel().getShare(comp);
+                if (share > 0) {
+                    asset.sharePercents.put(comp.getId(), share);
+                    int price = (comp.getCurrentSpace() != null) ? comp.getCurrentSpace().getPrice() : 0;
+                    int unit = (comp.getShareUnit() > 0) ? comp.getShareUnit() : 10;
+                    int value = (share / unit) * price;
+                    asset.holdingValues.put(comp.getId(), value);
+                }
+            }
+            roundAssets.put(p.getName(), asset);
+        }
+        assetHistory.put(roundId, roundAssets);
+        playerAssetHistory.set(assetHistory);
+
+    }
+
+    public LinkedHashMap<String, Map<String, PlayerAssetSnapshot>> getPlayerAssetHistory() {
+        return playerAssetHistory.value();
+    }
+
+    protected void captureCompanyPayoutSnapshot(String roundId) {
+        // 1. Capture Cumulative History (Existing Logic)
+        LinkedHashMap<String, Map<String, Integer>> history = companyPayoutHistory.value();
+        LinkedHashMap<String, Map<String, Integer>> newHistory;
+        if (history == null)
+            newHistory = new LinkedHashMap<>();
+        else
+            newHistory = new LinkedHashMap<>(history);
+
+        if (!newHistory.containsKey(roundId)) {
+            Map<String, Integer> currentSnapshot = cumulativeCompanyPayouts.value();
+            if (currentSnapshot == null)
+                currentSnapshot = new HashMap<>();
+            newHistory.put(roundId, new HashMap<>(currentSnapshot));
+            companyPayoutHistory.set(newHistory);
+        }
+
+        // --- START FIX: Capture Instantaneous & RESET ---
+        LinkedHashMap<String, Map<String, Integer>> instHistory = instantaneousPayoutHistory.value();
+        LinkedHashMap<String, Map<String, Integer>> newInstHistory;
+        if (instHistory == null)
+            newInstHistory = new LinkedHashMap<>();
+        else
+            newInstHistory = new LinkedHashMap<>(instHistory);
+
+        if (!newInstHistory.containsKey(roundId)) {
+            Map<String, Integer> roundSnapshot = currentRoundPayouts.value();
+            if (roundSnapshot == null)
+                roundSnapshot = new HashMap<>();
+
+            // Save the snapshot
+            newInstHistory.put(roundId, new HashMap<>(roundSnapshot));
+            instantaneousPayoutHistory.set(newInstHistory);
+
+            // CRITICAL: Reset the accumulator for the next round
+            // We set it to a new empty map (state-safe)
+            currentRoundPayouts.set(new HashMap<>());
+
+        }
+        // --- END FIX ---
+    }
+
+    // ... (around line 2240) ...
+    protected void updatePayoutTracker(PossibleAction action) {
+        if (action == null)
+            return;
+
+        // DEBUG: Log the class of every action processed to catch the exact Revenue
+        // action type
+
+        if (action instanceof SetDividend) {
+            SetDividend sd = (SetDividend) action;
+            PublicCompany company = sd.getCompany();
+            if (company == null)
+                return;
+
+            int amount = 0;
+            // Determine amount based on allocation type
+            if (sd.getRevenueAllocation() == SetDividend.PAYOUT) {
+                amount = sd.getActualRevenue();
+            } else if (sd.getRevenueAllocation() == SetDividend.SPLIT) {
+                amount = sd.getActualRevenue() / 2;
+            }
+
+            if (amount > 0) {
+                String compId = company.getId();
+
+                // --- START FIX ---
+                // 1. Update Cumulative
+                Map<String, Integer> cumulative = cumulativeCompanyPayouts.value();
+                if (cumulative == null)
+                    cumulative = new HashMap<>();
+                else
+                    cumulative = new HashMap<>(cumulative); // Copy-on-write
+
+                int newCumulativeTotal = cumulative.getOrDefault(compId, 0) + amount;
+                cumulative.put(compId, newCumulativeTotal);
+                cumulativeCompanyPayouts.set(cumulative);
+
+                // 2. Update Instantaneous
+                Map<String, Integer> current = currentRoundPayouts.value();
+                if (current == null)
+                    current = new HashMap<>();
+                else
+                    current = new HashMap<>(current);
+
+                int newCurrentTotal = current.getOrDefault(compId, 0) + amount;
+                current.put(compId, newCurrentTotal);
+                currentRoundPayouts.set(current);
+
+            }
+        }
+    }
+
+    public LinkedHashMap<String, Map<String, Integer>> getCompanyPayoutHistory() {
+        return companyPayoutHistory.value();
+    }
+
+    /**
+     * Public accessor for the worth history, intended for UI/Reporting.
+     */
+    public LinkedHashMap<String, Map<String, Double>> getPlayerWorthHistory() {
+        return playerWorthHistory.value();
+    }
+
+    /**
+     * Called from the UI to launch the Company Payout Chart.
+     * * @param parentFrame The main UI frame required as the dialog parent.
+     */
+    public void displayCompanyPayoutChart(Object parentFrame) {
+        try {
+            Class<?> chartClass = Class.forName("net.sf.rails.ui.swing.charts.CompanyPayoutChartWindow");
+            java.lang.reflect.Method showMethod = chartClass.getMethod("showChart", JFrame.class, GameManager.class);
+
+            JFrame frame = (JFrame) parentFrame;
+            showMethod.invoke(null, frame, this);
+
+        } catch (Exception e) {
+            log.error("Failed to display Company Payout Chart.", e);
+        }
+    }
+
+    /**
+     * Public accessor to trigger the UI to display ONLY the final ranking list.
+     * This is intended for the "Game End Report" menu item.
+     * * @param parentFrame The main UI frame required as the dialog parent.
+     */
+    public void displayFinalRankingOnly(Object parentFrame) {
+        try {
+            // We assume the worth chart class has a static method specifically for the
+            // ranking report
+            // The method name should be clear, e.g., showRankingReport
+            Class<?> chartClass = Class.forName("net.sf.rails.ui.swing.charts.WorthChartWindow");
+
+            // The method should accept the JFrame parent and GameManager.
+            java.lang.reflect.Method showMethod = chartClass.getMethod("showRankingReport", JFrame.class,
+                    GameManager.class);
+
+            // Cast the parentFrame object to a generic JFrame
+            JFrame frame = (JFrame) parentFrame;
+
+            // Call the static showRankingReport method
+            showMethod.invoke(null, frame, this);
+
+        } catch (Exception e) {
+            log.error(
+                    "Failed to display Final Ranking Report. Ensure WorthChartWindow has showRankingReport(JFrame, GameManager).",
+                    e);
+        }
     }
 
     public boolean isGameOver() {
@@ -1540,29 +2685,6 @@ public class GameManager extends RailsManager implements Configurable, Owner {
 
     public boolean getGameOverReportedUI() {
         return (gameOverReportedUI);
-    }
-
-    public List<String> getGameReport() {
-
-        List<String> b = new ArrayList<>();
-
-        /* Sort players by total worth */
-        List<Player> rankedPlayers = new ArrayList<>(getRoot().getPlayerManager().getPlayers());
-        Collections.sort(rankedPlayers);
-
-        /* Report winner */
-        Player winner = rankedPlayers.get(0);
-        b.add(LocalText.getText("EoGWinner") + winner.getId() + "!");
-        b.add(LocalText.getText("EoGFinalRanking") + " :");
-
-        /* Report final ranking */
-        int i = 0;
-        for (Player p : rankedPlayers) {
-            b.add((++i) + ". " + Bank.format(this, p.getWorth()) + " "
-                    + p.getId());
-        }
-
-        return b;
     }
 
     public RoundFacade getCurrentRound() {
@@ -1617,19 +2739,19 @@ public class GameManager extends RailsManager implements Configurable, Owner {
     }
 
     public Object getGuiParameter(GuiDef.Parm key) {
-        if (key == GuiDef.Parm.HAS_SPECIAL_COMPANY_INCOME) {
-            log.debug("+++ Get {}={} OrDefault={}",
-                    key,
-                    guiParameters.get(key),
-                    guiParameters.getOrDefault(key, false));
-        }
+        // if (key == GuiDef.Parm.HAS_SPECIAL_COMPANY_INCOME) {
+        // log.debug("+++ Get {}={} OrDefault={}",
+        // key,
+        // guiParameters.get(key),
+        // guiParameters.getOrDefault(key, false));
+        // }
         return guiParameters.getOrDefault(key, false);
     }
 
     public void setGuiParameter(GuiDef.Parm key, boolean value) {
-        if (key == GuiDef.Parm.HAS_SPECIAL_COMPANY_INCOME) {
-            log.debug("+++ Set {}={}", key, value);
-        }
+        // if (key == GuiDef.Parm.HAS_SPECIAL_COMPANY_INCOME) {
+        // log.debug("+++ Set {}={}", key, value);
+        // }
         guiParameters.put(key, value);
     }
 
@@ -1642,8 +2764,8 @@ public class GameManager extends RailsManager implements Configurable, Owner {
         return gameParameters.getOrDefault(key, false);
     }
 
-    public int getParmAsInt (GameDef.Parm key) {
-        Object parm = getGameParameter (key);
+    public int getParmAsInt(GameDef.Parm key) {
+        Object parm = getGameParameter(key);
         if (parm instanceof Integer) {
             return (Integer) parm;
         } else {
@@ -1651,8 +2773,8 @@ public class GameManager extends RailsManager implements Configurable, Owner {
         }
     }
 
-    public boolean getParmAsBoolean (GameDef.Parm key) {
-        Object parm = getGameParameter (key);
+    public boolean getParmAsBoolean(GameDef.Parm key) {
+        Object parm = getGameParameter(key);
         if (parm instanceof Boolean) {
             return (Boolean) parm;
         } else {
@@ -1664,8 +2786,9 @@ public class GameManager extends RailsManager implements Configurable, Owner {
      * Move the special property to the party that will later benefit from it:
      * the company or the player (in the latter case it is stored in the GameManager
      * as a "common" property: buyable by all companies.
+     * 
      * @param owner The current buyer (and future seller) of the property.
-     * @param sps The (set of) property(ies) to be allocated.
+     * @param sps   The (set of) property(ies) to be allocated.
      */
     public void allocateSpecialProperties(MoneyOwner owner, Set<SpecialProperty> sps) {
         // Move any special abilities to the portfolio, if configured so.
@@ -1678,7 +2801,7 @@ public class GameManager extends RailsManager implements Configurable, Owner {
             for (SpecialProperty sp : sps) {
                 if ((owner instanceof PublicCompany && sp.isUsableIfOwnedByCompany())
                         || (owner instanceof Player && sp.isUsableIfOwnedByPlayer())
-                        && "toGameManager".equalsIgnoreCase(sp.getTransferText())) {
+                                && "toGameManager".equalsIgnoreCase(sp.getTransferText())) {
                     // This must be SellBonusToken - remember the owner!
                     if (sp instanceof SellBonusToken) {
                         // TODO: Check if this works correctly
@@ -1695,7 +2818,7 @@ public class GameManager extends RailsManager implements Configurable, Owner {
 
                 } else if (owner instanceof Player && sp.isUsableIfOwnedByPlayer()
                         && "toPlayer".equalsIgnoreCase(sp.getTransferText())) {
-                    spsMoveToPlayer.add (sp);
+                    spsMoveToPlayer.add(sp);
                 }
             }
             for (SpecialProperty sp : spsToMoveToPC) {
@@ -1703,11 +2826,11 @@ public class GameManager extends RailsManager implements Configurable, Owner {
             }
             for (SpecialProperty sp : spsToMoveToGM) {
                 this.addSpecialProperty(sp);
-                log.debug("SP {} is now a common property", sp.getInfo());
+                // log.debug("SP {} is now a common property", sp.getInfo());
             }
             for (SpecialProperty sp : spsMoveToPlayer) {
                 sp.moveTo(owner);
-                log.debug("SP {} is now a player property", sp.getInfo());
+                // log.debug("SP {} is now a player property", sp.getInfo());
             }
         }
     }
@@ -1723,17 +2846,22 @@ public class GameManager extends RailsManager implements Configurable, Owner {
 
     // TODO: Write new SpecialPropertiesModel
 
-    /* (non-Javadoc)
-     * @see rails.game.GameManager#getCommonSpecialProperties()
+    public Map<String, Integer> getCumulativeCompanyPayouts() {
+        return cumulativeCompanyPayouts.value();
+    }
+
+    /**
+     * Launches the Investment Multiplier Chart.
      */
-/*    public boolean removeSpecialProperty(SpecialProperty property) {
-
-        if (commonSpecialProperties != null) {
-            return commonSpecialProperties.removeObject(property);
+    public void displayMultiplierChart(Object parentFrame) {
+        try {
+            Class<?> chartClass = Class.forName("net.sf.rails.ui.swing.charts.MultiplierChartWindow");
+            java.lang.reflect.Method showMethod = chartClass.getMethod("showChart", JFrame.class, GameManager.class);
+            showMethod.invoke(null, (JFrame) parentFrame, this);
+        } catch (Exception e) {
+            log.error("Failed to display Multiplier Chart.", e);
         }
-
-        return false;
-    } */
+    }
 
     public List<SpecialProperty> getCommonSpecialProperties() {
         return getSpecialProperties(null, false);
@@ -1771,15 +2899,14 @@ public class GameManager extends RailsManager implements Configurable, Owner {
         if (cm == null) {
             cm = ct.newCorrectionManager(this);
             correctionManagers.put(ct, cm);
-            log.debug("Added CorrectionManager for {}", ct);
+            // log.debug("Added CorrectionManager for {}", ct);
         }
         return cm;
     }
 
     public List<PublicCompany> getCompaniesInRunningOrder() {
 
-        Map<Integer, PublicCompany> operatingCompanies =
-                new TreeMap<>();
+        Map<Integer, PublicCompany> operatingCompanies = new TreeMap<>();
         StockSpace space;
         int key;
         int minorNo = 0;
@@ -1789,11 +2916,10 @@ public class GameManager extends RailsManager implements Configurable, Owner {
             // is ascending.
             if (company.hasStockPrice() && company.hasStarted()) {
                 space = company.getCurrentSpace();
-                key =
-                        1000000 * (999 - space.getPrice()) + 10000
-                                * (99 - space.getColumn()) + 100
+                key = 1000000 * (999 - space.getPrice()) + 10000
+                        * (99 - space.getColumn()) + 100
                                 * space.getRow()
-                                + space.getStackPosition(company);
+                        + space.getStackPosition(company);
             } else {
                 key = ++minorNo;
             }
@@ -1831,13 +2957,15 @@ public class GameManager extends RailsManager implements Configurable, Owner {
 
     public int getStorageId(String typeName) {
         Integer id = storageIds.get(typeName);
-        if (id == null) id = 0;
+        if (id == null)
+            id = 0;
         return id;
     }
 
     public int storeObject(String typeName, Object object) {
         Integer id = storageIds.get(typeName);
-        if (id == null) id = 0;
+        if (id == null)
+            id = 0;
         objectStorage.put(typeName + id, object);
         storageIds.put(typeName, id + 1); // store next id
         return id;
@@ -1847,7 +2975,8 @@ public class GameManager extends RailsManager implements Configurable, Owner {
         return objectStorage.get(typeName + id);
     }
 
-    // TODO (Rails2.0): rewrite this, use PhaseAction interface stored at PhaseManager
+    // TODO (Rails2.0): rewrite this, use PhaseAction interface stored at
+    // PhaseManager
     public void processPhaseAction(String name, String value) {
         getCurrentRound().processPhaseAction(name, value);
     }
@@ -1863,63 +2992,64 @@ public class GameManager extends RailsManager implements Configurable, Owner {
     }
 
     // shortcut to PlayerManager
-    protected Player getCurrentPlayer() {
+    public Player getCurrentPlayer() {
         return getRoot().getPlayerManager().getCurrentPlayer();
     }
 
     /*
-    public void setNationalToFound(String national) {
+     * public void setNationalToFound(String national) {
+     * 
+     * for (PublicCompany company : this.getAllPublicCompanies()) {
+     * if ( "national".equals(company.getId())) {
+     * this.nationalToFound = company;
+     * }
+     * }
+     * }
+     * 
+     * public PublicCompany getNationalToFound() {
+     * // TODO Auto-generated method stub
+     * return nationalToFound;
+     * }
+     * 
+     * public void setNationalFormationStartingPlayer(PublicCompany
+     * nationalToFound2, Player currentPlayer) {
+     * this.NationalFormStartingPlayer.put(nationalToFound2, currentPlayer);
+     * 
+     * }
+     * 
+     * public Player getNationalFormationStartingPlayer(PublicCompany comp) {
+     * return this.NationalFormStartingPlayer.get(comp);
+     * }
+     */
 
-        for (PublicCompany company : this.getAllPublicCompanies()) {
-            if ( "national".equals(company.getId())) {
-                this.nationalToFound = company;
-            }
-        }
-    }
-
-    public PublicCompany getNationalToFound() {
-        // TODO Auto-generated method stub
-        return nationalToFound;
-    }
-
-    public void setNationalFormationStartingPlayer(PublicCompany nationalToFound2, Player currentPlayer) {
-        this.NationalFormStartingPlayer.put(nationalToFound2, currentPlayer);
-
-    }
-
-    public Player getNationalFormationStartingPlayer(PublicCompany comp) {
-        return this.NationalFormStartingPlayer.get(comp);
-    }*/
-
-    //--------------------------------------------
+    // --------------------------------------------
     // Register certificates and trains to prevent double income in one round.
     // Used by 1837. (Not yet by 1835)
-    //--------------------------------------------
+    // --------------------------------------------
 
     /**
      * Registry of exchanged certificates to be denied income
      * because their precursors produced revenue in the same OR.
      */
-    private final HashSetState<Certificate> blockedCertificates
-            = HashSetState.create(this, "BlockedCertificates");
+    private final HashSetState<Certificate> blockedCertificates = HashSetState.create(this, "BlockedCertificates");
 
     /**
      * Registry of exchanged trains that may not run for a major company
      * because they have already run for the associated minor in the same OR.
-     * NOTE: here and in many other places the term "minors" includes coal companies.
+     * NOTE: here and in many other places the term "minors" includes coal
+     * companies.
      */
-    private final HashSetState<Train> blockedTrains
-            = HashSetState.create(this, "BlockedTrains");
+    private final HashSetState<Train> blockedTrains = HashSetState.create(this, "BlockedTrains");
 
     public void clearBlockedCertificates() {
         blockedCertificates.clear();
     }
 
-    public void blockCertificate (Certificate certificate) {
+    public void blockCertificate(Certificate certificate) {
         blockedCertificates.add(certificate);
     }
 
-    public boolean isCertificateBlocked (Certificate certificate) {
+    public boolean isCertificateBlocked(Certificate certificate) {
         return blockedCertificates.contains(certificate);
     }
 
@@ -1927,28 +3057,676 @@ public class GameManager extends RailsManager implements Configurable, Owner {
         blockedTrains.clear();
     }
 
-    public void blockTrain (Train train) {
+    public void blockTrain(Train train) {
         blockedTrains.add(train);
     }
 
-    public boolean isTrainBlocked (Train train) {
+    public boolean isTrainBlocked(Train train) {
         return blockedTrains.contains(train);
     }
 
-
-    //------------------------------------
+    // ------------------------------------
     // Random generator
     // Used by SOH
-    //------------------------------------
+    // ------------------------------------
     private Random randomGenerator;
-    public Random getRandomGenerator () {
+
+    public Random getRandomGenerator() {
         if (randomGenerator == null) {
             long seed = Long.parseLong(getRoot().getGameOptions().get(GameOption.RANDOM_SEED));
-            log.info ("Random seed = {}", seed);
-            randomGenerator = new Random (seed);
+            // log.info("Random seed = {}", seed);
+            randomGenerator = new Random(seed);
         }
         return randomGenerator;
     }
-}
 
+    /**
+     * Public accessor to the list of players for UI binding.
+     * 
+     * @return The list of Player objects.
+     */
+    public List<Player> getPlayers() {
+        return getRoot().getPlayerManager().getPlayers();
+    }
+
+    // ++ TIME MANAGEMENT CONSEQUENCE ++
+    // Default to NONE
+    private TimeConsequence timeConsequence = TimeConsequence.NONE;
+
+    public void setTimeConsequence(TimeConsequence consequence) {
+        this.timeConsequence = (consequence != null) ? consequence : TimeConsequence.NONE;
+    }
+
+    public TimeConsequence getTimeConsequence() {
+        return this.timeConsequence;
+    }
+
+    // ++ START AI STATE RESTORATION SETTERS ++
+    // These methods are for 're-hydrating' a saved state and bypass normal logic.
+
+    public void setAbsoluteActionCounter_AI(int count) {
+        // This is a plain int in GameManager, not an IntegerState
+        this.absoluteActionCounter = count;
+    }
+
+    public void setStartRoundNumber_AI(int count) {
+        this.startRoundNumber.set(count);
+    }
+
+    public void setStockRoundNumber_AI(int count) {
+        this.stockRoundNumber.set(count);
+    }
+
+    public void setAbsoluteORNumber_AI(int count) {
+        this.absoluteORNumber.set(count);
+    }
+
+    public void setRelativeORNumber_AI(int count) {
+        this.relativeORNumber.set(count);
+    }
+
+    public void setCurrentRound_AI(Round round) {
+        this.currentRound.set(round);
+    }
+
+    /**
+     * Used by OperatingRound during a reload to "look ahead" at the next action
+     * in the save file. This is required to fix the "Baden" relay pause.
+     * 
+     * @return The *next* PossibleAction in the log, or null if not reloading
+     *         or if at the end of the list.
+     */
+    public PossibleAction getNextActionFromLog() {
+        if (!isReloading() || this.actionsBeingReloaded == null) {
+            return null;
+        }
+
+        int nextIndex = this.reloadActionIndex + 1;
+        if (nextIndex < this.actionsBeingReloaded.size()) {
+            return this.actionsBeingReloaded.get(nextIndex);
+        }
+
+        return null;
+    }
+
+    public boolean processOnReload(PossibleAction action) {
+        getRoot().getReportManager().getDisplayBuffer().clear();
+
+        // We capture the state *before* the action is processed.
+        if (this.logOutputDirectory != null) {
+            try {
+                String filename = String.format("state_%05d.json", getActionCountModel().value());
+                File outputFile = new File(this.logOutputDirectory, filename);
+                net.sf.rails.game.ai.snapshot.JsonStateSerializer.serialize(this, outputFile.getAbsolutePath());
+            } catch (Exception e) {
+                log.error("BatchLogGenerator FAILED to save state snapshot", e);
+            }
+        }
+
+        // Log possible actions (normally this is outcommented)
+        for (PossibleAction a : possibleActions.getList()) {
+            // log.info("{}", a);
+        }
+
+        logActionTaken(action);
+        try {
+            // Allow but negate spurious NullAction (usually Skip)
+            if (action instanceof NullAction
+                    && !possibleActions.contains(NullAction.class)) {
+                return true;
+            }
+
+            // New in Rails2.0: Check if the action is allowed
+            if (!possibleActions.validate(action)) {
+                DisplayBuffer.add(this, LocalText.getText("ActionNotAllowed",
+                        action.toString()));
+                // DO NOT return false. Log the warning and proceed.
+                log.warn("GAMEMANAGER [BruteForce]: Validation failed for action. IGNORING and continuing replay.",
+                        action);
+            }
+
+            // FOR BACKWARDS COMPATIBILITY
+            boolean doProcess = true;
+            if (skipNextDone) {
+                if (action instanceof NullAction
+                        && ((NullAction) action).getMode() == NullAction.Mode.DONE) {
+                    if (currentRound.value() instanceof OperatingRound
+                            && ((OperatingRound) currentRound.value()).getStep() == skippedStep) {
+                        doProcess = false;
+                    }
+                }
+            }
+            skipNextDone = false;
+            skippedStep = null;
+
+            ChangeStack changeStack = getRoot().getStateManager().getChangeStack();
+
+            // This is the critical state-advancing call
+            if (doProcess && !processCorrectionActions(action) && !getCurrentRound().process(action)) {
+                String msg = "Player " + action.getPlayerName() + "'s action \""
+                        + action + "\"\n  in " + getCurrentRound().getRoundName()
+                        + " is considered invalid by the game engine";
+                log.error(msg);
+                DisplayBuffer.add(this, msg);
+                // DO NOT return false.
+                log.warn("GAMEMANAGER [BruteForce]: Engine failed to process action. IGNORING and continuing replay.",
+                        action);
+            }
+
+            // This code will now be reached even if validation/process fails
+            executedActions.add(action);
+            updatePayoutTracker(action);
+
+            possibleActions.clear();
+            getCurrentRound().setPossibleActions();
+            changeStack.close(action);
+
+            if (!isGameOver())
+                setCorrectionActions();
+
+        } catch (Exception e) {
+            // This handles a hard crash
+            log.error("GAMEMANAGER [BruteForce]: CRASH during replay. IGNORING and continuing. Error: {} -> {}",
+                    e.getClass().getSimpleName(), e.getMessage());
+        }
+
+        return true; // Always return true to allow GameLoader to continue
+
+    }
+
+    public LinkedHashMap<String, Map<String, Integer>> getInstantaneousPayoutHistory() {
+        return instantaneousPayoutHistory.value();
+    }
+
+    /**
+     * Public getter for the configured OperatingRound class.
+     * Required by GameStateRestorer.
+     */
+    public Class<? extends OperatingRound> getOperatingRoundClass() {
+        return this.operatingRoundClass;
+    }
+
+    /**
+     * Public getter for the configured StockRound class.
+     * Required by GameStateRestorer.
+     */
+    public Class<? extends StockRound> getStockRoundClass() {
+        return this.stockRoundClass;
+    }
+
+    /**
+     * Public getter for the actionCount IntegerState.
+     * Required by JsonStateSerializer.
+     */
+    public IntegerState getActionCountModel() {
+        return this.actionCount;
+    }
+
+    /**
+     * AI Accessor: Allows the AI to undo the last simulation step.
+     * Wraps the standard GameAction.Mode.UNDO logic.
+     */
+    public void undo() {
+        process(new GameAction(getRoot(), GameAction.Mode.UNDO));
+    }
+
+    public List<String> getGameReport() {
+
+        List<String> b = new ArrayList<>();
+
+        List<Player> rankedPlayersRaw = new ArrayList<>(getRoot().getPlayerManager().getPlayers());
+        Collections.sort(rankedPlayersRaw); // Sorts by Player.compareTo (raw worth)
+
+        Player winnerRaw = rankedPlayersRaw.get(0);
+        double winnerWorthRaw = winnerRaw.getWorth();
+
+        b.add(LocalText.getText("EoGWinner") + winnerRaw.getId() + "!");
+        b.add(LocalText.getText("EoGFinalRanking") + " (Raw Worth):");
+
+        int rank = 1;
+        // Iterate normally (Winner first) for the report
+        for (Player p : rankedPlayersRaw) {
+            double percent = (winnerWorthRaw > 0) ? (p.getWorth() / winnerWorthRaw) * 100.0 : 0.0;
+            String line = String.format("%d. %s (%s) - %.1f%%",
+                    rank,
+                    p.getId(),
+                    Bank.format(this, p.getWorth()),
+                    percent);
+
+            b.add(line);
+            rank++;
+        }
+        List<Player> rankedPlayersTimeAdj = new ArrayList<>(getRoot().getPlayerManager().getPlayers());
+
+        // Helper to calculate adjusted worth: Net Worth + (Negative TimeBank)
+        // This ensures strictly negative times are subtracted, while positive times are
+        // ignored.
+        java.util.function.ToIntFunction<Player> getAdjustedWorth = p -> {
+            int val = p.getWorth();
+            int time = p.getTimeBankModel().value();
+            return val + Math.min(0, time);
+        };
+
+        Collections.sort(rankedPlayersTimeAdj, new Comparator<Player>() {
+            @Override
+            public int compare(Player p1, Player p2) {
+                // Sort by time-adjusted worth, descending
+                int val1 = getAdjustedWorth.applyAsInt(p1);
+                int val2 = getAdjustedWorth.applyAsInt(p2);
+                int result = -Integer.compare(val1, val2);
+
+                // Then by name
+                if (result == 0) {
+                    result = p1.getId().compareTo(p2.getId());
+                }
+                return result;
+            }
+        });
+
+        // 2. Report winner based on time-adjusted worth
+        Player winnerTimeAdj = rankedPlayersTimeAdj.get(0);
+        double winnerWorthTimeAdj = getAdjustedWorth.applyAsInt(winnerTimeAdj);
+
+        // Separate the reports with a blank line for clarity
+        b.add("");
+        b.add(LocalText.getText("EoGFinalRanking") + " (Time-Adjusted Worth):");
+
+        rank = 1;
+        for (Player p : rankedPlayersTimeAdj) {
+            double worthTimeAdj = getAdjustedWorth.applyAsInt(p);
+            double percent = (winnerWorthTimeAdj > 0) ? (worthTimeAdj / winnerWorthTimeAdj) * 100.0 : 0.0;
+            String line = String.format("%d. %s (%s) - %.1f%%",
+                    rank,
+                    p.getId(),
+                    Bank.format(this, (int) worthTimeAdj), // Format the adjusted worth
+                    percent);
+
+            b.add(line);
+            rank++;
+        }
+
+        return b;
+    }
+
+    // --- REPLACEMENT FOR LOGGING SECTION ---
+
+    // 1. STATE VARIABLES
+    protected final GenericState<String> statusMessageState = new GenericState<>(this, "StatusMessageState");
+    protected final GenericState<String> lastLogActor = new GenericState<>(this, "LastLogActor");
+    protected final GenericState<String> lastLogCompany = new GenericState<>(this, "LastLogCompany");
+    protected final ArrayListState<String> passedPlayers = new ArrayListState<>(this, "PassedPlayersList");
+
+    // 2. TRANSIENT FIELD (Standard Java List)
+    // We initialize it here to avoid NPEs on new games
+
+    private Class<? extends RoundFacade> lastRoundClass = null;
+    private String currentLogPrefix = "";
+
+    public String getLastActionSummary() {
+        if (statusMessageState == null)
+            return "";
+        String hist = statusMessageState.value();
+        if (Util.hasValue(hist)) {
+            if (Util.hasValue(currentLogPrefix)) {
+                return currentLogPrefix + " " + hist;
+            }
+            return hist;
+        }
+        return "";
+    }
+
+    // --- ROBUST GETTER (Prevents UI Crashes) ---
+    public String getPassedPlayersLog() {
+        if (passedPlayers.isEmpty())
+            return "";
+        return String.join(", ", passedPlayers);
+    }
+
+    protected void clearStatusMessage() {
+        if (statusMessageState != null)
+            statusMessageState.set("");
+        currentLogPrefix = "";
+        lastRoundClass = null;
+        if (passedPlayers != null)
+            passedPlayers.clear();
+    }
+
+    /**
+     * Called by process() to record human-readable history.
+     * Includes robust error handling to prevent game freezes.
+     */
+    public void logAction(PossibleAction action) {
+        if (action == null)
+            return;
+
+        try {
+            // --- 0. SETUP VARIABLES ---
+            String actorName = action.getPlayerName();
+            String actionString = action.toString();
+
+            // --- 1. RESET LOGIC (Turn Boundary) ---
+            String oldActor = lastLogActor.value();
+
+            String newCompany = "";
+            Company actingCompany = null;
+            if (action instanceof PossibleORAction) {
+                actingCompany = ((PossibleORAction) action).getCompany();
+            } else if (action instanceof BuyTrain) {
+                actingCompany = ((BuyTrain) action).getCompany();
+            } else if (action instanceof SetDividend) {
+                actingCompany = ((SetDividend) action).getCompany();
+            }
+            if (actingCompany != null)
+                newCompany = actingCompany.getId();
+
+            String oldCompany = lastLogCompany.value();
+            if (oldCompany == null)
+                oldCompany = "";
+
+            boolean actorChanged = (oldActor == null) || !actorName.equals(oldActor);
+            boolean companyChanged = Util.hasValue(newCompany) && !newCompany.equals(oldCompany);
+
+            RoundFacade currentRound = getCurrentRound();
+            boolean roundChanged = (lastRoundClass == null || !lastRoundClass.equals(currentRound.getClass()));
+
+            if (actorChanged || companyChanged || roundChanged) {
+                statusMessageState.set("");
+                currentLogPrefix = "";
+                lastRoundClass = currentRound.getClass();
+                lastLogActor.set(actorName);
+                lastLogCompany.set(newCompany);
+
+                if (roundChanged)
+                    passedPlayers.clear();
+            }
+
+            // --- 2. UPDATE PREFIX ---
+            if (actingCompany != null) {
+                currentLogPrefix = actingCompany.getId() + " (" + actorName + ")";
+            } else if (!Util.hasValue(currentLogPrefix)) {
+                currentLogPrefix = actorName;
+            }
+
+            String entry = "";
+
+            // --- 3. FORMATTING & PASS LOGIC ---
+
+            if (action instanceof BuyCertificate) {
+                BuyCertificate bc = (BuyCertificate) action;
+                // calculate correct percentage using Base Share Unit * Multiplier
+                // If Share Unit is 10%, and we buy 2 units (20% cert), result is 20.
+                int baseUnit = bc.getCompany().getShareUnit();
+                int sharePercent = bc.getNumberBought() * bc.getSharePerCertificate();
+
+                // Fallback if sharePerCertificate is just a multiplier (e.g. 1 or 2)
+                if (sharePercent < baseUnit)
+                    sharePercent = sharePercent * baseUnit;
+
+                String compId = bc.getCompany().getId();
+
+                boolean isNationalization = false;
+                if (bc.getFromPortfolio() != null && bc.getFromPortfolio().getParent() instanceof Player) {
+                    Player seller = (Player) bc.getFromPortfolio().getParent();
+                    if (!seller.getName().equals(actorName)) {
+                        isNationalization = true;
+                        entry = "nationalizes " + sharePercent + "% from " + seller.getName();
+                    }
+                }
+
+                if (!isNationalization) {
+                    entry = "bought " + sharePercent + "% " + compId;
+                }
+                passedPlayers.clear();
+            } else if (action instanceof SellShares) {
+                SellShares ss = (SellShares) action;
+                // Calculate actual percentage
+                int sharePercent = ss.getShareUnits() * ss.getCompany().getShareUnit() * ss.getNumber();
+                entry = "sold " + sharePercent + "% " + ss.getCompany().getId();
+
+                // Conditional Pass Logic ---
+                // Rule: Selling counts as a "Pass" (Green Text) ONLY if the player
+                // has NOT bought anything this turn.
+                if (getCurrentRound() instanceof StockRound) {
+                    StockRound sr = (StockRound) getCurrentRound();
+                    if (!sr.hasPlayerBoughtThisTurn()) {
+                        // If they haven't bought, this sell counts as a pass (so far)
+                        if (!passedPlayers.contains(actorName)) {
+                            passedPlayers.add(actorName);
+                        }
+                    }
+                }
+                // Note: If they Buy *after* selling, the Buy block above will
+                // trigger on the next action and clear this entry. Correct.
+
+            } else if (action instanceof BuyStartItem) {
+                String itemName = "start item";
+                if (actionString.contains("startItem=")) {
+                    try {
+                        itemName = actionString.substring(actionString.indexOf("startItem=") + 10).split(",")[0];
+                    } catch (Exception e) {
+                    }
+                }
+                entry = "bought " + itemName;
+                passedPlayers.clear();
+            } else if (action instanceof LayTile) {
+                LayTile lt = (LayTile) action;
+                String location = lt.getChosenHex().getId();
+                String cityName = lt.getChosenHex().getStopName();
+                if (Util.hasValue(cityName))
+                    location += " (" + cityName + ")";
+                entry = "laid tile " + lt.getLaidTile().getId() + " on " + location;
+            } else if (action instanceof LayToken) {
+                LayToken lt = (LayToken) action;
+                String location = lt.getChosenHex().getId();
+                String cityName = lt.getChosenHex().getStopName();
+                if (Util.hasValue(cityName))
+                    location += " (" + cityName + ")";
+                entry = "placed token on " + location;
+            } else if (action instanceof BuyTrain) {
+                BuyTrain bt = (BuyTrain) action;
+                String trainName = (bt.getTrain() != null) ? bt.getTrain().getName().split("_")[0] : "?";
+                String sourceName = "IPO";
+
+                // Extract Source
+                if (actionString.contains("from=") || actionString.contains("portfolio=")) {
+                    if (actionString.contains("Bank") || actionString.contains("Pool")
+                            || actionString.contains("IPO")) {
+                        sourceName = "IPO";
+                    } else {
+                        // Extract specific source name
+                        sourceName = "Market";
+                        try {
+                            if (actionString.contains("from="))
+                                sourceName = actionString.substring(actionString.indexOf("from=") + 5)
+                                        .split("[,\\}]")[0];
+                            else if (actionString.contains("portfolio="))
+                                sourceName = actionString.substring(actionString.indexOf("portfolio=") + 10)
+                                        .split("[,\\}]")[0];
+                        } catch (Exception e) {
+                        }
+                    }
+                }
+
+                // Extract Price
+                int price = bt.getPricePaid();
+
+                // String price = "0";
+                // if (actionString.contains("price=")) {
+                // try {
+                // price = actionString.substring(actionString.indexOf("price=") +
+                // 6).split("[,\\}]")[0];
+                // } catch (Exception e) {}
+                // }
+
+                if ("IPO".equals(sourceName)) {
+                    entry = "buys fresh " + trainName;
+                } else {
+                    entry = "buys " + trainName + " from " + sourceName + " for " + price;
+                }
+            } else if (action instanceof SetDividend) {
+                SetDividend da = (SetDividend) action;
+                String alloc = "paid out";
+                if (da.getRevenueAllocation() == SetDividend.WITHHOLD)
+                    alloc = "withheld";
+                else if (da.getRevenueAllocation() == SetDividend.SPLIT)
+                    alloc = "split";
+                entry = "revenue " + da.getActualRevenue() + " (" + alloc + ")";
+            } else if (action.getClass().getSimpleName().contains("ExchangeForPrussian")) {
+                String comp = "Share";
+                if (actionString.contains("companyToExchange=")) {
+                    try {
+                        int start = actionString.indexOf("companyToExchange=") + 18;
+                        int end = actionString.indexOf(",", start);
+                        if (end == -1)
+                            end = actionString.indexOf("]", start);
+                        if (end > start)
+                            comp = actionString.substring(start, end);
+                    } catch (Exception e) {
+                    }
+                }
+                entry = "exchanges " + comp;
+            } else if (action instanceof DiscardTrain) {
+                DiscardTrain dt = (DiscardTrain) action;
+                String tName = (dt.getDiscardedTrain() != null) ? dt.getDiscardedTrain().getName() : "train";
+                entry = "discards " + tName;
+            } else if (action instanceof NullAction) {
+                NullAction na = (NullAction) action;
+                if (na.getMode() == NullAction.Mode.PASS) {
+                    entry = "passed";
+                    if (!passedPlayers.contains(actorName)) {
+                        passedPlayers.add(actorName);
+                    }
+                } else {
+                    return;
+                }
+            } else {
+                entry = actionString;
+            }
+
+            // --- 4. SMART APPEND LOGIC ---
+            String currentHistory = statusMessageState.value();
+            if (currentHistory == null)
+                currentHistory = "";
+            // If the history already ends with exactly this entry, do not append it again.
+            // This fixes the "Double Blue Text" issue (e.g. "Laid Tile X, Laid Tile X").
+            if (currentHistory.endsWith(entry)) {
+                return;
+            }
+
+            if (entry.startsWith("sold ") && currentHistory.contains("sold ")) {
+                try {
+                    String lastEntry = currentHistory.substring(currentHistory.lastIndexOf("sold "));
+                    String compName = entry.substring(entry.lastIndexOf(" ") + 1);
+
+                    if (lastEntry.endsWith(compName)) {
+                        int oldPct = Integer.parseInt(lastEntry.split(" ")[1].replace("%", ""));
+                        int newPct = Integer.parseInt(entry.split(" ")[1].replace("%", ""));
+                        int total = oldPct + newPct;
+                        String baseHistory = currentHistory.substring(0, currentHistory.lastIndexOf("sold "));
+                        statusMessageState.set(baseHistory + "sold " + total + "% " + compName);
+                        return;
+                    }
+                } catch (Exception e) {
+                }
+            }
+
+            if (currentHistory.length() > 0) {
+                statusMessageState.set(currentHistory + ", " + entry);
+            } else {
+                statusMessageState.set(entry);
+            }
+
+        } catch (Exception e) {
+            // SILENT FAIL: Log error but DO NOT crash the game
+            log.error("Error generating history log", e);
+        }
+    }
+
+    /**
+     * Calculate the worth of a public company certificate for player
+     * net-worth/bankruptcy,
+     * used to override the market price (e.g., for 1835 Minors before flotation).
+     * Default behavior is to return -1, indicating no override; the market price
+     * should be used.
+     */
+    public int getPublicCompanyWorth(PublicCompany company) {
+        return -1; // Default: No override, use market price
+    }
+
+    /**
+     * Called from the UI to launch the Worth History Chart.
+     * 
+     * @param parentFrame The main UI frame (e.g., StatusWindow) required as the
+     *                    dialog parent.
+     */
+    public void displayWorthChart(Object parentFrame) {
+        // We use reflection/dynamic class loading here to avoid making GameManager
+        // dependent on specific UI classes (like WorthChartWindow) at compile time.
+        try {
+            Class<?> chartClass = Class.forName("net.sf.rails.ui.swing.charts.WorthChartWindow");
+            // Use JFrame.class for reflection method lookup to handle the generic parent
+            // frame
+            java.lang.reflect.Method showMethod = chartClass.getMethod("showChart", JFrame.class, GameManager.class);
+
+            // Cast the parentFrame object to a generic JFrame
+            JFrame frame = (JFrame) parentFrame;
+
+            // Call the static showChart method
+            showMethod.invoke(null, frame, this);
+
+        } catch (Exception e) {
+            log.error("Failed to display Worth Chart. Is WorthChartWindow.java compiled and on classpath?", e);
+        }
+    }
+
+    // --- START FIX ---
+    private void saveTimeData(File saveFile) {
+        if (!isTimeManagementEnabled()) return;
+        
+        File timeFile = new File(saveFile.getAbsolutePath() + ".time");
+        try (PrintWriter writer = new PrintWriter(timeFile)) {
+            for (Player p : getRoot().getPlayerManager().getPlayers()) {
+                // Format: PlayerName=Seconds
+                writer.println(p.getName() + "=" + p.getTimeBankModel().value());
+            }
+            log.info("[TIME] Saved time data to sidecar: {}", timeFile.getName());
+        } catch (IOException e) {
+            log.error("[TIME] Failed to save time sidecar", e);
+        }
+    }
+
+    private void loadTimeData(File saveFile) {
+        if (!isTimeManagementEnabled()) return;
+
+        File timeFile = new File(saveFile.getAbsolutePath() + ".time");
+        if (!timeFile.exists()) {
+            log.info("[TIME] No sidecar file found ({}), using calculated replay time.", timeFile.getName());
+            return;
+        }
+
+        try (java.io.BufferedReader reader = new java.io.BufferedReader(new java.io.FileReader(timeFile))) {
+            String line;
+            while ((line = reader.readLine()) != null) {
+                String[] parts = line.split("=");
+                if (parts.length == 2) {
+                    String pName = parts[0];
+                    int seconds = Integer.parseInt(parts[1]);
+                    
+for (Player p : getRoot().getPlayerManager().getPlayers()) {
+                         if (p.getName().equals(pName)) {
+                             p.getTimeBankModel().set(seconds);
+                             break; 
+                         }
+                    }
+                }
+            }
+            log.info("[TIME] Restored exact player times from sidecar.");
+        } catch (Exception e) {
+            log.error("[TIME] Failed to load time sidecar", e);
+        }
+    }
+    // --- END FIX ---
+
+
+}
 

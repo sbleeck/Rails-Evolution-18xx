@@ -13,6 +13,7 @@ import net.sf.rails.util.Util;
 
 public final class Config {
 
+
     private static final Logger log = LoggerFactory.getLogger(Config.class);
 
     /**

@@ -94,7 +94,7 @@ public class MapManager extends RailsManager implements Configurable {
     }
 
     public void finishConfiguration (RailsRoot root) throws ConfigurationException {
-
+// log.error("--- MapManager.finishConfiguration START ---"); // <<< ADD
         for (MapHex hex:hexes.values()) {
             hex.finishConfiguration(root);
         }
@@ -128,6 +128,7 @@ public class MapManager extends RailsManager implements Configurable {
             }
         }
         hexTable = hexTableBuilder.build();
+        // log.error("--- MapManager.finishConfiguration: Finished placing initial tiles on hexes. ---");
 
         for (PublicCompany company : root.getCompanyManager().getAllPublicCompanies()) {
             List<MapHex> homeHexes = company.getHomeHexes();
@@ -160,6 +161,7 @@ public class MapManager extends RailsManager implements Configurable {
             mapImageFilepath = "/" + rootDirectory + "/" + mapImageFilename;
         }
 
+        // log.error("--- MapManager.finishConfiguration END ---"); // <<< ADD
     }
 
     /**
@@ -239,7 +241,7 @@ public class MapManager extends RailsManager implements Configurable {
         if (!log.isDebugEnabled() || sides == null) return;
         Iterator<HexSide> it = sides.iterator();
         while (it.hasNext()) {
-            log.debug("{} {}", prefix, it.next());
+            // log.debug("{} {}", prefix, it.next());
         }
     }
 

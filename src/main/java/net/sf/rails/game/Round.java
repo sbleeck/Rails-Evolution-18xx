@@ -323,9 +323,17 @@ public /*abstract*/ class Round extends RailsAbstractItem implements RoundFacade
                 }
             }
         }
-        // Inform GameManager
-        gameManager.nextRound(this);
-    }
+// This is the "1835-aware" patch.
+        // We check if the gameManager is an instance of the 1835-subclass.
+        // If it is, we MUST cast it to force the compiler to call the
+        // overridden nextRound() method that checks the priority queue.
+        if (gameManager instanceof net.sf.rails.game.specific._1835.GameManager_1835) {
+            ((net.sf.rails.game.specific._1835.GameManager_1835) gameManager).nextRound(this);
+        } else {
+            // Otherwise, do the normal, non-polymorphic call.
+            gameManager.nextRound(this);
+        }
+        }
 
     // called only from 1835 Operating Round?
     public boolean wasInterrupted() {
@@ -335,6 +343,9 @@ public /*abstract*/ class Round extends RailsAbstractItem implements RoundFacade
     /** Stub to allow lower subclasses to provide their own window title */
     public String getOwnWindowTitle() {
         return null;
+    }
+        public List<PossibleAction> getPossibleActionsList() {
+        return possibleActions.getList();
     }
 
 }

@@ -46,7 +46,7 @@ public class RunToCoalMineModifier
 
         List<RevenueTrainRun> invalidRuns = new ArrayList<>();
         int i = 0;
-        log.debug ("--------------------------------------------------");
+        // log.debug ("--------------------------------------------------");
         for (RevenueTrainRun run:runs) {
             log.debug ("Run {}: {}", ++i,
                     run.prettyPrint(true)

@@ -218,7 +218,7 @@ public class TileHexUpgrade extends HexUpgrade implements Iterable<HexSide> {
     }
 
     public boolean noValidRotation() {
-        return rotations.isEmpty();
+        return this.rotations == null || this.rotations.isEmpty();
     }
 
     public boolean hexIsBlocked() {

@@ -4,6 +4,8 @@
  */
 package net.sf.rails.game.specific._1835;
 
+// import static net.sf.rails.game.financial.StockRound.log;
+
 import java.util.*;
 
 import com.google.common.collect.Sets;
@@ -19,15 +21,19 @@ import net.sf.rails.common.ReportBuffer;
 import net.sf.rails.game.*;
 import net.sf.rails.game.model.PortfolioModel;
 import net.sf.rails.game.state.Portfolio;
+import net.sf.rails.game.model.PortfolioModel;
 import rails.game.action.PossibleAction;
+import rails.game.specific._1835.ExchangeForPrussianShare;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class StockRound_1835 extends StockRound {
 
     /**
      * Constructed via Configure
      */
-    public StockRound_1835 (GameManager parent, String id) {
+    public StockRound_1835(GameManager parent, String id) {
         super(parent, id);
     }
 
@@ -38,7 +44,8 @@ public class StockRound_1835 extends StockRound {
     public void setBuyableCerts() {
 
         super.setBuyableCerts();
-        if (companyBoughtThisTurnWrapper.value() != null) return;
+        if (companyBoughtThisTurnWrapper.value() != null)
+            return;
 
         int price;
         int cash = currentPlayer.getCash();
@@ -49,19 +56,26 @@ public class StockRound_1835 extends StockRound {
 
         // Nationalisation
         for (PublicCompany company : companyManager.getAllPublicCompanies()) {
-            if (!company.getType().getId().equalsIgnoreCase("Major")) continue;
-            if (!company.hasFloated()) continue;
-            if (company.getPresident() != currentPlayer) continue;
-            if (currentPlayer.getPortfolioModel().getShare(company) < 55) continue;
-            if (currentPlayer.hasSoldThisRound(company)) continue;
-            
+            if (!company.getType().getId().equalsIgnoreCase("Major"))
+                continue;
+            if (!company.hasFloated())
+                continue;
+            if (company.getPresident() != currentPlayer)
+                continue;
+            if (currentPlayer.getPortfolioModel().getShare(company) < 55)
+                continue;
+            if (currentPlayer.hasSoldThisRound(company))
+                continue;
+
             for (Player otherPlayer : getRoot().getPlayerManager().getPlayers()) {
-                if (otherPlayer == currentPlayer) continue;
+                if (otherPlayer == currentPlayer)
+                    continue;
 
                 /* Get the unique player certificates and check which ones can be bought */
                 from = otherPlayer.getPortfolioModel();
                 certs = from.getCertificates(company);
-                if (certs == null || certs.isEmpty()) continue;
+                if (certs == null || certs.isEmpty())
+                    continue;
 
                 /* Allow for multiple share unit certificates (e.g. 1835) */
                 PublicCertificate[] uniqueCerts;
@@ -69,21 +83,24 @@ public class StockRound_1835 extends StockRound {
 
                 stockSpace = company.getCurrentSpace();
                 unitsForPrice = company.getShareUnitsForSharePrice();
-                price = (int)(1.5 * stockSpace.getPrice() / unitsForPrice);
+                price = (int) (1.5 * stockSpace.getPrice() / unitsForPrice);
 
-                /* Check what share multiples are available
+                /*
+                 * Check what share multiples are available
                  * Normally only 1, but 1 and 2 in 1835. Allow up to 4.
                  */
                 uniqueCerts = new PublicCertificate[5];
                 for (PublicCertificate cert2 : certs) {
                     shares = cert2.getShares();
-                    if (uniqueCerts[shares] != null) continue;
+                    if (uniqueCerts[shares] != null)
+                        continue;
                     uniqueCerts[shares] = cert2;
                 }
 
                 /* Create a BuyCertificate action per share size */
                 for (shares = 1; shares < 5; shares++) {
-                    if (uniqueCerts[shares] == null) continue;
+                    if (uniqueCerts[shares] == null)
+                        continue;
 
                     /* Would the player exceed the total certificate limit? */
                     if (!stockSpace.isNoCertLimit()
@@ -92,7 +109,8 @@ public class StockRound_1835 extends StockRound {
                         continue;
 
                     // Does the player have enough cash?
-                    if (cash < price * shares) continue;
+                    if (cash < price * shares)
+                        continue;
 
                     possibleActions.add(new BuyCertificate(company,
                             uniqueCerts[shares].getShare(),
@@ -112,7 +130,7 @@ public class StockRound_1835 extends StockRound {
     @Override
     // change: price differs for nationalization action
     // requires: move into new activity
-    protected int getBuyPrice (BuyCertificate action, StockSpace currentSpace) {
+    protected int getBuyPrice(BuyCertificate action, StockSpace currentSpace) {
         int price = currentSpace.getPrice();
         if (action.getFromPortfolio().getParent() instanceof Player) {
             price *= 1.5;
@@ -120,19 +138,25 @@ public class StockRound_1835 extends StockRound {
         return price;
     }
 
-    /** Share price goes down 1 space for any number of shares sold.
+    
+
+    /**
+     * Share price goes down 1 space for any number of shares sold.
+     * In 1835, EVERY share sold drops the price.
      */
-    // change: specific share price adjustment
-    // requires: do a parameterization
     @Override
-    protected void adjustSharePrice (PublicCompany company, Owner seller, int sharesSold, boolean soldBefore) {
-        // No more changes if it has already dropped
+    protected void adjustSharePrice(PublicCompany company, Owner seller, int sharesSold, boolean soldBefore) {
+        // Always call super to enforce the price drop on the stock market.
+        // This ensures that selling 10% then 10% results in TWO drops.
+        super.adjustSharePrice(company, seller, sharesSold, soldBefore);
+
+        // Track last sold for UI/Undo purposes
         if (soldBefore) {
             lastSoldCompany = company;
-        } else {
-            super.adjustSharePrice (company, seller,1, soldBefore);
         }
     }
+
+    private static final Logger log = LoggerFactory.getLogger(StockRound_1835.class);
 
     @Override
     public boolean done(NullAction action, String playerName,
@@ -142,33 +166,39 @@ public class StockRound_1835 extends StockRound {
                 hasActed.set(false);
             }
         }
-         return super.done(action, playerName, hasAutopassed);
+        return super.done(action, playerName, hasAutopassed);
     }
 
-  /*  (non-Javadoc)
-     * @see net.sf.rails.game.StockRound#mayPlayerSellShareOfCompany(net.sf.rails.game.PublicCompany)
-    */ 
+    /*
+     * (non-Javadoc)
+     * * @see
+     * net.sf.rails.game.StockRound#mayPlayerSellShareOfCompany(net.sf.rails.game.
+     * PublicCompany)
+     */
     @Override
     public boolean mayPlayerSellShareOfCompany(PublicCompany company) {
-        if (!super.mayPlayerSellShareOfCompany(company) ) 
-            { 
+        if (!super.mayPlayerSellShareOfCompany(company)) {
             return false;
+        } else {
+            /*
+             * Player is President and ia allowed to sell his director share if there is
+             * enough space in the pool in 1835
+             * But if he has sold a share in this round he is allowed to sell dump the
+             * presidency...
+             *
+             */
+            if (company.getPresident() == currentPlayer) {
+                if (PlayerShareUtils.poolAllowsShares(company) > 1)
+                    return true;
             }
-        else {
-          /*
-           * Player is President and ia allowed to sell his director share if there is enough space in the pool in 1835
-           * But if he has sold a share in this round he is allowed to sell dump the presidency...
-           *
-           * */
-            if (company.getPresident() == currentPlayer) { 
-                if (PlayerShareUtils.poolAllowsShares(company) >1) return true;
-                }
         }
         return true;
     }
 
     protected void setGameSpecificActions() {
-        /* If in one turn multiple sales of the same company occur,
+
+        /*
+         * If in one turn multiple sales of the same company occur,
          * this is normally done at the same price.
          * In 1835 the rules state otherwise, a special action
          * enables following that rule strictly.
@@ -176,40 +206,63 @@ public class StockRound_1835 extends StockRound {
         if (lastSoldCompany != null) {
             possibleActions.add(new AdjustSharePrice(lastSoldCompany, EnumSet.of(AdjustSharePrice.Direction.DOWN)));
         }
+
+        // PFR rules allow exchange in subsequent Stock Rounds until the Minor is gone.
+        // We generate the action if the player holds an eligible Minor and PR has
+        // started.
+        PublicCompany pr = companyManager.getPublicCompany("PR");
+
+        // FIX: Relaxed condition check: if PR exists and is not closed.
+        if (pr != null && pr.hasStarted()&& !pr.isClosed()) {
+            for (PublicCompany minor : companyManager.getAllPublicCompanies()) {
+                String id = minor.getId();
+                // Check eligible Minors/pre-majors: M1-M6, HB, BB
+                if (id.startsWith("M") && id.length() == 2 || id.equals("HB") || id.equals("BB")) {
+                    if (currentPlayer.getPortfolioModel().getShare(minor) > 0) {
+                        // Only offer exchange if the minor hasn't already been closed/removed
+                        if (!minor.isClosed()) {
+                            possibleActions.add(new ExchangeForPrussianShare(minor));
+                        }
+                    }
+                }
+            }
+        }
     }
 
     protected boolean processGameSpecificAction(PossibleAction action) {
         if (action instanceof AdjustSharePrice) {
-            super.adjustSharePrice ((AdjustSharePrice)action);
+            super.adjustSharePrice((AdjustSharePrice) action);
             return true;
         } else {
             return false;
         }
     }
 
-
     /*
-    @Override
-    protected boolean checkIfSplitSaleOfPresidentAllowed() {
-        // in 1835 its not allowed to Split the President Certificate on sale
-        return false;
-    }*/
-
-	@Override
-	protected void setPriority(String string) {
-		if (string.matches("BuyCert|StartCompany")) {
-			super.setPriority(string);
-		}
-	}
+     * @Override
+     * protected boolean checkIfSplitSaleOfPresidentAllowed() {
+     * // in 1835 its not allowed to Split the President Certificate on sale
+     * return false;
+     * }
+     */
 
     @Override
-    protected boolean executeShareTransfer(PublicCompany company, List<PublicCertificate> certsToSell, Player dumpedPlayer, int presSharesToSell) {
+    protected void setPriority(String string) {
+        if (string.matches("BuyCert|StartCompany")) {
+            super.setPriority(string);
+        }
+    }
+
+    @Override
+    protected boolean executeShareTransfer(PublicCompany company, List<PublicCertificate> certsToSell,
+            Player dumpedPlayer, int presSharesToSell) {
 
         boolean swapped = false;
         BankPortfolio bankTo = (BankPortfolio) pool.getParent();
 
         if (dumpedPlayer != null && presSharesToSell > 0) {
-            executePresidentTransferAfterDump(company, new TreeSet<>(certsToSell), dumpedPlayer, presSharesToSell, company.getPresident(), bankTo);
+            executePresidentTransferAfterDump(company, new TreeSet<>(certsToSell), dumpedPlayer, presSharesToSell,
+                    company.getPresident(), bankTo);
 
             ReportBuffer.add(this, LocalText.getText("IS_NOW_PRES_OF",
                     dumpedPlayer.getId(),
@@ -223,22 +276,84 @@ public class StockRound_1835 extends StockRound {
         return swapped;
     }
 
-    private void executePresidentTransferAfterDump(PublicCompany company, Set<PublicCertificate> certsToSell, Player newPresident, int presSharesToSell, Player oldPresident, BankPortfolio bankTo) {
+    private void executePresidentTransferAfterDump(PublicCompany company, Set<PublicCertificate> certsToSell,
+            Player newPresident, int presSharesToSell, Player oldPresident, BankPortfolio bankTo) {
         PublicCertificate presidentCert = company.getPresidentsShare();
 
-        SortedSet<PublicCertificate.Combination> newPresidentsReplacementForPresidentShare = CertificatesModel.certificateCombinations(  newPresident.getPortfolioModel().getCertificates(company), presidentCert.getShares());
+        SortedSet<PublicCertificate.Combination> newPresidentsReplacementForPresidentShare = CertificatesModel
+                .certificateCombinations(newPresident.getPortfolioModel().getCertificates(company),
+                        presidentCert.getShares());
 
-        // FIXME: This should be based on a selection of the old president, however it chooses the combination with least certificates, which is favorable in most cases
-        PublicCertificate.Combination swapToOldPresident = newPresidentsReplacementForPresidentShare.first();
+        PublicCertificate.Combination swapToOldPresident = null;
+
+        // Check if a manual choice was set in the UI (inherited from StockRound static
+        // field)
+        if (StockRound.manualSwapChoice != null && !StockRound.manualSwapChoice.isEmpty()) {
+            for (PublicCertificate.Combination comb : newPresidentsReplacementForPresidentShare) {
+                // Convert combination to list of sizes for comparison
+                List<Integer> combSizes = new ArrayList<>();
+                for (PublicCertificate c : comb.getCertificates()) {
+                    combSizes.add(c.getShares());
+                }
+                Collections.sort(combSizes);
+
+                // manualSwapChoice is already sorted
+                if (combSizes.equals(StockRound.manualSwapChoice)) {
+                    swapToOldPresident = comb;
+                    log.warn("[SWAP-1835] Applying manual swap choice: {}", StockRound.manualSwapChoice);
+                    break;
+                }
+            }
+            StockRound.manualSwapChoice = null; // Clear after use
+        }
+
+        // Fallback to default behavior if no choice or match found
+        if (swapToOldPresident == null) {
+            swapToOldPresident = newPresidentsReplacementForPresidentShare.first();
+        }
 
         Portfolio.moveAll(swapToOldPresident, oldPresident);
         presidentCert.moveTo(newPresident);
 
-        Set<PublicCertificate> oldPresidentsCertsWithoutCertsToSell = Sets.difference(oldPresident.getPortfolioModel().getCertificates(company), certsToSell);
-        SortedSet<PublicCertificate.Combination> sellableCertificateCombinations = CertificatesModel.certificateCombinations(
-                oldPresidentsCertsWithoutCertsToSell,
-                presSharesToSell);
+        Set<PublicCertificate> oldPresidentsCertsWithoutCertsToSell = Sets
+                .difference(oldPresident.getPortfolioModel().getCertificates(company), certsToSell);
+        SortedSet<PublicCertificate.Combination> sellableCertificateCombinations = CertificatesModel
+                .certificateCombinations(
+                        oldPresidentsCertsWithoutCertsToSell,
+                        presSharesToSell);
 
         Portfolio.moveAll(sellableCertificateCombinations.last(), bankTo);
+    }
+
+    @Override
+    public void start() {
+
+        super.start();
+
+        //  Remove Legacy PFR Trigger ---
+        // The GameManager_1835 now handles the "Ask at start of round" logic centrally.
+        // We do NOT check for the 4-train here anymore, because checking here ignores
+        // the "Declined" flag and causes a double-ask.
+
+        /*
+         * Legacy code removed:
+         * if (fourTrainSold && prNotStarted && m2Exists) {
+         * ((GameManager_1835) gameManager).startPrussianFormationRound(this);
+         * }
+         */
+
+        // However, we DO keep the "Subsequent Round" check for Phase 3 cleanup
+        // (If PR is already open but not complete).
+        PublicCompany pr = companyManager.getPublicCompany(GameDef_1835.PR_ID);
+
+        if (pr != null && pr.hasStarted() && !pr.isClosed()) {
+            // Check if Prussian formation is complete (minors still exist)
+            boolean prComplete = PrussianFormationRound.prussianIsComplete(gameManager);
+
+            // If incomplete, force the cleanup round (Exchange opportunities)
+            if (!prComplete) {
+                ((GameManager_1835) gameManager).startPrussianFormationRound(this);
+            }
+        }
     }
 }

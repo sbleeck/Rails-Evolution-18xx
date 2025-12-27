@@ -6,124 +6,131 @@ import net.sf.rails.common.Config;
 import net.sf.rails.common.GuiDef;
 import net.sf.rails.common.LocalText;
 import net.sf.rails.game.*;
+import net.sf.rails.game.round.RoundFacade;
+import net.sf.rails.game.state.IntegerState;
 import net.sf.rails.ui.swing.elements.*;
+import net.sf.rails.ui.swing.hexmap.GUIHex;
 import net.sf.rails.ui.swing.hexmap.HexHighlightMouseListener;
+import net.sf.rails.ui.swing.hexmap.HexMap;
 import net.sf.rails.util.Util;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import rails.game.action.*;
-
+import rails.game.correct.CorrectionModeAction;
+import rails.game.correct.OperatingCost;
+import javax.swing.border.BevelBorder;
 import javax.swing.*;
+import javax.swing.border.TitledBorder; // Add
+import rails.game.specific._1835.StartPrussian;
+import rails.game.specific._1835.ExchangeForPrussianShare; // Add this!
+import javax.swing.border.Border;
+import java.util.Collection;
+import net.sf.rails.ui.swing.StatusWindow;
+
+// Add
+// Add
 import java.awt.*;
 import java.awt.event.*;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
 
-
 public class ORPanel extends GridPanel
-implements ActionListener, KeyListener, RevenueListener {
+        implements ActionListener, RevenueListener {
 
     private static final long serialVersionUID = 1L;
 
     public static final String OPERATING_COST_CMD = "OperatingCost";
     public static final String BUY_PRIVATE_CMD = "BuyPrivate";
-    public static final String BUY_TRAIN_CMD = "BuyTrain";
-    private static final String WITHHOLD_CMD = "Withhold";
-    private static final String SPLIT_CMD = "Split";
-    public static final String PAYOUT_CMD = "Payout";
-    public static final String SET_REVENUE_CMD = "SetRevenue";
-    private static final String DONE_CMD = "Done";
-    public static final String CONFIRM_CMD = "Confirm";
-    private static final String SKIP_CMD = "Skip";
-    private static final String UNDO_CMD = "Undo";
-    private static final String REDO_CMD = "Redo";
+
+    public static final String UNDO_CMD = "Undo";
+    public static final String REDO_CMD = "Redo";
     public static final String REM_TILES_CMD = "RemainingTiles";
-    private static final String NETWORK_INFO_CMD = "NetworkInfo";
+    public static final String NETWORK_INFO_CMD = "NetworkInfo";
     public static final String TAKE_LOANS_CMD = "TakeLoans";
     public static final String REPAY_LOANS_CMD = "RepayLoans";
+
+    public static final String BUY_TRAIN_CMD = "BuyTrain";
+    public static final String WITHHOLD_CMD = "Withhold";
+    public static final String SPLIT_CMD = "Split";
+    public static final String PAYOUT_CMD = "Payout";
+    public static final String SET_REVENUE_CMD = "SetRevenue";
+    public static final String DONE_CMD = "Done";
+    public static final String CONFIRM_CMD = "Confirm";
+    public static final String SKIP_CMD = "Skip";
+
+    // Sidebar Components ---
+    private JPanel sidebarPanel;
+    private JPanel phase1Panel, phase2Panel, phase3Panel, phase4Panel, footerPanel;
+    private ActionButton btnRevPayout, btnRevWithhold, btnRevSplit;
+    public ActionButton btnDone;
+
+    public ActionButton currentDefaultButton; // For Enter key
+    public int activePhase = 0; // 1=Build, 2=Token, 3=Revenue, 4=Train
+
+    public JPanel trainButtonsPanel;
+    public List<GUIHex> cycleableHexes = new ArrayList<>();
+    public int cycleIndex = -1;
 
     private ORWindow orWindow;
     private ORUIManager orUIManager;
 
-    private JPanel statusPanel;
-    private JPanel buttonPanel;
+    private JPanel dynamicButtonPanel;
 
-    private JMenuBar menuBar;
-    private JMenu infoMenu;
-    private JMenuItem remainingTilesMenuItem;
     private JMenu trainsInfoMenu;
     private JMenu phasesInfoMenu;
     private JMenu networkInfoMenu;
     private JMenu specialMenu;
-    private JMenu loansMenu;
-    private JMenu zoomMenu;
-    private JMenuItem zoomIn, zoomOut, fitToWindow, fitToWidth, fitToHeight, calibrateMap;
     private ActionMenuItem takeLoans;
     private ActionMenuItem repayLoans;
 
-    // Grid elements per function
-    private Caption[] leftCompName;
-    private int leftCompNameXOffset, leftCompNameYOffset;
-    private Caption[] rightCompName;
-    private int rightCompNameXOffset, rightCompNameYOffset;
-    private Field[] president;
-    private int presidentXOffset, presidentYOffset;
-    private Field[] sharePrice;
-    private int sharePriceXOffset, sharePriceYOffset;
-    private Field[] cash;
-    private int cashXOffset, cashYOffset;
-    private Field[] privates;
-    private int privatesXOffset, privatesYOffset;
-    private Field[] newPrivatesCost;
-    private Field[] compLoans;
-    private int loansXOffset, loansYOffset;
-    private Field[] tiles;
-    private int tilesXOffset, tilesYOffset;
-    private Field[] tileCost;
-    private Field[] tokens;
-    private Field[] tokenCost;
-    private Field[] tokensLeft;
-    private Field[] tokenBonus;
-    private int tokensXOffset, tokensYOffset;
-    private Field[] revenue;
-    private Spinner[] revenueSelect;
-    private Field[] decision;
-    private int revXOffset, revYOffset;
-    private Field[] trains;
-    private int trainsXOffset, trainsYOffset;
-    private Field[] newTrainCost;
-    private int rightsXOffset, rightsYOffset;
-    private Field[] rights;
-    /**
-     * For the direct Income to be entered during the OR Phase
-     * and the (remaining) dividend
-     */
-    private Field[] dividend;
-    private Spinner[] directIncomeSelect;
-    private Field[] directIncomeRevenue;
-    private int bonusRevXOffset, bonusRevYOffset;
+    // --- VISUAL CONSTANTS ---
+    // Matches Status Window Yellow
+    private static final Color BG_DETAILS = new Color(235, 230, 255); // Exact Mauve from Status Window
+    private static final Color CARD_BG = new Color(255, 255, 240); // Beige for Cards
+    private static final Color BG_HIGHLIGHT = new Color(255, 255, 200);
+    private static final Color BG_NORMAL = UIManager.getColor("Panel.background");
+    private static final Color FG_READOUT = Color.BLACK;
+    private static final Color BG_READOUT = Color.WHITE; // High contrast for data
 
+    private static final Font FONT_READOUT = new Font("SansSerif", Font.BOLD, 18);
+    private static final Font FONT_HEADER = new Font("SansSerif", Font.BOLD, 12);
+
+    // --- COMPONENTS ---
+    private JLabel lblCash;
+    private JLabel lblRevenue;
+    private TokenDisplayPanel tokenDisplay; // Replaces lblTokens
+
+    private JPanel miscActionPanel; // Container for special property buttons inside Phase 1
+    private TrainDisplayPanel trainDisplay; // ADDED
     private boolean privatesCanBeBought;
-    private boolean bonusTokensExist;
     private boolean hasCompanyLoans;
+    private boolean specialMode = false;
+    public static final String SHOW_CMD = "Show";
+    public static final String TRAIN_SKIP_CMD = "TrainSkip";
+
+    public ActionButton btnBuildShow;
+    public ActionButton btnTrainSkip;
+    public ActionButton btnTileSkip, btnTileConfirm;
+    public ActionButton btnTokenSkip, btnTokenConfirm;
+    private boolean hasDirectCompanyIncomeInOR; // Muss wahrscheinlich auch wiederhergestellt werden, da die Logik sie
+                                                // nutzt
+    private boolean bonusTokensExist;
     private boolean hasRights;
-    private boolean hasDirectCompanyIncomeInOR;
+    // Die Variable 'hasDirectCompanyIncomeInOR' wurde von Ihnen im letzten Schritt
+    // doppelt deklariert.
+    // Wir lassen sie hier weg und verwenden die bereits existierende Deklaration.
+    private boolean showNumbersActive = false; // Zustand für das neue Hotkey-Feature
+    // In ORPanel.java (Klassenvariablen)
+    public ActionButton buttonOC;
+    public ActionButton button1;
 
-    // Configured properties
-    private boolean showAllCompanies = "always".equalsIgnoreCase(
-            Config.get("orPanel.showAllCompanies",""));
-    private boolean showSpinner = "yes".equalsIgnoreCase(
-            Config.get("orPanel.showSpinner",""));
+    public void setSpecialMode(boolean enabled) {
+        this.specialMode = enabled;
+    }
 
-    private Caption tileCaption, tokenCaption, revenueCaption, trainCaption,
-    privatesCaption, loansCaption, directIncomeCaption;
-
-    private ActionButton buttonOC; // sfy: button for operating costs
-    private ActionButton button1;
     private ActionButton button2;
     private ActionButton button3;
-    private ActionButton undoButton;
-    private ActionButton redoButton;
 
     // Current state
     private int orCompIndex = -1;
@@ -140,32 +147,85 @@ implements ActionListener, KeyListener, RevenueListener {
     private List<JFrame> openWindows = new ArrayList<>();
 
     protected static final Logger log = LoggerFactory.getLogger(ORPanel.class);
+    private JPanel legendPanel;
+    private List<BuyTrain> availableTrainActions = new ArrayList<>();
+    private JPanel specialPanel;
+    // Static registry to allow remote cleanup from Game Model via Reflection
+    private static final List<ORPanel> activeInstances = new ArrayList<>();
+
+    public static void forceGlobalCleanup() {
+        SwingUtilities.invokeLater(() -> {
+            for (ORPanel panel : activeInstances) {
+                // RACE CONDITION FIX:
+                // If the engine has already advanced to an Operating Round by the time this
+                // delayed task runs, we must NOT wipe the UI.
+                if (panel.orUIManager != null && panel.orUIManager.getGameUIManager() != null) {
+                    RoundFacade current = panel.orUIManager.getGameUIManager().getCurrentRound();
+                    if (current instanceof OperatingRound) {
+                        continue;
+                    }
+                }
+
+                panel.finish();
+            }
+        });
+    }
+
+    private JPanel specialContainer;
+
+    // --- 1. Sizing & Styling Constants ---
+    private static final int SIDEBAR_WIDTH = 190;
+    private static final int SIDEBAR_HEIGHT = 750;
+    private static final int BTN_HEIGHT = 28;
+    private static final Font BTN_FONT = new Font("SansSerif", Font.PLAIN, 11);
+    private static final Font HEADER_FONT = new Font("SansSerif", Font.BOLD, 11);
+
+    // Colors
+    // User requested "Green behind done must go". Setting to INACTIVE_BG (Standard
+    // Gray).
+    private JLabel companyLogo;
+    private JLabel companyCashLabel;
+    private JLabel tokenCountLabel;
+    private JLabel revenuePreviewLabel;
+    private JLabel trainListLabel;
+    private static final Color ACTIVE_BG = new Color(180, 220, 255); // Clear Blue
+    private static final Color INFO_BG = Color.WHITE; // White for data fields
+    private static final Color INACTIVE_BG = UIManager.getColor("Panel.background");
+    private static final Color DISABLED_BG = Color.LIGHT_GRAY; // Gray for SR/Inactive
+    private JPanel cashPanel;
+
+    public ORWindow getORWindow() {
+        return orWindow;
+    }
 
     public ORPanel(ORWindow parent, ORUIManager orUIManager) {
         super();
+
+        activeInstances.add(this);
+        // CRITICAL: Set the size of the ORPanel itself to match the desired sidebar
+        // width when used as the WEST panel in ORWindow.
+        setPreferredSize(new Dimension(SIDEBAR_WIDTH, 0));
 
         orWindow = parent;
         this.orUIManager = orUIManager;
         GameUIManager gameUIManager = parent.gameUIManager;
 
-        statusPanel = new JPanel();
-        gb = new GridBagLayout();
-        statusPanel.setLayout(gb);
-        statusPanel.setBorder(BorderFactory.createEtchedBorder());
-        statusPanel.setOpaque(true);
-
-        gridPanel = statusPanel;
+        // Use a blank JPanel for gridPanel to satisfy GridPanel heritage,
+        // ensuring no inherited methods accidentally target the active sidebar layout.
+        gridPanel = new JPanel();
         parentFrame = parent;
+        // Ensure the ORPanel can receive focus for hotkeys
+        setFocusable(true);
 
         round = gameUIManager.getCurrentRound();
-        //        noMapMode = gameUIManager.getGameParameterAsBoolean(GuiDef.Parm.NO_MAP_MODE);
         privatesCanBeBought = gameUIManager.getGameParameterAsBoolean(GuiDef.Parm.CAN_ANY_COMPANY_BUY_PRIVATES);
         bonusTokensExist = gameUIManager.getGameParameterAsBoolean(GuiDef.Parm.DO_BONUS_TOKENS_EXIST);
         hasCompanyLoans = gameUIManager.getGameParameterAsBoolean(GuiDef.Parm.HAS_ANY_COMPANY_LOANS);
         hasRights = gameUIManager.getGameParameterAsBoolean(GuiDef.Parm.HAS_ANY_RIGHTS);
         hasDirectCompanyIncomeInOR = gameUIManager.getGameParameterAsBoolean(GuiDef.Parm.HAS_SPECIAL_COMPANY_INCOME);
 
-        initButtonPanel();
+        initSidebar();
+
         gbc = new GridBagConstraints();
 
         players = gameUIManager.getPlayerManager();
@@ -174,135 +234,61 @@ implements ActionListener, KeyListener, RevenueListener {
             companies = ((OperatingRound) round).getOperatingCompanies().toArray(new PublicCompany[0]);
             nc = companies.length;
         }
-        log.debug("companies found: {} in {}", nc, round);
 
         initFields();
 
-        setLayout(new BorderLayout());
-        add(statusPanel, BorderLayout.CENTER);
-
-        //only add button panel directly for conventional layout
-        if (!parent.isDockingFrameworkEnabled()) {
-            add(buttonPanel, BorderLayout.SOUTH);
-        }
-
-        menuBar = new JMenuBar();
-
-        infoMenu = new JMenu(LocalText.getText("Info"));
-        infoMenu.setEnabled(true);
-
-        //only add remaining tiles display option for conventional layout
-        //as this is always included as a dockable panel in the docking frame layout
-        if (!parent.isDockingFrameworkEnabled()) {
-            remainingTilesMenuItem = new JMenuItem(LocalText.getText("RemainingTiles"));
-            remainingTilesMenuItem.addActionListener(this);
-            remainingTilesMenuItem.setActionCommand(REM_TILES_CMD);
-            infoMenu.add(remainingTilesMenuItem);
-        }
-
-        menuBar.add(infoMenu);
-
-        addCompanyInfo();
-        addTrainsInfo();
-        addPhasesInfo();
-        addNetworkInfo();
-
-        specialMenu = new JMenu(LocalText.getText("SPECIAL"));
-        specialMenu.setBackground(Color.YELLOW);
-        // Normally not seen because menu is not opaque
-        specialMenu.setEnabled(false);
-        menuBar.add(specialMenu);
-
-        if (hasCompanyLoans) {
-            loansMenu = new JMenu (LocalText.getText("LOANS"));
-            loansMenu.setEnabled(true);
-
-            takeLoans = new ActionMenuItem (LocalText.getText("TakeLoans"));
-            takeLoans.addActionListener(this);
-            takeLoans.setEnabled(false);
-            loansMenu.add(takeLoans);
-            menuItemsToReset.add(takeLoans);
-
-            repayLoans = new ActionMenuItem (LocalText.getText("RepayLoans"));
-            repayLoans.addActionListener(this);
-            repayLoans.setEnabled(false);
-            loansMenu.add(repayLoans);
-            menuItemsToReset.add(repayLoans);
-
-            menuBar.add(loansMenu);
-        }
-
-        zoomMenu = new JMenu("Zoom");
-        zoomMenu.setEnabled(true);
-        zoomIn = new JMenuItem("In");
-        zoomIn.addActionListener(this);
-        zoomIn.setEnabled(true);
-        zoomMenu.add(zoomIn);
-        zoomOut = new JMenuItem("Out");
-        zoomOut.addActionListener(this);
-        zoomOut.setEnabled(true);
-        zoomMenu.add(zoomOut);
-        fitToWindow = createFitToMenuItem("Fit to window");
-        if (fitToWindow.isSelected()) orWindow.getMapPanel().fitToWindow();
-        zoomMenu.add(fitToWindow);
-        fitToWidth = createFitToMenuItem("Fit to width");
-        if (fitToWidth.isSelected()) orWindow.getMapPanel().fitToWidth();
-        zoomMenu.add(fitToWidth);
-        fitToHeight = createFitToMenuItem("Fit to height");
-        if (fitToHeight.isSelected()) orWindow.getMapPanel().fitToHeight();
-        zoomMenu.add(fitToHeight);
-        calibrateMap = new JMenuItem("CalibrateMap");
-        calibrateMap.addActionListener(this);
-        calibrateMap.setEnabled(Config.isDevelop());
-        zoomMenu.add(calibrateMap);
-        menuBar.add(zoomMenu);
-
-        // only add menu bar for conventional layout
-        // (otherwise part of DockingFrame)
-        if (!parent.isDockingFrameworkEnabled()) {
-            add(menuBar, BorderLayout.NORTH);
-        }
-
+        // --- MENU REMOVAL ---
+        // All local JMenuBar construction (Info, Special, Loans, Zoom) has been removed
+        // as it is now handled by StatusWindow.
+        setupHotkeys(); // <--- ADD THIS CALL
         setVisible(true);
-
-        addKeyListener(this);
-    }
-
-    private JCheckBoxMenuItem createFitToMenuItem(String name) {
-        JCheckBoxMenuItem menuItem = new JCheckBoxMenuItem(name);
-        menuItem.addActionListener(this);
-        menuItem.setEnabled(true);
-
-        //check whether this is the default fit to option
-        if (name.equalsIgnoreCase(Config.get("map.defaultZoomFitOption"))) {
-            menuItem.setSelected(true);
-        }
-        return menuItem;
     }
 
     public void recreate(OperatingRound or) {
-        log.debug("ORPanel.recreate() called");
-
         companies = or.getOperatingCompanies().toArray(new PublicCompany[0]);
         nc = companies.length;
 
-        // Remove old fields. Don't forget to deregister the Observers
         deRegisterObservers();
-        statusPanel.removeAll();
 
-        // Create new fields
-        initFields();
+        // AGGRESSIVE WAKE-UP:
+        // Ensure the sidebar transitions from "Stock Round Gray" to "Active Mauve"
+        // immediately.
+        // We unhide all standard panels to ensure the UI is ready for the first
+        // company.
+        if (sidebarPanel != null) {
+            sidebarPanel.setBackground(BG_DETAILS); // Mauve
+            sidebarPanel.setOpaque(true);
 
-        // update the networkInfo menu
-        // TODO: This relies on a recreate as soon as companies have changed
-        addNetworkInfo();
+            if (cashPanel != null)
+                cashPanel.setVisible(true);
+            if (phase1Panel != null)
+                phase1Panel.setVisible(true);
+            if (phase2Panel != null)
+                phase2Panel.setVisible(true);
+            if (phase3Panel != null)
+                phase3Panel.setVisible(true);
+            if (phase4Panel != null)
+                phase4Panel.setVisible(true);
+            if (footerPanel != null)
+                footerPanel.setVisible(true);
+
+            sidebarPanel.revalidate();
+            sidebarPanel.repaint();
+        }
+
+        // Force data update immediately after recreate (when Stock Round ends)
+        // The ORUIManager initOR method calls this.
+        if (orComp != null) { // orComp is set inside initORCompanyTurn
+            updateSidebarData();
+        }
 
         repaint();
     }
 
     private void initButtonPanel() {
+        // --- 1. Initialize Buttons (RESTORED) ---
+        // This prevents the NullPointerException
 
-        // sfy: operatingcosts button
         buttonOC = new ActionButton(RailsIcon.OPERATING_COST);
         buttonOC.setActionCommand(OPERATING_COST_CMD);
         buttonOC.setMnemonic(KeyEvent.VK_O);
@@ -310,98 +296,19 @@ implements ActionListener, KeyListener, RevenueListener {
         buttonOC.setEnabled(false);
         buttonOC.setVisible(false);
 
-        button1 = new ActionButton(null);
+        button1 = new ActionButton(RailsIcon.BUY_TRAIN);
         button1.addActionListener(this);
         button1.setEnabled(false);
 
         button2 = new ActionButton(RailsIcon.DONE);
-        button2.setActionCommand(DONE_CMD);
-        button2.setMnemonic(KeyEvent.VK_D);
         button2.addActionListener(this);
         button2.setEnabled(false);
+        button2.setVisible(false);
 
         button3 = new ActionButton(RailsIcon.BUY_PRIVATE);
-        button3.setActionCommand(BUY_PRIVATE_CMD);
-        button3.setMnemonic(KeyEvent.VK_V);
         button3.addActionListener(this);
         button3.setEnabled(false);
         button3.setVisible(false);
-
-        undoButton = new ActionButton(RailsIcon.UNDO);
-        undoButton.setActionCommand(UNDO_CMD);
-        undoButton.setMnemonic(KeyEvent.VK_U);
-        undoButton.addActionListener(this);
-        undoButton.setEnabled(false);
-
-        redoButton = new ActionButton(RailsIcon.REDO);
-        redoButton.setActionCommand(REDO_CMD);
-        redoButton.setMnemonic(KeyEvent.VK_R);
-        redoButton.addActionListener(this);
-        redoButton.setEnabled(false);
-
-        //choose button panel layout depending on whether panel becomes a dockable
-        if (orWindow.isDockingFrameworkEnabled()) {
-
-            //customized panel for dockable layout
-            //the minimal size is defined by the size of one button
-            //(aim here: user can choose whether buttons are laid out
-            //           vertically or horizontally or in a grid, since
-            //           the minimal size's restriction is minimal indeed.)
-            buttonPanel = new JPanel() {
-                private static final long serialVersionUID = 1L;
-                @Override
-                public Dimension getMinimumSize() {
-                    int width = 0;
-                    int height = 0;
-                    if (getComponents().length != 0) {
-                        //getting the first component is sufficient as their
-                        //size is all the same
-                        width = getComponents()[0].getPreferredSize().width;
-                        height = getComponents()[0].getPreferredSize().height;
-                    }
-                    //add a margin
-                    width += 10;
-                    height += 10;
-                    return new Dimension(width,height);
-                }
-                @Override
-                public Dimension getPreferredSize() {
-                    return getMinimumSize();
-                }
-            };
-
-        } else {
-            //plain panel for conventional layout
-            buttonPanel = new JPanel();
-        }
-
-        buttonPanel.add(buttonOC);
-        buttonPanel.add(button1);
-        buttonPanel.add(button2);
-        buttonPanel.add(button3);
-        buttonPanel.add(undoButton);
-        buttonPanel.add(redoButton);
-
-        //for dockable button panel, ensure that all buttons have the same size
-        //(necessary, otherwise vertical/box layout will look ugly)
-        if (orWindow.isDockingFrameworkEnabled()) {
-
-            //get maximum size
-            Dimension maxSize = new Dimension();
-            for (Component c : buttonPanel.getComponents() ) {
-                if (c.getPreferredSize().width > maxSize.width)
-                    maxSize.width = c.getPreferredSize().width;
-                if (c.getPreferredSize().height > maxSize.height)
-                    maxSize.height = c.getPreferredSize().height;
-            }
-            //apply maximum size to all buttons
-            for (Component c : buttonPanel.getComponents() ) {
-                c.setPreferredSize(maxSize);
-            }
-
-        }
-
-        buttonPanel.setOpaque(true);
 
     }
 
@@ -410,425 +317,30 @@ implements ActionListener, KeyListener, RevenueListener {
             @Override
             public void mouseClicked(MouseEvent e) {
                 if (e.getComponent() instanceof Caption) {
-                    Caption c = (Caption)e.getComponent();
+                    Caption c = (Caption) e.getComponent();
                     executeNetworkInfo(c.getText());
                 }
             }
+
             @Override
-            public void mouseExited(MouseEvent e) {}
+            public void mouseExited(MouseEvent e) {
+            }
+
             @Override
-            public void mouseEntered(MouseEvent e) {}
+            public void mouseEntered(MouseEvent e) {
+            }
+
             @Override
-            public void mousePressed(MouseEvent e) {}
+            public void mousePressed(MouseEvent e) {
+            }
+
             @Override
-            public void mouseReleased(MouseEvent e) {}
+            public void mouseReleased(MouseEvent e) {
+            }
         };
     }
 
     private void initFields() {
-        leftCompName = new Caption[nc];
-        rightCompName = new Caption[nc];
-        president = new Field[nc];
-        sharePrice = new Field[nc];
-        cash = new Field[nc];
-        trains = new Field[nc];
-        privates = new Field[nc];
-        tiles = new Field[nc];
-        tileCost = new Field[nc];
-        tokens = new Field[nc];
-        tokenCost = new Field[nc];
-        tokensLeft = new Field[nc];
-        if (bonusTokensExist) tokenBonus = new Field[nc];
-        if (hasCompanyLoans) compLoans = new Field[nc];
-        if (hasRights) rights = new Field[nc];
-        revenue = new Field[nc];
-        revenueSelect = new Spinner[nc];
-        if (hasDirectCompanyIncomeInOR) {
-            dividend = new Field[nc];
-            directIncomeRevenue = new Field[nc];
-            directIncomeSelect = new Spinner[nc];
-        }
-        decision = new Field[nc];
-        newTrainCost = new Field[nc];
-        newPrivatesCost = new Field[nc];
-
-        leftCompNameXOffset = 0;
-        leftCompNameYOffset = 2;
-        int currentXOffset = leftCompNameXOffset;
-        int lastXWidth;
-
-        MouseListener companyCaptionMouseClickListener = getCompanyCaptionMouseClickListener();
-
-        /* Top titles */
-        addField(new Caption("Company"), 0, 0, lastXWidth = 1, 2,
-                WIDE_BOTTOM + WIDE_RIGHT);
-
-        presidentXOffset = currentXOffset += lastXWidth;
-        presidentYOffset = leftCompNameYOffset;
-        addField(new Caption("President"), presidentXOffset, 0, lastXWidth = 1,
-                2, WIDE_BOTTOM);
-
-        sharePriceXOffset = currentXOffset += lastXWidth;
-        sharePriceYOffset = leftCompNameYOffset;
-        addField(new Caption("<html><center>Share<br>value</center></html>"), sharePriceXOffset,
-                0, lastXWidth = 1, 2, WIDE_BOTTOM);
-
-        cashXOffset = currentXOffset += lastXWidth;
-        cashYOffset = leftCompNameYOffset;
-        addField(new Caption("Treasury"), cashXOffset, 0, lastXWidth = 1, 2,
-                WIDE_BOTTOM + WIDE_RIGHT);
-
-        if (privatesCanBeBought) {
-            privatesXOffset = currentXOffset += lastXWidth;
-            privatesYOffset = leftCompNameYOffset;
-            addField(privatesCaption = new Caption("Privates"),
-                    privatesXOffset, 0, lastXWidth = 2, 1, WIDE_RIGHT);
-            addField(new Caption("owned"), privatesXOffset, 1, 1, 1,
-                    WIDE_BOTTOM);
-            addField(new Caption("cost"), privatesXOffset + 1, 1, 1, 1,
-                    WIDE_BOTTOM + WIDE_RIGHT);
-        }
-
-        if (hasCompanyLoans) {
-            loansXOffset = currentXOffset += lastXWidth;
-            loansYOffset = leftCompNameYOffset;
-            addField (loansCaption = new Caption(LocalText.getText("LOANS")),
-                    loansXOffset, 0, lastXWidth = 1, 2, WIDE_BOTTOM + WIDE_RIGHT);
-        }
-
-        if (hasRights) {
-            rightsXOffset = currentXOffset += lastXWidth;
-            rightsYOffset = leftCompNameYOffset;
-            addField (new Caption(LocalText.getText("RIGHTS")),
-                    rightsXOffset, 0, lastXWidth = 1, 2, WIDE_RIGHT);
-        }
-
-        tilesXOffset = currentXOffset += lastXWidth;
-        tilesYOffset = leftCompNameYOffset;
-        addField(tileCaption = new Caption("Tiles"), tilesXOffset, 0,
-                lastXWidth = 2, 1, WIDE_RIGHT);
-        addField(new Caption("laid"), tilesXOffset, 1, 1, 1, WIDE_BOTTOM);
-        addField(new Caption("cost"), tilesXOffset + 1, 1, 1, 1, WIDE_BOTTOM
-                + WIDE_RIGHT);
-
-        tokensXOffset = currentXOffset += lastXWidth;
-        tokensYOffset = leftCompNameYOffset;
-        lastXWidth = bonusTokensExist ? 4 : 3;
-        addField(tokenCaption = new Caption("Tokens"), tokensXOffset, 0,
-                lastXWidth, 1, WIDE_RIGHT);
-        addField(new Caption("laid"), tokensXOffset, 1, 1, 1, WIDE_BOTTOM);
-        addField(new Caption("cost"), tokensXOffset + 1, 1, 1, 1, WIDE_BOTTOM);
-        addField(new Caption("left"), tokensXOffset + 2, 1, 1, 1,
-                WIDE_BOTTOM + (bonusTokensExist ? 0 : WIDE_RIGHT));
-        if (bonusTokensExist) {
-            addField(new Caption("bonus"), tokensXOffset + 3, 1, 1, 1,
-                    WIDE_BOTTOM + WIDE_RIGHT);
-        }
-
-        revXOffset = currentXOffset += lastXWidth;
-        revYOffset = leftCompNameYOffset;
-
-        if (hasDirectCompanyIncomeInOR) {
-            addField(revenueCaption = new Caption("Revenue"), revXOffset, 0, lastXWidth = 3, 1, 0);
-            addField(new Caption("earned"), revXOffset, 1, 1, 1, WIDE_BOTTOM);
-            addField(new Caption("payout"), revXOffset + 1, 1, 1, 1, WIDE_BOTTOM );
-            addField(new Caption("dividend"), revXOffset + 2, 1, 1, 1, WIDE_BOTTOM );
-            bonusRevXOffset = currentXOffset += lastXWidth;
-            bonusRevYOffset =leftCompNameYOffset;
-            addField(directIncomeCaption = new Caption("<html><center>Company<br>direct<br>income</center></html>"),
-                    bonusRevXOffset, 0, lastXWidth = 1, 2, WIDE_BOTTOM + WIDE_RIGHT);
-        } else {
-            addField(revenueCaption = new Caption("Revenue"), revXOffset, 0, lastXWidth = 2, 1, WIDE_RIGHT);
-            addField(new Caption("earned"), revXOffset, 1, 1, 1, WIDE_BOTTOM);
-            addField(new Caption("payout"), revXOffset + 1, 1, 1, 1, WIDE_BOTTOM + WIDE_RIGHT);
-        }
-
-        trainsXOffset = currentXOffset += lastXWidth;
-        trainsYOffset = leftCompNameYOffset;
-        addField(trainCaption = new Caption("Trains"), trainsXOffset, 0, lastXWidth = 2, 1, WIDE_RIGHT);
-        addField(new Caption("owned"), trainsXOffset, 1, 1, 1, WIDE_BOTTOM);
-        addField(new Caption("cost"), trainsXOffset + 1, 1, 1, 1, WIDE_BOTTOM + WIDE_RIGHT);
-
-        rightCompNameXOffset = currentXOffset += lastXWidth;
-        rightCompNameYOffset = leftCompNameYOffset;
-        addField(new Caption("Company"), rightCompNameXOffset, 0, 1, 2, WIDE_BOTTOM);
-
-        fields = new JComponent[1+currentXOffset][2+nc];
-        shareRowVisibilityObservers = new RowVisibility[nc];
-
-        for (int i = 0; i < nc; i++) {
-            c = companies[i];
-            shareRowVisibilityObservers[i] = new RowVisibility(this, leftCompNameYOffset + i, c.getInGameModel());
-            observers.add(shareRowVisibilityObservers[i]);
-
-            boolean visible = !c.isClosed();
-
-            f = leftCompName[i] = new Caption(c.getId());
-            f.setBackground(c.getBgColour());
-            f.setForeground(c.getFgColour());
-            HexHighlightMouseListener.addMouseListener(f,
-                    orUIManager,c,false);
-            f.addMouseListener(companyCaptionMouseClickListener);
-            f.setToolTipText(LocalText.getText("NetworkInfoDialogTitle", c.getId()));
-            addField(f, leftCompNameXOffset, leftCompNameYOffset + i, 1, 1,
-                    WIDE_RIGHT, visible);
-
-            f = president[i] =
-                    //                            new Field(c.hasStarted() && !c.isClosed()
-                    //                                    ? c.getPresident().getNameAndPriority() : "");
-                    new Field(c.getPresidentModel());
-            addField(f, presidentXOffset, presidentYOffset + i, 1, 1, 0, visible);
-
-            if (c.hasStockPrice()) {
-                f = sharePrice[i] = new Field(c.getCurrentPriceModel());
-                ((Field) f).setColorModel(c.getCurrentPriceModel());
-                addField(f, sharePriceXOffset, sharePriceYOffset + i, 1, 1, 0, visible);
-            }
-            f = cash[i] = new Field(c.getPurseMoneyModel());
-            addField(f, cashXOffset, cashYOffset + i, 1, 1, WIDE_RIGHT, visible);
-
-            if (privatesCanBeBought) {
-                f = privates[i] = new Field (c.getPortfolioModel().getPrivatesOwnedModel());
-                HexHighlightMouseListener.addMouseListener(f, orUIManager, c.getPortfolioModel());
-                addField(f, privatesXOffset, privatesYOffset + i, 1, 1,
-                        0, visible);
-
-                f = newPrivatesCost[i] =
-                        new Field(c.getPrivatesSpentThisTurnModel());
-                addField(f, privatesXOffset + 1, privatesYOffset + i, 1, 1,
-                        WIDE_RIGHT, visible);
-            }
-
-            if (hasCompanyLoans) {
-                //if (c.canLoan()) {
-                if (c.getLoanValueModel() != null) {
-                    f = compLoans[i] = new Field (c.getLoanValueModel());
-                } else {
-                    f = compLoans[i] = new Field ("");
-                }
-                addField (f, loansXOffset, loansYOffset + i, 1, 1, WIDE_RIGHT, visible);
-            }
-
-            if (hasRights) {
-                f = rights[i] = new Field (c.getRightsModel());
-                addField (f, rightsXOffset, rightsYOffset + i, 1, 1, WIDE_RIGHT, visible);
-            }
-
-            f = tiles[i] = new Field(c.getTilesLaidThisTurnModel());
-            addField(f, tilesXOffset, tilesYOffset + i, 1, 1, 0, visible);
-
-            f = tileCost[i] = new Field(c.getTilesCostThisTurnModel());
-            addField(f, tilesXOffset + 1, tilesYOffset + i, 1, 1, WIDE_RIGHT, visible);
-
-            f = tokens[i] = new Field(c.getTokensLaidThisTurnModel());
-            addField(f, tokensXOffset, tokensYOffset + i, 1, 1, 0, visible);
-
-            f = tokenCost[i] = new Field(c.getTokensCostThisTurnModel());
-            addField(f, tokensXOffset + 1, tokensYOffset + i, 1, 1, 0, visible);
-
-            f = tokensLeft[i] = new Field(c.getBaseTokensModel());
-            addField(f, tokensXOffset + 2, tokensYOffset + i, 1, 1,
-                    bonusTokensExist ? 0 : WIDE_RIGHT, visible);
-
-            if (bonusTokensExist) {
-                f = tokenBonus[i] = new Field(c.getBonusTokensModel());
-                addField(f, tokensXOffset + 3, tokensYOffset + i, 1, 1,
-                        WIDE_RIGHT, visible);
-            }
-
-            if(hasDirectCompanyIncomeInOR) {
-                f = revenue[i] = new Field(c.getLastRevenueModel());
-                addField(f, revXOffset, revYOffset + i, 1, 1, 0, visible);
-
-                f = revenueSelect[i] = new Spinner(0, 0, 0,
-                        orUIManager.getGameUIManager().getGameManager().getRevenueSpinnerIncrement());
-                //align spinner size with field size
-                //(so that changes to visibility don't affect panel sizing)
-                f.setPreferredSize(revenue[i].getPreferredSize());
-                addField(f, revXOffset, revYOffset + i, 1, 1, 0,  false);
-                // deactivated below, as this caused problems by gridpanel rowvisibility function -- sfy
-                //            revenue[i].addDependent(revenueSelect[i]);
-
-                f = decision[i] = new Field(c.getLastRevenueAllocationModel());
-                addField(f, revXOffset + 1, revYOffset + i, 1, 1, 0,  visible);
-
-                f = dividend[i] = new Field(c.getLastDividendModel());
-                addField (f, revXOffset + 2, revYOffset + i, 1, 1, 0,  visible);
-
-                f = directIncomeRevenue[i] = new Field(c.getLastDirectIncomeModel());
-                addField(f, bonusRevXOffset, bonusRevYOffset + i, 1, 1, WIDE_RIGHT, visible);
-
-                f = directIncomeSelect[i] = new Spinner(0, 0, 0,
-                        orUIManager.getGameUIManager().getGameManager().getRevenueSpinnerIncrement());
-                f.setPreferredSize(directIncomeRevenue[i].getPreferredSize());
-                addField(f, bonusRevXOffset, bonusRevYOffset + i, 1, 1,
-                        WIDE_RIGHT,  false);
-            } else {
-                f = revenue[i] = new Field(c.getLastRevenueModel());
-                addField(f, revXOffset, revYOffset + i, 1, 1, 0, visible);
-
-                f = revenueSelect[i] = new Spinner(0, 0, 0,
-                        orUIManager.getGameUIManager().getGameManager().getRevenueSpinnerIncrement());
-                //align spinner size with field size
-                //(so that changes to visibility don't affect panel sizing)
-                f.setPreferredSize(revenue[i].getPreferredSize());
-                addField(f, revXOffset, revYOffset + i, 1, 1, 0,  false);
-                // deactived below, as this caused problems by gridpanel rowvisibility function -- sfy
-                //            revenue[i].addDependent(revenueSelect[i]);
-
-                f = decision[i] = new Field(c.getLastRevenueAllocationModel());
-                addField(f, revXOffset + 1, revYOffset + i, 1, 1, WIDE_RIGHT,  visible);
-            }
-
-            f = trains[i] = new Field(c.getPortfolioModel().getTrainsModel());
-            addField(f, trainsXOffset, trainsYOffset + i, 1, 1, 0,  visible);
-
-            f = newTrainCost[i] = new Field(c.getTrainsSpentThisTurnModel());
-            addField(f, trainsXOffset + 1, trainsYOffset + i, 1, 1, WIDE_RIGHT,  visible);
-
-            f = rightCompName[i] = new Caption(c.getId());
-            f.setBackground(companies[i].getBgColour());
-            f.setForeground(companies[i].getFgColour());
-            HexHighlightMouseListener.addMouseListener(f, orUIManager,c,false);
-            f.addMouseListener(companyCaptionMouseClickListener);
-            f.setToolTipText(LocalText.getText("NetworkInfoDialogTitle",c.getId()));
-            addField(f, rightCompNameXOffset, rightCompNameYOffset + i, 1, 1, 0,  visible);
-        }
-
-    }
-
-    protected void addCompanyInfo() {
-
-    	CompanyManager cm = orUIManager.getGameUIManager().getGameManager().getRoot().getCompanyManager();
-    	List<CompanyType> comps = cm.getCompanyTypes();
-        JMenu compMenu, menu, item;
-
-        compMenu = new JMenu(LocalText.getText("Companies"));
-        compMenu.setEnabled(true);
-        infoMenu.add(compMenu);
-
-    	for (CompanyType type : comps) {
-    		menu = new JMenu (LocalText.getText(type.getId()));
-            menu.setEnabled(true);
-            compMenu.add(menu);
-
-    		for (Company comp : type.getCompanies()) {
-    			item = new JMenu(comp.getId());
-                item.setEnabled(true);
-                JMenuItem menuItem = new JMenuItem(comp.getInfoText());
-    			if (comp instanceof PrivateCompany) {
-                    //highlighting on menu items always enabled irrespective of config
-                    HexHighlightMouseListener.addMouseListener(menuItem,
-                            orUIManager,(PrivateCompany)comp,true);
-                    HexHighlightMouseListener.addMouseListener(item,
-                            orUIManager,(PrivateCompany)comp,true);
-                }
-                if (comp instanceof PublicCompany) {
-                    //highlighting on menu items always enabled irrespective of config
-                    HexHighlightMouseListener.addMouseListener(menuItem,
-                            orUIManager,(PublicCompany)comp,true);
-                    HexHighlightMouseListener.addMouseListener(item,
-                            orUIManager,(PublicCompany)comp,true);
-                }
-                item.add(menuItem);
-                menu.add(item);
-            }
-        }
-    }
-
-    protected void addTrainsInfo() {
-
-        TrainManager tm = orWindow.getGameUIManager().getRoot().getTrainManager();
-        List<TrainType> types = tm.getTrainTypes();
-        JMenu item;
-
-        trainsInfoMenu = new JMenu(LocalText.getText("TRAINS"));
-        trainsInfoMenu.setEnabled(true);
-        infoMenu.add(trainsInfoMenu);
-
-        for (TrainType type : types) {
-            item = new JMenu (LocalText.getText("N_Train", type.getName()));
-            item.setEnabled(true);
-            item.add(new JMenuItem(type.getInfo()));
-            trainsInfoMenu.add(item);
-        }
-    }
-
-    protected void addPhasesInfo() {
-
-        PhaseManager pm = orWindow.getGameUIManager().getRoot().getPhaseManager();
-        List<Phase> phases = pm.getPhases();
-        JMenu item;
-        StringBuffer b;
-        b = new StringBuffer("<html>");
-
-        phasesInfoMenu = new JMenu(LocalText.getText("Phases"));
-        phasesInfoMenu.setEnabled(true);
-        infoMenu.add(phasesInfoMenu);
-
-        for (Phase phase : phases) {
-            b.setLength(6);
-            appendInfoText(b, LocalText.getText("PhaseTileColours", phase.getTileColoursString()));
-            appendInfoText(b, LocalText.getText("PhaseNumberOfORs", phase.getNumberOfOperatingRounds()));
-            appendInfoText(b, LocalText.getText("PhaseOffBoardStep", phase.getOffBoardRevenueStep()));
-            appendInfoText(b, LocalText.getText("PhaseTrainLimitStep", phase.getTrainLimitStep()));
-            if (phase.doPrivatesClose()) {
-                appendInfoText(b, LocalText.getText("PhaseClosesAllPrivates"));
-            }
-            if (phase.getClosedObjects() != null) {
-                for (Closeable object : phase.getClosedObjects()) {
-                    if (Util.hasValue(object.getClosingInfo())) {
-                        appendInfoText(b, LocalText.getText("PhaseRemoves", Util.lowerCaseFirst(object.getClosingInfo())));
-                    }
-                }
-            }
-            if (Util.hasValue(phase.getInfo())) {
-                appendInfoText(b, phase.getInfo());
-            }
-            item = new JMenu (LocalText.getText("PhaseX", phase.toText()));
-            item.setEnabled(true);
-            item.add(new JMenuItem(b.toString()));
-            phasesInfoMenu.add(item);
-        }
-    }
-
-    protected void addNetworkInfo() {
-        if (networkInfoMenu != null) infoMenu.remove(networkInfoMenu);
-        networkInfoMenu = createNetworkInfo();
-        if (networkInfoMenu == null) return;
-        networkInfoMenu.setEnabled(true);
-        infoMenu.add(networkInfoMenu);
-    }
-
-    protected JMenu createNetworkInfo() {
-
-        boolean route_highlight = orUIManager.gameUIManager.getGameParameterAsBoolean(GuiDef.Parm.ROUTE_HIGHLIGHT);
-        boolean revenue_suggest = orUIManager.gameUIManager.getGameParameterAsBoolean(GuiDef.Parm.REVENUE_SUGGEST);
-
-        if (!route_highlight && !revenue_suggest) return null;
-
-        JMenu networkMenu = new JMenu(LocalText.getText("NetworkInfo"));
-
-        //network graphs only for developers
-        if (route_highlight && Config.isDevelop()) {
-            JMenuItem item = new JMenuItem("Network");
-            item.addActionListener(this);
-            item.setActionCommand(NETWORK_INFO_CMD);
-            networkMenu.add(item);
-        }
-
-        if (revenue_suggest) {
-            CompanyManager cm = orUIManager.getGameUIManager().getGameManager().getRoot().getCompanyManager();
-            for (PublicCompany comp : cm.getAllPublicCompanies()) {
-                if (!comp.hasFloated() || comp.isClosed()) continue;
-                JMenuItem item = new JMenuItem(comp.getId());
-                item.addActionListener(this);
-                item.setActionCommand(NETWORK_INFO_CMD);
-                networkMenu.add(item);
-            }
-        }
-
-        return networkMenu;
     }
 
     protected void executeNetworkInfo(String companyName) {
@@ -839,20 +351,22 @@ implements ActionListener, KeyListener, RevenueListener {
             NetworkGraph mapGraph = network.getMapGraph();
             mapGraph.optimizeGraph();
             JFrame mapWindow = mapGraph.visualize("Optimized Map Network");
-            if ( mapWindow != null ) {
+            if (mapWindow != null) {
                 openWindows.add(mapWindow);
             }
         } else {
             CompanyManager cm = root.getCompanyManager();
             PublicCompany company = cm.getPublicCompany(companyName);
-            //handle the case of invalid parameters
-            //could occur if the method is not invoked by the menu (but by the click listener)
-            if (company == null) return;
-            if ( Config.getBoolean("map.route.window.display", true) ) {
+            // handle the case of invalid parameters
+            // could occur if the method is not invoked by the menu (but by the click
+            // listener)
+            if (company == null)
+                return;
+            if (Config.getBoolean("map.route.window.display", true)) {
                 NetworkAdapter network = NetworkAdapter.create(root);
                 NetworkGraph routeGraph = network.getRevenueGraph(company, Lists.newArrayList());
                 JFrame mapWindow = routeGraph.visualize("Route Network for " + company);
-                if ( mapWindow != null ) {
+                if (mapWindow != null) {
                     openWindows.add(mapWindow);
                 }
             }
@@ -862,20 +376,20 @@ implements ActionListener, KeyListener, RevenueListener {
             while (anotherTrain) {
                 // multi
                 ra = RevenueAdapter.createRevenueAdapter(root, company, root.getPhaseManager().getCurrentPhase());
-                for (String addTrain:addTrainList) {
+                for (String addTrain : addTrainList) {
                     ra.addTrainByString(addTrain);
                 }
                 ra.initRevenueCalculator(true); // true => multigraph, false => simplegraph
-                log.debug("Revenue Adapter:{}", ra);
                 int revenueValue = ra.calculateRevenue();
-                log.debug("Revenue Value:{}", revenueValue);
-                log.debug("Revenue Run:{}", ra.getOptimalRunPrettyPrint(true));
-                //try-catch clause temporary workaround as revenue adapter's
-                //convertRcRun might erroneously raise exceptions
-                try {ra.drawOptimalRunAsPath(orUIManager.getMap());}
-                catch (Exception e) {}
+                // try-catch clause temporary workaround as revenue adapter's
+                // convertRcRun might erroneously raise exceptions
+                try {
+                    ra.drawOptimalRunAsPath(orUIManager.getMap());
+                } catch (Exception e) {
+                }
                 /*
-                 * TODO: Here the automatic calculation of the Special Company Income needs to be implemented
+                 * TODO: Here the automatic calculation of the Special Company Income needs to
+                 * be implemented
                  * 1837: Coal Mines
                  * 1853: Mail Contract
                  * 1822: Mail Contract
@@ -883,26 +397,26 @@ implements ActionListener, KeyListener, RevenueListener {
                  * 1854 old/new : Mail Contract ?
                  */
                 int specialRevenue = ra.getSpecialRevenue();
-                log.debug("Special revenue: {}", specialRevenue);
 
                 if (!Config.isDevelop()) {
-                    //parent component is ORPanel so that dialog won't hide the routes painted on the map
+                    // parent component is ORPanel so that dialog won't hide the routes painted on
+                    // the map
                     JOptionPane.showMessageDialog(this,
-                            LocalText.getText("NetworkInfoDialogMessage",company.getId(),
-                                    orUIManager.getGameUIManager().format(revenueValue)) ,
-                            LocalText.getText("NetworkInfoDialogTitle",company.getId()),
+                            LocalText.getText("NetworkInfoDialogMessage", company.getId(),
+                                    orUIManager.getGameUIManager().format(revenueValue)),
+                            LocalText.getText("NetworkInfoDialogTitle", company.getId()),
                             JOptionPane.INFORMATION_MESSAGE);
-                    //train simulation only for developers
+                    // train simulation only for developers
                     break;
                 }
 
                 JOptionPane.showMessageDialog(orWindow, "RevenueValue = " + revenueValue +
                         "\nRevenueRun = \n" + ra.getOptimalRunPrettyPrint(true));
 
-                String trainString =
-                    JOptionPane.showInputDialog(null, "Enter train string (Examples: 5, 3+3, 4D, 6E, D)",
-                            "Add another train to run?",
-                            JOptionPane.QUESTION_MESSAGE);
+                String trainString = JOptionPane.showInputDialog(null,
+                        "Enter train string (Examples: 5, 3+3, 4D, 6E, D)",
+                        "Add another train to run?",
+                        JOptionPane.QUESTION_MESSAGE);
                 if (trainString == null || trainString.equals("")) {
                     anotherTrain = false;
                 } else {
@@ -910,195 +424,56 @@ implements ActionListener, KeyListener, RevenueListener {
                 }
 
             }
-            //clean up the paths on the map
+            // clean up the paths on the map
             orUIManager.getMap().setTrainPaths(null);
-            //but retain paths already existing before
+            // but retain paths already existing before
             if (revenueAdapter != null) {
-                //try-catch clause temporary workaround as revenue adapter's
-                //convertRcRun might erroneously raise exceptions
-                try {revenueAdapter.drawOptimalRunAsPath(orUIManager.getMap());}
-                catch (Exception e) {}
+                // try-catch clause temporary workaround as revenue adapter's
+                // convertRcRun might erroneously raise exceptions
+                try {
+                    revenueAdapter.drawOptimalRunAsPath(orUIManager.getMap());
+                } catch (Exception e) {
+                }
             }
         }
-    }
-
-    private void appendInfoText (StringBuffer b, String text) {
-        if (text == null || text.length() == 0) return;
-        if (b.length() > 6) b.append("<br>");
-        b.append(text);
-    }
-
-    public void finish() {
-
-        buttonOC.setEnabled(false); // operatingcosts sfy
-        button1.setEnabled(false);
-        button2.setEnabled(false);
-        button3.setEnabled(false);
-        undoButton.setEnabled(false);
-        redoButton.setEnabled(false);
-
-        disableRoutesDisplay();
-
-        //clear all highlighting (president column and beyond)
-        resetActions();
-
     }
 
     public void redrawRoutes() {
         if (revenueAdapter != null && isDisplayRoutes()) {
-            //try-catch clause temporary workaround as revenue adapter's
-            //convertRcRun might erroneously raise exceptions
-            try {revenueAdapter.drawOptimalRunAsPath(orUIManager.getMap());}
-            catch (Exception e) {}
+            // try-catch clause temporary workaround as revenue adapter's
+            // convertRcRun might erroneously raise exceptions
+            try {
+                revenueAdapter.drawOptimalRunAsPath(orUIManager.getMap());
+            } catch (Exception e) {
+            }
         }
     }
-
-    @Override
-    public void actionPerformed(ActionEvent actor) {
-
-        // What kind action has been taken?
-        JComponent source = (JComponent) actor.getSource();
-        String command = actor.getActionCommand();
-        List<PossibleAction> executedActions;
-        PossibleAction executedAction = null;
-
-        if (source instanceof ActionTaker) {
-            executedActions = ((ActionTaker) source).getPossibleActions();
-            // In most cases we have only one
-            if (!executedActions.isEmpty()) {
-                executedAction = executedActions.get(0);
-                // In all cases, the actions in the list must be
-                // instances of the same class
-                log.debug("Action taken is {}", executedAction);
-            }
-
-            if (executedAction instanceof SetDividend) {
-
-                selectRevenueSpinner(false);
-                // If revenue is zero, the company apparently has no route,
-                // because without a train we wouldn't be here.
-                if (getRevenue(orCompIndex) == 0) {
-                    //    decision[orCompIndex].setText(LocalText.getText("NO_ROUTE"));
-                /* Disabled, we should only set this value from the model
-                   via a new allocation type */
-                    ((SetDividend) executedAction).setRevenueAllocation(SetDividend.NO_ROUTE);
-                }
-                /* Disabled, we should only set this value from the model.
-                } else if (action.getAllowedAllocations().length == 1) {
-                    int allocation = action.getAllowedAllocations()[0];
-                    if (allocation >= 0 && allocation < SetDividend.NUM_OPTIONS) {
-                        decision[orCompIndex].setText(SetDividend.getAllocationNameKey(allocation));
-                    }
-                }*/
-            }
-
-            orUIManager.processAction(command, executedActions);
-        } else if (source == zoomIn) {
-            fitToWindow.setSelected(false);
-            fitToWidth.setSelected(false);
-            fitToHeight.setSelected(false);
-            orWindow.getMapPanel().zoom(true);
-        } else if (source == zoomOut) {
-            fitToWindow.setSelected(false);
-            fitToWidth.setSelected(false);
-            fitToHeight.setSelected(false);
-            orWindow.getMapPanel().zoom(false);
-        } else if (source == fitToWindow) {
-            if (fitToWindow.isSelected()) {
-                fitToWidth.setSelected(false);
-                fitToHeight.setSelected(false);
-                orWindow.getMapPanel().fitToWindow();
-            } else {
-                orWindow.getMapPanel().removeFitToOption();
-            }
-        } else if (source == fitToWidth) {
-            if (fitToWidth.isSelected()) {
-                fitToWindow.setSelected(false);
-                fitToHeight.setSelected(false);
-                orWindow.getMapPanel().fitToWidth();
-            } else {
-                orWindow.getMapPanel().removeFitToOption();
-            }
-        } else if (source == fitToHeight) {
-            if (fitToHeight.isSelected()) {
-                fitToWindow.setSelected(false);
-                fitToWidth.setSelected(false);
-                orWindow.getMapPanel().fitToHeight();
-            } else {
-                orWindow.getMapPanel().removeFitToOption();
-            }
-        } else if (source == calibrateMap) {
-            MapManager mapManager = orUIManager.getMap().getMapManager();
-            String offsetX = JOptionPane.showInputDialog(this, "Change translation in X-dimension", mapManager.getMapXOffset());
-            try {
-                mapManager.setMapXOffset(Integer.parseInt(offsetX));
-            } catch (NumberFormatException e) {} // do nothing
-            String offsetY = JOptionPane.showInputDialog(this, "Change translation in Y-dimension", mapManager.getMapYOffset());
-            try {
-                mapManager.setMapYOffset(Integer.parseInt(offsetY));
-            } catch (NumberFormatException e) {} // do nothing
-            String scale = JOptionPane.showInputDialog(this, "Change scale", mapManager.getMapScale());
-            try {
-                mapManager.setMapScale(Float.parseFloat(scale));
-            } catch (NumberFormatException e) {} // do nothing
-            orWindow.getMapPanel().zoom(true);
-            orWindow.getMapPanel().zoom(false);
-        } else if (command.equalsIgnoreCase(NETWORK_INFO_CMD)) {
-            JMenuItem item = (JMenuItem)actor.getSource();
-            executeNetworkInfo(item.getText());
-        } else {
-            orUIManager.processAction(command, null);
-        }
-    }
-
-
 
     public int getRevenue(int orCompIndex) {
-        return (Integer) revenueSelect[orCompIndex].getValue();
+        return 0;
     }
 
     public void setRevenue(int orCompIndex, int amount) {
-        revenueSelect[orCompIndex].setValue(amount);
-        revenue[orCompIndex].setText(format(amount));
+
     }
 
     public void setDirectRevenue(int orCompIndex, int amount) {
-        if (hasDirectCompanyIncomeInOR) {
-            directIncomeSelect[orCompIndex].setValue(amount);
-            directIncomeRevenue[orCompIndex].setText(format(amount));
-        }
+
     }
 
-    public void setDividend (int orCompIndex, int amount) {
-        if (hasDirectCompanyIncomeInOR) {
-            dividend[orCompIndex].setText(format(amount));
-        }
+    public void setDividend(int orCompIndex, int amount) {
+
     }
 
     public void resetActions() {
-        tileCaption.setHighlight(false);
-        tokenCaption.setHighlight(false);
-        revenueCaption.setHighlight(false);
-        if(hasDirectCompanyIncomeInOR) {
-            directIncomeCaption.setHighlight(false);
-        }
-        trainCaption.setHighlight(false);
-        if (privatesCanBeBought) privatesCaption.setHighlight(false);
-        for ( Field field : president ) {
-            field.setHighlight(false);
-        }
-
-        if (hasCompanyLoans) {
-            loansCaption.setHighlight(false);
-        }
+        // All Dashboard Highlighting logic removed.
 
         for (JMenuItem item : menuItemsToReset) {
             item.setEnabled(false);
             if (item instanceof ActionMenuItem) {
-                ((ActionMenuItem)item).clearPossibleActions();
+                ((ActionMenuItem) item).clearPossibleActions();
             }
         }
-        undoButton.setEnabled(false);
 
         removeAllHighlights();
     }
@@ -1107,23 +482,20 @@ implements ActionListener, KeyListener, RevenueListener {
     public void resetORCompanyTurn(int orCompIndex) {
         for (int i = 0; i < nc; i++) {
             /*
-            if (hasDirectCompanyIncomeInOr) {
-                setSelect(revenue[i], revenueSelect[i], directIncomeSelect[i], directIncomeRevenue[i], false);
-            } else {
-            setSelect(revenue[i], revenueSelect[i], false);
-            }*/
+             * if (hasDirectCompanyIncomeInOr) {
+             * setSelect(revenue[i], revenueSelect[i], directIncomeSelect[i],
+             * directIncomeRevenue[i], false);
+             * } else {
+             * setSelect(revenue[i], revenueSelect[i], false);
+             * }
+             */
             selectRevenueSpinner(false);
         }
     }
 
     // No longer used?
     public void resetCurrentRevenueDisplay() {
-        if (hasDirectCompanyIncomeInOR) {
-            setSelect(revenue[orCompIndex], revenueSelect[orCompIndex],
-                    directIncomeSelect[orCompIndex], directIncomeRevenue[orCompIndex], false);
-        } else {
-        setSelect(revenue[orCompIndex], revenueSelect[orCompIndex], false);
-        }
+
     }
 
     /**
@@ -1140,8 +512,10 @@ implements ActionListener, KeyListener, RevenueListener {
 
     /**
      *
-     * @return True if the routes of the currently active company should be displayed.
-     * As a prerequisite of this feature, route highlighting has to be enabled/supported.
+     * @return True if the routes of the currently active company should be
+     *         displayed.
+     *         As a prerequisite of this feature, route highlighting has to be
+     *         enabled/supported.
      */
     private boolean isDisplayCurrentRoutes() {
         return (isDisplayRoutes()
@@ -1170,222 +544,47 @@ implements ActionListener, KeyListener, RevenueListener {
 
     private void updateCurrentRoutes(boolean isSetRevenueStep) {
 
-        // initialize and start the revenue adapter if routes to be displayed
-        // or revenue to be suggested in the revenue step
-        if (isDisplayCurrentRoutes() || (isSuggestRevenue() && isSetRevenueStep)) {
+        // Always calculate revenue to ensure the Sidebar shows the "Actual" potential
+        // revenue.
+        // We guard against null/closed companies, but ignore the "Display Routes"
+        // preference for the calculation itself.
+        if (orComp != null && !orComp.isClosed()) {
 
-            //only consider revenue quantification for the set revenue step and only
-            //if suggest option is on
+            // only consider revenue quantification for the set revenue step and only
+            // if suggest option is on
             isRevenueValueToBeSet = isSetRevenueStep && isSuggestRevenue();
 
             RailsRoot root = orUIManager.getGameUIManager().getRoot();
-            revenueAdapter = RevenueAdapter.createRevenueAdapter(root, orComp, root.getPhaseManager().getCurrentPhase());
+
+            // Ensure previous calculation is stopped before starting a new one
+            clearRevenueAdapter();
+
+            revenueAdapter = RevenueAdapter.createRevenueAdapter(root, orComp,
+                    root.getPhaseManager().getCurrentPhase());
             revenueAdapter.initRevenueCalculator(true);
             revenueAdapter.addRevenueListener(this);
             revenueThread = new Thread(revenueAdapter);
             revenueThread.start();
         } else {
 
-            //remove current routes also if display option is not active
-            //(as it could have just been turned off)
+            // remove current routes also if display option is not active
+            // (as it could have just been turned off)
             clearRevenueAdapter();
             disableRoutesDisplay();
         }
 
     }
 
-    public void initORCompanyTurn(PublicCompany orComp, int orCompIndex) {
-
-        this.orComp = orComp;
-        this.orCompIndex = orCompIndex;
-        if (orCompIndex >= 0) president[orCompIndex].setHighlight(true);
-
-        removeAllHighlights();
-
-        buttonOC.clearPossibleActions();
-        button1.clearPossibleActions();
-        button2.clearPossibleActions();
-        button3.clearPossibleActions();
-
-        buttonOC.setEnabled(false);
-        button1.setEnabled(false);
-        button2.setEnabled(false);
-        button3.setEnabled(false);
-
-        updateCurrentRoutes(false);
-    }
-
-    public void initTileLayingStep() {
-
-        tileCaption.setHighlight(true);
-        setHighlight(tiles[orCompIndex],true);
-        setHighlight(tileCost[orCompIndex],true);
-        button1.setVisible(false);
-
-        setCompanyVisibility(showAllCompanies);
-        selectRevenueSpinner(false);
-    }
-
-    public void initTokenLayingStep() {
-
-        tokenCaption.setHighlight(true);
-        setHighlight(tokens[orCompIndex],true);
-        setHighlight(tokenCost[orCompIndex],true);
-        setHighlight(tokensLeft[orCompIndex],true);
-        if (tokenBonus != null) setHighlight(tokenBonus[orCompIndex],true);
-        button1.setEnabled(false);
-        button1.setVisible(false);
-        button2.setEnabled(false);
-
-        setCompanyVisibility(showAllCompanies);
-        selectRevenueSpinner(false);
-    }
-
-    public void initRevenueEntryStep(int orCompIndex, SetDividend action) {
-
-        revenueCaption.setHighlight(true);
-        setHighlight(revenueSelect[orCompIndex],true);
-
-    // *** We don't really need the presets.
-    //    setRevenue (orCompIndex, action.getPresetRevenue());
-    //    if (hasDirectCompanyIncomeInOR) {
-    //        setDirectRevenue (orCompIndex, action.getPresetCompanyTreasuryRevenue());
-    //        setDividend(orCompIndex,
-    //                action.getPresetRevenue() - action.getPresetCompanyTreasuryRevenue());
-    //    }
-    //    //revenueSelect[orCompIndex].setValue(action.getPresetRevenue());
-    //    //revenue[orCompIndex].setText(format(action.getPresetRevenue()));
-        selectRevenueSpinner (true);
-
-        button1.setRailsIcon(RailsIcon.SET_REVENUE);
-        button1.setActionCommand(SET_REVENUE_CMD);
-        button1.setPossibleAction(action);
-        button1.setMnemonic(KeyEvent.VK_R);
-        button1.setEnabled(true);
-        button1.setVisible(true);
-
-        button2.setVisible(false);
-
-        //indicate interest in setting revenue values (and not only displaying routes)
-        updateCurrentRoutes(true);
-
-        //setCompanyVisibility(false);
-    }
-
-    @Override
-    public void revenueUpdate(int bestRevenue, int specialRevenue, boolean finalResult) {
-        if (isRevenueValueToBeSet) {
-            setRevenue (orCompIndex, bestRevenue);
-
-            /*
-             * This needs to have another value for the automatic setting of a Direct Income for a Company
-             */
-            if(hasDirectCompanyIncomeInOR) {
-                setDirectRevenue(orCompIndex, specialRevenue);
-                setDividend(orCompIndex, bestRevenue - specialRevenue);
-            }
-        }
-        if (finalResult) {
-            orUIManager.getMap().setTrainPaths(null);
-            //try-catch clause temporary workaround as revenue adapter's
-            //convertRcRun might erroneously raise exceptions
-            //leaving on exception is admissible as exception only occur
-            //if revenue would be 0.
-            try {
-                revenueAdapter.drawOptimalRunAsPath(orUIManager.getMap());
-
-                if (isRevenueValueToBeSet) {
-                    orUIManager.getMessagePanel().setInformation("Best Run Value = " + bestRevenue +
-                            " with " + Util.convertToHtml(revenueAdapter.getOptimalRunPrettyPrint(false)));
-                    orUIManager.getMessagePanel().setDetail(
-                            Util.convertToHtml(revenueAdapter.getOptimalRunPrettyPrint(true)));
-                }
-            }
-            catch (Exception e) {}
-        }
-        //selectRevenueSpinner (false);
-    }
-
     public void stopRevenueUpdate() {
         isRevenueValueToBeSet = false;
     }
 
-
-    public void initPayoutStep(int orCompIndex, SetDividend action,
-            boolean withhold, boolean split, boolean payout) {
-
-        setHighlight(decision[orCompIndex],true);
-
-        SetDividend clonedAction;
-        selectRevenueSpinner(false);
-        if (withhold) {
-            button1.setRailsIcon(RailsIcon.WITHHOLD);
-            button1.setActionCommand(WITHHOLD_CMD);
-            clonedAction = (SetDividend) action.clone();
-            clonedAction.setRevenueAllocation(SetDividend.WITHHOLD);
-            button1.setPossibleAction(clonedAction);
-            button1.setMnemonic(KeyEvent.VK_W);
-            button1.setEnabled(true);
-            button1.setVisible(true);
-        } else {
-            button1.setVisible(false);
-        }
-
-        if (split) {
-            button2.setRailsIcon(RailsIcon.SPLIT);
-            button2.setActionCommand(SPLIT_CMD);
-            clonedAction = (SetDividend) action.clone();
-            clonedAction.setRevenueAllocation(SetDividend.SPLIT);
-            button2.setPossibleAction(clonedAction);
-            button2.setMnemonic(KeyEvent.VK_S);
-            button2.setEnabled(true);
-            button2.setVisible(true);
-        } else {
-            button2.setVisible(false);
-        }
-
-        if (payout) {
-            button3.setRailsIcon(RailsIcon.PAYOUT);
-            button3.setActionCommand(PAYOUT_CMD);
-            clonedAction = (SetDividend) action.clone();
-            clonedAction.setRevenueAllocation(SetDividend.PAYOUT);
-            button3.setPossibleAction(clonedAction);
-            button3.setMnemonic(KeyEvent.VK_P);
-            button3.setEnabled(true);
-            button3.setVisible(true);
-        } else {
-            button3.setVisible(false);
-        }
-
-        setCompanyVisibility(showAllCompanies);
-    }
-
-    public void initTrainBuying(boolean enabled) {
-
-        trainCaption.setHighlight(true);
-        setHighlight(trains[orCompIndex],true);
-        setHighlight(newTrainCost[orCompIndex],true);
-
-        button1.setRailsIcon(RailsIcon.BUY_TRAIN);
-        button1.setActionCommand(BUY_TRAIN_CMD);
-        button1.setMnemonic(KeyEvent.VK_T);
-        button1.setEnabled(enabled);
-        button1.setVisible(true);
-
-        button2.setVisible(true);
-
-        setCompanyVisibility(true);
-    }
-
-    // operating costs sfy
     public void initOperatingCosts(boolean enabled) {
 
         buttonOC.setEnabled(enabled);
         buttonOC.setVisible(enabled);
-        tileCaption.setHighlight(enabled);
-        tokenCaption.setHighlight(enabled);
-    }
 
+    }
 
     public void initPrivateBuying(boolean enabled) {
 
@@ -1397,8 +596,9 @@ implements ActionListener, KeyListener, RevenueListener {
             }
             button3.setEnabled(enabled);
             button3.setVisible(enabled);
-            privatesCaption.setHighlight(enabled);
-            if (orCompIndex >= 0) setHighlight(privates[orCompIndex],enabled);
+            // privatesCaption.setHighlight(enabled);
+            // if (orCompIndex >= 0)
+            // setHighlight(privates[orCompIndex], enabled);
         } else {
             button3.setVisible(false);
         }
@@ -1421,68 +621,42 @@ implements ActionListener, KeyListener, RevenueListener {
         specialMenu.setOpaque(true);
     }
 
-    public boolean hasSpecialActions () {
+    public boolean hasSpecialActions() {
         return specialMenu.getItemCount() > 0;
     }
 
-    public void enableDone(NullAction action) {
-
-        button2.setRailsIcon(RailsIcon.DONE);
-        button2.setActionCommand(DONE_CMD);
-        button2.setMnemonic(KeyEvent.VK_D);
-        button2.setPossibleAction(action);
-        button2.setEnabled(true);
-    }
-
-    public void setupConfirm() {
-        orUIManager.getUpgradePanel().setActive();
-        button1.setRailsIcon(RailsIcon.CONFIRM);
-        button1.setActionCommand(CONFIRM_CMD);
-        button1.setMnemonic(KeyEvent.VK_C);
-        button1.setPossibleAction(null);
-        button1.setVisible(true);
-        enableConfirm(false);
-    }
-
-    public void enableConfirm(boolean enable) {
-        button1.setEnabled(enable);
-    }
-
-    // Added because Skip is normally not set if there are no Base tokens to lay
-    // *** Apparently not used
-    public void enableSkip (NullAction action) {
-        orUIManager.getUpgradePanel().setActive(); // Only to display Skip.
-        // For unknown reasons the below does not work.
-        button2.setRailsIcon(RailsIcon.SKIP);
-        button2.setActionCommand(SKIP_CMD);
-        button2.setMnemonic(KeyEvent.VK_S);
-        button2.setPossibleAction(action);
-        button2.setEnabled(true);
-        button2.setVisible(true);
-    }
-
     public void enableUndo(GameAction action) {
-        undoButton.setEnabled(action != null);
-        if (action != null) undoButton.setPossibleAction(action);
+        // undoButton.setEnabled(action != null);
+        // if (action != null)
+        // undoButton.setPossibleAction(action);
     }
 
     public void enableRedo(GameAction action) {
-        redoButton.setEnabled(action != null);
-        if (action != null) redoButton.setPossibleAction(action);
+        // redoButton.setEnabled(action != null);
+        // if (action != null)
+        // redoButton.setPossibleAction(action);
     }
 
-    public void enableLoanTaking (TakeLoans action) {
-        if (action != null) takeLoans.addPossibleAction(action);
+    public void enableLoanTaking(TakeLoans action) {
+        if (action != null)
+            takeLoans.addPossibleAction(action);
         takeLoans.setEnabled(action != null);
     }
 
-    public void enableLoanRepayment (RepayLoans action) {
+    public void dispose() {
+        for (JFrame frame : openWindows) {
+            frame.dispose();
+        }
+        openWindows.clear();
+    }
+
+    public void enableLoanRepayment(RepayLoans action) {
 
         repayLoans.setPossibleAction(action);
         repayLoans.setEnabled(true);
 
-        loansCaption.setHighlight(true);
-        setHighlight(compLoans[orCompIndex],true);
+        // loansCaption.setHighlight(true);
+        // setHighlight(compLoans[orCompIndex], true);
 
         button1.setRailsIcon(RailsIcon.REPAY_LOANS);
         button1.setActionCommand(REPAY_LOANS_CMD);
@@ -1492,20 +666,26 @@ implements ActionListener, KeyListener, RevenueListener {
         button1.setVisible(true);
     }
 
-    public void disableButtons () {
-        button1.setEnabled(false);
-        button2.setEnabled(false);
-        button3.setEnabled(false);
-        undoButton.setEnabled(false);
-        redoButton.setEnabled(false);
+    public void disableButtons() {
+        if (button1 != null)
+            button1.setEnabled(false);
+        if (button2 != null)
+            button2.setEnabled(false);
+        if (button3 != null)
+            button3.setEnabled(false);
+
+        if (dynamicButtonPanel != null) {
+            dynamicButtonPanel.removeAll();
+            dynamicButtonPanel.revalidate();
+            dynamicButtonPanel.repaint();
+        }
     }
 
     public void finishORCompanyTurn(int orCompIndex) {
-        //clear all highlighting (president column and beyond)
+        // clear all highlighting (president column and beyond)
         resetActions();
-
-        button1.setEnabled(false);
-
+        // Ensure map numbers are switched off when the company finishes
+        setTileBuildNumbers(false);
         orUIManager.getMap().setTrainPaths(null);
     }
 
@@ -1523,44 +703,37 @@ implements ActionListener, KeyListener, RevenueListener {
     }
 
     // EV: to replace the above two methods
-    private void selectRevenueSpinner (boolean active) {
-        selectRevenueSpinner (orCompIndex, active);
+    private void selectRevenueSpinner(boolean active) {
+        selectRevenueSpinner(orCompIndex, active);
     }
 
-    private void selectRevenueSpinner (int compIndex, boolean active) {
-        int oldRevenue;
-        int oldDirectRevenue;
+    // In ORPanel.java
+    private void selectRevenueSpinner(int compIndex, boolean active) {
 
-        boolean spinnerActivated = active && showSpinner;
-        revenue[compIndex].setVisible(!spinnerActivated);
-        setHighlight(revenue[compIndex], active && !showSpinner);
-        revenueSelect[compIndex].setVisible(spinnerActivated);
-        setHighlight(revenueSelect[compIndex],spinnerActivated);
-
-        oldRevenue = parseOldValue(revenue[compIndex].getText());
-        if (spinnerActivated) {
-            revenueSelect[compIndex].setValue(oldRevenue);
-        }
-        if (hasDirectCompanyIncomeInOR) {
-            directIncomeRevenue[compIndex].setVisible(!spinnerActivated);
-            setHighlight(directIncomeRevenue[compIndex], active && !showSpinner);
-            directIncomeSelect[compIndex].setVisible(spinnerActivated);
-            setHighlight(directIncomeSelect[compIndex], spinnerActivated);
-            oldDirectRevenue = parseOldValue(directIncomeRevenue[compIndex].getText());
-            if (spinnerActivated) {
-                directIncomeSelect[compIndex].setValue(oldDirectRevenue);
-            }
-            setHighlight(dividend[compIndex], active);
-        }
     }
 
     public String format(int amount) {
         return orUIManager.getGameUIManager().format(amount);
     }
 
-    private int parseOldValue (String text) {
+    private int parseOldValue(String text) {
         if (Util.hasValue(text)) {
-            return Integer.parseInt(text.replaceAll("[^0-9]", ""));
+            // 1. Remove non-numeric characters (including currency symbols, commas, etc.)
+            String numericString = text.replaceAll("[^0-9-]", "");
+
+            // 2. CRITICAL: Check if the resulting string is actually empty (i.e., it
+            // contained only non-numeric chars)
+            if (numericString.isEmpty() || numericString.equals("-")) {
+                return 0;
+            }
+
+            // 3. Parse the clean numeric string
+            try {
+                return Integer.parseInt(numericString);
+            } catch (NumberFormatException e) {
+                // Fallback for safety, though check should prevent this
+                return 0;
+            }
         } else {
             return 0;
         }
@@ -1570,62 +743,1556 @@ implements ActionListener, KeyListener, RevenueListener {
         return companies;
     }
 
-    public JPanel getButtonPanel() {
-        return buttonPanel;
-    }
-
     public JMenuBar getMenuBar() {
-        return menuBar;
-    }
-
-    /**
-     * Adds buttons to the button panel (adjusting their size to the standard size)
-     * @param index The position where to add the buttons
-     */
-    public void addToButtonPanel(RailsIconButton[] buttons, int index) {
-        //get standard size
-        Dimension standardSize = null;
-        Component[] existingButtons = buttonPanel.getComponents();
-        if (existingButtons != null && existingButtons.length > 0) {
-            standardSize = existingButtons[0].getPreferredSize();
-        }
-
-        //apply sizing to new buttons
-        //add buttons to the panel
-        for (int i=buttons.length-1 ; i >= 0 ; i--) {
-            buttons[i].setPreferredSize(standardSize);
-            buttonPanel.add(buttons[i],index);
-        }
+        return null;
     }
 
     /**
      * Control visibility of companies in the ORPanel.
+     * 
      * @param showAll True if all active companies must be shown,
      *                false if only the currently operating company is shown.
      */
     private void setCompanyVisibility(boolean showAll) {
-        for (int i = 0; i < nc; i++) {
-            boolean visible = shareRowVisibilityObservers[i].lastValue() && (showAll || (i == orCompIndex));
-            setRowVisibility(i + leftCompNameYOffset, visible);
-        }
-        selectRevenueSpinner(!showAll);
+
     }
 
     public int getCompanyTreasuryBonusRevenue(int orCompIndex) {
-        return (Integer) directIncomeSelect[orCompIndex].getValue();
+        return 0;
     }
 
     public void setTreasuryBonusRevenue(int orCompIndex2, int bonusAmount) {
-        directIncomeRevenue[orCompIndex2]
-                .setText(orUIManager
-                        .getGameUIManager()
-                        .format(bonusAmount));
+
     }
 
-    public void dispose() {
-        for ( JFrame frame : openWindows ) {
-            frame.dispose();
-        }
-        openWindows.clear();
+    private ActionButton createDynamicButton(PossibleAction action) {
+
+        // 1. Create the button with a default "Undo" icon, as required
+        // by the constructor to prevent a crash.
+        ActionButton button = new ActionButton(RailsIcon.OK);
+
+        // 2. Set the visible text from the action's label.
+        // (e.g., "Discard 2+2_3")
+        button.setText(action.getButtonLabel());
+
+        // 3. NOW, REMOVE THE ICON. This should force the button
+        // to respect the text we just set.
+        button.setIcon(null);
+
+        // 4. Force the button to recalculate its size based on the new text.
+        button.setPreferredSize(null);
+
+        // 5. Set the tooltip (still useful).
+        button.setToolTipText(action.getButtonLabel());
+
+        // 6. Associate the action.
+        button.setPossibleAction(action);
+
+        // 7. Add listener.
+        button.addActionListener(this);
+        button.setEnabled(true);
+        button.setVisible(true);
+        return button;
     }
+
+    public void updateCycleableHexes(Collection<GUIHex> hexes) {
+        cycleableHexes.clear();
+        cycleIndex = -1;
+        if (hexes != null) {
+            for (GUIHex hex : hexes) {
+                // Only add hexes that are visibly highlighted as options
+                if (hex.getState() == GUIHex.State.SELECTABLE) {
+                    cycleableHexes.add(hex);
+                }
+            }
+        }
+    }
+
+    /**
+     * Clears the list of cycleable hexes. Called when non-map
+     * steps (like Buy Train) are active.
+     */
+    public void resetHexCycle() {
+        cycleableHexes.clear();
+        cycleIndex = -1;
+    }
+
+    private void addLegendItem(String key, String desc) {
+        JLabel lbl = new JLabel("<html><b>[" + key + "]</b> " + desc + "</html>");
+        lbl.setFont(new Font("SansSerif", Font.PLAIN, 10));
+        lbl.setForeground(Color.DARK_GRAY);
+        legendPanel.add(lbl);
+        legendPanel.add(new JLabel("|"));
+    }
+
+    // STUB METHOD: Add this to ORPanel class to fix "cannot find symbol" error
+    public void enableSkipAllButton(boolean enable) {
+        // Button removed, functionality handled by Done/Skip buttons
+    }
+
+    // : Sidebar Construction & Logic ---
+    public JPanel getSidebarPanel() {
+        return sidebarPanel;
+    }
+
+    private void applyPanelStyle(JPanel p, boolean active, Color c1, Color c2, Border b1, Border b2) {
+        p.setBackground(active ? c1 : c2);
+        ((javax.swing.border.TitledBorder) p.getBorder()).setBorder(active ? b1 : b2);
+        p.repaint();
+    }
+
+    public void initTileLayingStep() {
+        activePhase = 1;
+        // Don't clear buttons here, let updateDynamicActions do it
+    }
+
+    public void initTokenLayingStep() {
+        activePhase = 2;
+    }
+
+    public void initRevenueEntryStep(int idx, SetDividend action) {
+        activePhase = 3; // Fallback
+    }
+
+    public void initPayoutStep(int idx, SetDividend action, boolean w, boolean s, boolean p) {
+        activePhase = 3;
+    }
+
+    public void initTrainBuying(List<BuyTrain> actions) {
+        activePhase = 4;
+    }
+
+    public void setupConfirm() {
+        enableConfirm(false);
+    }
+
+    public void enableButton1(PossibleAction a) {
+    } // No-op
+
+    public void enableSkip(NullAction a) {
+    } // No-op, handled by updateDynamicActions
+
+    public void enableDone(NullAction a) {
+    } // No-op
+
+    private void cleanupUpgradesPanel() {
+        // Attempt to find and hide the "Ghost" buttons in the UpgradesPanel
+        if (orUIManager != null && orUIManager.getUpgradePanel() != null) {
+            Component[] comps = orUIManager.getUpgradePanel().getComponents();
+            for (Component c : comps) {
+                if (c instanceof AbstractButton) {
+                    AbstractButton b = (AbstractButton) c;
+                    String cmd = b.getActionCommand();
+                    // Hide buttons that conflict with our Sidebar
+                    if (CONFIRM_CMD.equals(cmd) || SKIP_CMD.equals(cmd)) {
+                        b.setVisible(false);
+                    }
+                }
+            }
+        }
+    }
+
+    private void setupButton(ActionButton btn, PossibleAction pa) {
+        btn.setEnabled(true);
+        btn.setPossibleAction(pa);
+    }
+
+    private void enableRevenueBtn(ActionButton btn, SetDividend sd, int allocation) {
+        btn.setEnabled(true);
+        SetDividend clone = (SetDividend) sd.clone();
+        clone.setRevenueAllocation(allocation);
+        btn.setPossibleAction(clone);
+    }
+
+    private void updateDefaultButton() {
+        currentDefaultButton = null;
+
+        // 1. Phase 1: Track (Confirm > Skip)
+        if (activePhase == 1) {
+            if (btnTileConfirm != null && btnTileConfirm.isEnabled()) {
+                currentDefaultButton = btnTileConfirm;
+            } else if (btnTileSkip != null && btnTileSkip.isEnabled()) {
+                currentDefaultButton = btnTileSkip;
+            }
+        }
+        // 2. Phase 2: Token (Confirm > Skip)
+        else if (activePhase == 2) {
+            if (btnTokenConfirm != null && btnTokenConfirm.isEnabled()) {
+                currentDefaultButton = btnTokenConfirm;
+            } else if (btnTokenSkip != null && btnTokenSkip.isEnabled()) {
+                currentDefaultButton = btnTokenSkip;
+            }
+        }
+        // 3. Phase 3: Revenue (Split/Minor Priority)
+        else if (activePhase == 3) {
+            // PRIORITY CHANGE: Split (Minor action) must be checked before Payout (Major
+            // action),
+            // as Split is the action required to continue for minors.
+            if (btnRevSplit != null && btnRevSplit.isEnabled()) {
+                currentDefaultButton = btnRevSplit;
+            } else if (btnRevPayout != null && btnRevPayout.isEnabled()) {
+                currentDefaultButton = btnRevPayout;
+            } else if (btnRevWithhold != null && btnRevWithhold.isEnabled()) {
+                currentDefaultButton = btnRevWithhold;
+            }
+        }
+        // 4. Phase 4 (Trains) or Catch-All (Done)
+        else {
+            if (activePhase == 4 && btnTrainSkip != null && btnTrainSkip.isEnabled()) {
+                currentDefaultButton = btnTrainSkip;
+            } else if (btnDone != null && btnDone.isEnabled()) {
+                currentDefaultButton = btnDone;
+            }
+        }
+
+        // Apply to RootPane immediately to update the visual border
+        if (this.getRootPane() != null) {
+            this.getRootPane().setDefaultButton(currentDefaultButton);
+        }
+    }
+
+    public void initORCompanyTurn(PublicCompany orComp, int orCompIndex) {
+        // Force reset of map numbers to clear artifacts from the previous company.
+        // We do this unconditionally (instead of checking showNumbersActive) to ensure
+        // the map is scrubbed clean even if the UI state thinks it's already off.
+        setTileBuildNumbers(false);
+        //
+        // log.info("ORPanel: initORCompanyTurn for {}. Clearing Map Overlays.", (orComp
+        // != null ? orComp.getId() : "null"));
+
+        // Explicitly call the map panel's clear method to ensure the visual state
+        // is reset before the new company's data is calculated.
+        if (orWindow != null && orWindow.getMapPanel() != null) {
+            orWindow.getMapPanel().clearOverlays();
+        }
+
+        try {
+            this.orComp = orComp;
+            this.orCompIndex = orCompIndex;
+
+            if (showNumbersActive) {
+                toggleTileBuildNumbers(); // Umschalten auf 'false'
+            }
+
+            // if (orCompIndex >= 0 && president != null && orCompIndex < president.length
+            // && president[orCompIndex] != null) {
+            // president[orCompIndex].setHighlight(true);
+            // }
+            removeAllHighlights();
+
+            if (sidebarPanel != null) {
+                // Reset to Mauve when active
+                sidebarPanel.setBackground(BG_DETAILS);
+
+                // Show Cash Panel ---
+                if (cashPanel != null)
+                    cashPanel.setVisible(true);
+
+                phase1Panel.setVisible(true);
+                phase2Panel.setVisible(true);
+                phase3Panel.setVisible(true);
+                phase4Panel.setVisible(true);
+                footerPanel.setVisible(true);
+            }
+
+            if (orComp != null && companyLogo != null) {
+                companyLogo.setText(orComp.getId());
+                companyLogo.setBackground(orComp.getBgColour());
+                companyLogo.setForeground(orComp.getFgColour());
+                companyLogo.setVisible(true);
+                companyLogo.revalidate();
+            }
+
+            if (orUIManager != null) {
+                PossibleActions paContainer = orUIManager.getPossibleActions();
+                if (paContainer != null) {
+                    List<PossibleAction> initialActions = paContainer.getList();
+                    if (initialActions != null && !initialActions.isEmpty()) {
+                        updateDynamicActions(initialActions);
+                    }
+                }
+            }
+
+            updateSidebarData();
+            updateCurrentRoutes(false);
+
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+
+    /**
+     * Handles cycling through selectable hexes on the map based on direction.
+     * 
+     * @param direction 1 for next (CW), -1 for previous (ACW).
+     */
+    private void cycleHexes(int direction) {
+        if (orUIManager == null || cycleableHexes.isEmpty())
+            return;
+
+        cycleIndex += direction;
+
+        // Wrap around logic
+        if (cycleIndex >= cycleableHexes.size())
+            cycleIndex = 0;
+        if (cycleIndex < 0)
+            cycleIndex = cycleableHexes.size() - 1;
+
+        GUIHex hexToSelect = cycleableHexes.get(cycleIndex);
+        // Select the hex on the map
+        orUIManager.hexClicked(hexToSelect, orUIManager.getMap().getSelectedHex(), false);
+        enableConfirm(true);
+    }
+
+    public void enableConfirm(boolean enable) {
+        if (activePhase == 1 && btnTileConfirm != null)
+            btnTileConfirm.setEnabled(enable);
+        if (activePhase == 2 && btnTokenConfirm != null)
+            btnTokenConfirm.setEnabled(enable);
+
+        // 1. Recalculate the Default Button immediately.
+        updateDefaultButton();
+
+        // 2. CRITICAL: Force Focus to ORPanel.
+        // Use robust name check to catch 1835 subclasses
+        RoundFacade current = orUIManager.getGameUIManager().getCurrentRound();
+        String rName = (current != null) ? current.getClass().getSimpleName() : "NULL";
+
+        boolean isStartRound = (current instanceof StartRound) ||
+                rName.contains("StartRound") ||
+                rName.contains("FormationRound");
+
+        if (!isStartRound) {
+            SwingUtilities.invokeLater(this::requestFocusInWindow);
+        }
+
+        // 3. Repaint sidebar to show the "Default Button" border change
+        if (sidebarPanel != null)
+            sidebarPanel.repaint();
+
+        // Force focus back to ORPanel after data refresh.
+        // This counters the StatusWindow pulling focus when shared data models update.
+        SwingUtilities.invokeLater(() -> {
+            if (orUIManager != null && orUIManager.getGameUIManager() != null) {
+                RoundFacade current2 = orUIManager.getGameUIManager().getCurrentRound();
+                // Only grab focus if we are NOT in a Start Round (Auction)
+                if (!(current2 instanceof StartRound)) {
+                    this.requestFocusInWindow();
+                }
+            }
+        });
+
+    }
+
+    public void updateDynamicActions(List<PossibleAction> actions) {
+
+        // LOGGING: Trace exactly what actions are hitting the UI
+        if (actions != null) {
+            for (PossibleAction pa : actions) {
+            }
+        }
+
+        // Capture the previous phase before resetSidebarState() clears it.
+        int previousPhase = this.activePhase;
+        cleanupUpgradesPanel();
+        resetSidebarState();
+        updateSidebarData(); // Refreshes text, but visibility is handled below
+
+        if (actions == null || actions.isEmpty()) {
+            if (sidebarPanel != null)
+                sidebarPanel.repaint();
+            // Ensure focus returns even if actions list is empty (e.g., waiting for engine)
+            SwingUtilities.invokeLater(() -> {
+                if (!(orUIManager.getGameUIManager().getCurrentRound() instanceof StartRound)) {
+                    this.requestFocusInWindow();
+                }
+            });
+            return;
+        }
+
+        // --- 1. FILTER SPECIAL ACTIONS ---
+        List<PossibleAction> specialActions = new ArrayList<>();
+
+        boolean isPrussianContext = actions.stream()
+                .anyMatch(a -> a instanceof StartPrussian || a instanceof ExchangeForPrussianShare);
+
+        for (PossibleAction pa : actions) {
+            if ((pa instanceof LayBaseToken && ((LayBaseToken) pa).getType() == LayBaseToken.HOME_CITY) ||
+                    (pa instanceof StartPrussian) ||
+                    (pa instanceof ExchangeForPrussianShare) ||
+                    (pa instanceof DiscardTrain)) { // Treat Discard as Special to hide clutter
+                specialActions.add(pa);
+            } else if (pa instanceof NullAction) {
+                NullAction na = (NullAction) pa;
+                boolean isSpecialFlow = this.specialMode || isPrussianContext;
+
+                // If we are in a special flow OR a Discard is pending, standard "Done" becomes
+                // special
+                boolean isDiscardContext = actions.stream().anyMatch(a -> a instanceof DiscardTrain);
+
+                if ((isSpecialFlow || isDiscardContext)
+                        && (na.getMode() == NullAction.Mode.DONE || na.getMode() == NullAction.Mode.PASS)) {
+                    specialActions.add(pa);
+                }
+            }
+        }
+
+        // --- 2. RENDER SPECIAL ACTIONS (IF EXIST) ---
+        if (!specialActions.isEmpty()) {
+            this.specialMode = true;
+
+            // HIDE Standard Phase Panels
+            if (phase1Panel != null)
+                phase1Panel.setVisible(false);
+            if (phase2Panel != null)
+                phase2Panel.setVisible(false);
+            if (phase3Panel != null)
+                phase3Panel.setVisible(false);
+            if (phase4Panel != null)
+                phase4Panel.setVisible(false);
+            if (footerPanel != null)
+                footerPanel.setVisible(false);
+
+            // Hide the Sticky Treasury Panel so it doesn't block buttons
+            if (lblCash != null && lblCash.getParent() != null) {
+                lblCash.getParent().setVisible(false);
+            }
+
+            // SHOW Special Panel
+            if (specialPanel != null && specialContainer != null) {
+                specialContainer.setVisible(true);
+                specialPanel.removeAll();
+
+                for (PossibleAction spa : specialActions) {
+                    String labelText = spa.getButtonLabel();
+                    if (spa instanceof NullAction) {
+                        NullAction na = (NullAction) spa;
+                        if (na.getMode() == NullAction.Mode.DONE)
+                            labelText = "Done";
+                        else if (na.getMode() == NullAction.Mode.PASS)
+                            labelText = "Decline / Pass";
+                    }
+
+                    // Format nicely with HTML center
+                    String htmlLabel = "<html><center>"
+                            + (labelText != null ? labelText.replace(":", ":<br>") : "Action") + "</center></html>";
+
+                    ActionButton b = createSidebarButton(htmlLabel, "Special");
+                    b.setPossibleAction(spa);
+
+                    // Custom Styling
+                    if (spa instanceof DiscardTrain) {
+                        b.setActionCommand("Discard");
+                        b.setBackground(new Color(255, 200, 200)); // RED for Discard
+                        // Clean up label for Discard
+                        String cleanLabel = spa.getButtonLabel().replace("Company discards ", "").replace("'", "");
+                        b.setText("<html><center>Discard<br>" + cleanLabel + "</center></html>");
+                    } else if (spa instanceof NullAction) {
+                        NullAction.Mode mode = ((NullAction) spa).getMode();
+                        if (mode == NullAction.Mode.PASS)
+                            b.setActionCommand(SKIP_CMD);
+                        else
+                            b.setActionCommand(DONE_CMD);
+                        b.setBackground(new Color(200, 230, 255)); // Blue
+                    } else {
+                        b.setBackground(new Color(200, 230, 255)); // Blue
+                    }
+
+                    b.setEnabled(true);
+                    b.setPreferredSize(new Dimension(SIDEBAR_WIDTH - 20, 50));
+                    b.setMaximumSize(new Dimension(SIDEBAR_WIDTH - 20, 50));
+
+                    specialPanel.add(b);
+                    specialPanel.add(Box.createVerticalStrut(5));
+                }
+                specialPanel.revalidate();
+                specialPanel.repaint();
+            }
+
+            // Ensure focus returns to the panel for hotkeys even in special mode
+            SwingUtilities.invokeLater(this::requestFocusInWindow);
+
+            return;
+        }
+
+        // --- 3. RESTORE STANDARD MODE ---
+        this.specialMode = false;
+
+        // Hide Special Panel
+        if (specialContainer != null)
+            specialContainer.setVisible(false);
+
+        // Restore Standard Panels
+        if (phase1Panel != null)
+            phase1Panel.setVisible(true);
+        if (phase2Panel != null)
+            phase2Panel.setVisible(true);
+        if (phase3Panel != null)
+            phase3Panel.setVisible(true);
+        if (phase4Panel != null)
+            phase4Panel.setVisible(true);
+        if (footerPanel != null)
+            footerPanel.setVisible(true);
+
+        // RESTORE Sticky Treasury (It comes back in normal play)
+        if (lblCash != null && lblCash.getParent() != null) {
+            lblCash.getParent().setVisible(true);
+        }
+
+        // --- 4. STANDARD PHASE DETECTION ---
+        int detectedPhase = 0;
+        boolean hasTrainsToBuy = false;
+
+        // Prioritize the earliest phase.
+        boolean canLayTile = false;
+        boolean canLayToken = false;
+        boolean canSetRevenue = false;
+        boolean canBuyTrain = false;
+
+        for (PossibleAction pa : actions) {
+            if (pa instanceof LayTile)
+                canLayTile = true;
+            else if (pa instanceof LayToken || pa instanceof LayBaseToken)
+                canLayToken = true;
+            else if (pa instanceof SetDividend)
+                canSetRevenue = true;
+            else if (pa instanceof BuyTrain) {
+                canBuyTrain = true;
+                hasTrainsToBuy = true;
+            } else if (pa instanceof DiscardTrain) {
+                canBuyTrain = true; // Stay in Phase 4 for discards
+            }
+        }
+
+        if (canLayTile)
+            detectedPhase = 1;
+        else if (canLayToken)
+            detectedPhase = 2;
+        else if (canSetRevenue)
+            detectedPhase = 3;
+        else if (canBuyTrain)
+            detectedPhase = 4;
+
+        if (detectedPhase > 0)
+            this.activePhase = detectedPhase;
+
+        // If we are in phase 4 but have no trains to buy (and no discard), we are
+        // likely just waiting to click Done
+        if (activePhase == 4 && !hasTrainsToBuy && actions.stream().noneMatch(a -> a instanceof DiscardTrain)) {
+            activePhase = 5;
+        }
+
+        highlightActivePhase();
+
+        // Clear and populate class-level list for Hotkey access
+        availableTrainActions.clear();
+
+        // List<PossibleAction> buyTrainActions = new ArrayList<>();
+
+        // --- 5. RENDER STANDARD BUTTONS ---
+        for (PossibleAction pa : actions) {
+            if (pa instanceof CorrectionModeAction)
+                continue;
+
+            // 1. Check Special Properties FIRST.
+            if (pa instanceof UseSpecialProperty) {
+                ActionButton bSpecial = createSidebarButton(pa.getButtonLabel(), "SpecialProperty");
+                bSpecial.setPossibleAction(pa);
+                bSpecial.setEnabled(true);
+
+                if (miscActionPanel != null) {
+                    miscActionPanel.add(bSpecial);
+                    miscActionPanel.add(Box.createVerticalStrut(2));
+                    miscActionPanel.revalidate();
+                    miscActionPanel.repaint();
+                }
+
+            } else if (pa instanceof SetDividend) {
+                SetDividend sd = (SetDividend) pa;
+                if (sd.isAllocationAllowed(SetDividend.PAYOUT))
+                    enableRevenueBtn(btnRevPayout, sd, SetDividend.PAYOUT);
+                if (sd.isAllocationAllowed(SetDividend.WITHHOLD))
+                    enableRevenueBtn(btnRevWithhold, sd, SetDividend.WITHHOLD);
+                if (sd.isAllocationAllowed(SetDividend.SPLIT))
+                    enableRevenueBtn(btnRevSplit, sd, SetDividend.SPLIT);
+
+            } else if (pa instanceof BuyTrain) {
+                // Instead of creating buttons, collect the action for GameStatus
+                // buyTrainActions.add(pa);
+                availableTrainActions.add((BuyTrain) pa);
+
+            } else if (pa instanceof NullAction) {
+                NullAction.Mode mode = ((NullAction) pa).getMode();
+                if (mode == NullAction.Mode.SKIP) {
+                    if (activePhase == 1)
+                        setupButton(btnTileSkip, pa);
+                    if (activePhase == 2)
+                        setupButton(btnTokenSkip, pa);
+                } else if (mode == NullAction.Mode.DONE || mode == NullAction.Mode.PASS) {
+                    setupButton(btnDone, pa);
+                }
+            }
+        }
+
+        // If we are in Train phase but can't buy anything, enable Skip (unless forced)
+        if (activePhase == 4 && btnTrainSkip != null)
+            btnTrainSkip.setEnabled(true);
+        if (orUIManager != null && orUIManager.getGameUIManager() != null) {
+            StatusWindow sw = orUIManager.getGameUIManager().getStatusWindow();
+            if (sw != null && sw.getGameStatus() != null) {
+                // sw.getGameStatus().setTrainBuyingActions(buyTrainActions);
+                // Pass the class-level list (cast up if necessary, but GameStatus likely takes
+                // List<BuyTrain> or List<PossibleAction>)
+                // If setTrainBuyingActions expects specific generic, we pass our list.
+                // Assuming setTrainBuyingActions takes List<BuyTrain> based on context context:
+                sw.getGameStatus().setTrainBuyingActions((List<PossibleAction>) (List<?>) availableTrainActions);
+            }
+        }
+
+        // 5 Enforce Tile Build Numbers based on Phase 1
+        if (activePhase == 1 || activePhase == 2) {
+            setTileBuildNumbers(true);
+        } else {
+            setTileBuildNumbers(false);
+            // Aggressively clear map overlays (red edges) when not in Building/Token Phase
+            if (orWindow != null && orWindow.getMapPanel() != null) {
+                orWindow.getMapPanel().clearOverlays();
+            }
+        }
+
+        if (sidebarPanel != null)
+            sidebarPanel.repaint();
+        updateCurrentRoutes(false);
+
+        // 6: Force focus and set Default Button after layout stabilizes.
+        SwingUtilities.invokeLater(() -> {
+            updateDefaultButton();
+
+            RoundFacade currentFinal = orUIManager.getGameUIManager().getCurrentRound();
+            String rNameFinal = (currentFinal != null) ? currentFinal.getClass().getSimpleName() : "NULL";
+            boolean isStartRoundFinal = (currentFinal instanceof StartRound) || rNameFinal.contains("StartRound")
+                    || rNameFinal.contains("FormationRound");
+
+            if (!isStartRoundFinal) {
+                this.requestFocusInWindow();
+            }
+        });
+    }
+
+    @Override
+    public void revenueUpdate(int bestRevenue, int specialRevenue, boolean finalResult) {
+        // 1. Always update the Sidebar Revenue Label with the calculated actual revenue
+        if (lblRevenue != null) {
+            lblRevenue.setText(orUIManager.getGameUIManager().format(bestRevenue));
+        }
+
+        if (isRevenueValueToBeSet) {
+            setRevenue(orCompIndex, bestRevenue);
+
+            if (hasDirectCompanyIncomeInOR) {
+                setDirectRevenue(orCompIndex, specialRevenue);
+                setDividend(orCompIndex, bestRevenue - specialRevenue);
+            }
+        }
+        if (finalResult) {
+            // 2. Handle Map Drawing (Only if Final Result AND Routes are enabled)
+            // Clear old paths first to avoid artifacts
+            orUIManager.getMap().setTrainPaths(null);
+
+            // Only draw the new path if the user has enabled Route Highlighting
+            if (isDisplayCurrentRoutes()) {
+                try {
+                    revenueAdapter.drawOptimalRunAsPath(orUIManager.getMap());
+                } catch (Exception e) {
+                }
+            }
+
+            if (isRevenueValueToBeSet) {
+                orUIManager.getMessagePanel().setInformation("Best Run Value = " + bestRevenue +
+                        " with " + Util.convertToHtml(revenueAdapter.getOptimalRunPrettyPrint(false)));
+                orUIManager.getMessagePanel().setDetail(
+                        Util.convertToHtml(revenueAdapter.getOptimalRunPrettyPrint(true)));
+            }
+        }
+    }
+
+    private JLabel createInfoLabel(String text) {
+        JLabel lbl = new JLabel(text, SwingConstants.CENTER);
+        lbl.setOpaque(true);
+        lbl.setBackground(Color.WHITE); // INFO_BG
+        lbl.setForeground(Color.BLACK);
+        lbl.setBorder(BorderFactory.createLineBorder(Color.LIGHT_GRAY));
+        lbl.setAlignmentX(Component.CENTER_ALIGNMENT);
+        // Slightly wider to fill panel, minus padding
+        lbl.setMaximumSize(new Dimension(SIDEBAR_WIDTH - 20, 24));
+        lbl.setPreferredSize(new Dimension(SIDEBAR_WIDTH - 20, 24));
+        return lbl;
+    }
+
+    @Override
+    public void actionPerformed(ActionEvent actor) {
+        // long eventTime = actor.getWhen(); // Unused
+
+        JComponent source = (JComponent) actor.getSource();
+        String command = actor.getActionCommand();
+
+        // --- 1. Handle Commands (Zoom logic moved to StatusWindow) ---
+
+        if (command.equals(REM_TILES_CMD)) {
+            // Keep: Required for the "Remaining Tiles" command to work
+            new RemainingTilesWindow(orWindow);
+            return;
+        }
+
+        // --- 2. Handle Sidebar Buttons ---
+        else if (command.equals(SHOW_CMD)) {
+            // Toggle visual help numbers on map
+            toggleTileBuildNumbers();
+            return;
+        } else if (command.equals(TRAIN_SKIP_CMD)) {
+            // Manual Skip for Phase 4 -> Advance to Phase 5 (Done)
+            activePhase = 5;
+            highlightActivePhase();
+            updateDefaultButton(); // Focus moves to 'Done'
+
+            // visually disable train buttons to indicate the choice is made
+            if (btnTrainSkip != null)
+                btnTrainSkip.setEnabled(false);
+            if (trainButtonsPanel != null) {
+                for (Component c : trainButtonsPanel.getComponents()) {
+                    c.setEnabled(false);
+                }
+            }
+            return;
+        }
+
+        // --- 3. Handle Confirm Button ---
+        else if (command.equals(CONFIRM_CMD)) {
+            if (orUIManager != null) {
+                // Disable the specific button for the active phase to prevent double-clicks
+                if (activePhase == 1 && btnTileConfirm != null) {
+                    btnTileConfirm.setEnabled(false);
+                } else if (activePhase == 2 && btnTokenConfirm != null) {
+                    btnTokenConfirm.setEnabled(false);
+                }
+                // Explicitly clear tile numbers and cycle list immediately on confirm
+                // to remove "red boundaries" and text before the next state loads.
+                setTileBuildNumbers(false);
+                resetHexCycle();
+                removeAllHighlights();
+                // Force immediate map cleanup on Confirm
+                if (orWindow != null && orWindow.getMapPanel() != null) {
+                    orWindow.getMapPanel().clearOverlays();
+                }
+                orUIManager.confirmUpgrade();
+            }
+            return;
+        }
+
+        // --- 4. Handle Operating Cost ---
+        else if (command.equals(OPERATING_COST_CMD)) {
+            if (orUIManager != null)
+                orUIManager.operatingCosts();
+            return;
+        }
+
+        // --- 5. Handle Buy Private ---
+        else if (command.equals(BUY_PRIVATE_CMD)) {
+            if (orUIManager != null)
+                orUIManager.buyPrivate();
+            return;
+        }
+
+        // --- 6. Handle ALL GAME ACTIONS (Buttons, ActionMenus) ---
+        List<PossibleAction> executedActions = null;
+
+        if (source instanceof ActionTaker) {
+            executedActions = ((ActionTaker) source).getPossibleActions();
+
+            if (executedActions != null && !executedActions.isEmpty()) {
+                PossibleAction first = executedActions.get(0);
+
+                // Safety checks for map actions
+                if ((first instanceof LayToken && ((LayToken) first).getChosenHex() == null) ||
+                        (first instanceof LayBaseToken && ((LayBaseToken) first).getChosenHex() == null) ||
+                        (first instanceof LayTile && ((LayTile) first).getChosenHex() == null)) {
+
+                    return;
+                }
+            }
+            orUIManager.processAction(command, executedActions, source);
+        }
+    }
+
+    private JPanel createDataRow(String labelText, JLabel valueField) {
+        JPanel panel = new JPanel(new BorderLayout(5, 0));
+        panel.setOpaque(false);
+        panel.setMaximumSize(new Dimension(SIDEBAR_WIDTH, 26)); // Fixed height row
+
+        JLabel lbl = new JLabel(labelText);
+        lbl.setForeground(Color.DARK_GRAY);
+        lbl.setFont(new Font("SansSerif", Font.BOLD, 12));
+        lbl.setPreferredSize(new Dimension(55, 26)); // Fixed label width for alignment
+        lbl.setHorizontalAlignment(SwingConstants.RIGHT);
+
+        valueField.setBackground(INFO_BG); // White
+        valueField.setOpaque(true);
+        valueField.setBorder(BorderFactory.createLineBorder(Color.LIGHT_GRAY));
+        valueField.setHorizontalAlignment(SwingConstants.CENTER);
+        valueField.setFont(new Font("SansSerif", Font.PLAIN, 12));
+
+        panel.add(lbl, BorderLayout.WEST);
+        panel.add(valueField, BorderLayout.CENTER);
+
+        return panel;
+    }
+
+    public void resetSidebarState() {
+
+        // Ensure btnDone is clean before next round of logic, preventing stale commands
+        // (like TRAIN_SKIP_CMD) from persisting into other phases.
+        if (btnDone != null) {
+            btnDone.setActionCommand(DONE_CMD);
+            btnDone.setPossibleAction(null);
+            btnDone.setEnabled(false);
+        }
+
+        if (btnTileSkip != null)
+            btnTileSkip.setEnabled(false);
+        if (btnTileConfirm != null)
+            btnTileConfirm.setEnabled(false);
+        if (btnTokenSkip != null)
+            btnTokenSkip.setEnabled(false);
+        if (btnTokenConfirm != null)
+            btnTokenConfirm.setEnabled(false);
+        if (btnRevPayout != null)
+            btnRevPayout.setEnabled(false);
+        if (btnRevWithhold != null)
+            btnRevWithhold.setEnabled(false);
+        if (btnRevSplit != null)
+            btnRevSplit.setEnabled(false);
+        if (btnDone != null)
+            btnDone.setEnabled(false);
+        if (btnTrainSkip != null)
+            btnTrainSkip.setEnabled(false); // Fix NPE
+
+        if (trainButtonsPanel != null)
+            trainButtonsPanel.removeAll();
+
+        if (miscActionPanel != null) {
+            miscActionPanel.removeAll();
+            miscActionPanel.revalidate(); // Reset layout
+            miscActionPanel.repaint();
+        }
+
+        if (specialContainer != null)
+            specialContainer.setVisible(false);
+        if (specialPanel != null)
+            specialPanel.removeAll();
+
+        activePhase = 0;
+        // highlightActivePhase(); // Optional: clears border highlights
+    }
+
+    public void finish() {
+        this.orComp = null;
+        this.orCompIndex = -1;
+
+        // Ensure map numbers are cleared when the round ends
+        setTileBuildNumbers(false);
+
+        if (sidebarPanel != null) {
+            sidebarPanel.setBackground(Color.LIGHT_GRAY); // Disabled BG
+
+            // Reset Logo
+            if (companyLogo != null) {
+                companyLogo.setText("Stock Round");
+                companyLogo.setBackground(Color.LIGHT_GRAY);
+                companyLogo.setForeground(Color.GRAY);
+                companyLogo.setVisible(true);
+            }
+            // --- Wipe Cockpit Data ---
+            if (lblCash != null) {
+                lblCash.setText("-");
+                lblCash.setBackground(Color.WHITE);
+                // Hide the container holding the cash label so the box disappears completely
+                if (lblCash.getParent() != null) {
+                    lblCash.getParent().setVisible(false);
+                }
+            }
+
+            if (tokenDisplay != null) {
+                tokenDisplay.setTokens(0, Color.GRAY);
+            }
+            if (lblRevenue != null) {
+                lblRevenue.setText("-");
+                lblRevenue.setBackground(Color.WHITE);
+            }
+            if (trainDisplay != null) {
+                trainDisplay.setTrains("-", 1);
+            }
+
+            // Hide Phase Panels
+            if (phase1Panel != null)
+                phase1Panel.setVisible(false);
+            if (phase2Panel != null)
+                phase2Panel.setVisible(false);
+            if (phase3Panel != null)
+                phase3Panel.setVisible(false);
+            if (phase4Panel != null)
+                phase4Panel.setVisible(false);
+            if (footerPanel != null)
+                footerPanel.setVisible(false);
+
+            // Aggressively clear Special Panel to prevent "Sticky Buttons" artifact
+            // We must remove components AND force validation to ensure the UI updates
+            // immediately.
+            if (specialPanel != null) {
+                specialPanel.removeAll();
+                specialPanel.revalidate();
+                specialPanel.repaint();
+            }
+            if (specialContainer != null) {
+                specialContainer.setVisible(false);
+                specialContainer.revalidate(); // Force layout update to hide border
+                specialContainer.repaint();
+            }
+
+            sidebarPanel.revalidate();
+            sidebarPanel.repaint();
+        }
+
+        if (trainButtonsPanel != null)
+            trainButtonsPanel.removeAll();
+
+        // Disable Legacy Buttons
+        if (buttonOC != null)
+            buttonOC.setEnabled(false);
+        if (button1 != null)
+            button1.setEnabled(false);
+        if (button2 != null)
+            button2.setEnabled(false);
+        if (button3 != null)
+            button3.setEnabled(false);
+
+        disableRoutesDisplay();
+        resetActions();
+        repaint();
+    }
+
+    private ActionButton createSidebarButton(String text, String cmd) {
+        ActionButton b = new ActionButton(RailsIcon.OK);
+        b.setText(text);
+        b.setIcon(null);
+        b.setActionCommand(cmd);
+        b.addActionListener(this);
+        b.setEnabled(false);
+        b.setHorizontalAlignment(SwingConstants.CENTER);
+        b.setFont(BTN_FONT);
+
+        // --- FIX: Alignment for BoxLayout ---
+        b.setAlignmentX(Component.CENTER_ALIGNMENT);
+        // ------------------------------------
+
+        b.setPreferredSize(new Dimension(SIDEBAR_WIDTH - 20, BTN_HEIGHT));
+        b.setMaximumSize(new Dimension(SIDEBAR_WIDTH - 20, BTN_HEIGHT)); // Enforce Max Height
+        b.setMargin(new Insets(2, 2, 2, 2));
+        return b;
+    }
+
+    public void setTileBuildNumbers(boolean show) {
+        // Always update logic to ensure map numbers refresh when the company changes.
+        // We removed the "if (state != show)" check because map data changes between
+        // turns.
+        this.showNumbersActive = show;
+
+        if (btnBuildShow != null) {
+            btnBuildShow.setText(showNumbersActive ? "Hide" : "Show");
+        }
+
+        if (orUIManager != null) {
+            orUIManager.updateHexBuildNumbers(showNumbersActive);
+        }
+        repaint();
+    }
+
+    public void toggleTileBuildNumbers() {
+        setTileBuildNumbers(!this.showNumbersActive);
+    }
+
+    // --- Helper: Create Panel with Titled Border ---
+    private JPanel createPhasePanel(String title) {
+        JPanel p = new JPanel();
+        p.setLayout(new BoxLayout(p, BoxLayout.Y_AXIS));
+        p.setBorder(BorderFactory.createTitledBorder(
+                BorderFactory.createLineBorder(Color.GRAY), title,
+                TitledBorder.LEFT, TitledBorder.TOP, FONT_HEADER));
+        p.setOpaque(false);
+        p.setBackground(BG_NORMAL);
+        p.setAlignmentX(Component.CENTER_ALIGNMENT);
+        return p;
+    }
+
+    // --- Helper: Smaller Readout ---
+    private JLabel createReadoutLabel(String startText) {
+        JLabel lbl = new JLabel(startText, SwingConstants.CENTER);
+        lbl.setOpaque(true);
+        lbl.setBackground(BG_READOUT);
+        lbl.setForeground(Color.BLACK);
+        lbl.setFont(new Font("SansSerif", Font.BOLD, 12));
+        lbl.setBorder(BorderFactory.createLineBorder(Color.LIGHT_GRAY));
+        lbl.setMaximumSize(new Dimension(1000, 24));
+        return lbl;
+    }
+
+    // --- Highlighting Logic ---
+    private void highlightActivePhase() {
+        // Reset all panels
+        applyPanelStyle(phase1Panel, false);
+        applyPanelStyle(phase2Panel, false);
+        applyPanelStyle(phase3Panel, false);
+        applyPanelStyle(phase4Panel, false);
+
+        // Reset Data Fields to Mauve
+        if (tokenDisplay != null)
+            tokenDisplay.setBackground(BG_DETAILS);
+        if (lblRevenue != null)
+            lblRevenue.setBackground(BG_DETAILS);
+
+        // Apply Yellow Highlight + Push Color to Data Fields
+        if (activePhase == 1) {
+            applyPanelStyle(phase1Panel, true);
+        } else if (activePhase == 2) {
+            applyPanelStyle(phase2Panel, true);
+            // 6. Token Field Yellow
+            if (tokenDisplay != null)
+                tokenDisplay.setBackground(BG_HIGHLIGHT);
+        } else if (activePhase == 3) {
+            applyPanelStyle(phase3Panel, true);
+            // 7. Revenue Field Yellow
+            if (lblRevenue != null)
+                lblRevenue.setBackground(BG_HIGHLIGHT);
+        } else if (activePhase == 4) {
+            applyPanelStyle(phase4Panel, true);
+        }
+    }
+
+    private void applyPanelStyle(JPanel p, boolean active) {
+        if (p == null)
+            return;
+        // Change Background: Mauve (Transparent) if inactive, Highlight (Opaque) if
+        // active
+        if (active) {
+            p.setOpaque(true);
+            p.setBackground(BG_HIGHLIGHT);
+        } else {
+            p.setOpaque(false); // Let Mauve show through
+        }
+
+        // Thicker border if active
+        Border line = active
+                ? BorderFactory.createLineBorder(Color.ORANGE, 2)
+                : BorderFactory.createLineBorder(Color.GRAY, 1);
+
+        if (p.getBorder() instanceof TitledBorder) {
+            ((TitledBorder) p.getBorder()).setBorder(line);
+        }
+        p.repaint();
+    }
+
+    private JLabel createProminentLabel(String startText) {
+        JLabel lbl = new JLabel(startText, SwingConstants.CENTER);
+        lbl.setOpaque(true);
+        lbl.setBackground(BG_DETAILS); // Default to Light Green
+        lbl.setForeground(FG_READOUT);
+        lbl.setFont(FONT_READOUT);
+        lbl.setBorder(BorderFactory.createLineBorder(Color.GRAY, 1));
+        // Fixed Height 26px for compactness
+        lbl.setMaximumSize(new Dimension(SIDEBAR_WIDTH - 10, 26));
+        lbl.setPreferredSize(new Dimension(SIDEBAR_WIDTH - 10, 26));
+        lbl.setAlignmentX(Component.CENTER_ALIGNMENT);
+        return lbl;
+    }
+
+    private void initSidebar() {
+        sidebarPanel = new JPanel();
+        sidebarPanel.setLayout(new BoxLayout(sidebarPanel, BoxLayout.Y_AXIS));
+        sidebarPanel.setPreferredSize(new Dimension(SIDEBAR_WIDTH, SIDEBAR_HEIGHT));
+        sidebarPanel.setBorder(BorderFactory.createEmptyBorder(2, 2, 2, 2));
+
+        // Set the Main Sidebar Background to Mauve
+        sidebarPanel.setOpaque(true);
+        sidebarPanel.setBackground(BG_DETAILS);
+
+        // --- 1. HEADER (Logo) ---
+        companyLogo = new JLabel("Stock Round", SwingConstants.CENTER);
+        companyLogo.setOpaque(true);
+        companyLogo.setFont(new Font("SansSerif", Font.BOLD, 14));
+        companyLogo.setBackground(Color.LIGHT_GRAY);
+        companyLogo.setForeground(Color.DARK_GRAY);
+
+        Dimension logoSize = new Dimension(SIDEBAR_WIDTH, 90);
+        companyLogo.setMinimumSize(logoSize);
+        companyLogo.setPreferredSize(logoSize);
+        companyLogo.setMaximumSize(logoSize);
+        companyLogo.setAlignmentX(Component.CENTER_ALIGNMENT);
+        sidebarPanel.add(companyLogo);
+
+        sidebarPanel.add(Box.createVerticalStrut(2));
+
+        // --- 2. GLOBAL HUD (Cash) ---
+        // 1. Treasury in a Panel (Like others, but never active)
+        JPanel treasuryPanel = createPhasePanel("Treasury");
+        this.cashPanel = treasuryPanel; // Capture reference so we can restore visibility later
+        // Force opaque Mauve background for the "content" area if needed,
+        // but since we want the seamless look, transparency is usually best unless
+        // highlighting.
+        // However, user said "just mauve", so we keep it transparent to show sidebar
+        // BG.
+        treasuryPanel.add(Box.createVerticalStrut(5));
+
+        lblCash = new JLabel("-", SwingConstants.CENTER);
+        lblCash.setFont(FONT_READOUT);
+        lblCash.setForeground(FG_READOUT);
+        lblCash.setOpaque(true);
+        lblCash.setBackground(BG_DETAILS); // Mauve background
+        lblCash.setBorder(null); // 2. No Black Frame
+        lblCash.setAlignmentX(Component.CENTER_ALIGNMENT);
+        // Add to panel
+        treasuryPanel.add(lblCash);
+        sidebarPanel.add(treasuryPanel);
+
+        treasuryPanel.add(Box.createVerticalStrut(5)); // Bottom padding
+        // sidebarPanel.add(Box.createVerticalStrut(4));
+
+        // --- 2b. SPECIAL CONTAINER (The Fix) ---
+        // Initialize the container for Special Actions (Prussian, Private Auctions)
+        // and add it to the stack so it exists in the layout.
+        specialContainer = new JPanel(new BorderLayout());
+        specialContainer.setOpaque(false);
+        specialContainer.setVisible(false); // Hidden by default
+
+        // Optional: Add a border to make it distinct
+        specialContainer.setBorder(BorderFactory.createTitledBorder(
+                BorderFactory.createLineBorder(Color.RED), "Special / Decision",
+                TitledBorder.LEFT, TitledBorder.TOP, FONT_HEADER));
+
+        specialPanel = new JPanel();
+        specialPanel.setLayout(new BoxLayout(specialPanel, BoxLayout.Y_AXIS));
+        specialPanel.setOpaque(false);
+
+        specialContainer.add(specialPanel, BorderLayout.CENTER);
+
+        // Add it to the sidebar stack BEFORE Phase 1
+        sidebarPanel.add(specialContainer);
+        sidebarPanel.add(Box.createVerticalStrut(2));
+
+        // --- 3. PHASE 1: TRACK ---
+        phase1Panel = createPhasePanel("1. Track");
+
+        JPanel p1Btns = new JPanel(new GridLayout(1, 1, 2, 0));
+        p1Btns.setOpaque(false);
+        btnTileSkip = createSidebarButton("Skip", SKIP_CMD);
+        // btnBuildShow = createSidebarButton("Show", SHOW_CMD);
+
+        p1Btns.add(btnTileSkip);
+        phase1Panel.add(p1Btns);
+        phase1Panel.add(Box.createVerticalStrut(2));
+        btnTileConfirm = createSidebarButton("Confirm", CONFIRM_CMD);
+        phase1Panel.add(btnTileConfirm);
+
+        // Initialize the panel for dynamic/special actions (like OBB Tile Lay)
+        miscActionPanel = new JPanel();
+        miscActionPanel.setLayout(new BoxLayout(miscActionPanel, BoxLayout.Y_AXIS));
+        miscActionPanel.setOpaque(false);
+        phase1Panel.add(Box.createVerticalStrut(2));
+        phase1Panel.add(miscActionPanel);
+
+        sidebarPanel.add(phase1Panel);
+        sidebarPanel.add(Box.createVerticalStrut(2));
+
+        // --- 4. PHASE 2: TOKEN ---
+        phase2Panel = createPhasePanel("2. Token");
+
+        // Token Readout
+        tokenDisplay = new TokenDisplayPanel();
+        tokenDisplay.setPreferredSize(new Dimension(SIDEBAR_WIDTH - 10, 30));
+        tokenDisplay.setMaximumSize(new Dimension(SIDEBAR_WIDTH - 10, 30));
+        tokenDisplay.setAlignmentX(Component.CENTER_ALIGNMENT);
+        // Ensure BG matches the requested Mauve
+        tokenDisplay.setBackground(BG_DETAILS);
+        phase2Panel.add(tokenDisplay);
+
+        phase2Panel.add(Box.createVerticalStrut(2));
+
+        btnTokenSkip = createSidebarButton("Skip", SKIP_CMD);
+        phase2Panel.add(btnTokenSkip);
+        phase2Panel.add(Box.createVerticalStrut(2));
+        btnTokenConfirm = createSidebarButton("Confirm", CONFIRM_CMD);
+        phase2Panel.add(btnTokenConfirm);
+
+        sidebarPanel.add(phase2Panel);
+        sidebarPanel.add(Box.createVerticalStrut(2));
+
+        // --- 5. PHASE 3: REVENUE ---
+        phase3Panel = createPhasePanel("3. Revenue");
+
+        // Revenue Readout
+        lblRevenue = new JLabel("0", SwingConstants.CENTER);
+        lblRevenue.setFont(FONT_READOUT); // 4. Bigger Font
+        lblRevenue.setOpaque(true);
+        lblRevenue.setBackground(BG_DETAILS);
+        lblRevenue.setBorder(null); // 4. No Black Frame
+
+        // Fix height to prevent jumping
+        lblRevenue.setPreferredSize(new Dimension(SIDEBAR_WIDTH - 20, 30));
+        lblRevenue.setMaximumSize(new Dimension(SIDEBAR_WIDTH - 20, 30));
+        lblRevenue.setAlignmentX(Component.CENTER_ALIGNMENT);
+        phase3Panel.add(lblRevenue);
+
+        phase3Panel.add(Box.createVerticalStrut(2));
+        btnRevPayout = createSidebarButton("Payout", PAYOUT_CMD);
+        phase3Panel.add(btnRevPayout);
+        phase3Panel.add(Box.createVerticalStrut(2));
+        btnRevWithhold = createSidebarButton("Withhold", WITHHOLD_CMD);
+        phase3Panel.add(btnRevWithhold);
+        phase3Panel.add(Box.createVerticalStrut(2));
+        btnRevSplit = createSidebarButton("Split", SPLIT_CMD);
+        phase3Panel.add(btnRevSplit);
+
+        sidebarPanel.add(phase3Panel);
+        sidebarPanel.add(Box.createVerticalStrut(2));
+
+        // --- 6. PHASE 4: TRAINS ---
+        phase4Panel = createPhasePanel("4. Trains / Buy");
+
+        // New Visual Train Display
+        trainDisplay = new TrainDisplayPanel();
+        phase4Panel.add(trainDisplay);
+
+        // Tight spacing
+        phase4Panel.add(Box.createVerticalStrut(2));
+
+        btnTrainSkip = createSidebarButton("Skip Buy", TRAIN_SKIP_CMD);
+        phase4Panel.add(btnTrainSkip);
+
+        // Container for Buyable Trains (populated dynamically)
+        trainButtonsPanel = new JPanel(new GridBagLayout());
+        trainButtonsPanel.setOpaque(false);
+        phase4Panel.add(trainButtonsPanel);
+
+        sidebarPanel.add(phase4Panel);
+        sidebarPanel.add(Box.createVerticalStrut(4));
+
+        // --- 7. FOOTER ---
+        footerPanel = new JPanel(new FlowLayout(FlowLayout.CENTER, 0, 0));
+        footerPanel.setOpaque(false); // Transparent to show Mauve
+        // footerPanel.setMaximumSize(new Dimension(SIDEBAR_WIDTH, 40));
+
+        btnDone = createSidebarButton("DONE", DONE_CMD);
+        btnDone.setFont(new Font("SansSerif", Font.BOLD, 14));
+        btnDone.setPreferredSize(new Dimension(SIDEBAR_WIDTH - 10, 35));
+        footerPanel.add(btnDone);
+
+        // 3. Remove Glue to reduce empty space below
+        sidebarPanel.add(Box.createVerticalStrut(10)); // Small gap instead of Glue
+        sidebarPanel.add(footerPanel);
+        sidebarPanel.add(Box.createVerticalStrut(5));
+    }
+
+    private void updateSidebarData() {
+        // 1. Check & Clear (Redundant safety)
+        if (orComp == null) {
+            if (lblCash != null)
+                lblCash.setText("-");
+            return;
+        }
+
+        // 2. Header
+        if (companyLogo != null) {
+            GameManager gm = orUIManager.getGameUIManager().getGameManager();
+            String orInfo = "OR " + gm.getRelativeORNumber() + "/" + gm.getNumOfORs();
+            String playerInfo = (orComp.getPresident() != null) ? orComp.getPresident().getName() : "";
+
+            String logoText = "<html><center>" +
+                    "<font size='5'>" + orComp.getId() + "</font><br>" +
+                    "<font size='4'>" + playerInfo + "</font><br>" +
+                    "<font size='4'>" + orInfo + "</font>" +
+                    "</center></html>";
+
+            companyLogo.setText(logoText);
+            companyLogo.setBackground(orComp.getBgColour());
+            companyLogo.setForeground(orComp.getFgColour());
+            companyLogo.setVisible(true);
+        }
+
+        // --- STYLE: Light Green Background, Black Text ---
+        Color infoBg = BG_DETAILS;
+        Color infoFg = FG_READOUT;
+
+        if (lblCash != null) {
+            lblCash.setText(format(orComp.getPurseMoneyModel().value()));
+            lblCash.setBackground(infoBg);
+            lblCash.setForeground(infoFg);
+        }
+
+        if (tokenDisplay != null) {
+            int available = 0;
+            if (orComp.getAllBaseTokens() != null) {
+                // Count unplaced tokens
+                for (net.sf.rails.game.BaseToken t : orComp.getAllBaseTokens()) {
+                    if (!t.isPlaced())
+                        available++;
+                }
+            }
+            tokenDisplay.setTokens(available, orComp);
+        }
+
+        if (lblRevenue != null) {
+            // FIX: Match Status Window by using int value directly
+            int val = orComp.getLastRevenue();
+            lblRevenue.setText(format(val));
+            lblRevenue.setBackground(infoBg);
+            lblRevenue.setForeground(infoFg);
+        }
+
+        if (trainDisplay != null) {
+            String trains = orComp.getPortfolioModel().getTrainsModel().toText();
+            int limit = orComp.getCurrentTrainLimit();
+            trainDisplay.setTrains(trains, limit);
+        }
+        /* REMOVED OLD LABEL UPDATES (lblTrains, lblTrainLimit) */
+        // --- END FIX ---
+
+        if (sidebarPanel != null) {
+            sidebarPanel.revalidate();
+            sidebarPanel.repaint();
+        }
+
+        if (sidebarPanel != null) {
+            sidebarPanel.revalidate();
+            sidebarPanel.repaint();
+        }
+    }
+
+    private void setupHotkeys() {
+
+        // Use WHEN_IN_FOCUSED_WINDOW so hotkeys work even if the Map has focus
+        InputMap inputMap = this.getInputMap(JComponent.WHEN_IN_FOCUSED_WINDOW);
+        ActionMap actionMap = this.getActionMap();
+
+        // S: Cycle Hexes (Clockwise)
+        inputMap.put(KeyStroke.getKeyStroke(KeyEvent.VK_S, 0), "cycleHexCW");
+        actionMap.put("cycleHexCW", new AbstractAction() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                cycleHexes(1);
+            }
+        });
+
+        // D: Cycle Hexes (Anti-Clockwise) OR Done
+        inputMap.put(KeyStroke.getKeyStroke(KeyEvent.VK_D, 0), "cycleHexACW");
+        actionMap.put("cycleHexACW", new AbstractAction() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                // 1. Try to cycle hexes first
+                if (cycleableHexes != null && !cycleableHexes.isEmpty()) {
+                    cycleHexes(-1);
+                }
+                // 2. If no hexes to cycle, trigger DONE
+                else if (btnDone != null && btnDone.isEnabled()) {
+                    btnDone.doClick();
+                }
+            }
+        });
+
+    }
+
+    /**
+     * Public accessor for the IPO Buy logic, triggered by ORWindow hotkeys.
+     */
+    public void processIPOBuy() {
+
+        if (!availableTrainActions.isEmpty()) {
+            for (BuyTrain action : availableTrainActions) {
+                String label = action.getButtonLabel();
+                // Heuristic: IPO trains usually don't mention "Pool" or "Discard"
+                boolean isPool = (label != null
+                        && (label.toLowerCase().contains("pool") || label.toLowerCase().contains("discard")));
+
+                if (!isPool) {
+                    List<PossibleAction> toExec = new ArrayList<>();
+                    toExec.add(action);
+                    orUIManager.processAction(BUY_TRAIN_CMD, toExec, ORPanel.this);
+                    break; // Buy only one
+                }
+            }
+        }
+    }
+
+    private class TrainDisplayPanel extends JPanel {
+        // Visual Constants matching GameStatus
+        private final Dimension DIM_TRAIN_CARD = new Dimension(52, 28);
+        private final Color BG_CARD_PASSIVE = new Color(255, 255, 240); // Beige
+
+        // Dummy group to satisfy ClickField constructor constraints (fixes NPE)
+        private final ButtonGroup dummyGroup = new ButtonGroup();
+        
+        public TrainDisplayPanel() {
+            setOpaque(false);
+            setLayout(new GridBagLayout()); // Center the vertical stack
+            setBorder(null);
+        }
+
+        public void setTrains(String trainString, int limit) {
+            removeAll();
+
+            // 1. Parse Trains
+            List<String> trains = new ArrayList<>();
+            if (trainString != null && !trainString.isEmpty() && !trainString.equals("None")
+                    && !trainString.equals("-")) {
+                String[] split = trainString.split("[,\\s]+");
+                for (String s : split) {
+                    if (!s.trim().isEmpty())
+                        trains.add(s.trim());
+                }
+            }
+
+            // 2. Build Vertical Stack
+            JPanel stack = new JPanel(new GridLayout(0, 1, 0, 5)); // 1 Column, 5px Gap
+            stack.setOpaque(false);
+
+            int totalSlots = Math.max(limit, Math.max(trains.size(), 1));
+for (int i = 0; i < totalSlots; i++) {
+                // --- START FIX ---
+                // FIX NPE: Pass 'dummyGroup' instead of null.
+                // The parent ClickField class throws an exception if the group is null.
+                RailCard card = new RailCard((net.sf.rails.game.Train)null, dummyGroup);
+                
+                card.setPreferredSize(DIM_TRAIN_CARD);
+                card.setMinimumSize(DIM_TRAIN_CARD);
+                card.setMaximumSize(DIM_TRAIN_CARD);
+                card.setCompactMode(true); // Centers text, bold font
+                card.setOpaque(true);
+
+                if (i < trains.size()) {
+                    // Active Card (Beige)
+                    String text = trains.get(i);
+                    card.setCustomLabel(text); // RailCard handles the HTML formatting
+                    card.setBackground(BG_CARD_PASSIVE); // Beige
+                    card.setBorder(BorderFactory.createCompoundBorder(
+                            BorderFactory.createLineBorder(Color.BLACK, 1),
+                            BorderFactory.createEmptyBorder(1, 1, 1, 1)));
+                } else {
+                    // Empty Slot (Gray/Dashed look)
+                    card.setCustomLabel("_"); // Subtle placeholder
+                    card.setBackground(new Color(240, 240, 240));
+                    card.setBorder(BorderFactory.createCompoundBorder(
+                            BorderFactory.createLineBorder(Color.GRAY, 1),
+                            BorderFactory.createEmptyBorder(1, 1, 1, 1)));
+                    // Make text gray for empty slots
+                    card.setForeground(Color.GRAY);
+                }
+                stack.add(card);
+                // --- END FIX ---
+            }
+
+            add(stack);
+            revalidate();
+            repaint();
+        }
+    }
+
+    /**
+     * * Visual display for Tokens (Updated to use TokenIcon)
+     * Replaces the old "paintComponent" dots with actual Game Tokens.
+     */
+    private class TokenDisplayPanel extends JPanel {
+        // Standard Sidebar width is ~190, so we can fit ~5 tokens comfortably
+        private final int ICON_DIAMETER = 24;
+
+        public TokenDisplayPanel() {
+            setOpaque(true);
+            setBackground(BG_DETAILS); // Match Sidebar Mauve
+            setBorder(null);
+            // FlowLayout allows tokens to center themselves dynamically
+            setLayout(new FlowLayout(FlowLayout.CENTER, 5, 2));
+        }
+
+        /**
+         * The NEW method required to fix the compiler error.
+         * Accepts PublicCompany to generate the correct Icon with Text.
+         */
+        public void setTokens(int count, PublicCompany company) {
+            removeAll(); // Clear old components
+
+            if (company != null && count > 0) {
+                Color bgColor = company.getBgColour();
+                Color fgColor = company.getFgColour();
+                String idText = company.getId();
+
+                for (int i = 0; i < count; i++) {
+                    // Create the official token look using TokenIcon
+                    // Ensure TokenIcon is imported from net.sf.rails.ui.swing.elements
+                    TokenIcon tokenIcon = new TokenIcon(
+                            ICON_DIAMETER,
+                            fgColor,
+                            bgColor,
+                            idText);
+
+                    JLabel iconLabel = new JLabel(tokenIcon);
+                    iconLabel.setToolTipText("Available Token");
+                    iconLabel.setText(""); // No text needed outside the icon
+
+                    add(iconLabel);
+                }
+            }
+
+            revalidate();
+            repaint();
+        }
+
+        // DEPRECATED Compatibility Method (Fixes legacy calls if any exist)
+        // This ensures the compiler finds a match even if old code calls it,
+        // though it won't render icons without the company object.
+        public void setTokens(int count, Color color) {
+            // Fallback: If we have a stored company reference, use it.
+            // Otherwise, just clear.
+            if (ORPanel.this.orComp != null) {
+                setTokens(count, ORPanel.this.orComp);
+            } else {
+                removeAll();
+                revalidate();
+                repaint();
+            }
+        }
+    }
+
+    public void setCustomHeader(String title, String subtitle) {
+        if (companyLogo != null) {
+            String logoText = "<html><center>" +
+                    "<font size='5'>" + title + "</font><br>" +
+                    "<font size='4'>" + subtitle + "</font>" +
+                    "</center></html>";
+            companyLogo.setText(logoText);
+            companyLogo.setBackground(BG_DETAILS);
+            companyLogo.setForeground(Color.BLACK);
+            companyLogo.setVisible(true);
+            companyLogo.revalidate();
+            companyLogo.repaint();
+        }
+        if (sidebarPanel != null) {
+            sidebarPanel.revalidate();
+            sidebarPanel.repaint();
+        }
+    }
+
+    public static void setGlobalCustomHeader(String title, String subtitle) {
+        SwingUtilities.invokeLater(() -> {
+            for (ORPanel panel : activeInstances) {
+                panel.setCustomHeader(title, subtitle);
+            }
+        });
+    }
+
 }

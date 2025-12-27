@@ -28,7 +28,6 @@ import net.sf.rails.ui.swing.elements.ActionButton;
 import net.sf.rails.ui.swing.elements.RailsIcon;
 import rails.game.action.GameAction;
 
-
 /**
  * ReportWindow displays the game history
  */
@@ -77,7 +76,7 @@ public class ReportWindow extends JFrame implements ActionListener, HyperlinkLis
         messagePanel.setLayout(new BorderLayout());
 
         message = new JLabel();
-        message.setText( LocalText.getText("REPORT_TIMEWARP_ACTIVE"));
+        message.setText(LocalText.getText("REPORT_TIMEWARP_ACTIVE"));
         message.setHorizontalAlignment(JLabel.CENTER);
         message.setVisible(false);
         messagePanel.add(message, "North");
@@ -107,7 +106,7 @@ public class ReportWindow extends JFrame implements ActionListener, HyperlinkLis
         Font font = UIManager.getFont("Label.font");
         String bodyRule = "body { font-family: " + font.getFamily() + "; " +
                 "font-size: " + font.getSize() + "pt; }";
-        ((HTMLDocument)editorPane.getDocument()).getStyleSheet().addRule(bodyRule);
+        ((HTMLDocument) editorPane.getDocument()).getStyleSheet().addRule(bodyRule);
 
         JScrollPane reportPane = new JScrollPane(editorPane);
         add(reportPane, "Center");
@@ -117,37 +116,37 @@ public class ReportWindow extends JFrame implements ActionListener, HyperlinkLis
 
         backwardButton = new ActionButton(RailsIcon.REPORT_MOVE_BACKWARD);
         backwardButton.addActionListener(this);
-        backwardButton.setEnabled(! isStatic);
+        backwardButton.setEnabled(!isStatic);
         buttonPanel.add(backwardButton);
 
         forwardButton = new ActionButton(RailsIcon.REPORT_MOVE_FORWARD);
         forwardButton.addActionListener(this);
-        forwardButton.setEnabled(! isStatic);
+        forwardButton.setEnabled(!isStatic);
         buttonPanel.add(forwardButton);
 
         // TODO: Add new command button functionality
-//        commentButton = new JButton(LocalText.getText("REPORT_COMMENT"));
-//        commentButton.addActionListener(
-//                new ActionListener() {
-//                    public void actionPerformed(ActionEvent arg0) {
-//                        String newComment = (String)JOptionPane.showInputDialog(
-//                                this,
-//                                LocalText.getText("REPORT_COMMENT_ASK"),
-//                                LocalText.getText("REPORT_COMMENT_TITLE"),
-//                                JOptionPane.PLAIN_MESSAGE,
-//                                null,
-//                                null,
-//                                ReportBuffer.getComment()
-//                        );
-//                        if (newComment != null) {
-//                            ReportBuffer.addComment(newComment);
-//                            updateLog();
-//                            scrollDown();
-//                        }
-//                    }
-//                }
-//        );
-//        buttonPanel.add(commentButton);
+        // commentButton = new JButton(LocalText.getText("REPORT_COMMENT"));
+        // commentButton.addActionListener(
+        // new ActionListener() {
+        // public void actionPerformed(ActionEvent arg0) {
+        // String newComment = (String)JOptionPane.showInputDialog(
+        // this,
+        // LocalText.getText("REPORT_COMMENT_ASK"),
+        // LocalText.getText("REPORT_COMMENT_TITLE"),
+        // JOptionPane.PLAIN_MESSAGE,
+        // null,
+        // null,
+        // ReportBuffer.getComment()
+        // );
+        // if (newComment != null) {
+        // ReportBuffer.addComment(newComment);
+        // updateLog();
+        // scrollDown();
+        // }
+        // }
+        // }
+        // );
+        // buttonPanel.add(commentButton);
 
         // remaining code from AbstractReportWindow
 
@@ -160,7 +159,8 @@ public class ReportWindow extends JFrame implements ActionListener, HyperlinkLis
         addWindowListener(new WindowAdapter() {
             @Override
             public void windowClosing(WindowEvent e) {
-                if (timeWarpMode) return;
+                if (timeWarpMode)
+                    return;
                 gameUIManager.uncheckMenuItemBox(StatusWindow.REPORT_CMD);
                 frame.dispose();
             }
@@ -171,6 +171,7 @@ public class ReportWindow extends JFrame implements ActionListener, HyperlinkLis
             public void componentMoved(ComponentEvent e) {
                 guiMgr.getWindowSettings().set(frame);
             }
+
             @Override
             public void componentResized(ComponentEvent e) {
                 guiMgr.getWindowSettings().set(frame);
@@ -187,7 +188,7 @@ public class ReportWindow extends JFrame implements ActionListener, HyperlinkLis
         forwardButton.setEnabled(false);
         backwardButton.setEnabled(false);
 
-        if ( ! gameUIManager.isMyTurn() ) {
+        if (!gameUIManager.isMyTurn()) {
             // not our turn, we shouldn't enable undo/etc buttons
             return;
         }
@@ -195,44 +196,48 @@ public class ReportWindow extends JFrame implements ActionListener, HyperlinkLis
         boolean haveRedo = false;
         boolean undoFlag = false;
         List<GameAction> gameActions = gameUIManager.getGameManager().getPossibleActions().getType(GameAction.class);
-        for (GameAction action:gameActions) {
+        for (GameAction action : gameActions) {
             switch (action.getMode()) {
-            case UNDO:
-                undoFlag = true;
-                backwardButton.setPossibleAction(action);
-                backwardButton.setEnabled(true);
-                break;
-            case FORCED_UNDO:
-                if (undoFlag) break; // only activate forced undo, if no other undo available
-                backwardButton.setPossibleAction(action);
-                backwardButton.setEnabled(true);
-                break;
-            case REDO:
-                forwardButton.setPossibleAction(action);
-                forwardButton.setEnabled(true);
-                haveRedo = true;
-                break;
-            default:
-                break;
+                case UNDO:
+                    undoFlag = true;
+                    backwardButton.setPossibleAction(action);
+                    backwardButton.setEnabled(true);
+                    break;
+                case FORCED_UNDO:
+                    if (undoFlag)
+                        break; // only activate forced undo, if no other undo available
+                    backwardButton.setPossibleAction(action);
+                    backwardButton.setEnabled(true);
+                    break;
+                case REDO:
+                    forwardButton.setPossibleAction(action);
+                    forwardButton.setEnabled(true);
+                    haveRedo = true;
+                    break;
+                default:
+                    break;
             }
         }
-        if (!haveRedo) deactivateTimeWarp();
+        if (!haveRedo)
+            deactivateTimeWarp();
     }
 
     public void scrollDown() {
         // only set caret if visible
-        //if (!this.isVisible()) return;
+        // if (!this.isVisible()) return;
 
-        // find the active message in the parsed html code (not identical to the position in the html string)
+        // find the active message in the parsed html code (not identical to the
+        // position in the html string)
         // thus the message indicator is used
         SwingUtilities.invokeLater(() -> {
             int caretPosition;
-            try{
+            try {
                 String docText = editorPane.getDocument().getText(0, editorPane.getDocument().getLength());
                 caretPosition = docText.indexOf(ReportBuffer.ACTIVE_MESSAGE_INDICATOR);
-            } catch (BadLocationException e){
+            } catch (BadLocationException e) {
                 caretPosition = -1;
-            };
+            }
+            ;
             final int caretPositionStore = caretPosition;
             if (caretPosition != -1) {
                 editorPane.setCaretPosition(caretPositionStore);
@@ -242,9 +247,9 @@ public class ReportWindow extends JFrame implements ActionListener, HyperlinkLis
 
     @Override
     public void actionPerformed(ActionEvent e) {
-        ActionButton button = (ActionButton)e.getSource();
-        GameAction action = (GameAction)button.getPossibleActions().get(0);
-        if ( action != null && (action.getMode() == GameAction.Mode.FORCED_UNDO)) {
+        ActionButton button = (ActionButton) e.getSource();
+        GameAction action = (GameAction) button.getPossibleActions().get(0);
+        if (action != null && (action.getMode() == GameAction.Mode.FORCED_UNDO)) {
             activateTimeWarp();
         }
 
@@ -253,7 +258,7 @@ public class ReportWindow extends JFrame implements ActionListener, HyperlinkLis
 
     @Override
     public void hyperlinkUpdate(HyperlinkEvent e) {
-        if (e.getEventType() == HyperlinkEvent.EventType.ACTIVATED && ! isStatic ) {
+        if (e.getEventType() == HyperlinkEvent.EventType.ACTIVATED && !isStatic) {
             activateTimeWarp();
             URL url = e.getURL();
             int index = url.getPort();

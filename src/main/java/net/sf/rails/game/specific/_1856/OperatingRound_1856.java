@@ -348,11 +348,11 @@ public class OperatingRound_1856 extends OperatingRound {
                         minNumber, maxNumber, operatingCompany.value().getValuePerLoan()));
 
                 // Step may only be skipped if repayment is optional
-                if (minNumber == 0) doneAllowed = true;
+                if (minNumber == 0) doneAllowed.set(true);
 
             } else {
                 // No (more) loans
-                doneAllowed = true;
+                doneAllowed.set(true);
             }
         }
     }

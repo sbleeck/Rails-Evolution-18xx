@@ -66,17 +66,57 @@ public class ConfigManager implements Configurable {
 
     public static void initConfiguration(boolean test) {
         log = LoggerFactory.getLogger(ConfigManager.class);
+
+        /*
+        // Set default game variant (overrides config profiles)
+    instance.transientConfig.put("default_game", "1835"); 
+
+    // Set default player names (overrides config profiles)
+    instance.transientConfig.put("player.name.1", "Stefan");
+    instance.transientConfig.put("player.name.2", "Rainer");
+    instance.transientConfig.put("player.name.3", "Christian");
+    instance.transientConfig.put("player.name.4", "Bjoern");
+    instance.transientConfig.put("player.name.5", "Marc");
+    
+// NEW INJECTIONS FROM SCREENSHOT
+    instance.transientConfig.put("game.variant.option", "Clemens"); 
+
+    // Inject key default 'ticks' / game options
+    instance.transientConfig.put("map.route.highlight", "yes"); // Assuming boolean is stored as yes/no
+    */
+
+    
         try {
             // Find the config tag inside the config xml file
             // the last arguments refers to the fact that no GameOptions are required
             Tag configTag = Tag.findTopTagInFile(CONFIG_XML_FILE, CONFIG_XML_DIR, CONFIG_TAG, null);
-            log.info("Opened config xml, filename = " + CONFIG_XML_FILE);
+            // log.info("Opened config xml, filename = " + CONFIG_XML_FILE);
             instance.configureFromXML(configTag);
         } catch (ConfigurationException e) {
-            log.error("Configuration error in setup of " + CONFIG_XML_FILE, e);
+            // log.error("Configuration error in setup of " + CONFIG_XML_FILE, e);
         } catch (Exception e) {
-            log.error ("Unexpected error in reading config file {}: {}", CONFIG_XML_FILE, e);
+            // log.error ("Unexpected error in reading config file {}: {}", CONFIG_XML_FILE, e);
         }
+        // --- START: ADD THIS BLOCK BACK ---
+    // Set default game variant (overrides config profiles)
+    instance.transientConfig.put("default_game", "1835"); 
+
+    // Set default player names (overrides config profiles)
+    instance.transientConfig.put("player.name.1", "Stefan");
+    instance.transientConfig.put("player.name.2", "Rainer");
+    instance.transientConfig.put("player.name.3", "Bjoern");
+    instance.transientConfig.put("player.name.4", "Christian");
+    // Note: 'player.name.5' and 'game.variant.option' from the old code are not in your properties file.
+
+    // Inject key default 'ticks' / game options
+    // Note: The properties file uses 'true', but the old code used 'yes'. 
+    // Use the value your game code expects (I'll guess 'true' based on your file).
+    instance.transientConfig.put("map.route.highlight", "true");
+    instance.transientConfig.put("orPanel.revenue.suggest", "true");
+    instance.transientConfig.put("orPanel.showAllCompanies", "always");
+    instance.transientConfig.put("orPanel.showSpinner", "yes");
+    instance.transientConfig.put("ai.save.state.on.move", "true");
+    // --- END: ADD THIS BLOCK BACK ---
 
         if (test) {
             instance.initTest();
@@ -244,7 +284,7 @@ public class ConfigManager implements Configurable {
         for (List<ConfigItem> panel : configSections.values()) {
             maxElements = Math.max(maxElements, panel.size());
         }
-        log.debug("Configuration sections with maximum elements of {}", maxElements);
+        // log.debug("Configuration sections with maximum elements of {}", maxElements);
         return maxElements;
     }
 
@@ -269,7 +309,7 @@ public class ConfigManager implements Configurable {
      * updates the user profile according to the changes in configItems
      */
     public boolean saveProfile(boolean applyInitMethods) {
-        log.debug("saving profile now");
+        // log.debug("saving profile now");
         for (List<ConfigItem> items : configSections.values()) {
             for (ConfigItem item : items) {
                 if (item.isGameRelated) {
@@ -283,7 +323,7 @@ public class ConfigManager implements Configurable {
                 // if item has changed ==> change profile and call init Method
                 if (item.hasChanged()) {
                     activeProfile.setProperty(item.name, item.getNewValue());
-                    log.debug("User properties for = {} set to value = {}", item.name, item.getCurrentValue());
+                    // log.debug("User properties for = {} set to value = {}", item.name, item.getCurrentValue());
                     item.callInitMethod(applyInitMethods);
                     item.resetValue();
                 }

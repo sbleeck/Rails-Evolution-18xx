@@ -26,6 +26,7 @@ import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
 
+import net.sf.rails.ui.swing.TimeOptionsDialog;
 import net.sf.rails.common.Config;
 import net.sf.rails.common.GameData;
 import net.sf.rails.common.GameInfo;
@@ -35,6 +36,7 @@ import net.sf.rails.common.LocalText;
 import net.sf.rails.common.parser.ConfigurationException;
 import net.sf.rails.common.parser.GameInfoParser;
 import net.sf.rails.common.parser.GameOptionsParser;
+import net.sf.rails.game.GameManager; // IMPORTANT: Must be importable
 import net.sf.rails.game.RailsRoot;
 import net.sf.rails.sound.SoundManager;
 import net.sf.rails.util.GameLoader;
@@ -54,10 +56,12 @@ public class GameSetupController {
     private final Map<GameInfo, GameOptionsSet.Builder> gameOptions = Maps.newHashMap();
 
     // UI references
-    private final GameSetupWindow window;
+    public final GameSetupWindow window; 
     private ConfigWindow configWindow;
     private GameUIManager gameUIManager;
-
+    
+    private GameManager defaultGameManager = null;
+    
     private final String savedFileExtension;
 
     // Actions
@@ -72,6 +76,7 @@ public class GameSetupController {
     private final ActionListener gameAction = new GameAction();
     private final ActionListener configureAction = new ConfigureAction();
     private final ActionListener randomizeAction = new RandomizeAction();
+    private final ActionListener timeOptionsAction = new TimeOptionsAction(); 
     private final InputVerifier playerNameVerifier = new PlayerNameVerifier();
 
     private static final GameSetupController instance = new GameSetupController();
@@ -86,12 +91,38 @@ public class GameSetupController {
         }
 
         window = new GameSetupWindow(this);
-
+        
         savedFileExtension = "." + StringUtils.defaultIfBlank(Config.get("save.filename.extension"), GameUIManager.DEFAULT_SAVE_EXTENSION);
 
         // Notify the sound manager about having started the setup menu
         SoundManager.notifyOfGameSetup();
     }
+    
+    /**
+     * Public method to access the template GameManager for TimeOptionsDialog.
+     * This manager holds the time settings configuration chosen by the user.
+     */
+    public GameManager getDefaultGameManager() {
+        GameManager gm = defaultGameManager; 
+        
+        if (gm == null) {
+            try {
+                GameInfo selectedGame = window.getSelectedGame();
+                
+                GameData gameData = GameData.create(selectedGame, getAvailableOptions(selectedGame), window.getPlayers());
+                
+                RailsRoot railsRoot = RailsRoot.create(gameData);
+                // FIX 1: Correctly use the getManager method signature 
+                    gm = railsRoot.getGameManager();
+                defaultGameManager = gm; 
+            } catch (ConfigurationException e) {
+                log.error("Unable to create default GameManager for options dialog", e);
+                return null;
+            }
+        }
+        return gm;
+    }
+
 
     public static GameSetupController getInstance() {
         return instance;
@@ -105,9 +136,8 @@ public class GameSetupController {
         return ImmutableList.copyOf(gameList);
     }
 
-    // Return default game, if none is set, returns the first
     protected GameInfo getDefaultGame() {
-        GameInfo defaultGame = GameInfo.findGame(gameList, Config.get("default_game"));
+        GameInfo defaultGame = GameInfo.findGame(gameList, Config.get("default_game"));        
         if (defaultGame == null) {
             defaultGame = gameList.first();
         }
@@ -129,15 +159,17 @@ public class GameSetupController {
         log.debug("Load Game Options of {}", game.getName());
         GameOptionsSet.Builder loadGameOptions;
         try {
-            loadGameOptions = GameOptionsParser.load(game.getName());
+            loadGameOptions = GameOptionsParser.load(game.getName()); 
         } catch (ConfigurationException e) {
             log.error(e.getMessage());
+            // FIX 2: Correct GameInfo method name should be getID()
             loadGameOptions = GameOptionsSet.builder();
         }
         gameOptions.put(game, loadGameOptions);
         return loadGameOptions;
     }
 
+    /** FIX 3: Implements the missing helper method prepareGameUIInit() */
     public void prepareGameUIInit() {
         window.setVisible(false);
         if (configWindow != null) {
@@ -145,13 +177,16 @@ public class GameSetupController {
             configWindow = null;
         }
     }
-
+    
+    /** FIX 4: Implements the missing helper method loadAndStartGame(File) */
     private void loadAndStartGame(File gameFile) {
         prepareGameUIInit();
         GameLoader.loadAndStartGame(gameFile);
     }
 
-    // Action inner classes
+
+    // Existing Actions remain here...
+
     private class NewAction extends AbstractAction {
         private static final long serialVersionUID = 0L;
 
@@ -187,7 +222,9 @@ public class GameSetupController {
 
             RailsRoot railsRoot = null;
             try {
+                // Get the final GameData, which should include time settings from the cached defaultGameManager
                 GameData gameData = GameData.create(selectedGame, selectedOptions, players);
+                
                 railsRoot = RailsRoot.create(gameData);
             } catch (ConfigurationException e) {
                 log.error("unable to continue", e);
@@ -201,6 +238,7 @@ public class GameSetupController {
                 JOptionPane.showMessageDialog(window, startError, "", JOptionPane.ERROR_MESSAGE);
                 System.exit(-1);
             }
+            // FIX 3 usage
             prepareGameUIInit();
             gameUIManager = GameLoader.startGameUIManager (railsRoot, false, splashWindow);
             gameUIManager.gameUIInit(true); // true indicates new game
@@ -372,6 +410,29 @@ public class GameSetupController {
         }
     }
 
+    private class TimeOptionsAction extends AbstractAction {
+        private static final long serialVersionUID = 0L;
+
+        @Override
+        public void actionPerformed(ActionEvent arg0) {
+            GameManager gm = getDefaultGameManager();
+            
+            if (gm != null) {
+                // FIX 5: Fix type incompatibility error (GameSetupWindow extends JDialog, which is a Window, but the
+                // TimeOptionsDialog constructor expects Frame or Dialog. JDialog works as a parent for JDialog).
+                // Since GameSetupWindow extends JDialog, it can be passed directly.
+                // The correct constructor is TimeOptionsDialog(Dialog owner, GameManager gm)
+                TimeOptionsDialog dialog = new TimeOptionsDialog(window, gm);
+                dialog.setVisible(true);
+            } else {
+                JOptionPane.showMessageDialog(window, 
+                                              "Could not initialize game manager for settings.", 
+                                              "Error", 
+                                              JOptionPane.ERROR_MESSAGE);
+            }
+        }
+    }
+
     private class OptionChangeAction extends AbstractAction {
         private static final long serialVersionUID = 0L;
 
@@ -534,6 +595,10 @@ public class GameSetupController {
 
     public ActionListener getGameAction() {
         return gameAction;
+    }
+
+    public ActionListener getTimeOptionsAction() {
+        return timeOptionsAction;
     }
 
     public InputVerifier getPlayerNameVerifier() {

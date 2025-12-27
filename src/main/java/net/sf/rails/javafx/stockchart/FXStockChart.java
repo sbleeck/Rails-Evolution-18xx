@@ -8,6 +8,8 @@ import net.sf.rails.game.financial.StockMarket;
 import net.sf.rails.game.financial.StockSpace;
 import net.sf.rails.ui.swing.GameUIManager;
 
+import net.sf.rails.game.PublicCompany;
+
 /**
  * The stock-chart component, containing a grid with all stock fields composing the stock-chart
  */
@@ -16,6 +18,8 @@ public class FXStockChart extends GridPane {
      * The stock fields of the model
      */
     private final StockMarket market;
+    private final GameUIManager gameUIManager;
+    private PublicCompany selectedCompany = null;
 
     /**
      * Constructor
@@ -26,6 +30,7 @@ public class FXStockChart extends GridPane {
         super();
 
         this.market = gameUIManager.getRoot().getStockMarket();
+        this.gameUIManager = gameUIManager;
 
         initialize();
         populateStockPanel();
@@ -104,6 +109,7 @@ public class FXStockChart extends GridPane {
         }
     }
 
+
     /**
      * Creates a {@link ColumnConstraints} object with the given width factor.
      * The width factor defines, how much wider the column is compared to other columns.
@@ -135,4 +141,6 @@ public class FXStockChart extends GridPane {
 
         return constraints;
     }
+
+    
 }

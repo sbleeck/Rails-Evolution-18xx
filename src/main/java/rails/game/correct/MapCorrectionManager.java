@@ -1,24 +1,22 @@
 package rails.game.correct;
 
-import java.util.*;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.stream.Collectors;
 
-import rails.game.action.LayBaseToken;
-import rails.game.action.LayTile;
+import javax.swing.JOptionPane;
+
 import net.sf.rails.common.DisplayBuffer;
 import net.sf.rails.common.LocalText;
 import net.sf.rails.common.ReportBuffer;
-import net.sf.rails.game.*;
+import net.sf.rails.game.GameManager;
+import net.sf.rails.game.HexSide;
+import net.sf.rails.game.MapHex;
+import net.sf.rails.game.MapManager;
+import net.sf.rails.game.Tile;
+import net.sf.rails.game.TileManager;
 
-import com.google.common.collect.ImmutableList;
-
-
-public final class MapCorrectionManager extends CorrectionManager {
-
-    public static enum ActionStep {
-        SELECT_HEX,SELECT_TILE,SELECT_ORIENTATION,CONFIRM,RELAY_BASETOKENS,FINISHED,CANCELLED;
-    }
-
-    private MapCorrectionAction activeTileAction = null;
+public class MapCorrectionManager extends CorrectionManager {
 
     private MapCorrectionManager(GameManager parent) {
         super(parent, CorrectionType.CORRECT_MAP);
@@ -30,194 +28,118 @@ public final class MapCorrectionManager extends CorrectionManager {
 
     @Override
     public List<CorrectionAction> createCorrections() {
-        List<CorrectionAction> actions = super.createCorrections();
-
-        if (isActive()) {
-            if (activeTileAction == null) {
-                activeTileAction = new MapCorrectionAction(getRoot());
-            }
-            actions.add(activeTileAction);
-            // FIXME: This is a workaround to get the LayTile and LayToken actions created from inside the CorrectionManager
-            LayTile tileAction = new LayTile(getRoot(), LayTile.CORRECTION);
-            getParent().getPossibleActions().add(tileAction);
-            for (PublicCompany company:getRoot().getCompanyManager().getAllPublicCompanies()) {
-                if (!company.isClosed() && company.hasLaidHomeBaseTokens() && company.getNumberOfFreeBaseTokens() > 0) {
-                    LayBaseToken tokenAction = new LayBaseToken(getRoot(), LayBaseToken.CORRECTION);
-                    tokenAction.setCompany(company);
-                    getParent().getPossibleActions().add(tokenAction);
-                }
-            }
-        }
+        List<CorrectionAction> actions = new ArrayList<>();
+        actions.add(new CorrectionModeAction(getRoot(), CorrectionType.CORRECT_MAP, isActive()));
         return actions;
     }
 
     @Override
-    public boolean executeCorrection(CorrectionAction action){
-        if (action instanceof MapCorrectionAction)
-            return execute((MapCorrectionAction) action);
-        else // any other action, could be a correctionMode action
+    public boolean executeCorrection(CorrectionAction action) {
+        
+        // 1. Menu Click -> Wizard
+        if (action instanceof CorrectionModeAction) {
+            if (!isActive()) {
+                if (!getParent().isReloading()) {
+                    runWizard();
+                }
+                return true; 
+            }
             return super.executeCorrection(action);
+        }
+
+        // 2. Execution Logic
+        if (action instanceof MapCorrectionAction) {
+            return execute((MapCorrectionAction) action);
+        }
+
+        return super.executeCorrection(action);
     }
 
-    private boolean execute(MapCorrectionAction action){
+    private void runWizard() {
+        MapManager mm = getRoot().getMapManager();
+        
+        // Step 1: Select Hex
+        List<String> hexNames = mm.getHexes().stream()
+                .map(MapHex::getId)
+                .sorted()
+                .collect(Collectors.toList());
 
-        if (action.getStep() == ActionStep.FINISHED) {
-            // already finished, thus on reload
-            action.setNextStep(ActionStep.FINISHED);
-        } else if (action.getNextStep() == ActionStep.CANCELLED) {
-            // cancelled => set to null and return
-            activeTileAction = null;
-            return true;
+        if (hexNames.isEmpty()) {
+            DisplayBuffer.add(this, "No hexes found on map.");
+            return;
         }
 
-        MapHex hex = action.getLocation();
+        String selectedHex = (String) JOptionPane.showInputDialog(
+            null, 
+            "Select Hex to Correct:",
+            "Map Correction (1/3)",
+            JOptionPane.QUESTION_MESSAGE,
+            null, 
+            hexNames.toArray(), 
+            hexNames.get(0)
+        );
+        if (selectedHex == null) return;
 
-        Tile chosenTile = action.getChosenTile();
-        TileManager tmgr = getRoot().getTileManager();
-        Tile preprintedTile = tmgr.getTile(hex.getPreprintedTileId());
+        // Step 2: Select Tile (Text Input for ID)
+        String tileId = JOptionPane.showInputDialog(
+            null, 
+            "Enter Tile Number (e.g. '6' or '57'):",
+            "Map Correction (2/3)",
+            JOptionPane.QUESTION_MESSAGE
+        );
+        if (tileId == null || tileId.trim().isEmpty()) return;
+        tileId = tileId.trim();
 
-        // check conditions
-        String errMsg = null;
-        while (true) {
-            // check if chosenTile is still available (not for preprinted)
-            // FIXME: Check if this is still correct (Rails 2.0), removed that check as all
-            // tiles have external id defined
-            if (chosenTile != null // && rails.util.Util.hasValue(chosenTile.toText())
-                    && chosenTile != hex.getCurrentTile()
-                    && chosenTile.getFreeCount() == 0) {
-                errMsg =
-                    LocalText.getText("TileNotAvailable",
-                            chosenTile.toText());
-                // return to step of tile selection
-                action.selectHex(hex);
-                break;
-            }
-            // check if chosenTile contains enough slots
-            Set<BaseToken> baseTokens = hex.getBaseTokens();
-            if (chosenTile != null && baseTokens != null && !baseTokens.isEmpty()) {
-                Collection<Station> stations = chosenTile.getStations();
-                int nbSlots = 0;
-                if (stations != null) {
-                    for (Station station:stations) {
-                        nbSlots += station.getBaseSlots();
-                    }
-                }
-                if (baseTokens.size() > nbSlots) {
-                    errMsg =
-                        LocalText.getText("CorrectMapNotEnoughSlots", chosenTile.toText());
-                    // return to step of tile selection
-                    action.selectHex(hex);
-                    break;
-                }
-                // check if chosenTile requires relays
-                // this is not implemented yet, thus error message
-                if (chosenTile.getNumStations() >= 2
-                        && hex.getCurrentTile().getColourNumber() >= chosenTile.getColourNumber()
-                        // B. or the current tile requires relays
-                        || hex.getCurrentTile().relayBaseTokensOnUpgrade()) {
-                    errMsg =
-                        LocalText.getText("CorrectMapRequiresRelays", chosenTile.toText());
-                    // return to step of tile selection
-                    action.selectHex(hex);
-                    break;
-                }
-            }
-            break;
+        // Step 3: Select Rotation
+        Integer[] rotations = {0, 1, 2, 3, 4, 5};
+        Integer selectedRot = (Integer) JOptionPane.showInputDialog(
+            null, 
+            "Select Rotation:",
+            "Map Correction (3/3)",
+            JOptionPane.QUESTION_MESSAGE,
+            null, 
+            rotations, 
+            rotations[0]
+        );
+        if (selectedRot == null) return;
+
+        // Step 4: Create Action
+        MapCorrectionAction mca = new MapCorrectionAction(getRoot(), selectedHex, tileId, selectedRot);
+        getParent().process(mca);
+    }
+
+    private boolean execute(MapCorrectionAction action) {
+        MapManager mm = getRoot().getMapManager();
+        TileManager tm = getRoot().getTileManager();
+
+        // [FIX] Use getHex instead of getMapHex
+        MapHex hex = mm.getHex(action.getHexName());
+        if (hex == null) {
+            DisplayBuffer.add(this, "Error: Hex not found: " + action.getHexName());
+            return false;
         }
 
-        if (errMsg != null) {
-            DisplayBuffer.add(this, LocalText.getText("CorrectMapCannotLayTile",
-                    chosenTile.toText(),
-                    hex.getId(),
-                    errMsg ));
-            ;
+        // Try to get a tile instance
+        Tile tile = tm.getTile(action.getTileNumber());
+        
+        if (tile == null) {
+            DisplayBuffer.add(this, "Error: Tile ID not found: " + action.getTileNumber());
+            return false;
         }
 
-        ActionStep nextStep;
-        // not yet finished, move to next step
-        if (action.getStep() != ActionStep.FINISHED)
-            nextStep = action.getNextStep();
-        else
-            nextStep = ActionStep.FINISHED;
+hex.upgrade(tile, HexSide.get(action.getRotation()), null);
 
-        // preparation for the next step
-        switch (nextStep) {
-        case SELECT_TILE:
-            // create list of possible up and downgrades
-            // REMARK: This is commented out for Rails 2.0
-//            List<Tile> possibleTiles = tmgr.getAllUpgrades(preprintedTile, hex);
-//            if (preprintedTile == hex.getCurrentTile())
-//                possibleTiles.remove(hex.getCurrentTile()); // remove preprinted tile if still laid
-//            action.setTiles(possibleTiles);
-            break;
-        case SELECT_ORIENTATION:
-            // default orientation for preprinted files
-            if (preprintedTile == chosenTile) {
-                int orientation = hex.getPreprintedTileRotation().getTrackPointNumber();
-                action.selectOrientation(orientation);
-                action.setNextStep(ActionStep.CONFIRM);
-                break;
-            } else if (chosenTile.getFixedOrientation() != null) {
-                int orientation = chosenTile.getFixedOrientation().getTrackPointNumber();
-                action.selectOrientation(orientation);
-                action.setNextStep(ActionStep.CONFIRM);
-                break;
-            } else {
-                break;
-            }
-        case RELAY_BASETOKENS:
-            // check if relays are necessary:
-            // A. downgrades or equalgrades to a tile with two stations or more
-            if (chosenTile.getNumStations() >= 2
-                    && hex.getCurrentTile().getColourNumber() >= chosenTile.getColourNumber()
-                    // B. or the current tile requires relays
-                    || hex.getCurrentTile().relayBaseTokensOnUpgrade()) {
-                // define tokens for relays
-                ImmutableList.Builder<BaseToken> tokens = ImmutableList.builder();
-                for (Stop oldStop:hex.getStops()) {
-                    tokens.addAll(oldStop.getBaseTokens());
-                }
-                action.setTokensToRelay(tokens.build());
-                // define possible stations
-                action.setPossibleStations(chosenTile.getStations());
-                break;
-            } else {
-                action.selectRelayBaseTokens(null);
-                // move to FINISHED
-                return execute(action);
-            }
-        case FINISHED:
-
-
-            // lays tile
-            HexSide orientation = HexSide.get(action.getOrientation());
-            hex.upgrade(chosenTile, orientation, new HashMap<String,Integer>());
-
-            String msg = LocalText.getText("CorrectMapLaysTileAt",
-                    chosenTile.toText(), hex.getId(), hex.getOrientationName(orientation));
-            ReportBuffer.add(this, msg);
-            getParent().addToNextPlayerMessages(msg, true);
-
-            // relays tokens
-            //            if (action.getTokensToRelay() != null) {
-            //                for (BaseToken token:action.getTokensToRelay()) {
-            //                    int i = action.getTokensToRelay().indexOf(token);
-            //
-            //                }
-            //            }
-
-            activeTileAction = null;
-            break;
-
-        case CANCELLED:
-            // should be captured above
-            activeTileAction = null;
+        String msg = String.format("Correction: Laid Tile %s on %s (Rot: %d)", 
+                action.getTileNumber(), action.getHexName(), action.getRotation());
+        
+        ReportBuffer.add(this, msg);
+        DisplayBuffer.add(this, msg);
+        
+        // Safe UI Refresh
+        if (getParent().getGameUIManager() != null && !getParent().isReloading()) {
+            getParent().getGameUIManager().forceFullUIRefresh();
         }
-
-        if (action.getStep() != ActionStep.FINISHED) {
-            action.moveToNextStep();
-        }
-
+        
         return true;
     }
 }

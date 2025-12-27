@@ -18,6 +18,7 @@ import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 
+
 import javax.swing.JComponent;
 import javax.swing.JLayeredPane;
 import javax.swing.SwingUtilities;
@@ -555,6 +556,8 @@ public abstract class HexMap implements MouseListener, MouseMotionListener {
     protected double scale;
     private int zoomStep = 10; // can be overwritten in config
     private double zoomFactor = 1; // defined dynamically if zoomStep changed
+private boolean displayHexNames = false;
+    private boolean displayBuildNumbers = true;
 
     protected Dimension originalSize;
     private Dimension currentSize;
@@ -593,6 +596,29 @@ public abstract class HexMap implements MouseListener, MouseMotionListener {
 
     protected abstract void setOriginalSize();
 
+    public void zoomIn() {
+        zoom(true);
+    }
+
+    public void zoomOut() {
+        zoom(false);
+    }
+    public boolean getDisplayHexNames() {
+        return displayHexNames;
+    }
+
+    public void setDisplayHexNames(boolean display) {
+        this.displayHexNames = display;
+    }
+
+    public boolean getDisplayBuildNumbers() {
+        return displayBuildNumbers;
+    }
+
+    public void setDisplayBuildNumbers(boolean display) {
+        this.displayBuildNumbers = display;
+    }
+    
 
     public void init(ORUIManager orUIManager, MapManager mapManager) {
 
@@ -982,7 +1008,8 @@ public abstract class HexMap implements MouseListener, MouseMotionListener {
         if (newHex != null) newHex.addHighlightRequest();
 
         // display tool tip
-        setToolTipText(newHex != null ? newHex.getToolTip() : null);
+        // setToolTipText(newHex != null ? newHex.getToolTip() : null);
+        setToolTipText(null);
 
         hexAtMousePosition = newHex;
     }
@@ -1031,6 +1058,7 @@ public abstract class HexMap implements MouseListener, MouseMotionListener {
      * needed!
      */
     public synchronized void repaintAll(Rectangle r) {
+        if (r == null) return; // Ignore invalid repaint requests
         for (JComponent l : layers) {
             l.repaint(r);
         }

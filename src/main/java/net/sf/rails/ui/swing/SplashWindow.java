@@ -25,6 +25,8 @@ import javax.swing.border.EtchedBorder;
 
 import net.sf.rails.common.Config;
 import net.sf.rails.common.LocalText;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /**
@@ -39,6 +41,11 @@ public class SplashWindow {
     /**
      * in millisecs
      */
+
+        protected static final Logger log = LoggerFactory.getLogger(ORPanel.class);
+
+
+        
     private static final long PROGRESS_UPDATE_INTERVAL = 200;
 
     private static final String DUMMY_STEP_BEFORE_START = "-1";
@@ -300,6 +307,7 @@ public class SplashWindow {
         return myWin;
     }
 
+// ... (lines of unchanged context code) ...
     public void finalizeGameInit() {
         notifyOfStep(STEP_FINALIZE);
 
@@ -308,12 +316,31 @@ public class SplashWindow {
         //block any frame disposal to the point in time when this is through
         try {
             SwingUtilities.invokeAndWait(new Thread(() -> {
-                //visibility
-                for (JFrame frame : framesRegisteredAsVisible) {
-                    frame.setVisible(true);
-                }
-                //to front
+                
+                // --- START DEBUG LOGGING ---
+                
+                // Log the intended Z-order before processing
+                StringBuilder sb = new StringBuilder();
                 for (JFrame frame : framesRegisteredToFront) {
+                    sb.append(frame.getName()).append(" -> ");
+                }
+                // --- END DEBUG LOGGING ---
+
+
+                // 1. Show background frames FIRST.
+                // We show windows that are visible but NOT in the toFront list.
+                for (JFrame frame : framesRegisteredAsVisible) {
+                    if (!framesRegisteredToFront.contains(frame)) {
+                        frame.setVisible(true);
+                    }
+                }
+
+                // 2. Show and order Foreground frames.
+                for (JFrame frame : framesRegisteredToFront) {
+                    // Only show if it was actually requested to be visible
+                    if (framesRegisteredAsVisible.contains(frame)) {
+                        frame.setVisible(true);
+                    }
                     frame.toFront();
                 }
             }));
@@ -325,6 +352,8 @@ public class SplashWindow {
             myWin.dispose();
         }
     }
+
+
 
     private class ProgressVisualizer extends Thread {
         private long elapsedTime = 0;

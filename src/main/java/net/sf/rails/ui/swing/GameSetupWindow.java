@@ -1,6 +1,8 @@
 package net.sf.rails.ui.swing;
 
 import java.awt.*;
+import java.awt.event.ActionEvent; // FIX: Added Import
+import java.awt.event.ActionListener; // FIX: Added Import
 import java.awt.event.ItemEvent;
 import java.awt.event.ItemListener;
 import java.awt.event.KeyEvent;
@@ -11,6 +13,7 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.SortedMap;
 
+// Import for animation
 import javax.swing.*;
 
 import com.google.common.collect.ImmutableList;
@@ -23,7 +26,6 @@ import net.sf.rails.common.GameInfo;
 import net.sf.rails.common.GameOption;
 import net.sf.rails.common.GameOptionsSet;
 import net.sf.rails.common.LocalText;
-
 
 /**
  * The Game Setup Window displays the first window presented to the user. This
@@ -45,8 +47,9 @@ public class GameSetupWindow extends JDialog {
     private final JButton optionButton = new JButton(LocalText.getText("OPTIONS"));
     private final JButton infoButton = new JButton(LocalText.getText("INFO"));
     private final JButton creditsButton = new JButton(LocalText.getText("CREDITS"));
-    private final JButton configureButton= new JButton(LocalText.getText("CONFIG"));
+    private final JButton configureButton = new JButton(LocalText.getText("CONFIG"));
     private final JButton randomizeButton = new JButton(LocalText.getText("RandomizePlayers"));
+    private final JButton timeOptionsButton = new JButton(LocalText.getText("TIME_SETTINGS", "Time Settings"));
 
     private final JComboBox<String> configureBox = new JComboBox<>();
     private final JComboBox<String> gameNameBox = new JComboBox<>();
@@ -55,10 +58,10 @@ public class GameSetupWindow extends JDialog {
         private final JLabel number = new JLabel();
         private final JTextField name = new JTextField();
     }
+
     private final List<PlayerInfo> players = Lists.newArrayList();
 
-    private final SortedMap<GameOption, JComponent> optionComponents =
-            Maps.newTreeMap();
+    private final SortedMap<GameOption, JComponent> optionComponents = Maps.newTreeMap();
 
     private final GameSetupController controller;
 
@@ -86,6 +89,7 @@ public class GameSetupWindow extends JDialog {
         creditsButton.setMnemonic(KeyEvent.VK_E);
         configureButton.setMnemonic(KeyEvent.VK_C);
         randomizeButton.setMnemonic(KeyEvent.VK_R);
+        timeOptionsButton.setMnemonic(KeyEvent.VK_T);
 
         this.getContentPane().setLayout(new GridBagLayout());
         this.setTitle("Rails: New Game");
@@ -97,7 +101,17 @@ public class GameSetupWindow extends JDialog {
         gameListPane.setLayout(new GridLayout(2, 2));
         gameListPane.setBorder(BorderFactory.createLoweredBevelBorder());
 
-        newButton.addActionListener(controller.getNewAction());
+        newButton.addActionListener(e -> {
+            if (getPlayers().isEmpty()) {
+                JOptionPane.showMessageDialog(this, 
+                    "You must enter at least one player name!", 
+                    "Warning", JOptionPane.WARNING_MESSAGE);
+                return;
+            }
+            // Directly proceed. Operator settings are handled in the Time Dialog.
+            controller.getNewAction().actionPerformed(e);
+        });
+
         loadButton.addActionListener(controller.getLoadAction());
         recentButton.addActionListener(controller.getRecentAction());
         recoveryButton.addActionListener(controller.getRecoveryAction());
@@ -106,15 +120,22 @@ public class GameSetupWindow extends JDialog {
         infoButton.addActionListener(controller.getInfoAction());
         creditsButton.addActionListener(controller.getCreditsAction());
         configureButton.addActionListener(controller.getConfigureAction());
-        randomizeButton.addActionListener(controller.getRandomizeAction());
+        
+        // Randomize with animation
+        randomizeButton.addActionListener(e -> {
+            performRandomizationEffect(e);
+        });
+        
+        timeOptionsButton.addActionListener(controller.getTimeOptionsAction());
 
         buttonPane.add(configureButton);
         buttonPane.add(configureBox);
+        buttonPane.add(timeOptionsButton);
+        buttonPane.add(new JLabel()); // Placeholder
         buttonPane.add(newButton);
         buttonPane.add(loadButton);
         buttonPane.add(recentButton);
-        recoveryButton.setEnabled(Config.get("save.recovery.active", "no").equalsIgnoreCase("yes"));
-        buttonPane.add(recoveryButton);
+recoveryButton.setEnabled(Config.get("save.recovery.active", "yes").equalsIgnoreCase("yes"));        buttonPane.add(recoveryButton);
 
         buttonPane.add(infoButton);
         buttonPane.add(quitButton);
@@ -131,56 +152,32 @@ public class GameSetupWindow extends JDialog {
         GridBagConstraints gc;
 
         gc = new GridBagConstraints();
-        gc.gridx = 0;
-        gc.gridy = 0;
-        gc.weightx = 0;
-        gc.weighty = 0;
-        gc.gridwidth = 1;
-        gc.gridheight = 1;
-        gc.ipadx = 0;
-        gc.ipady = 0;
+        gc.gridx = 0; gc.gridy = 0; gc.weightx = 0; gc.weighty = 0;
+        gc.gridwidth = 1; gc.gridheight = 1; gc.ipadx = 0; gc.ipady = 0;
         gc.anchor = GridBagConstraints.CENTER;
         gc.fill = GridBagConstraints.HORIZONTAL;
         gc.insets = new Insets(0, 0, 0, 0);
         this.getContentPane().add(playersPane, gc);
 
         gc = new GridBagConstraints();
-        gc.gridx = 0;
-        gc.gridy = 1;
-        gc.weightx = 0;
-        gc.weighty = 0;
-        gc.gridwidth = 1;
-        gc.gridheight = 1;
-        gc.ipadx = 0;
-        gc.ipady = 0;
+        gc.gridx = 0; gc.gridy = 1; gc.weightx = 0; gc.weighty = 0;
+        gc.gridwidth = 1; gc.gridheight = 1; gc.ipadx = 0; gc.ipady = 0;
         gc.anchor = GridBagConstraints.CENTER;
         gc.fill = GridBagConstraints.BOTH;
         gc.insets = new Insets(0, 0, 0, 0);
         this.getContentPane().add(gameListPane, gc);
 
         gc = new GridBagConstraints();
-        gc.gridx = 0;
-        gc.gridy = 2;
-        gc.weightx = 0;
-        gc.weighty = 0;
-        gc.gridwidth = 1;
-        gc.gridheight = 1;
-        gc.ipadx = 0;
-        gc.ipady = 0;
+        gc.gridx = 0; gc.gridy = 2; gc.weightx = 0; gc.weighty = 0;
+        gc.gridwidth = 1; gc.gridheight = 1; gc.ipadx = 0; gc.ipady = 0;
         gc.anchor = GridBagConstraints.CENTER;
         gc.fill = GridBagConstraints.BOTH;
         gc.insets = new Insets(0, 0, 0, 0);
         this.getContentPane().add(optionsPane, gc);
 
         gc = new GridBagConstraints();
-        gc.gridx = 0;
-        gc.gridy = 3;
-        gc.weightx = 0;
-        gc.weighty = 0;
-        gc.gridwidth = 1;
-        gc.gridheight = 1;
-        gc.ipadx = 0;
-        gc.ipady = 0;
+        gc.gridx = 0; gc.gridy = 3; gc.weightx = 0; gc.weighty = 0;
+        gc.gridwidth = 1; gc.gridheight = 1; gc.ipadx = 0; gc.ipady = 0;
         gc.anchor = GridBagConstraints.CENTER;
         gc.fill = GridBagConstraints.HORIZONTAL;
         gc.insets = new Insets(0, 0, 0, 0);
@@ -204,16 +201,16 @@ public class GameSetupWindow extends JDialog {
 
     private void initConfigBox() {
         final ConfigManager cm = ConfigManager.getInstance();
-        for (String profile:cm.getProfiles()) {
+        for (String profile : cm.getProfiles()) {
             configureBox.addItem(profile);
         }
         configureBox.setSelectedItem(cm.getActiveProfile());
 
-        configureBox.addItemListener(arg0 -> cm.changeProfile((String)configureBox.getSelectedItem())
-        );
+        configureBox.addItemListener(arg0 -> cm.changeProfile((String) configureBox.getSelectedItem()));
     }
 
-    void toggleOptions() {
+    // FIX: Re-added missing public method used by GameSetupController
+    public void toggleOptions() {
         if (optionsPane.isVisible()) {
             optionsPane.setVisible(false);
             optionButton.setText(LocalText.getText("OPTIONS"));
@@ -223,8 +220,8 @@ public class GameSetupWindow extends JDialog {
         }
     }
 
-    // TODO: Rewrite Options mechanism to allow for common options
-    void initOptions(GameInfo selectedGame) {
+    // FIX: Re-added missing public method used by GameSetupController
+    public void initOptions(GameInfo selectedGame) {
         // clear all previous options
         optionsPane.removeAll();
         optionComponents.clear();
@@ -234,15 +231,14 @@ public class GameSetupWindow extends JDialog {
             // no options available
             JLabel label = new JLabel(LocalText.getText("NoGameOptions"));
             optionsPane.add(label);
-        } else  {
+        } else {
             List<GameOption> options = availableOptions.getOptions();
             optionsPane.setLayout(new GridLayout(((options.size() + 1) / 2), 2, 2, 2));
 
             for (GameOption option : options) {
                 String selectedValue = option.getSelectedValue();
                 if (option.isBoolean()) {
-                    JCheckBox checkbox =
-                            new JCheckBox(option.getLocalisedName());
+                    JCheckBox checkbox = new JCheckBox(option.getLocalisedName());
                     if (selectedValue.equalsIgnoreCase("yes")) {
                         checkbox.setSelected(true);
                     }
@@ -281,7 +277,8 @@ public class GameSetupWindow extends JDialog {
         }
     }
 
-    void hideOptions() {
+    // FIX: Re-added missing public method used by GameSetupController
+    public void hideOptions() {
         optionsPane.setVisible(false);
         optionsPane.removeAll();
         optionComponents.clear();
@@ -291,9 +288,9 @@ public class GameSetupWindow extends JDialog {
     void initPlayersPane(GameInfo selectedGame) {
         playersPane.setVisible(false);
 
-        // Remember names that have already been filled-in...
+        // 1. Remember names that have already been filled-in...
         List<String> prefilledPlayers = Lists.newArrayList();
-        for (PlayerInfo player:players) {
+        for (PlayerInfo player : players) {
             if (player.name != null
                     && player.name.getText().length() > 0) {
                 prefilledPlayers.add(player.name.getText());
@@ -302,8 +299,26 @@ public class GameSetupWindow extends JDialog {
         // and remove existing players
         players.clear();
 
-        // use default players if none provided so far
-        if (prefilledPlayers.isEmpty()) {
+        // 2. NEW LOGIC: Collect configured player names
+        List<String> configPlayers = Lists.newArrayList();
+        int maxConfigurablePlayers = selectedGame.getMaxPlayers(); // Only check up to max players
+        for (int i = 1; i <= maxConfigurablePlayers; i++) {
+            String playerName = Config.get("player.name." + i);
+            // Only add the name if the config key exists AND has a non-empty value
+            if (playerName.length() > 0) {
+                configPlayers.add(playerName);
+            } else {
+                // Stop once the sequence of configured names is broken
+                break;
+            }
+        }
+
+        // 3. PRIORITIZE: If custom names were found, use them
+        if (!configPlayers.isEmpty()) {
+            prefilledPlayers = configPlayers;
+        }
+        // OR use default players if neither user-typed nor custom config names are present
+        else if (prefilledPlayers.isEmpty()) {
             prefilledPlayers = Arrays.asList(Config.get("default_players").split(","));
         }
 
@@ -326,10 +341,6 @@ public class GameSetupWindow extends JDialog {
             player.number.setText(LocalText.getText("PlayerName", Integer.toString(i + 1)));
             player.name.setInputVerifier(controller.getPlayerNameVerifier());
 
-            /*
-             * Prefill with any configured player names. This can be useful to
-             * speed up testing purposes.
-             */
             if (i < prefilledPlayers.size()) {
                 player.name.setText(prefilledPlayers.get(i));
             }
@@ -378,7 +389,7 @@ public class GameSetupWindow extends JDialog {
 
     ImmutableList<String> getPlayers() {
         ImmutableList.Builder<String> playerList = ImmutableList.builder();
-        for (PlayerInfo player:players) {
+        for (PlayerInfo player : players) {
             String name = player.name.getText();
             if (name != null && name.length() > 0) {
                 playerList.add(name);
@@ -389,7 +400,7 @@ public class GameSetupWindow extends JDialog {
 
     void setPlayers(List<String> newPlayers) {
         LinkedList<String> newPlayersCopy = Lists.newLinkedList(newPlayers);
-        for (PlayerInfo player:players) {
+        for (PlayerInfo player : players) {
             if (newPlayersCopy.isEmpty()) {
                 player.name.setText(null);
             } else {
@@ -410,7 +421,8 @@ public class GameSetupWindow extends JDialog {
         player.number.setForeground(Color.GRAY);
     }
 
-    boolean isPlayerEnabled(Integer playerNr) {
+    // FIX: Re-added missing public method used by GameSetupController
+    public boolean isPlayerEnabled(Integer playerNr) {
         return players.get(playerNr).name.isEnabled();
     }
 
@@ -419,7 +431,8 @@ public class GameSetupWindow extends JDialog {
         EventQueue.invokeLater(() -> focus.name.requestFocusInWindow());
     }
 
-    boolean areOptionsVisible() {
+    // FIX: Re-added missing public method used by GameSetupController
+    public boolean areOptionsVisible() {
         return optionsPane.isVisible();
     }
 
@@ -433,16 +446,117 @@ public class GameSetupWindow extends JDialog {
         }
     }
 
-    void addConfigureProfile(String profile) {
+    public void addConfigureProfile(String profile) {
         configureBox.addItem(profile);
     }
 
-    void removeConfigureProfile(String profile) {
+    public void removeConfigureProfile(String profile) {
         configureBox.removeItem(profile);
     }
 
-    void changeConfigureProfile(String profile) {
+    public void changeConfigureProfile(String profile) {
         configureBox.setSelectedItem(profile);
     }
 
+
+    private void performRandomizationEffect(ActionEvent originalEvent) {
+        // 1. Setup & Guard Clauses
+        randomizeButton.setEnabled(false);
+        
+        List<String> originalNames = Lists.newArrayList(getPlayers());
+        int activeCount = originalNames.size();
+        
+        // If fewer than 2 players, just shuffle instantly and return
+        if (activeCount < 2) {
+            java.util.Collections.shuffle(originalNames);
+            setPlayers(originalNames);
+            randomizeButton.setEnabled(true);
+            return;
+        }
+
+        // 2. Pre-calculate the "Destiny" (Final Result)
+        List<String> finalNames = Lists.newArrayList(originalNames);
+        java.util.Collections.shuffle(finalNames); 
+
+        // Track which UI rows (indices) are "locked"
+        boolean[] locked = new boolean[activeCount]; 
+        
+        // 3. Animation Configuration
+        final int SHUFFLE_TICK_MS = 50;   // Update "flux" text every 50ms
+        final int LOCK_DELAY_MS = 1000;    // Lock one player every 600ms (0.6s)
+        
+        Timer timer = new Timer(SHUFFLE_TICK_MS, null); 
+        
+        timer.addActionListener(new ActionListener() {
+            int lockedCount = 0;
+            long lastLockTime = System.currentTimeMillis();
+
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                long now = System.currentTimeMillis();
+                
+                // --- Phase A: Lock a new player? ---
+                // We wait for the delay, then pick a RANDOM unlocked position to fix
+                if (lockedCount < activeCount && (now - lastLockTime > LOCK_DELAY_MS)) {
+                    
+                    // Find all indices that are not yet locked
+                    List<Integer> availableIndices = Lists.newArrayList();
+                    for (int i = 0; i < activeCount; i++) {
+                        if (!locked[i]) availableIndices.add(i);
+                    }
+                    
+                    if (!availableIndices.isEmpty()) {
+                        // Pick one random slot to "crystallize"
+                        int indexToLock = availableIndices.get((int)(Math.random() * availableIndices.size()));
+                        locked[indexToLock] = true;
+                        
+                        // Fix the value to the pre-calculated destiny
+                        PlayerInfo pInfo = players.get(indexToLock);
+                        pInfo.name.setText(finalNames.get(indexToLock));
+                        
+                        // Visual Cue: Locked = Black & Bold
+                        pInfo.name.setForeground(Color.BLACK); 
+                        pInfo.name.setFont(pInfo.name.getFont().deriveFont(Font.BOLD)); 
+                        
+                        lockedCount++;
+                        lastLockTime = now;
+                    }
+                }
+
+                // --- Phase B: Animate the "Flux" (Unlocked players) ---
+                if (lockedCount < activeCount) {
+                    for (int i = 0; i < activeCount; i++) {
+                        if (!locked[i]) {
+                            PlayerInfo pInfo = players.get(i);
+                            
+                            // Show random noise (pick any name from the original list)
+                            String randomName = originalNames.get((int)(Math.random() * activeCount));
+                            pInfo.name.setText(randomName);
+                            
+                            // Visual Cue: Flux = Gray & Italic
+                            pInfo.name.setForeground(Color.GRAY);
+                            pInfo.name.setFont(pInfo.name.getFont().deriveFont(Font.ITALIC)); 
+                        }
+                    }
+                } else {
+                    // --- Phase C: Finish ---
+                    ((Timer)e.getSource()).stop();
+                    
+                    // Final cleanup to ensure clean state
+                    setPlayers(finalNames); // Ensure text is exact
+                    
+                    // Reset font styles for everyone
+                    for (int i = 0; i < activeCount; i++) {
+                        PlayerInfo pInfo = players.get(i);
+                        pInfo.name.setForeground(Color.BLACK);
+                        pInfo.name.setFont(pInfo.name.getFont().deriveFont(Font.PLAIN));
+                    }
+                    
+                    randomizeButton.setEnabled(true);
+                }
+            }
+        });
+        
+        timer.start();
+    }
 }

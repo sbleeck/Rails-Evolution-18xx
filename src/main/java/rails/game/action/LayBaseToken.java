@@ -170,16 +170,36 @@ public class LayBaseToken extends LayToken {
         return (type == LayBaseToken.CORRECTION);
     }
 
+    // --- START FIX ---
     @Override
     public String toString() {
-        String typeName = type + " (" + typeText[type != 99 ? type : typeText.length-1] + ")";
-        return super.toString() +
-                 RailsObjects.stringHelper(this)
-                    .addToString("type", typeName)
-                    .addToString("cost", cost)
-                    .addToStringOnlyActed("chosenStation", chosenStation)
-                    .toString()
-        ;
+        StringBuilder sb = new StringBuilder();
+        
+        // 1. Basic Action Description
+        // Use getChosenHex() if available, otherwise check if chosenHex field is directly accessible
+        // Based on readObject, 'chosenHex' is the field name.
+        String hexName = (getChosenHex() != null) ? getChosenHex().getId() : "Map";
+        sb.append("Lays token on ").append(hexName);
+
+        // 2. Cost Context
+        if (getCost() > 0) {
+            sb.append(" for ").append(getCost());
+        }
+
+        // 3. Special Action / Type Context
+        // Log indicates: type=1 (Location), type=2 (Special), type=3 (Home/Etc)
+        if (getSpecialProperty() != null) {
+            String spName = getSpecialProperty().getClass().getSimpleName()
+                .replace("Special", "") // Clean up "SpecialBaseTokenLay" -> "BaseTokenLay"
+                .replace("Lay", "");    
+            sb.append(" [").append(spName).append("]");
+        } else if (type == HOME_CITY) { 
+            sb.append(" (Home)");
+        } else if (type == FORCED_LAY) {
+            sb.append(" (Forced)");
+        }
+
+        return sb.toString();
     }
 
     /** Deserialize */

@@ -1,45 +1,65 @@
-# maven build directory
-/target/
-/build/
+# --- OS Specific (macOS) ---
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
 
-# eclipse specific files
-/.settings/
+# --- Java Build Artifacts ---
+*.class
+*.jar
+*.war
+*.nar
+*.ear
+*.zip
+*.tar.gz
+*.rar
 
-.project
-.classpath
+# --- Gradle Build System ---
+.gradle/
+build/
+/gradle/wrapper/gradle-wrapper.properties
 
-# IntelliJ specific files
+# --- IntelliJ IDEA ---
 .idea/
-rails.iml
+*.iws
+*.iml
+*.ipr
+out/
 
-# rails log files
+# --- Eclipse ---
+.settings/
+bin/
+.classpath
+.project
+
+# --- Logs & Runtime Configuration ---
+*.log
 **/18xx.log
-**/*.log
+Rails18xx.ini
+UserGridStyle.ini
+UserTileStyle.ini
 
-# backup files
-**/*.*~
+# --- Backup & Junk Files ---
+# This handles the .bak and specific file clutter you had before
+*.bak
+*.tmp
+*~
+*.swp
+*.failed
 
-# icon thumbnail files
-**/.directory
+# --- Specific Exclusions from your previous setup ---
+TileDesigner.exe
+logFile_IS_UNDEFINED
 
-# failed Rails test files
-**/*.failed
-/bin/
 
-#classes
-/classes/
-**/*.class
-
-/.gradle/
-/src/main/java/net/sf/rails/game/specific/_1837/CoalExchangeRound.java.bak
-/src/main/java/net/sf/rails/game/specific/_1837/CoalExchangeRound2708.j
-/src/main/java/net/sf/rails/game/specific/_1837/CoalExchangeRoundNew.j
-/out/production/main/rails/game/action/FoldIntoNational.java.bak
-/src/main/java/rails/game/action/FoldIntoNational.java.bak
-/HowTo-info.txt
-/src/main/resources/logback-test.xml
-/logFile_IS_UNDEFINED
-/Rails18xx.ini
-/TileDesigner.exe
-/UserGridStyle.ini
-/UserTileStyle.ini
+# --- Exclude Personal & Data Junk ---
+.vscode/
+logs/
+old/
+old_games/
+python/
+*.docx
+*.pdf
+*.txt
+*.rails
+*.time

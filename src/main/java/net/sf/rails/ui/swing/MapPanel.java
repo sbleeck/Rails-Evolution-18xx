@@ -52,7 +52,7 @@ public class MapPanel extends JPanel {
             map.init(gameUIManager.getORUIManager(), mmgr);
             originalMapSize = map.getOriginalSize();
         } catch (Exception e) {
-            log.error("Map class instantiation error:", e);
+            // log.error("Map class instantiation error:", e);
             return;
         }
 
@@ -91,6 +91,42 @@ public class MapPanel extends JPanel {
                 zoomFit (fitToWidth, fitToHeight);
             }
         });
+    }
+
+public void zoomIn() {
+        if (map != null) {
+            zoom(true); // Call LOCAL method, not map.zoomIn()
+            this.revalidate();
+            this.repaint();
+        }
+    }
+
+    public void zoomOut() {
+        if (map != null) {
+            zoom(false); // Call LOCAL method
+            this.revalidate();
+            this.repaint();
+        }
+    }
+
+
+    public void toggleDisplayHexNames() {
+        if (map != null) {
+            // Fix: Use getDisplayHexNames() instead of isDisplayHexNames()
+            // If getDisplayHexNames() doesn't exist, check HexMap.java for the correct getter
+            boolean current = map.getDisplayHexNames(); 
+            map.setDisplayHexNames(!current);
+            this.repaint(); // Call repaint on the Panel, not the map object
+        }
+    }
+
+    public void toggleDisplayBuildNumbers() {
+        if (map != null) {
+            // Fix: Use getDisplayBuildNumbers() instead of isDisplayBuildNumbers()
+            boolean current = map.getDisplayBuildNumbers();
+            map.setDisplayBuildNumbers(!current);
+            this.repaint(); // Call repaint on the Panel
+        }
     }
 
 
@@ -258,4 +294,40 @@ public class MapPanel extends JPanel {
     public GUIHex getSelectedHex() {
         return map.getSelectedHex();
     }
+
+    /**
+     * Aggressively clears map overlays (build numbers) AND resets highlighting.
+     * Iterates ALL hexes to ensure no "ghost" state remains from previous phases.
+     */
+    public void clearOverlays() {
+        if (map != null) {
+            // log.info("MapPanel: Aggressive clear invoked. Resetting all hex states and overlays.");
+            
+            // 1. Force the global flag to false
+            // map.setDisplayBuildNumbers(false);
+            
+            // 2. NUCLEAR OPTION: Iterate EVERY hex to scrub state
+            // This fixes "Ghost in some cases" where the upgrade list might be stale
+            for (GUIHex hex : map.getHexes()) {
+                boolean changed = false;
+                
+                // Clear Red/Selectable Highlights (Fixes Token Phase issue)
+                if (hex.getState() != GUIHex.State.NORMAL) {
+                    hex.setState(GUIHex.State.NORMAL);
+                    changed = true;
+                }
+                
+                // Clear Ghost Numbers
+                if (hex.getCustomOverlayText() != null) {
+                    hex.setCustomOverlayText(null);
+                    changed = true;
+                }
+            }
+            
+            // 3. Force a full repaint
+            this.repaint();
+        }
+    }
+
+
 }

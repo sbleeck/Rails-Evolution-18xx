@@ -461,4 +461,22 @@ public class StockMarket extends RailsManager implements Configurable {
         return marketModel;
     }
 
+    /**
+     * Manually moves a company token to a specific target space.
+     * Ensures that tokens are correctly added/removed from the grid spaces.
+     */
+    public void correctStockPrice(PublicCompany company, StockSpace target) {
+        StockSpace current = company.getCurrentSpace();
+        
+        // Log the manual intervention
+        if (current != target) {
+            // prepareMove handles: 
+            // 1. Logging
+            // 2. company.setCurrentSpace(target)
+            // 3. target.addToken(company)
+            // 4. current.removeToken(company)
+            prepareMove(company, current, target);
+        }
+    }
+    
 }

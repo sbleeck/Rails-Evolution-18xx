@@ -350,4 +350,13 @@ public class Stop extends RailsAbstractItem implements RailsOwner, Comparable<St
         }
         return b.toString();
     }
+
+/**
+     * AI Accessor: Required for StateVectorBuilder.
+     * Returns a List copy of the BaseTokens.
+     */
+    public java.util.List<BaseToken> getTokens() {
+return new java.util.ArrayList<>(this.tokens.items());
+    }
+
 }

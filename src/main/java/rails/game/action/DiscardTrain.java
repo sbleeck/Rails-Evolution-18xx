@@ -69,6 +69,35 @@ public class DiscardTrain extends PossibleORAction {
         this.forced = forced;
     }
 
+    /**
+     * Constructor for a *specific* "discard" action.
+     * This represents the *result* of a choice, not the choice itself.
+     *
+     * @param company The company discarding the train.
+     * @param discardedTrain The specific train to be discarded.
+     */
+    public DiscardTrain(PublicCompany company, Train discardedTrain) {
+        super(company.getRoot());
+        this.company = company;
+        this.companyName = company.getId();
+
+        // Set the specific train to be discarded
+        setDiscardedTrain(discardedTrain);
+
+        // This action is forced (it's a specific instruction, not a choice)
+        setForced(true);
+
+        // Set the 'ownedTrains' list to *only* this train. This is critical
+        // for the equalsAs() logic to distinguish this specific action
+        // from other specific DiscardTrain actions.
+        this.ownedTrains = new TreeSet<>(Comparator.comparing(AbstractItem::getId));
+        if (discardedTrain != null) {
+            setOwnedTrains(Set.of(discardedTrain));
+        } else {
+            setOwnedTrains(Set.of());
+        }
+    }
+    
     // Also used in ListAndFixSavedFiles
     public void setOwnedTrains(Set<Train> trains) {
 

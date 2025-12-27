@@ -58,6 +58,7 @@ public class GameDef {
         LAY_TRACK,
         CHECK_DESTINATIONS,
         LAY_TOKEN,
+        RELAY_TOKEN, // New step for choosing where relayed tokens go
         CALC_REVENUE,
         PAYOUT,
         BUY_TRAIN,
@@ -75,12 +76,30 @@ public class GameDef {
         return item.getRoot().getGameManager().getGameParameter(key);
     }
 
+    /**
+     * Retrieves a parameter as an integer.
+     * FIX: Safely handles Boolean -> Integer conversion (True=1, False=0)
+     * to prevent ClassCastException if the option type is mismatched.
+     */
     public static int getParmAsInt(RailsItem item, GameDef.Parm key) {
-        if (key.defaultValue() instanceof Integer) {
-            return (Integer) getParm(item, key);
-        } else {
-            return -1;
+        Object val = getParm(item, key);
+        
+        if (val == null) return key.defaultValueAsInt();
+
+        if (val instanceof Integer) {
+            return (Integer) val;
+        } else if (val instanceof Boolean) {
+            // FIX: Convert Boolean to Int explicitly
+            return ((Boolean) val) ? 1 : 0;
+        } else if (val instanceof String) {
+            try {
+                return Integer.parseInt((String) val);
+            } catch (NumberFormatException e) {
+                return key.defaultValueAsInt();
+            }
         }
+        
+        return key.defaultValueAsInt();
     }
 
     public static boolean getParmAsBoolean(RailsItem item, GameDef.Parm key) {

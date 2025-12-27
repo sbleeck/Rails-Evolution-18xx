@@ -103,7 +103,7 @@ public class TrainRunModifier
         List<RevenueTrainRun> invalidRuns = new ArrayList<>();
         int i = 0;
         boolean directValueReset = true;
-        log.debug ("--------------------------------------------------");
+        // log.debug ("--------------------------------------------------");
         for (RevenueTrainRun run:runs) {
 
             NetworkTrain train = run.getTrain();

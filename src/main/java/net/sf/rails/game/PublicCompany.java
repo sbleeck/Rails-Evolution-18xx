@@ -112,6 +112,15 @@ public class PublicCompany extends RailsAbstractItem
      */
     protected String bgHexColour = "000000";
 
+
+    public Portfolio getPortfolio() {
+        return portfolio.getTrainsModel().getPortfolio();
+    }
+  
+    public String getLastRevenueAllocation() {
+        return lastRevenueAllocation.value();
+    }
+
     /**
      * Home hex & city *
      * Two home hexes is supported, but only if:<br>
@@ -1437,6 +1446,25 @@ public class PublicCompany extends RailsAbstractItem
         }
     }
 
+    /**
+     * Required for MultiplierChart: Returns the company's initial price.
+     * Checks Par Price first, then Fixed Price (for Minors), then Market Price.
+     */
+    public int getParPrice() {
+        // 1. Check for standard Par Price (Stock Space)
+        if (parPrice != null && parPrice.getPrice() != null) {
+            return parPrice.getPrice().getPrice();
+        }
+        
+        // 2. Check for Fixed Price (Minors/Privates masquerading as Publics)
+        if (fixedPrice > 0) {
+            return fixedPrice;
+        }
+
+
+        return 0; // Invalid/Not started
+    }
+
     public PriceModel getCurrentPriceModel() {
         return currentPrice;
     }
@@ -1718,6 +1746,7 @@ public class PublicCompany extends RailsAbstractItem
         return canUseSpecialProperties;
     }
 
+    
     /**
      * Get the unit of share.
      *
@@ -1734,6 +1763,14 @@ public class PublicCompany extends RailsAbstractItem
 
     public int getShareUnitsForSharePrice() {
         return shareUnitsForSharePrice;
+    }
+
+    /**
+     * Required for MultiplierChart: Returns the background color for chart legends.
+     */
+    public Color getBgColor() {
+        // Return the configured Color object
+        return bgColour;
     }
 
     /**
@@ -2706,4 +2743,23 @@ public class PublicCompany extends RailsAbstractItem
     public int getBondsInterest() {
         return bondsInterest;
     }
+
+    // These methods are for 're-hydrating' a saved state and bypass normal logic.
+
+public void setCash_AI(int cash) {
+this.treasury.getPurse().setAmount_AI(cash); // FIXED: Use new public setter);
+    }
+
+    public void setHasFloated_AI(boolean floated) {
+        this.hasFloated.set(floated);
+    }
+
+/**
+     * AI Accessor: Required for StateVectorBuilder.
+     * Aliases to the existing getMarketPrice() to satisfy the Interface.
+     */
+    public int getCurrentPrice() {
+        return getMarketPrice();
+    }
+
 }

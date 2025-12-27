@@ -15,11 +15,6 @@ public class GameOptionsSet {
 
     private final Map<String, String> options;
 
-    private GameOptionsSet(Map<String, String> options) {
-        super();
-
-        this.options = options;
-    }
 
     public Map<String, String> getOptions() {
         return options;
@@ -82,5 +77,11 @@ public class GameOptionsSet {
             return new GameOptionsSet(gameOptions);
         }
     }
+
+    public GameOptionsSet(Map<String, String> options) {
+        super();
+        this.options = options;
+    }
+
 
 }

@@ -46,6 +46,8 @@ public class RemainingTilesWindow extends JFrame implements WindowListener,
     public RemainingTilesWindow(ORWindow orWindow) {
         super();
 
+        log.error("RemainingTilesWindow: Starting initialization.");
+        
         this.orWindow = orWindow;
         tilePanel = new AlignedWidthPanel();
         slider = new JScrollPane(tilePanel);

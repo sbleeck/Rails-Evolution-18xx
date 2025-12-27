@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <GameOptions>
     <!--  Check if Clements is correct as default -->
-	<GameOption name="Variant" values="Standard,Clemens,Snake" default="Standard"/>
+	<GameOption name="Variant" values="Standard,Clemens,Snake" default="Clemens"/>
 	<GameOption name="RouteAwareness" values="Highlight,Deactivate" default="Highlight" />
 	<GameOption name="RouteAlgorithm" values="Permissive,Semi-Restrictive,Restrictive" default="Permissive" />
 	<GameOption name="RevenueCalculation" values="Suggest,Deactivate" default="Suggest" />
@@ -10,9 +10,9 @@
 	<GameOption name="FirstRoundSellRestriction" values="First Round,First Stock Round" default="First Round" />
 	<GameOption name="BYFloatsAt" values="50%,20%" default="50%"/>
 	<GameOption name="LDIncome" values="20M,30M" default="20M"/>
-	<GameOption name="MinorsRequireFloatedBY" type="toggle" default="no"/>
-	<GameOption name="PrussianReservedIgnored" type="toggle" default="no"/>
-	<GameOption name="NF_PfB_Westermann" type="toggle" default="no"/>
-	<GameOption name="NetworthHidden" type="toggle" default="no" />
-	<GameOption name="SeparateSalesAtSamePrice" type="toggle" default="yes"/>
+	<GameOption name="MinorsRequireFloatedBY" type="toggle" default="yes"/>
+	<GameOption name="PrussianReservedIgnored" type="toggle" default="yes"/>
+	<GameOption name="NF_PfB_Westermann" type="toggle" default="yes"/>
+	<GameOption name="NetworthHidden" type="toggle" default="yes" />
+	<GameOption name="RestrictTrainTradingToPresident" type="toggle" default="yes"/>
 </GameOptions>

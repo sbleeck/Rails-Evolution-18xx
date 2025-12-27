@@ -16,6 +16,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.awt.Font; // Fügt den fehlenden Font-Import hinzu
 
 import rails.game.action.LayBaseToken;
 import rails.game.action.LayBonusToken;
@@ -37,6 +38,7 @@ import net.sf.rails.ui.swing.GUIGlobals;
 import net.sf.rails.ui.swing.GUIToken;
 
 import com.google.common.collect.Lists;
+import java.util.Objects; // Fügt den fehlenden Import hinzu
 
 
 /**
@@ -44,6 +46,9 @@ import com.google.common.collect.Lists;
  */
 
 public class GUIHex implements Observer {
+
+    private String customOverlayText = null;
+
 
     /**
      * Static class that describes x-y coordinates for GUIHexes
@@ -106,6 +111,7 @@ public class GUIHex implements Observer {
 
         NORMAL(1.0, Color.black),
         SELECTABLE(0.9, Color.red),
+        TOKEN_SELECTABLE(0.9, Color.GREEN),
         SELECTED(0.8, Color.red),
         INVALIDS (0.9, Color.pink);
 
@@ -310,6 +316,7 @@ public class GUIHex implements Observer {
         borderSides.add(side);
     }
 
+
     public Rectangle getBounds() {
         return dimensions.rectBound;
     }
@@ -450,8 +457,13 @@ public class GUIHex implements Observer {
 
         if (!isTilePainted()) return;
 
-        FontMetrics fontMetrics = g.getFontMetrics();
-        if (getHex().getTileCost() > 0 ) {
+        // The old file did NOT check hexMap.getDisplayBuildNumbers() here.
+        // We revert to checking only if cost > 0.
+        if (getHex().getTileCost() > 0) {
+             // Optional: You can keep the flag check if you fixed HexMap.java default to true
+             // if (hexMap.getDisplayBuildNumbers()) { 
+            
+            FontMetrics fontMetrics = g.getFontMetrics();
             g.drawString(
                     Bank.format(getHex(), getHex().getTileCost()),
                     dimensions.rectBound.x
@@ -459,7 +471,9 @@ public class GUIHex implements Observer {
                             * 3 / 5,
                     dimensions.rectBound.y
                             + ((fontMetrics.getHeight() + dimensions.rectBound.height) * 9 / 15));
+            // }
         }
+
 
         Map<PublicCompany, Stop> homes = getHex().getHomes();
 
@@ -521,46 +535,39 @@ public class GUIHex implements Observer {
         	 */
         }
 
-        String extraText = hex.getExtraText();
+   String extraText = hex.getExtraText();
         if (extraText != null) {
             drawString(g, extraText, hex.getExtraTextX(), hex.getExtraTextY());
-            /*
-            g.drawString(
-                    extraText,
-                    dimensions.rectBound.x
-                            + hex.getExtraTextX()
-                            + (dimensions.rectBound.width - fontMetrics.stringWidth(extraText))
-                            * 1 / 2,
-                    dimensions.rectBound.y
-                            + hex.getExtraTextY()
-                            + ((fontMetrics.getHeight() + dimensions.rectBound.height) * 5 / 25));
+        }
+        
+        // --- START FIX: Draw Custom Overlay Text ---
+        // Fügt die Logik zum Zeichnen des Custom Overlay Textes hinzu, falls vorhanden
+        if (customOverlayText != null) {
+            drawString(g, customOverlayText, 0, 0); // Zeichnet den Text zentriert
+        }
+    
+    }
 
-             */
+
+
+// --- START FIX: Final Hex Repaint Logic (GUIHex.java) ---
+public void setCustomOverlayText(String text) {
+    String safeText = (text == null) ? "" : text; 
+    
+    if (!Objects.equals(this.customOverlayText, safeText)) {
+        this.customOverlayText = safeText;
+        if (this.hexMap != null) {
+            // FÜR DAS FINALE FIX: Wir rufen die spezifische Methode für die TokensTextsLayer auf (TokensLayer)
+            // Die Methode repaintTokens löst ein repaint der TokensTextsLayer aus.
+            this.hexMap.repaintTokens(this.getBounds()); 
         }
     }
-
-    /**
-     * Draw a string anywhere on a hex.
-     *
-     * @param text The string to draw
-     * @param x The horizontal coordinate where the text will be centered around;
-     *          0 = center, increases to the right.
-     * @param y The vertical coordinate where the text will be placed;
-     *          0 = just below the top of the hex, increases downwards.
-     * Should some font size parameter be added?
-     */
-    private void drawString (Graphics2D g, String text, int x, int y) {
-        FontMetrics fontMetrics = g.getFontMetrics();
-        g.drawString(
-                text,
-                dimensions.rectBound.x
-                        + x
-                        + (dimensions.rectBound.width - fontMetrics.stringWidth(text))
-                        * 1 / 2,
-                dimensions.rectBound.y
-                        + y
-                        + ((fontMetrics.getHeight() + dimensions.rectBound.height) * 5 / 25));
+}
+public String getCustomOverlayText() {
+        return this.customOverlayText;
     }
+    
+
 
     private void paintOverlay(Graphics2D g2) {
         Tile visibleTile = this.getVisibleTile();
@@ -861,4 +868,104 @@ public class GUIHex implements Observer {
         return toText() + " (" + hex.getCurrentTile().toText() + ")";
     }
 
+
+
+  /**
+     * Draw a string anywhere on a hex.
+     * Modified to handle "High Contrast Overlays" in the top-left corner,
+     * while keeping standard text (Private Companies) centered.
+     */
+    private void drawString(Graphics2D g, String text, int x, int y) {
+        if (text == null) return;
+
+        String rawText = text;
+        Font originalFont = g.getFont();
+        Color originalColor = g.getColor();
+        boolean restore = false;
+        
+        // Detect if this is our "Special Overlay" (passed as HTML)
+        boolean isOverlay = text.startsWith("<html>");
+
+        if (isOverlay) {
+           // Support multi-line text: Replace <br> with newline BEFORE stripping other tags
+            rawText = text.replaceAll("(?i)<br\\s*/?>", "\n");
+            // Strip remaining HTML tags
+            rawText = rawText.replaceAll("<[^>]*>", "");
+
+            // 1. SET FONT: Bold and slightly smaller (16pt) for better fit
+            Font overlayFont = new Font("SansSerif", Font.BOLD, 16);
+            g.setFont(overlayFont);
+            restore = true;
+        }
+
+        FontMetrics fontMetrics = g.getFontMetrics();
+        int x_final;
+        int y_final;
+
+        if (isOverlay) {
+            // --- STRATEGY: MEME TEXT (Top Left) ---
+            
+            // Calculate Top-Left Position (Safe zone inside the hex)
+            // x: Start at hex x + 20% of width
+            // y: Start at hex y + 30% of height (clears the top corner)
+            x_final = dimensions.rectBound.x + (int)(dimensions.rectBound.width * 0.20);
+            y_final = dimensions.rectBound.y + (int)(dimensions.rectBound.height * 0.30);
+
+            // Split into lines (handling N12 and Cost on separate lines)
+            String[] lines = rawText.split("\n");
+            int lineHeight = fontMetrics.getHeight();
+
+            for (int i = 0; i < lines.length; i++) {
+                String line = lines[i];
+                int y_pos = y_final + (i * lineHeight); // Shift down for second line
+// Apply different styles for ID vs Price
+                if (i == 0) {
+                    // Line 0 (ID): White Text with Black Outline (High Contrast)
+                    g.setColor(Color.BLACK);
+                    g.drawString(line, x_final - 1, y_pos - 1);
+                    g.drawString(line, x_final - 1, y_pos + 1);
+                    g.drawString(line, x_final + 1, y_pos - 1);
+                    g.drawString(line, x_final + 1, y_pos + 1);
+
+                    g.setColor(Color.WHITE);
+                    g.drawString(line, x_final, y_pos);
+                } else {
+                    // Line 1+ (Price): Black Text with White Halo (Standard Map Style)
+                    // 1. Draw Halo (Stroke) in WHITE
+                    g.setColor(Color.WHITE);
+                    g.drawString(line, x_final - 1, y_pos - 1);
+                    g.drawString(line, x_final - 1, y_pos + 1);
+                    g.drawString(line, x_final + 1, y_pos - 1);
+                    g.drawString(line, x_final + 1, y_pos + 1);
+
+                    // 2. Draw Text (Fill) in BLACK
+                    g.setColor(Color.BLACK);
+                    g.drawString(line, x_final, y_pos);
+                }
+                
+            }
+        } else {
+            // --- STRATEGY: STANDARD TEXT (Centered) ---
+            // This preserves logic for Private Companies (e.g., "(C&A)"), Reserved Hexes, etc.
+            
+            // 1. Horizontal Center
+            x_final = dimensions.rectBound.x + x + (dimensions.rectBound.width - fontMetrics.stringWidth(rawText)) / 2;
+
+            // 2. Vertical Center
+            int y_center = dimensions.rectBound.y + dimensions.rectBound.height / 2;
+            int y_height = fontMetrics.getHeight();
+            // Shift down slightly to align baseline
+            y_final = y_center + y + (y_height / 3);
+
+            // Draw standard text (uses whatever color was set by the caller)
+            g.drawString(rawText, x_final, y_final);
+        }
+
+        // Restore original settings so we don't break other drawing operations
+        if (restore) {
+            g.setFont(originalFont);
+            g.setColor(originalColor);
+        }
+    }
+    
 }

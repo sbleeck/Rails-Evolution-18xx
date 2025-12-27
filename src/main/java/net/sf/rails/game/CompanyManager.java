@@ -148,7 +148,8 @@ public class CompanyManager extends RailsManager implements Configurable {
                 if (company instanceof PrivateCompany) {
                     mPrivateCompanies.put(name, (PrivateCompany) company);
                     lPrivateCompanies.add((PrivateCompany) company);
-
+                    // Debugging: Verify if revenue is actually loaded from XML
+    
                 } else if (company instanceof PublicCompany) {
                     ((PublicCompany)company).setIndex (numberOfPublicCompanies++);
                     mPublicCompanies.put(name, (PublicCompany) company);

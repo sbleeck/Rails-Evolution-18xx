@@ -12,6 +12,7 @@ import net.sf.rails.game.financial.Certificate;
 import net.sf.rails.game.special.SellBonusToken;
 import net.sf.rails.game.special.SpecialProperty;
 import net.sf.rails.game.state.BooleanState;
+import net.sf.rails.game.state.Owner;
 import net.sf.rails.game.state.PortfolioSet;
 import net.sf.rails.util.*;
 
@@ -113,8 +114,25 @@ public class PrivateCompany extends RailsOwnableItem<PrivateCompany> implements 
             basePrice = tag.getAttributeAsInteger("basePrice", 0);
 
             // sfy 1889 changed to IntegerArray
-            revenue = tag.getAttributeAsIntegerList("revenue");
+revenue = tag.getAttributeAsIntegerList("revenue");
 
+            // Fix: Fallback for single integer values if list parsing fails (e.g. revenue="5")
+            if (revenue == null || revenue.isEmpty()) {
+                // Try reading as a single integer
+                int singleRev = tag.getAttributeAsInteger("revenue", -999);
+                revenue = new ArrayList<>();
+                
+                if (singleRev != -999) {
+                    revenue.add(singleRev);
+                    // log.info("PrivateCompany {}: Revenue parsed as single integer: {}", getId(), revenue);
+                } else {
+                    // log.warn("PrivateCompany {}: Revenue attribute missing or invalid. Defaulting to [0].", getId());
+                    revenue.add(0);
+                }
+            } else {
+                // log.info("PrivateCompany {}: Revenue parsed as list: {}", getId(), revenue);
+            }
+            
             // pld: adding revenue to info text
             infoText += "<br>Revenue: ";
             for (int i = 0; i < revenue.size(); i++) {
@@ -343,6 +361,10 @@ public class PrivateCompany extends RailsOwnableItem<PrivateCompany> implements 
 
     //  start: sfy 1889: new method
     public int getRevenueByPhase(Phase phase) {
+        // Fix: Robust handling for missing phase steps or index mismatches
+        if (revenue == null || revenue.isEmpty()) {
+            return 0;
+        }
         if (phase != null) {
             return revenue.get(Math.min(
                     revenue.size(),
@@ -370,8 +392,11 @@ public class PrivateCompany extends RailsOwnableItem<PrivateCompany> implements 
 
         unblockHexes();
 
-        moveTo(getRoot().getBank().getScrapHeap());
-
+Owner scrapHeap = getRoot().getBank().getScrapHeap();
+        if (getOwner() != scrapHeap) {
+            moveTo(scrapHeap);
+        }
+        
         ReportBuffer.add(this, LocalText.getText("PrivateCloses", getId()));
 
         // For 1856: buyable tokens still owned by the private will now
@@ -386,7 +411,7 @@ public class PrivateCompany extends RailsOwnableItem<PrivateCompany> implements 
         }
         for (SellBonusToken sbt : moveToGM) {
             getRoot().getGameManager().getCommonSpecialPropertiesPortfolio().add(sbt);
-            log.debug("SP {} is now a common property", sbt.getId());
+            // log.debug("SP {} is now a common property", sbt.getId());
         }
     }
 
@@ -396,12 +421,12 @@ public class PrivateCompany extends RailsOwnableItem<PrivateCompany> implements 
         if ((preventClosingConditions == null) || preventClosingConditions.isEmpty()) return true;
 
         if (preventClosingConditions.contains("doesNotClose")) {
-            log.debug("Private Company {} does not close (unconditional).", getId());
+            // log.debug("Private Company {} does not close (unconditional).", getId());
             return false;
         }
         if (preventClosingConditions.contains("ifOwnedByPlayer")
                 && getOwner() instanceof Player) {
-            log.debug("Private Company {} does not close, as it is owned by a player.", getId());
+            // log.debug("Private Company {} does not close, as it is owned by a player.", getId());
             return false;
         }
         return true;
@@ -438,7 +463,7 @@ public class PrivateCompany extends RailsOwnableItem<PrivateCompany> implements 
         try {
             clone = super.clone();
         } catch (CloneNotSupportedException e) {
-            log.error("Cannot clone company {}", getId());
+            // log.error("Cannot clone company {}", getId());
             return null;
         }
         return clone;
@@ -472,13 +497,13 @@ public class PrivateCompany extends RailsOwnableItem<PrivateCompany> implements 
             for (SpecialProperty sp : specialProperties) {
                 if (!sp.isExercised()) return;
             }
-            log.debug("CloseIfAll: closing {}", getId());
+            // log.debug("CloseIfAll: closing {}", getId());
             setClosed();
 
         } else if (closeIfAnyExercised) {
             for (SpecialProperty sp : specialProperties) {
                 if (sp.isExercised()) {
-                    log.debug("CloseIfAny: closing {}", getId());
+                    // log.debug("CloseIfAny: closing {}", getId());
                     setClosed();
                     return;
                 }

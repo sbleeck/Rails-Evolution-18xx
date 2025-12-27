@@ -246,4 +246,8 @@ public class Bank extends RailsManager implements CurrencyOwner, RailsMoneyOwner
         return get(item).unavailable;
     }
 
+    public void setCash_AI(int newAmount) {
+        this.cash.getPurse().setAmount_AI(newAmount);
+    }
+    
 }

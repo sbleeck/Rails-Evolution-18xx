@@ -4,6 +4,11 @@ import java.awt.*;
 import java.awt.event.WindowAdapter;
 import java.awt.event.WindowEvent;
 
+// --- DELETE ---
+// import java.awt.event.ComponentAdapter;
+// import java.awt.event.ComponentEvent;
+// --- END DELETE ---
+
 import javax.swing.*;
 
 import net.sf.rails.game.financial.StockMarket;
@@ -21,8 +26,12 @@ import net.sf.rails.javafx.stockchart.FXStockChart;
 public class StockChartWindow extends JFrame {
 
     private static final Logger log = LoggerFactory.getLogger(StockChartWindow.class);
+    
+    private GameUIManager gameUIManager;
 
     public StockChartWindow(GameUIManager gameUIManager) {
+        this.gameUIManager = gameUIManager;
+        
         final JFXPanel fxPanel = new JFXPanel();
         add(fxPanel);
         setTitle("Rails: Stock Chart");
@@ -46,11 +55,13 @@ public class StockChartWindow extends JFrame {
             }
         });
 
+
         Platform.runLater(() -> {
             Scene scene = new Scene(new FXStockChart(gameUIManager));
             fxPanel.setScene(scene);
-            frame.pack();
+            
+            // This is correct: Restore position after JavaFX is ready
+            gameUIManager.packAndApplySizing(frame);
         });
     }
-
 }

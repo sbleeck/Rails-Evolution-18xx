@@ -1234,7 +1234,7 @@ public class OperatingRound_1880 extends OperatingRound {
 
             if (!operatingCompany.value().mustOwnATrain()
                     || hasValidTrains()) {
-                doneAllowed = true;
+                doneAllowed.set(true);
             }
     }
 
