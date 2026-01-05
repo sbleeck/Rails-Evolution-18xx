@@ -272,10 +272,9 @@ private int selectedItemIndex = -1;
             // fires
             cards[i].addActionListener(this);
 
-            
-            // Fix for missing names: si.getPrimary().getId() corresponds to "OBB", "NF", etc.
-            // This prevents the card from defaulting to internal IDs like "cert_0".
-            cards[i].setText(si.getPrimary().getId());
+// Remove setText to prevent double-rendering (text behind card)
+            // Apply scaling here as requested
+            cards[i].setScale(1.3);
 
             // Layout
             addField(cards[i], itemNameXOffset[col], itemNameYOffset + row,
@@ -738,7 +737,7 @@ private int selectedItemIndex = -1;
             cards[i].clearPossibleActions();
 
             // Force the name (ID) again to ensure it doesn't revert to "cert_X"
-            cards[i].setText(si.getPrimary().getId());
+            // cards[i].setText(si.getPrimary().getId());
 
             // Set base visual state
             if (status == StartItem.SOLD) {
@@ -820,7 +819,7 @@ private int selectedItemIndex = -1;
 
                // Enable card for immediate purchase
 // Re-apply the text fix because setPossibleAction() might have overwritten it
-                cards[i].setText(item.getPrimary().getId());
+                // cards[i].setText(item.getPrimary().getId());
                 
                 // Restore the visual selection state if this index is selected
                 if (i == selectedItemIndex) {

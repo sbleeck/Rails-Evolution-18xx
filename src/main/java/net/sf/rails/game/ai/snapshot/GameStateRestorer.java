@@ -331,7 +331,6 @@ public class GameStateRestorer {
             log.debug("  - No master train list found in JSON.");
         }
 
-// --- START FIX (Map Restore Logic MOVED to Pass 3) ---
         // 3g. Map state (MOVED FROM PASS 2)
         log.debug("  - Restoring Map state ({} hexes)...", pojoState.map.hexes.size());
         MapManager mapManager = liveGameRoot.getMapManager();

@@ -262,7 +262,6 @@ public class GameManager_1835 extends GameManager {
 
     // ... (lines of unchanged context code) ...
     public void startPrussianFormationRound(Round currentRound) {
-        // --- START FIX ---
         // REMOVED: this.setPrussianFormationOffered();
         // We must NOT set the flag before starting, or PFR will see it and abort (loop
         // protection).
@@ -288,9 +287,7 @@ public class GameManager_1835 extends GameManager {
 
         // NOW set the flag, so future checks know it happened.
         this.setPrussianFormationOffered();
-        // --- END FIX ---
     }
-    // ... (rest of the method) ...
 
 
 

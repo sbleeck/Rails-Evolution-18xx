@@ -85,7 +85,7 @@ public class StatusWindow extends JFrame implements ActionListener, ActionPerfor
     protected static final String SAVESTATUS_CMD = "SaveGameStatus";
     protected static final String SAVEREPORT_CMD = "SaveReportFile";
     protected static final String EXPORT_CMD = "Export";
-    protected static final String UNDO_CMD = "Undo"; // 
+    protected static final String UNDO_CMD = "Undo"; //
     protected static final String FORCED_UNDO_CMD = "Undo!";
     protected static final String REDO_CMD = "Redo";
     protected static final String MAP_ZOOM_IN_CMD = "MapZoomIn";
@@ -109,6 +109,10 @@ public class StatusWindow extends JFrame implements ActionListener, ActionPerfor
     protected static final String AUTOPASS_CMD = "Autopass";
     protected static final String SHOW_PHASES_CMD = "ShowPhases";
     protected static final String REFRESH_NETWORK_CMD = "RefreshNetwork";
+
+    private float currentBaseFontSize = 14f; // Default starting size
+    private static final float SCALE_HEADER = 1.5f; // Relative size for "Thinking"
+    private static final float SCALE_TIMER = 2.0f; // Relative size for Timer
 
     protected JPanel buttonPanel;
     protected GameStatus gameStatus;
@@ -144,7 +148,6 @@ public class StatusWindow extends JFrame implements ActionListener, ActionPerfor
     protected ActionButton aiButton;
     protected ActionButton pauseButton;
 
-    // --- START FIX: Structural Change Detection (Corrected Path) ---
     private String lastCompanySignature = null;
 
     private void checkStructureChange() {
@@ -196,11 +199,7 @@ public class StatusWindow extends JFrame implements ActionListener, ActionPerfor
     private JMenu phasesMenu;
     private JMenu networkMenu;
 
-    // ... (existing imports and class definition) ...
 
-    // ... (lines of unchanged context code) ...
-
-    // --- START FIX ---
     public void initMenu() {
 
         menuBar = new JMenuBar();
@@ -382,22 +381,19 @@ public class StatusWindow extends JFrame implements ActionListener, ActionPerfor
         JMenuItem multiplierChartItem = gameUIManager.getMenuMultiplierChart();
         chartMenu.add(multiplierChartItem);
 
-
-        
         menuBar.add(chartMenu);
 
         // --- 5. ACTIONS MENU (Formerly Move) ---
         moveMenu = new JMenu(LocalText.getText("ACTIONS", "Actions"));
-// CONSOLIDATED UNDO ITEM (Mapped to potentially " Undo" actions)
-undoItem = new ActionMenuItem(LocalText.getText("UNDO"));
+        // CONSOLIDATED UNDO ITEM (Mapped to potentially " Undo" actions)
+        undoItem = new ActionMenuItem(LocalText.getText("UNDO"));
         undoItem.setName(LocalText.getText("UNDO"));
-        undoItem.setActionCommand(UNDO_CMD); 
+        undoItem.setActionCommand(UNDO_CMD);
         undoItem.setMnemonic(KeyEvent.VK_U);
         undoItem.setAccelerator(KeyStroke.getKeyStroke(KeyEvent.VK_Z, ActionEvent.CTRL_MASK));
         undoItem.addActionListener(this);
         undoItem.setEnabled(false);
         moveMenu.add(undoItem);
-
 
         redoItem = new ActionMenuItem(LocalText.getText("REDO"));
         redoItem.setName(LocalText.getText("REDO"));
@@ -449,17 +445,14 @@ undoItem = new ActionMenuItem(LocalText.getText("UNDO"));
         // moderatorMenu = new JMenu(LocalText.getText("MODERATOR"));
         // moderatorMenu.setMnemonic(KeyEvent.VK_M);
 
-    
+        // ---7. CORRECTION MENU ---
 
-               // ---7. CORRECTION MENU ---
-
-correctionMenu = new JMenu(LocalText.getText("CorrectionMainMenu"));
+        correctionMenu = new JMenu(LocalText.getText("CorrectionMainMenu"));
         correctionMenu.setName(LocalText.getText("CorrectionMainMenu"));
         correctionMenu.setMnemonic(KeyEvent.VK_C);
         correctionMenu.setEnabled(true);
         // menuBar.add(moderatorMenu);
         menuBar.add(correctionMenu); // Add as a top-level menu item
-
 
         // --- 9. DEVELOPER (Conditional) ---
         if (Config.isDevelop()) {
@@ -527,7 +520,6 @@ correctionMenu = new JMenu(LocalText.getText("CorrectionMainMenu"));
         }
     }
 
-
     // --- PINPOINT CHANGE: Replace the existing setCorrectionMenu method ---
     public void setCorrectionMenu() {
         // Reset the menu
@@ -539,7 +531,7 @@ correctionMenu = new JMenu(LocalText.getText("CorrectionMainMenu"));
 
         // 2. Iterate over ALL defined CorrectionTypes to build the menu dynamically
         for (CorrectionType type : CorrectionType.values()) {
-            
+
             boolean isActive = false;
             // Check if this specific type is currently active in the engine
             if (activeModes != null) {
@@ -553,22 +545,19 @@ correctionMenu = new JMenu(LocalText.getText("CorrectionMainMenu"));
 
             // Create a new action to toggle this mode (click flips the boolean)
             CorrectionModeAction toggleAction = new CorrectionModeAction(
-                    gameUIManager.getRoot(), 
-                    type, 
-                    isActive 
-            );
+                    gameUIManager.getRoot(),
+                    type,
+                    isActive);
 
             ActionCheckBoxMenuItem item = new ActionCheckBoxMenuItem(LocalText.getText(type.name()));
             item.addActionListener(this);
-            item.addPossibleAction(toggleAction); 
+            item.addPossibleAction(toggleAction);
             item.setSelected(isActive);
             item.setEnabled(true);
-            
+
             correctionMenu.add(item);
         }
     }
-
-
 
     public boolean setupFor(RoundFacade round) {
         currentRound = round;
@@ -759,12 +748,8 @@ correctionMenu = new JMenu(LocalText.getText("CorrectionMainMenu"));
             // GameUIManager.");
             enableAIButton(false); // Disable button immediately
             gameUIManager.performAIMove(); // Call the central AI handler
-      
-        } else if (command.equals(FONT_INCREASE_CMD)) { // <-- Reroutes to adjustGlobalFontScale
-            gameUIManager.adjustGlobalFontScale(0.1);
-        } else if (command.equals(FONT_DECREASE_CMD)) { // <-- Reroutes to adjustGlobalFontScale
-            gameUIManager.adjustGlobalFontScale(-0.1);
-        } else if (command.equals(MAP_ZOOM_IN_CMD)) {
+
+     } else if (command.equals(MAP_ZOOM_IN_CMD)) {
             gameUIManager.zoomMap(true); // Call zoom in
         } else if (command.equals(MAP_ZOOM_OUT_CMD)) {
             gameUIManager.zoomMap(false); // Call zoom out
@@ -776,11 +761,15 @@ correctionMenu = new JMenu(LocalText.getText("CorrectionMainMenu"));
         } else if (command.equals("MapFitHeight")) {
             gameUIManager.fitMapToHeight(); // Need to add this
 
-        } else if (command.equals(FONT_INCREASE_CMD)) {
-            gameUIManager.adjustGlobalFontScale(0.1);
+} else if (command.equals(FONT_INCREASE_CMD)) {
+            // 1. Update Global State (Saves to file)
+            gameUIManager.adjustGlobalFontScale(0.1); 
+            // 2. Update Local Visuals (Resizes headers/tables immediately)
+            updateFonts(currentBaseFontSize + 1f);
         } else if (command.equals(FONT_DECREASE_CMD)) {
             gameUIManager.adjustGlobalFontScale(-0.1);
-
+            updateFonts(Math.max(8f, currentBaseFontSize - 1f));
+            
         } else if (command.equals(REM_TILES_CMD) || command.equals(ORPanel.REM_TILES_CMD)) {
 
             // ARCHITECTURAL FIX: Route through ORUIManager
@@ -999,7 +988,6 @@ correctionMenu = new JMenu(LocalText.getText("CorrectionMainMenu"));
             }
         });
 
-        
     }
 
     public void init(GameUIManager gameUIManager) {
@@ -1021,7 +1009,6 @@ correctionMenu = new JMenu(LocalText.getText("CorrectionMainMenu"));
 
         // --- BUTTONS (SOUTH) ---
         buttonPanel = new JPanel();
-
 
         aiButton = new ActionButton(RailsIcon.AI_MOVE);
         aiButton.setActionCommand(AI_MOVE_CMD);
@@ -1073,34 +1060,20 @@ correctionMenu = new JMenu(LocalText.getText("CorrectionMainMenu"));
         pane.setLayout(new BorderLayout());
         initMenu();
 
-        // --- ACTIVITY PANEL (TOP) ---
-        JPanel activityPanel = new JPanel(new BorderLayout());
-        activityPanel.setBorder(BorderFactory.createCompoundBorder(
-                BorderFactory.createEtchedBorder(),
-                BorderFactory.createEmptyBorder(5, 5, 5, 5)));
-        activityPanel.setOpaque(true);
-        activityPanel.setBackground(Color.WHITE);
-
-        activityFont = new Font("Arial", Font.PLAIN, 16);
-        currentActorLabel = new JLabel(" Thinking: ...");
-        currentActorLabel.setFont(activityFont.deriveFont(Font.BOLD, 18f));
-        currentActorLabel.setOpaque(true);
-        currentActorLabel.setBackground(Color.WHITE);
-        currentActorLabel.setForeground(Color.BLACK);
-        currentActorLabel.setPreferredSize(new Dimension(800, 100));
-        activityPanel.add(currentActorLabel, BorderLayout.CENTER);
-
-        // 1. Initialize Game Time Label (Points 1, 3, 4)
+        // 2. Timer Label
         gameTimeLabel = new JLabel("00:00:00");
-        // Point 4: Font must be at least twice the size (Standard is ~11-12, so 24+)
-        gameTimeLabel.setFont(new Font("SansSerif", Font.BOLD, 24));
         gameTimeLabel.setForeground(Color.BLACK);
         gameTimeLabel.setHorizontalAlignment(SwingConstants.RIGHT);
-        gameTimeLabel.setBorder(BorderFactory.createEmptyBorder(0, 10, 0, 10)); // Padding
-        
-        // Point 1: Add to EAST of the same panel to keep on same line
-        activityPanel.add(gameTimeLabel, BorderLayout.EAST);
+        gameTimeLabel.setBorder(BorderFactory.createEmptyBorder(0, 10, 0, 10));
 
+        // 3. Apply Initial Fonts
+
+        // Restore this call, but calculate size based on the saved global scale
+        float savedScale = (float) gameUIManager.getFontScale();
+        // Default 14f * 1.0 = 14f. If saved 0.8 -> 11.2f
+        this.currentBaseFontSize = 14f * savedScale;
+        updateFonts(currentBaseFontSize);
+        
         // 2. Setup UI Timer
         if (uiRefreshTimer != null && uiRefreshTimer.isRunning()) {
             uiRefreshTimer.stop();
@@ -1113,8 +1086,6 @@ correctionMenu = new JMenu(LocalText.getText("CorrectionMainMenu"));
         });
         uiRefreshTimer.start();
 
-
-        pane.add(activityPanel, BorderLayout.NORTH); // Text on Top
         pane.add(gameStatusPane, BorderLayout.CENTER); // Table in Center
 
         // Bottom Container
@@ -1126,6 +1097,7 @@ correctionMenu = new JMenu(LocalText.getText("CorrectionMainMenu"));
         dynamicButtonPanel.setLayout(new FlowLayout(FlowLayout.LEFT));
         dynamicButtonPanel.setOpaque(false);
         southContainer.add(dynamicButtonPanel, BorderLayout.CENTER);
+        southContainer.add(gameTimeLabel, BorderLayout.EAST);
 
         pane.add(southContainer, BorderLayout.SOUTH); // Buttons on Bottom
 
@@ -1174,27 +1146,66 @@ correctionMenu = new JMenu(LocalText.getText("CorrectionMainMenu"));
         return dynamicButtonPanel;
     }
 
+    private void updateFonts(float baseSize) {
+        this.currentBaseFontSize = baseSize;
+
+        // 1. Update the Main Table (GameStatus)
+        // We set the font on the container; Swing inheritance handles the rest
+        // because we switched RailCard to native components.
+        Font baseFont = new Font("SansSerif", Font.PLAIN, (int) baseSize);
+        if (gameStatus != null) {
+            gameStatus.setFont(baseFont);
+            // Force recursive update for complex hierarchies
+            updateComponentTreeFont(gameStatus, baseFont);
+        }
+
+        // 2. Update Header (Thinking) -> 1.5x
+        if (currentActorLabel != null) {
+            currentActorLabel.setFont(baseFont.deriveFont(Font.BOLD, baseSize * SCALE_HEADER));
+        }
+
+        // 3. Update Timer -> 2.0x
+        if (gameTimeLabel != null) {
+            gameTimeLabel.setFont(baseFont.deriveFont(Font.BOLD, baseSize * SCALE_TIMER));
+        }
+
+        // 4. Update Buttons
+        if (buttonPanel != null) {
+            updateComponentTreeFont(buttonPanel, baseFont);
+        }
+    }
+
+    private void updateComponentTreeFont(Component comp, Font font) {
+        comp.setFont(font);
+        if (comp instanceof Container) {
+            for (Component child : ((Container) comp).getComponents()) {
+                updateComponentTreeFont(child, font);
+            }
+        }
+    }
+
     private void refreshTimeLabel() {
-        if (gameUIManager == null || gameUIManager.getGameManager() == null) return;
-        
+        if (gameUIManager == null || gameUIManager.getGameManager() == null)
+            return;
+
         String timeText = "00:00:00";
-        String colorHex = "#000000"; // Black
+        Color color = Color.BLACK;
 
         if (gameUIManager.isTimerPaused()) {
             timeText = "PAUSED";
-            colorHex = "#FF0000"; // Red
+            color = Color.RED;
         } else {
             Player p = gameUIManager.getCurrentPlayer();
             if (p != null) {
                 int val = p.getTimeBankModel().value();
                 int absVal = Math.abs(val);
-                timeText = String.format("%s: %s%02d:%02d", 
+                timeText = String.format("%s: %s%02d:%02d",
                         p.getName(),
-                        (val < 0 ? "-" : ""), 
-                        absVal / 60, 
+                        (val < 0 ? "-" : ""),
+                        absVal / 60,
                         absVal % 60);
-                
-                if (val < 0) colorHex = "#FF0000"; // Red
+                if (val < 0)
+                    color = Color.RED;
             } else {
                 net.sf.rails.game.GameManager gm = gameUIManager.getGameManager();
                 gm.incrementTotalGameTime();
@@ -1202,26 +1213,19 @@ correctionMenu = new JMenu(LocalText.getText("CorrectionMainMenu"));
             }
         }
 
-        // Render: Large Time on top, Small Metadata on bottom
-        // Font size 6 is roughly 24pt (Large), size 3 is ~12pt (Small)
-        String html = String.format("<html><div align='right'>" +
-                "<font size='6' color='%s'><b>%s</b></font><br>" +
-                "<font size='4' color='gray'>%s</font>" +
-                "</div></html>", 
-                colorHex, timeText, currentMetadata);
-
         if (gameTimeLabel != null) {
-            gameTimeLabel.setText(html);
-            gameTimeLabel.repaint();
+            gameTimeLabel.setText(timeText);
+            gameTimeLabel.setForeground(color);
         }
+
     }
 
-    private String currentMetadata = ""; 
+    private String currentMetadata = "";
 
     public void updateMetadata(String meta) {
         this.currentMetadata = meta;
         // Force an immediate update so it doesn't lag by 1 second
-        refreshTimeLabel(); 
+        refreshTimeLabel();
     }
 
     @Override
@@ -1233,8 +1237,9 @@ correctionMenu = new JMenu(LocalText.getText("CorrectionMainMenu"));
         }
 
         // Register the Global Hotkey Manager
-        KeyboardFocusManager.getCurrentKeyboardFocusManager().addKeyEventDispatcher(new GlobalHotkeyManager(gameUIManager));
-        
+        KeyboardFocusManager.getCurrentKeyboardFocusManager()
+                .addKeyEventDispatcher(new GlobalHotkeyManager(gameUIManager));
+
         // 2. Reset the menu items to disabled
         initGameActions();
 
@@ -1251,10 +1256,17 @@ correctionMenu = new JMenu(LocalText.getText("CorrectionMainMenu"));
 
         // Crash-Proof Dashboard Sync ---
         try {
-            // 1. Normal Update
+            // 1. FORCE RECREATE (Fixes "Green Ghost" and "Stale Names")
+            // Instead of just refreshing values, we destroy and rebuild the grid.
+            // This ensures all "Active" states are wiped clean and player order is
+            // re-fetched.
             if (gameStatus != null) {
-                gameStatus.refreshDashboard(); // This calls recreate() internally if structure changed
+                gameStatus.recreate();
             }
+
+            // Re-apply the current scaled font to the newly created buttons
+            updateFonts(this.currentBaseFontSize);
+            
             // Always push the Priority Deal state to the UI, regardless of Round Type.
             if (gameUIManager.getPriorityPlayer() != null) {
                 gameStatus.setPriorityPlayer(gameUIManager.getPriorityPlayer().getIndex());
@@ -1281,7 +1293,7 @@ correctionMenu = new JMenu(LocalText.getText("CorrectionMainMenu"));
             try {
                 // 4. HARD RESET: Destroy old instance, create NEW instance
                 if (gameStatus != null) {
-                   
+
                     // 1. Snapshot timing data before recreation
                     // NOTE: This relies on GameStatus.java having getLastPlayerTimes()
                     int[] savedTimes = gameStatus.getLastPlayerTimes();
@@ -1292,14 +1304,12 @@ correctionMenu = new JMenu(LocalText.getText("CorrectionMainMenu"));
 
                     // Initialize it
                     gameStatus.init(this, gameUIManager);
-                    
+
                     // 2. Restore timing data if needed
                     // NOTE: This relies on GameStatus.java having setLastPlayerTimes()
                     if (savedTimes != null) {
                         gameStatus.setLastPlayerTimes(savedTimes);
                     }
-
-                    
 
                     // Hot-swap it into the UI
                     if (gameStatusPane != null) {
@@ -1331,13 +1341,13 @@ correctionMenu = new JMenu(LocalText.getText("CorrectionMainMenu"));
             }
         }
 
-
         // 1. Highlight Logic
         if (!myTurn) {
             gameStatus.initTurn(getCurrentPlayer().getIndex(), false);
         } else {
             // FIX: Unconditionally call initTurn for the active player.
-            // Previously, this checked for StockRound/StartRound but skipped OperatingRound,
+            // Previously, this checked for StockRound/StartRound but skipped
+            // OperatingRound,
             // causing Privates and Fixed Income to vanish when it was your turn to operate.
             gameStatus.initTurn(getCurrentPlayer().getIndex(), true);
         }
@@ -1438,8 +1448,9 @@ correctionMenu = new JMenu(LocalText.getText("CorrectionMainMenu"));
         // This ensures our request runs AFTER other windows have finished their layout
         // churn.
         SwingUtilities.invokeLater(() -> {
-// Focus Management:
-            // We yield focus if we are in a Start Round (Auction) OR an Operating Round (Map).
+            // Focus Management:
+            // We yield focus if we are in a Start Round (Auction) OR an Operating Round
+            // (Map).
             // We only aggressively grab focus during Stock Rounds or related phases.
 
             boolean startIsActive = gameUIManager.isStartRoundActive();
@@ -1501,14 +1512,9 @@ correctionMenu = new JMenu(LocalText.getText("CorrectionMainMenu"));
         }
     }
 
-    public void updateActivityPanel(String fullHtmlText) {
-        if (currentActorLabel != null) {
-            // Logic is now centralized in GameUIManager. 
-            // We just render what we are given.
-            currentActorLabel.setText(fullHtmlText);
-        }
+    public void updateActivityPanel(String text) {
+return;
     }
-
 
     public void updateInfoMenu() {
         if (gameUIManager == null || gameUIManager.getGameManager() == null)
@@ -1523,7 +1529,6 @@ correctionMenu = new JMenu(LocalText.getText("CorrectionMainMenu"));
         buildPhasesMenu();
         buildNetworkMenu();
     }
-
 
     protected void buildCompaniesMenu() {
         companiesMenu.removeAll();
@@ -1622,9 +1627,9 @@ correctionMenu = new JMenu(LocalText.getText("CorrectionMainMenu"));
 
             // Mark current phase
 
-boolean isCurrent = phase.equals(gameUIManager.getRoot().getPhaseManager().getCurrentPhase());
+            boolean isCurrent = phase.equals(gameUIManager.getRoot().getPhaseManager().getCurrentPhase());
             String prefix = isCurrent ? "> " : "";
-                        item = new JMenu(prefix + LocalText.getText("PhaseX", phase.toText()));
+            item = new JMenu(prefix + LocalText.getText("PhaseX", phase.toText()));
             item.add(new JMenuItem(b.toString()));
             phasesMenu.add(item);
         }

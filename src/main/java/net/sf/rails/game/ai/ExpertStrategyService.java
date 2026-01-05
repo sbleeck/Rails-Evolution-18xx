@@ -930,7 +930,6 @@ public class ExpertStrategyService {
                     double multiplier = contextMatches ? 1.5 : 1.0;
                     double score = move.weight * multiplier;
 
-                    // --- START FIX ---
                     // Increase fuzz to 6.0 to allow moves with weight 8 to compete with weight 12
                     double fuzz = random.nextDouble() * 6.0;
 

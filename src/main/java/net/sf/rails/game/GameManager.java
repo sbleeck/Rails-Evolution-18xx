@@ -47,6 +47,12 @@ import com.google.common.collect.ComparisonChain;
 import net.sf.rails.game.ai.snapshot.JsonStateSerializer;
 import java.io.IOException; // Add this
 
+import java.awt.KeyboardFocusManager;
+import java.beans.PropertyChangeEvent;
+import java.beans.PropertyChangeListener;
+import java.awt.Component;
+import java.awt.Window;
+
 /**
  * This class manages the playing rounds by supervising all implementations of
  * Round. Currently everything is hardcoded &agrave; la 1830.
@@ -342,7 +348,7 @@ public class GameManager extends RailsManager implements Configurable, Owner {
     // even when the game state rolls back via Undo.
     private final Set<String> awardedBonuses = new HashSet<>();
     // 1. Add Variable and Accessors
-    protected int timeMgmtUndoPenalty = 10; // Minor (Self)
+    protected int timeMgmtUndoPenalty = 0; // Minor (Self)
     protected int timeMgmtMajorUndoPenalty = 30; // Major (Disruption) -- NEW
 
     public void setTimeMgmtMajorUndoPenalty(int seconds) {
@@ -663,6 +669,49 @@ public int getOrTimeBonus() {
         super(parent, id);
 
         this.guiHints = new GuiHints(this, "guiHints");
+        // Install the Focus Spy immediately upon creation to catch startup focus issues
+        installFocusSpy();
+    }
+
+    /**
+     * A diagnostic "Spy" that logs all focus and window activation changes.
+     * Use this to identify which component is stealing focus during Stock Rounds.
+     */
+    private void installFocusSpy() {
+        KeyboardFocusManager.getCurrentKeyboardFocusManager().addPropertyChangeListener("focusOwner", 
+            new PropertyChangeListener() {
+                @Override
+                public void propertyChange(PropertyChangeEvent evt) {
+                    Component oldC = (Component) evt.getOldValue();
+                    Component newC = (Component) evt.getNewValue();
+                    
+                    String oldName = (oldC != null) ? oldC.getClass().getSimpleName() + "[" + oldC.getName() + "]" : "null";
+                    String newName = (newC != null) ? newC.getClass().getSimpleName() + "[" + newC.getName() + "]" : "null";
+
+                    // log.info("FOCUS SPY [Component]: LOST={} | GAINED={}", oldName, newName);
+                    
+                    // Optional: Print stack trace if the focus shift looks suspicious (e.g. to a map component)
+                    // if (newName.contains("MapPanel") || newName.contains("ORPanel")) {
+                    //    Thread.dumpStack(); 
+                    // }
+                }
+            }
+        );
+
+        KeyboardFocusManager.getCurrentKeyboardFocusManager().addPropertyChangeListener("activeWindow", 
+            new PropertyChangeListener() {
+                @Override
+                public void propertyChange(PropertyChangeEvent evt) {
+                    Window oldW = (Window) evt.getOldValue();
+                    Window newW = (Window) evt.getNewValue();
+
+                    String oldName = (oldW != null) ? oldW.getClass().getSimpleName() + "[" + oldW.getName() + "]" : "null";
+                    String newName = (newW != null) ? newW.getClass().getSimpleName() + "[" + newW.getName() + "]" : "null";
+                    
+                    // log.info("FOCUS SPY [Window]: DEACTIVATED={} | ACTIVATED={}", oldName, newName);
+                }
+            }
+        );
     }
 
     public void configureFromXML(Tag tag) throws ConfigurationException {
@@ -1698,7 +1747,6 @@ public int getOrTimeBonus() {
 
             case UNDO:
             case FORCED_UNDO:
-// --- START FIX: Robust Penalty Logic ---
 
                 // 1. BLIND THE UI (Pre-Undo)
                 if (gameUIManager != null && getCurrentPlayer() != null) {
@@ -1729,6 +1777,8 @@ public int getOrTimeBonus() {
                     int penaltyAmount = 0;
                     String penaltyType = "";
 
+                   Player penaltyTarget = null;
+
                     // LOGIC:
                     // If playerBefore == playerAfter: I am undoing my own recent move. (Self-Correction)
                     // If playerBefore != playerAfter: I undid back into the previous player's turn. (Disruption)
@@ -1738,27 +1788,28 @@ public int getOrTimeBonus() {
                             // Minor Penalty for fixing your own math
                             penaltyAmount = timeMgmtUndoPenalty;
                             penaltyType = "Self-Correction";
+                            penaltyTarget = playerAfter;
                         } else {
                             // Major Penalty for disrupting the flow / going back a player
-                            // 'playerAfter' is the one who is now active (the Disruptor who went back)
+                            // The DISRUPTOR (playerBefore) pays, not the victim (playerAfter)
                             penaltyAmount = timeMgmtMajorUndoPenalty;
                             penaltyType = "Disruption";
+                            penaltyTarget = playerBefore;
                         }
                     }
 
-                    // Apply and Flash
-                    if (playerAfter != null && penaltyAmount > 0) {
+                    // Apply and Flash - Check penaltyAmount > 0 to prevent logging 0 penalties
+                    if (penaltyTarget != null && penaltyAmount > 0) {
 
                         // A. Apply Penalty to the restored time
-                        playerAfter.getTimeBankModel().add(-penaltyAmount);
-                        log.info("[TIME] {} Undo. Penalizing {}: -{}s", penaltyType, playerAfter.getName(),
+                        penaltyTarget.getTimeBankModel().add(-penaltyAmount);
+                        log.info("[TIME] {} Undo. Penalizing {}: -{}s", penaltyType, penaltyTarget.getName(),
                                 penaltyAmount);
 
                         // B. FORCE RED FLASH (Uses the final time AFTER penalty)
-                        triggerUITimeFlash(playerAfter, -penaltyAmount);
+                        triggerUITimeFlash(penaltyTarget, -penaltyAmount);
                     }
                 }
-
                 result = true;
                 break;
 
@@ -2396,12 +2447,19 @@ public int getOrTimeBonus() {
         String msg = LocalText.getText("BankIsBrokenDisplayText", msgContinue);
         DisplayBuffer.add(this, msg);
         addToNextPlayerMessages(msg, true);
-        if (!java.awt.GraphicsEnvironment.isHeadless()) {
-            javax.swing.JOptionPane.showMessageDialog(null,
-                    msg,
-                    "Bank Broken!",
-                    javax.swing.JOptionPane.WARNING_MESSAGE);
+
+        // Use invokeLater to prevent blocking the game loop, which causes duplicate moves (race condition)
+        if (!isReloading() && !java.awt.GraphicsEnvironment.isHeadless()) {
+             final String finalMsg = msg;
+             javax.swing.SwingUtilities.invokeLater(() -> 
+                 javax.swing.JOptionPane.showMessageDialog(null,
+                     finalMsg,
+                     "Bank Broken!",
+                     javax.swing.JOptionPane.WARNING_MESSAGE)
+             );
         }
+        
+
     }
 
     public void registerMaxedSharePrice(PublicCompany company, StockSpace space) {
@@ -2537,7 +2595,6 @@ public int getOrTimeBonus() {
             companyPayoutHistory.set(newHistory);
         }
 
-        // --- START FIX: Capture Instantaneous & RESET ---
         LinkedHashMap<String, Map<String, Integer>> instHistory = instantaneousPayoutHistory.value();
         LinkedHashMap<String, Map<String, Integer>> newInstHistory;
         if (instHistory == null)
@@ -2587,7 +2644,6 @@ public int getOrTimeBonus() {
             if (amount > 0) {
                 String compId = company.getId();
 
-                // --- START FIX ---
                 // 1. Update Cumulative
                 Map<String, Integer> cumulative = cumulativeCompanyPayouts.value();
                 if (cumulative == null)
@@ -3180,9 +3236,32 @@ public int getOrTimeBonus() {
             if (!possibleActions.validate(action)) {
                 DisplayBuffer.add(this, LocalText.getText("ActionNotAllowed",
                         action.toString()));
-                // DO NOT return false. Log the warning and proceed.
-                log.warn("GAMEMANAGER [BruteForce]: Validation failed for action. IGNORING and continuing replay.",
-                        action);
+
+                        StringBuilder sb = new StringBuilder();
+                sb.append("!!! RELOAD VALIDATION FAILURE ANALYSIS !!!\n");
+                sb.append("Failed Action: ").append(action).append("\n");
+                sb.append("Current Round: ").append(getCurrentRound() != null ? getCurrentRound().toString() : "null").append("\n");
+                
+                // Removed non-existent isBroken(). Just show cash.
+                sb.append("Bank Cash: ").append(getRoot().getBank().getPurse().value()).append("\n");
+                
+                sb.append("Game Over Pending: ").append(gameOverPending.value()).append("\n");
+                sb.append("Is Game Over: ").append(isGameOver()).append("\n");
+                
+                // Use getList() for size/empty checks
+                int actionCount = (possibleActions.getList() != null) ? possibleActions.getList().size() : 0;
+                sb.append("--- Available Possible Actions (" + actionCount + ") ---\n");
+                
+                if (actionCount == 0) {
+                    sb.append("  (NONE)\n");
+                } else {
+                    for (PossibleAction pa : possibleActions.getList()) {
+                        sb.append("  > ").append(pa).append("\n");
+                    }
+                }
+                sb.append("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n");
+                log.warn(sb.toString());
+
             }
 
             // FOR BACKWARDS COMPATIBILITY
@@ -3275,7 +3354,15 @@ public int getOrTimeBonus() {
         List<String> b = new ArrayList<>();
 
         List<Player> rankedPlayersRaw = new ArrayList<>(getRoot().getPlayerManager().getPlayers());
-        Collections.sort(rankedPlayersRaw); // Sorts by Player.compareTo (raw worth)
+
+        // Sort Descending: Winner (Highest Worth) First
+        Collections.sort(rankedPlayersRaw, (p1, p2) -> {
+            int result = Integer.compare(p2.getWorth(), p1.getWorth());
+            if (result == 0) {
+                return p1.getId().compareTo(p2.getId());
+            }
+            return result;
+        });
 
         Player winnerRaw = rankedPlayersRaw.get(0);
         double winnerWorthRaw = winnerRaw.getWorth();
@@ -3679,7 +3766,6 @@ public int getOrTimeBonus() {
         }
     }
 
-    // --- START FIX ---
     private void saveTimeData(File saveFile) {
         if (!isTimeManagementEnabled()) return;
         

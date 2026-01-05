@@ -540,7 +540,6 @@ public class GUIHex implements Observer {
             drawString(g, extraText, hex.getExtraTextX(), hex.getExtraTextY());
         }
         
-        // --- START FIX: Draw Custom Overlay Text ---
         // Fügt die Logik zum Zeichnen des Custom Overlay Textes hinzu, falls vorhanden
         if (customOverlayText != null) {
             drawString(g, customOverlayText, 0, 0); // Zeichnet den Text zentriert
@@ -550,7 +549,6 @@ public class GUIHex implements Observer {
 
 
 
-// --- START FIX: Final Hex Repaint Logic (GUIHex.java) ---
 public void setCustomOverlayText(String text) {
     String safeText = (text == null) ? "" : text; 
     

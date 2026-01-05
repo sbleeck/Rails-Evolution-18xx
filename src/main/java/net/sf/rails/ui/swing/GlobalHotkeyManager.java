@@ -7,13 +7,10 @@ import java.awt.event.KeyEvent;
 import javax.swing.text.JTextComponent;
 import javax.swing.AbstractButton;
 
-import net.sf.rails.game.GameDef;
 import net.sf.rails.game.OperatingRound;
 import net.sf.rails.game.StartRound;
-import rails.game.action.SetDividend;
 import net.sf.rails.game.round.RoundFacade;
-import rails.game.action.PossibleAction;
-import rails.game.action.SetDividend;
+import net.sf.rails.game.financial.StockRound;
 
 public class GlobalHotkeyManager implements KeyEventDispatcher {
 
@@ -30,13 +27,8 @@ public class GlobalHotkeyManager implements KeyEventDispatcher {
         }
 
         // --- SAFETY CHECK: TYPING ---
-        // If the user is typing in a text field (e.g. Chat, Save Name, Bid Amount),
-        // we generally do NOT want to intercept keys like 'A', 'T', 'Z', etc.
-        // We DO allow Ctrl+keys and maybe Enter/Esc depending on context, 
-        // but for safety, we yield if a text component has focus.
         Component focusOwner = KeyboardFocusManager.getCurrentKeyboardFocusManager().getFocusOwner();
         if (focusOwner instanceof JTextComponent && ((JTextComponent) focusOwner).isEditable()) {
-            // Allow Ctrl+Z / Ctrl+Y even in text fields (standard Undo/Redo)
             if (!e.isControlDown() && !e.isMetaDown()) {
                 return false; 
             }
@@ -51,8 +43,9 @@ public class GlobalHotkeyManager implements KeyEventDispatcher {
             return true;
         }
 
-        // 2. REDO (Ctrl + Y)
-        if (isCtrlDown && keyCode == KeyEvent.VK_Y) {
+        // 2. REDO (Ctrl + Y or Ctrl + Shift + Z)
+        // Standard Redo is often Shift+Ctrl+Z, but we keep Ctrl+Y support too
+        if (isCtrlDown && (keyCode == KeyEvent.VK_Y || (e.isShiftDown() && keyCode == KeyEvent.VK_Z))) {
             triggerRedo();
             return true;
         }
@@ -84,22 +77,6 @@ public class GlobalHotkeyManager implements KeyEventDispatcher {
         return false;
     }
 
-    private void triggerUndo() {
-        if (gameUIManager.getStatusWindow() != null 
-            && gameUIManager.getStatusWindow().undoItem != null 
-            && gameUIManager.getStatusWindow().undoItem.isEnabled()) {
-            gameUIManager.getStatusWindow().undoItem.doClick();
-        }
-    }
-
-    private void triggerRedo() {
-        StatusWindow sw = gameUIManager.getStatusWindow();
-        if (sw != null) {
-            if (sw.redoItem != null && sw.redoItem.isEnabled()) {
-                sw.redoItem.doClick();
-            } 
-        }
-    }
 
     private void triggerPause() {
         if (gameUIManager.getStatusWindow() != null 
@@ -118,40 +95,42 @@ public class GlobalHotkeyManager implements KeyEventDispatcher {
         
         // --- CASE 1: OPERATING ROUND (Skip) ---
         if (round instanceof OperatingRound) {
-ORWindow orWindow = gameUIManager.orWindow;
-                if (orWindow != null && orWindow.isVisible()) {
+            ORWindow orWindow = gameUIManager.orWindow;
+            if (orWindow != null && orWindow.isVisible()) {
                 ORPanel panel = orWindow.getORPanel();
                 if (panel != null) {
-                    // Try to click the context-specific SKIP button
-                    if (panel.activePhase == 1 && clickIfEnabled(panel.btnTileSkip)) return;
-                    if (panel.activePhase == 2 && clickIfEnabled(panel.btnTokenSkip)) return;
+                    
+                    // Phase 1 (Tile) & Phase 2 (Token):
+                    // Since we removed specific "Skip" buttons in favor of the Smart Button,
+                    // we trigger the underlying Skip logic via the Manager.
+                    if (panel.activePhase == 1 || panel.activePhase == 2) {
+                        if (orWindow.getORUIManager() != null) {
+                            orWindow.getORUIManager().skipUpgrade(); 
+                            return;
+                        }
+                    }
+
+                    // Phase 4 (Trains): "Skip" means "Done Buying" or "Skip Train"
                     if (panel.activePhase == 4 && clickIfEnabled(panel.btnTrainSkip)) return;
                     
-                    // Fallback: If "Done" is available (often treated as "No more moves"), click it
+                    // Fallback: Done
                     if (clickIfEnabled(panel.btnDone)) return;
                 }
             }
         }
 
         // --- CASE 2: AUCTION / START ROUND (Pass) ---
-        // "Esc" -> "No" -> "Pass"
         if (round instanceof StartRound) {
-            StartRoundWindow srw = gameUIManager.getStartRoundWindow();
-            // StartRoundWindow doesn't expose passButton publicly, but we can access it via Actions
-            // or if we change StartRoundWindow to expose it. 
-            // For now, let's rely on the Action mechanism if the window is focused, 
-            // OR use the StatusWindow pass button if it's mirrored there.
-            // Actually, StartRoundWindow is usually a Dialog or Frame. 
-            // We'll try the StatusWindow's pass button which often mirrors the current round's pass action.
             if (gameUIManager.getStatusWindow() != null) {
                 if (clickIfEnabled(gameUIManager.getStatusWindow().passButton)) return;
             }
         }
 
-        // --- CASE 3: STOCK ROUND (Pass/Done) ---
-        // In Stock Round, StatusWindow is the main view.
-        if (gameUIManager.getStatusWindow() != null && gameUIManager.getStatusWindow().isVisible()) {
-             if (clickIfEnabled(gameUIManager.getStatusWindow().passButton)) return;
+        // --- CASE 3: STOCK ROUND (Pass) ---
+        if (round instanceof StockRound) {
+             if (gameUIManager.getStatusWindow() != null && gameUIManager.getStatusWindow().isVisible()) {
+                 if (clickIfEnabled(gameUIManager.getStatusWindow().passButton)) return;
+            }
         }
     }
 
@@ -160,24 +139,16 @@ ORWindow orWindow = gameUIManager.orWindow;
 
         // --- CASE 1: OPERATING ROUND ---
         if (round instanceof OperatingRound) {
-            OperatingRound or = (OperatingRound) round;
- 
             ORWindow orWindow = gameUIManager.orWindow;
-    
             
             if (orWindow != null && orWindow.isVisible()) {
                 ORPanel panel = orWindow.getORPanel();
                 
-   
-                // Special Rule: Payout for Set Revenue
-                // Removed dynamic component loop to fix compilation error (getButtonPanel not found).
-                // We rely on standard default button processing below.
-                
-                // General Default: Current Default Button (Confirm, Done, etc.)
                 if (panel != null) {
+                    // 1. Try the calculated "Default Button" (Confirm, Done, etc.)
                     if (clickIfEnabled(panel.currentDefaultButton)) return;
                     
-                    // Fallback to ORUIManager confirm if button isn't explicitly set
+                    // 2. Fallback to Map Confirm (if button logic failed but map has selection)
                     if (orWindow.getORUIManager() != null) {
                         orWindow.getORUIManager().confirmUpgrade();
                     }
@@ -185,14 +156,14 @@ ORWindow orWindow = gameUIManager.orWindow;
             }
         }
         // CASE 2: STOCK ROUND
-        // Map Enter to the Status Window "Pass" / "Done" button (Global Key Interference Fix)
-        else if (round instanceof net.sf.rails.game.financial.StockRound) {
+        // Map Enter to the Status Window "Pass" / "Done"
+        else if (round instanceof StockRound) {
             if (gameUIManager.getStatusWindow() != null) {
                 clickIfEnabled(gameUIManager.getStatusWindow().passButton);
             }
         }
-
     }
+
     private boolean clickIfEnabled(AbstractButton btn) {
         if (btn != null && btn.isEnabled() && btn.isVisible()) {
             btn.doClick();
@@ -200,4 +171,50 @@ ORWindow orWindow = gameUIManager.orWindow;
         }
         return false;
     }
+   
+
+    private void triggerUndo() {
+        // 1. Priority: Operating Round Local Undo
+        if (gameUIManager.getCurrentRound() instanceof OperatingRound) {
+            // --- START FIX ---
+            ORWindow win = gameUIManager.orWindow; // Direct field access
+            // --- END FIX ---
+            if (win != null && win.isVisible() && win.getORPanel() != null) {
+                // Try executing on panel first. If successful, we are done.
+                if (win.getORPanel().executeUndo()) {
+                    return;
+                }
+            }
+        }
+
+        // 2. Fallback: Status Window (Global Undo)
+        if (gameUIManager.getStatusWindow() != null 
+            && gameUIManager.getStatusWindow().undoItem != null 
+            && gameUIManager.getStatusWindow().undoItem.isEnabled()) {
+            gameUIManager.getStatusWindow().undoItem.doClick();
+        }
+    }
+
+    private void triggerRedo() {
+        // 1. Priority: Operating Round Local Redo
+        if (gameUIManager.getCurrentRound() instanceof OperatingRound) {
+            // --- START FIX ---
+            ORWindow win = gameUIManager.orWindow; // Direct field access
+            // --- END FIX ---
+            if (win != null && win.isVisible() && win.getORPanel() != null) {
+                if (win.getORPanel().executeRedo()) {
+                    return;
+                }
+            }
+        }
+
+        // 2. Fallback: Status Window
+        StatusWindow sw = gameUIManager.getStatusWindow();
+        if (sw != null) {
+            if (sw.redoItem != null && sw.redoItem.isEnabled()) {
+                sw.redoItem.doClick();
+            } 
+        }
+    }
+
 }

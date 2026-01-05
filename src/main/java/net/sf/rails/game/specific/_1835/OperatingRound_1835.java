@@ -23,7 +23,8 @@ import net.sf.rails.game.financial.Bank;
 import net.sf.rails.game.special.ExchangeForShare;
 import net.sf.rails.game.special.SpecialProperty;
 import net.sf.rails.game.special.SpecialSingleTileLay;
-import java.lang.reflect.Field; // REQUIRED IMPORT
+import net.sf.rails.game.special.SpecialTileLay;
+import java.lang.reflect.Field;
 
 import net.sf.rails.game.model.PortfolioModel;
 import com.google.common.collect.Iterables;
@@ -77,8 +78,6 @@ public class OperatingRound_1835 extends OperatingRound {
         if (!trainsBoughtThisTurn.isEmpty()) {
             TrainCardType boughtType = trainsBoughtThisTurn.get(trainsBoughtThisTurn.size() - 1);
             String id = boughtType.getId();
-
-            // Logging for debugging
 
             boolean isFirst4 = "4".equals(id) && boughtType.getNumberBoughtFromIPO() == 1;
             boolean isFirst4Plus4 = "4+4".equals(id) && boughtType.getNumberBoughtFromIPO() == 1;
@@ -311,7 +310,6 @@ public class OperatingRound_1835 extends OperatingRound {
         return true;
     }
 
-    // ... (lines of unchanged context code) ...
     @Override
     protected void newPhaseChecks() {
         PhaseManager phaseManager = getRoot().getPhaseManager();
@@ -321,7 +319,6 @@ public class OperatingRound_1835 extends OperatingRound {
             company.getPortfolioModel().rustObsoleteTrains();
         }
 
-        // DEBUGGING PROBE: Log Phase 5 discard check
         if (currentPhase.getId().startsWith("5")) {
             boolean excess = checkForExcessTrains();
             if (excess) {
@@ -343,12 +340,9 @@ public class OperatingRound_1835 extends OperatingRound {
         boolean pfrTriggered = false;
         boolean isForcedByTrain = false;
 
-        // DEBUGGING PROBE: Train Purchase Scan
         if (prNotStarted) {
             for (TrainCardType tct : trainsBoughtThisTurn) {
                 String id = tct.getId();
-                // Log every train bought to see what the loop sees
-
                 if ("2+2".equals(id))
                     continue;
 
@@ -373,18 +367,12 @@ public class OperatingRound_1835 extends OperatingRound {
         boolean prIsComplete = PrussianFormationRound.prussianIsComplete(gameManager);
 
         if (fiveTrainBought) {
-            // 1. Silent Kill: Immediately close "paper" privates (NF, LD, OBB, PfB).
-            // This is safe to do inside the OR as it requires no user input.
             closePhase5Privates();
 
-            // 2. Complex Exchanges: If Minors/BB/HB still exist, trigger PFR.
-            // We defer the share exchanges and director swaps to the PFR, which handles
-            // UI interactions safely without crashing the OR transaction.
             if (!prIsComplete) {
                 pfrTriggeredThisOR.set(true);
                 needPrussianFormationCall.set(true);
             }
-
         }
 
         boolean phase5Forced = "5".equals(currentPhase.getId()) && !prIsComplete;
@@ -398,12 +386,10 @@ public class OperatingRound_1835 extends OperatingRound {
         boolean currentPfrTriggeredVal = pfrTriggeredThisOR.value();
 
         if ((pfrTriggered || phase5Forced) && !currentPfrTriggeredVal) {
-
             pfrTriggeredThisOR.set(true);
             needPrussianFormationCall.set(true);
         }
     }
-    // ... (rest of the method) ...
 
     public void clearPfrTriggerFlag_AI() {
         this.needPrussianFormationCall.set(false);
@@ -423,13 +409,6 @@ public class OperatingRound_1835 extends OperatingRound {
                     Bank.format(this, orWorthIncrease)));
         }
 
-        // Double-PFR Prevention:
-        // If PFR was triggered and completed during this OR, explicitly tell
-        // GameManager
-        // to consider it "Handled/Declined" right before we exit the OR.
-        // This prevents the GameManager from seeing the "Phase 5 + No Prussian"
-        // condition
-        // as valid again immediately at the start of the Stock Round.
         if (pfrTriggeredThisOR.value()) {
             ((GameManager_1835) gameManager).setPfrDeclined();
         }
@@ -466,51 +445,53 @@ public class OperatingRound_1835 extends OperatingRound {
         return result;
     }
 
+
+    // ... (lines of unchanged context code) ...
     @Override
     public boolean layTile(LayTile action) {
-        // SAFETY NET: Force cleanup of closed private properties immediately before
-        // processing.
-        // This handles cases where the AI "Skipped" the proper cleanup phase.
+        // SAFETY NET: Force cleanup of closed private properties immediately before processing.
         forceCleanupGhosts();
 
+       
         PublicCompany company = action.getCompany();
         boolean isBAHomeLay = company.getId().equals("BA") &&
                 !company.hasOperated() &&
                 action.getChosenHex().isHomeFor(company) &&
                 !this.mandatoryBadenTokenLaid.value();
 
-        // // DIAGNOSTIC LOGGING: Track marker disappearance
-        // // We capture the state of tokens on the hex BEFORE the tile lay logic executes.
-        // MapHex hex = action.getChosenHex();
-        // List<String> tokensBefore = hex.getStops().stream()
-        //         .flatMap(s -> s.getTokens().stream())
-        //         // FIX: Owner interface only has getId(), removed getName() call.
-        //         .map(t -> "Owner:" + t.getOwner().getId())
-        //         .collect(Collectors.toList());
+        // Snapshot state for potential restoration (PfB Logic)
+        boolean wasNormalLaid = normalTileLaidThisTurn.value();
+        GameDef.OrStep stepBefore = getStep();
+        Map<String, Integer> laysSnapshot = new HashMap<>();
+        for (String key : tileLaysPerColour.viewKeySet()) {
+            laysSnapshot.put(key, tileLaysPerColour.get(key));
+        }
 
-        // log.info("DIAGNOSTIC: Pre-LayTile on Hex {}. Existing Tokens: {}", hex.getId(), tokensBefore);
-        // --- END FIX ---
-
+        // Execute the parent action
         boolean result = super.layTile(action);
 
-        // // --- START FIX ---
-        // // DIAGNOSTIC LOGGING: Check result
-        // // We capture the state AFTER the lay. If 'tokensBefore' differs from
-        // // 'tokensAfter', we know the engine deleted a token during validation.
-        // List<String> tokensAfter = hex.getStops().stream()
-        //         .flatMap(s -> s.getTokens().stream())
-        //         // FIX: Owner interface only has getId(), removed getName() call.
-        //         .map(t -> "Owner:" + t.getOwner().getId())
-        //         .collect(Collectors.toList());
 
-        // if (!tokensBefore.equals(tokensAfter)) {
-        //     log.warn("DIAGNOSTIC: Token Change Detected! Before: {}, After: {}", tokensBefore, tokensAfter);
-        // }
-        // --- END FIX ---
+        // --- PfB/PF State Restoration Logic ---
+        // (Handles the specific complexity of PfB/PF multi-step interactions)
+        boolean isPfB = false;
+        SpecialProperty actionSp = action.getSpecialProperty();
+        if (result && actionSp != null && 
+            actionSp.getOriginalCompany() != null && 
+            ("PfB".equals(actionSp.getOriginalCompany().getId()) || "PF".equals(actionSp.getOriginalCompany().getId()))) {
+            isPfB = true;
+        }
+        
+        if (result && isPfB) {
+            normalTileLaidThisTurn.set(wasNormalLaid);
+            tileLaysPerColour.clear(); 
+            tileLaysPerColour.initFromMap(laysSnapshot); 
+            if (getStep() != stepBefore && !action.getChosenHex().getId().equals("L6")) {
+                setStep(stepBefore);
+            }
+        }
 
         if (result) {
             SpecialProperty sp = action.getSpecialProperty();
-
             // 1. OBB Extra Tile Limit Check
             if (sp instanceof SpecialSingleTileLay) {
                 String loc = ((SpecialSingleTileLay) sp).getLocationNameString();
@@ -518,7 +499,6 @@ public class OperatingRound_1835 extends OperatingRound {
                     hasLaidExtraOBBTile.set(true);
                 }
             }
-
             // 2. OBB Map Check
             checkOBBClosure();
         }
@@ -527,9 +507,9 @@ public class OperatingRound_1835 extends OperatingRound {
             setStep(GameDef.OrStep.LAY_TOKEN);
         }
 
+        // --- Baden Interruption Check ---
         if (result && action.getChosenHex().getId().equals("L6")) {
             PublicCompany ba = companyManager.getPublicCompany("BA");
-
             boolean isBrownUpgrade = false;
             if (action.getLaidTile() != null) {
                 String color = action.getLaidTile().getColourText();
@@ -538,87 +518,95 @@ public class OperatingRound_1835 extends OperatingRound {
                 }
             }
 
-            if (!company.equals(ba) && ba.hasStarted() && !this.mandatoryBadenTokenLaid.value() && !isBrownUpgrade) {
+            if (!company.equals(ba) && ba.hasFloated() && !this.mandatoryBadenTokenLaid.value() && !isBrownUpgrade) {
                 interruptedCompany.set(company);
                 operatingCompany.set(ba);
                 playerManager.setCurrentPlayer(ba.getPresident());
                 awaitingBadenHomeToken.set(true);
             }
         }
+
+        // --- START FIX: WATERTIGHT SEQUENCE ENFORCEMENT ---
+        // Goal: Support "Normal Tile -> Special Tile" sequence ROBUSTLY.
+        // Logic: If the engine auto-advanced the step, but we still have a usable special property,
+        // we FORCE the step back to LAY_TRACK. This compels the user to either use the property
+        // or explicitly click "Done", which writes a NullAction to the log. 
+        // This explicitly recorded "Done" ensures future replays never desync.
+        if (result && getStep() != GameDef.OrStep.LAY_TRACK 
+                && company.equals(operatingCompany.value()) 
+                && !awaitingBadenHomeToken.value()) {
+
+            boolean hasUsableSpecial = false;
+            List<SpecialTileLay> specials = getSpecialProperties(SpecialTileLay.class);
+
+            if (specials != null) {
+                for (SpecialTileLay sp : specials) {
+                    // Filter 1: Already used?
+                    if (sp.isExercised()) continue;
+
+                    // Filter 2: OBB Limit (already laid M15/M17 this turn?)
+                    if (sp instanceof SpecialSingleTileLay) {
+                        String loc = ((SpecialSingleTileLay) sp).getLocationNameString();
+                        if (loc != null && loc.matches("M1[57]") && hasLaidExtraOBBTile.value()) {
+                            continue;
+                        }
+                    }
+
+                    // Filter 3: Don't count the property we *just* used
+                    if (action.getSpecialProperty() == sp) {
+                        continue;
+                    }
+
+                    hasUsableSpecial = true;
+                    break;
+                }
+            }
+
+            if (hasUsableSpecial) {
+                setStep(GameDef.OrStep.LAY_TRACK);
+            }
+        }
+        // --- END FIX ---
+
         return result;
     }
 
-    // Method: forceCleanupGhosts
 
     private void forceCleanupGhosts() {
         for (PrivateCompany pc : companyManager.getAllPrivateCompanies()) {
             if (pc.isClosed()) {
-                // Try to clean regardless of what the getter says,
-                // because the getter might return a non-empty immutable view of a stale state.
                 removeSpecialProperties(pc);
             }
         }
     }
  
-    /**
-     * Helper to safely clear special properties from a closed private.
-     * STRATEGY:
-     * 1. Bypass the getter (which returns an ImmutableSet).
-     * 2. Use reflection to get the private 'specialProperties' field
-     * (PortfolioSet).
-     * 3. Use reflection again to get the inner 'portfolio' field (TreeSetState).
-     * 4. Call clear() on the TreeSetState.
-     */
     private void removeSpecialProperties(PrivateCompany pc) {
         if (pc == null)
             return;
 
         try {
-
-            // STEP 1: Get the private 'specialProperties' field from PrivateCompany
             java.lang.reflect.Field portfolioSetField = getFieldInHierarchy(pc.getClass(), "specialProperties");
-            if (portfolioSetField == null) {
-                return;
-            }
+            if (portfolioSetField == null) return;
             portfolioSetField.setAccessible(true);
             Object portfolioSetObj = portfolioSetField.get(pc);
+            if (portfolioSetObj == null) return;
 
-            if (portfolioSetObj == null) {
-                return;
-            }
-
-            // STEP 2: Get the private 'portfolio' field from the PortfolioSet object
-            // (We confirmed this field exists in your PortfolioSet.java upload)
-            java.lang.reflect.Field internalPortfolioField = getFieldInHierarchy(portfolioSetObj.getClass(),
-                    "portfolio");
-            if (internalPortfolioField == null) {
-                log.error("DIAGNOSTIC: Field 'portfolio' not found in {}", portfolioSetObj.getClass().getName());
-                return;
-            }
+            java.lang.reflect.Field internalPortfolioField = getFieldInHierarchy(portfolioSetObj.getClass(), "portfolio");
+            if (internalPortfolioField == null) return;
             internalPortfolioField.setAccessible(true);
             Object treeSetStateObj = internalPortfolioField.get(portfolioSetObj);
+            if (treeSetStateObj == null) return;
 
-            if (treeSetStateObj == null) {
-                return;
-            }
-
-            // STEP 3: Invoke clear() on the TreeSetState
-            // TreeSetState usually implements Collection or has a clear() method.
             try {
                 java.lang.reflect.Method clearMethod = treeSetStateObj.getClass().getMethod("clear");
                 clearMethod.invoke(treeSetStateObj);
             } catch (Exception e) {
-                // Fallback if it is a Collection
                 if (treeSetStateObj instanceof java.util.Collection) {
                     ((java.util.Collection<?>) treeSetStateObj).clear();
                 } else {
-                    log.error("DIAGNOSTIC: Could not clear final object of type {}",
-                            treeSetStateObj.getClass().getName());
                 }
             }
-
         } catch (Exception e) {
-            log.error("DIAGNOSTIC: Double-Reflection cleanup CRASHED for {}: {}", pc.getId(), e.toString());
             e.printStackTrace();
         }
     }
@@ -658,19 +646,20 @@ public class OperatingRound_1835 extends OperatingRound {
         boolean isInterruption = awaitingBadenHomeToken.value();
         boolean isSpecial = (action.getType() != LayBaseToken.GENERIC);
 
-        if (!isSpecial && tokensLaidCount > 0) {
+// Use the proper State object check. This ensures strict 1-token limits AND supports Undo/Redo.
+        // Previous logic using local 'tokensLaidCount' failed on Undo and didn't update the UI state.
+        if (!isSpecial && normalTokenLaidThisTurn.value()) {
             return false;
         }
+
 
         boolean result = super.layBaseToken(action);
 
         if (result) {
-            // Close Private if Special Property Used (NF/PfB Token)
             closePrivateIfSpecial(action.getSpecialProperty());
         }
 
         if (result && isInterruption) {
-
             this.mandatoryBadenTokenLaid.set(true);
             awaitingBadenHomeToken.set(false);
 
@@ -679,6 +668,14 @@ public class OperatingRound_1835 extends OperatingRound {
                 operatingCompany.set(originalCompany);
                 playerManager.setCurrentPlayer(originalCompany.getPresident());
                 interruptedCompany.set(null);
+                
+                // CRITICAL FIX: Restoration of Step for Original Company
+                // The original company (likely BY) was interrupted during Tile Laying.
+                // We must return the game state to LAY_TRACK so they can finish their turn.
+                setStep(GameDef.OrStep.LAY_TRACK);
+                
+                // We also ensure the transient token list for BY is clear to avoid state pollution
+                if (currentNormalTokenLays != null) currentNormalTokenLays.clear();
             }
             return true;
         }
@@ -692,9 +689,6 @@ public class OperatingRound_1835 extends OperatingRound {
             return true;
         }
 
-        if (result && !isSpecial) {
-            tokensLaidCount++;
-        }
         return result;
     }
 
@@ -716,10 +710,7 @@ public class OperatingRound_1835 extends OperatingRound {
             // PfB: Closes on Token Lay (not Tile Lay)
             if ("NF".equals(id) || "PfB".equals(id)) {
                 owner.close();
-                // --- START FIX ---
-                // KILL THE ZOMBIE: Explicitly strip properties to prevent ghost blocking
                 removeSpecialProperties(owner);
-                // --- END FIX ---
                 ReportBuffer.add(this, LocalText.getText("CompanyCloses", owner.getId()));
             }
         }
@@ -733,7 +724,6 @@ public class OperatingRound_1835 extends OperatingRound {
             MapHex m15 = getRoot().getMapManager().getHex("M15");
             MapHex m17 = getRoot().getMapManager().getHex("M17");
 
-            // Use !isPreprintedTileCurrent() to check if a tile has been laid
             if (m15 != null && !m15.isPreprintedTileCurrent() &&
                     m17 != null && !m17.isPreprintedTileCurrent()) {
 
@@ -744,20 +734,12 @@ public class OperatingRound_1835 extends OperatingRound {
         }
     }
 
-    /**
-     * Closes the "Simple" Privates that disappear in Phase 5 without compensation.
-     * Exempts BB and HB, as they must be exchanged for shares in the PFR.
-     */
     private void closePhase5Privates() {
         for (PrivateCompany pc : companyManager.getAllPrivateCompanies()) {
             if (pc.isClosed())
                 continue;
 
             String id = pc.getId();
-
-            // BB and HB are exchangeable for PR shares. They must stay open
-            // until the PFR processes them.
-            // All others (NF, LD, OBB, PfB, etc.) are removed from the game now.
             if (!"BB".equals(id) && !"HB".equals(id)) {
                 pc.close();
                 removeSpecialProperties(pc);
@@ -766,43 +748,32 @@ public class OperatingRound_1835 extends OperatingRound {
         }
     }
 
-    /**
-     * * This ensures that NO part of the game round (Action Generation, Map
-     * Validation, Token Logic) ever sees a property belonging to a Closed private
-     * company.
-     * * 1. Prevents creation of "Ghost Actions" (e.g. WT laying token on L14).
-     * 2. Prevents "Disappearing Markers" by stopping invalid blocking checks on L6.
-     */
     @Override
     public <T extends SpecialProperty> List<T> getSpecialProperties(Class<T> clazz) {
-        // 1. Get the raw list from the standard engine (which ignores closed status)
         List<T> properties = super.getSpecialProperties(clazz);
-
         if (properties != null && !properties.isEmpty()) {
-            // --- START FIX ---
-            // 2. Strict Filter: Remove anything owned by a Closed Private Company
-            // Added logging to detect "Ghost" property suppression
             properties.removeIf(sp -> {
                 boolean remove = sp.getOriginalCompany() instanceof PrivateCompany &&
                         ((PrivateCompany) sp.getOriginalCompany()).isClosed();
                 if (remove) {
-                    log.info("DIAGNOSTIC: Suppressed Ghost Property from Closed Company: {}",
-                            sp.getOriginalCompany().getId());
+                
                 }
                 return remove;
             });
-            // --- END FIX ---
         }
         return properties;
     }
 
     @Override
     public boolean setPossibleActions() {
-        // 1. Reverted Debug Logging to clean state
-
-        // 2. Existing 1835 Logic (Baden Home Token Interruption)
         if (awaitingBadenHomeToken.value()) {
             possibleActions.clear();
+            // CRITICAL FIX: Reset the doneAllowed flag. 
+            // Since we do not call super.setPossibleActions(), this flag retains its 
+            // 'true' state from the previous player's (BY) LAY_TRACK step.
+            // This prevents the generation of a 'SKIP' action which causes an infinite loop.
+            doneAllowed.set(false);
+
             PublicCompany ba = companyManager.getPublicCompany("BA");
             MapHex l6 = getRoot().getMapManager().getHex("L6");
 
@@ -819,8 +790,7 @@ public class OperatingRound_1835 extends OperatingRound {
 
                 possibleActions.add(action);
             }
-pruneGhostActions();
-
+            // DO NOT PRUNE HERE - BADEN needs these specific actions
             return true;
         }
 
@@ -831,7 +801,6 @@ pruneGhostActions();
         GameDef.OrStep step = getStep();
         PublicCompany company = operatingCompany.value();
 
-        // 3. Existing 1835 Logic (Initial Step)
         if (step == GameDef.OrStep.INITIAL) {
             initTurn();
 
@@ -842,19 +811,17 @@ pruneGhostActions();
                 }
                 if (homeHex != null && !homeHex.isPreprintedTileCurrent() && !homeHex.hasTokenOfCompany(company)) {
                     setStep(GameDef.OrStep.LAY_TOKEN);
-                    boolean result = setPossibleActions(); // Recursive
-pruneGhostActions();
+                    boolean result = setPossibleActions();
+                    pruneGhostActions();
                     return result;
                 }
             }
             nextStep();
-            boolean result = setPossibleActions(); // Recursive
+            boolean result = setPossibleActions();
             pruneGhostActions();
-
             return result;
         }
 
-        // 4. Existing 1835 Logic (Lay Track)
         if (step == GameDef.OrStep.LAY_TRACK) {
             if (company.getId().equals("BA") && !company.hasOperated()) {
                 MapHex homeHex = null;
@@ -866,13 +833,12 @@ pruneGhostActions();
                     possibleActions.clear();
                     possibleActions.addAll(getNormalTileLays(true));
                     possibleActions.addAll(getSpecialTileLays(true));
-pruneGhostActions();
+                    pruneGhostActions();
                     return true;
                 }
             }
         }
 
-        // 5. Existing 1835 Logic (Lay Token)
         if (step == GameDef.OrStep.LAY_TOKEN) {
             if (company.getId().equals("BA") && !company.hasOperated() && !this.mandatoryBadenTokenLaid.value()) {
                 possibleActions.clear();
@@ -890,42 +856,15 @@ pruneGhostActions();
                         stationChoice.setButtonLabel(buttonLabel);
 
                         possibleActions.add(stationChoice);
-
-                        pruneGhostActions();
                     }
                 }
-
+                pruneGhostActions();
                 return true;
             }
         }
 
-        // 6. Standard Logic for all other cases
         boolean result = super.setPossibleActions();
 
-        // CRITICAL FIX: Prune "Ghost Actions" from Closed Privates.
-        // The engine may generate actions for properties held by Public Companies
-        // even if the original Private Company is closed. Executing these causes state
-        // corruption
-        // (e.g. disappearing tokens on L14).
-        if (result && !possibleActions.isEmpty()) {
-            // Fix: Use getList() to iterate over a safe copy, as PossibleActions is not
-            // Iterable.
-            for (PossibleAction action : possibleActions.getList()) {
-                SpecialProperty sp = null;
-                if (action instanceof LayBaseToken) {
-                    sp = ((LayBaseToken) action).getSpecialProperty();
-                } else if (action instanceof LayTile) {
-                    sp = ((LayTile) action).getSpecialProperty();
-                }
-
-                if (sp != null && sp.getOriginalCompany() instanceof PrivateCompany) {
-                    if (((PrivateCompany) sp.getOriginalCompany()).isClosed()) {
-                        possibleActions.remove(action);
-                    }
-                }
-            }
-        }
-        
         if (result && !possibleActions.isEmpty()) {
             pruneGhostActions();
         }
@@ -933,16 +872,10 @@ pruneGhostActions();
         return result;
     }
 
-    /**
-     * Centralized method to remove actions generated by Closed Private Companies.
-     * This prevents the AI from simulating invalid "Ghost" moves that corrupt the
-     * map state.
-     */
     private void pruneGhostActions() {
         if (possibleActions.isEmpty())
             return;
 
-        // Create a safe copy to iterate to avoid ConcurrentModification
         List<PossibleAction> actions = new ArrayList<>(possibleActions.getList());
         
         for (PossibleAction action : actions) {
@@ -960,6 +893,4 @@ pruneGhostActions();
             }
         }
     }
-
-
 }

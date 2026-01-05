@@ -170,7 +170,6 @@ public class LayBaseToken extends LayToken {
         return (type == LayBaseToken.CORRECTION);
     }
 
-    // --- START FIX ---
     @Override
     public String toString() {
         StringBuilder sb = new StringBuilder();

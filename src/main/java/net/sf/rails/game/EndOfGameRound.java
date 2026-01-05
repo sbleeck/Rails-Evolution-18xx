@@ -37,14 +37,11 @@ public final class EndOfGameRound extends Round {
     public boolean setPossibleActions() {
         possibleActions.clear();
         
-        // --- START FIX ---
         // Logic to show FinalRankingDialog has been completely removed.
         // This method now ensures no erroneous buttons appear, but triggers no UI.
         return true;
-        // --- END FIX ---
     }
     
-    // --- DELETE ---
     // Class FinalRankingDialog removed entirely.
 
     public GuiHints getGuiHints() {

@@ -388,7 +388,6 @@ public class AIPlayer implements Actor {
 
 if (!validTileLays.isEmpty() && operatingCompany != null) {
             
-            // --- START FIX ---
             // 1. OPTIMIZATION: Sort moves to evaluate high-potential hexes (Cities/Towns) first.
             // This ensures that if we time out, we likely already checked the best upgrades.
             Collections.sort(validTileLays, new Comparator<TileLayOption>() {
@@ -541,7 +540,6 @@ if (!validTileLays.isEmpty() && operatingCompany != null) {
         // 4. Final Decision
         if (bestAction != null && bestOverallScore > -9000.0) {
 
-            // --- START FIX ---
             // CRITICAL FIX: Map "Synthetic" or "Stale" actions back to the live
             // 'possibleActions' list.
             // The AI Pathfinder/Strategy services often work with copies (Options) or
@@ -753,7 +751,6 @@ if (!validTileLays.isEmpty() && operatingCompany != null) {
 
 // ... (lines of unchanged context code) ...
     private PossibleAction findFallbackAction(List<PossibleAction> actions) {
-        // --- START FIX ---
         // Priority 1: Check for explicit "DONE" Mode (The Fix for AI syncing)
         for (PossibleAction action : actions) {
             if (action instanceof NullAction) {

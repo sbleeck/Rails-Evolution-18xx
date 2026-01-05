@@ -528,10 +528,18 @@ private void addGenericTokenLays(LayBaseToken action) {
         } catch (Exception e) {
         }
 
-        if (this.getORWindow() != null && this.getORWindow().isVisible()) {
-            this.getORWindow().requestFocus();
-        }
+        // if (this.getORWindow() != null && this.getORWindow().isVisible()) {
+        //     this.getORWindow().requestFocus();
+        // }
 
+        // Only grab focus if we are actually in an Operating Round
+        if (gameUIManager.getCurrentRound() instanceof OperatingRound 
+             || gameUIManager.getCurrentRound() instanceof PrussianFormationRound) {
+             
+            if (this.getORWindow() != null && this.getORWindow().isVisible()) {
+                this.getORWindow().requestFocus();
+            }
+        }
     }
 
     private void displayRemainingTiles() {
@@ -1669,7 +1677,7 @@ private void addGenericTokenLays(LayBaseToken action) {
                     upgradePanel.nextSelection();
                 }
 
-                // --- START FIX: Restore Focus After Interaction ---
+                // Restore Focus After Interaction ---
                 if (orWindow != null && orPanel != null) {
                     orPanel.requestFocusInWindow();
                 }
@@ -1685,7 +1693,7 @@ private void addGenericTokenLays(LayBaseToken action) {
                     map.selectHex(null);
                 }
                 setLocalStep(LocalSteps.SELECT_HEX);
-                // --- START FIX: Restore Focus After Deactivation ---
+                //  Restore Focus After Deactivation ---
                 if (orWindow != null && orPanel != null) {
                     orPanel.requestFocusInWindow();
                 }
@@ -1957,12 +1965,20 @@ public void setMapRelatedActions(PossibleActions actions) {
             gameUIManager.getStatusWindow().getGameStatus().refreshDashboard();
         }
 
-        // CRITICAL: Reclaim window focus immediately after Status Window updates.
-        // If StatusWindow stole focus, ORPanel.requestFocusInWindow() (called later)
-        // would fail.
-        if (orWindow != null && orWindow.isVisible()) {
-            orWindow.toFront(); // Ensure window is z-ordered top
-            orWindow.requestFocus(); // Ensure window is "Active"
+        // // CRITICAL: Reclaim window focus immediately after Status Window updates.
+        // // If StatusWindow stole focus, ORPanel.requestFocusInWindow() (called later)
+        // // would fail.
+        // if (orWindow != null && orWindow.isVisible()) {
+        //     orWindow.toFront(); // Ensure window is z-ordered top
+        //     orWindow.requestFocus(); // Ensure window is "Active"
+        // }
+
+if (currentRound instanceof OperatingRound || currentRound instanceof PrussianFormationRound) {
+            // CRITICAL: Reclaim window focus immediately after Status Window updates.
+            if (orWindow != null && orWindow.isVisible()) {
+                orWindow.toFront(); // Ensure window is z-ordered top
+                orWindow.requestFocus(); // Ensure window is "Active"
+            }
         }
 
         // --- 1. EXTRACT UNDO/REDO EARLY ---
@@ -2357,7 +2373,6 @@ public void updateHexBuildNumbers(boolean show) {
                 String hexId = guiHex.getHex().getId();
                 StringBuilder overlayText = new StringBuilder(hexId);
 
-                // --- START FIX ---
                 for (HexUpgrade upgrade : hexUpgrades.getUpgrades(guiHex)) {
                      if (upgrade instanceof TokenHexUpgrade) {
                          // The upgrade object already calculated the cost during 'validates()'.

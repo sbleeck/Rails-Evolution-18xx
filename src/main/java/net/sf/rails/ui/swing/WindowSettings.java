@@ -11,10 +11,12 @@ import net.sf.rails.util.SystemOS;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-
 public class WindowSettings {
 
     private final Map<String, Rectangle> settings = new HashMap<>();
+    // --- START FIX ---
+    private final Map<String, String> properties = new HashMap<>();
+    // --- END FIX ---
     private final String filepath;
     private final String defaultpath;
     private boolean defaultUsed = false;
@@ -31,7 +33,6 @@ public class WindowSettings {
     }
 
     private Rectangle rectangle (String windowName) {
-
         if (settings.containsKey(windowName)) {
             return settings.get(windowName);
         } else {
@@ -45,6 +46,19 @@ public class WindowSettings {
         return rectangle (w.getClass().getSimpleName());
     }
 
+    // --- START FIX ---
+    public String getProperty(String key) {
+        String val = properties.get(key);
+        log.info("WindowSettings: Retrieval request for key '{}' returned '{}'", key, val);
+        return val;
+    }
+
+    public void setProperty(String key, String value) {
+        log.info("WindowSettings: Setting property '{}' to '{}'", key, value);
+        properties.put(key, value);
+    }
+    // --- END FIX ---
+
     public boolean isDefaultUsed() {
         return defaultUsed;
     }
@@ -52,31 +66,53 @@ public class WindowSettings {
     public void load () {
         FileReader file;
         try {
+            log.info("WindowSettings: Attempting to load settings from '{}'", filepath);
             file = new FileReader (filepath);
         } catch (FileNotFoundException e1) {
+            log.warn("WindowSettings: User settings file not found at '{}'. Attempting default.", filepath);
             try {
                 file = new FileReader (defaultpath);
             } catch (FileNotFoundException e2) {
+                log.warn("WindowSettings: Default settings file not found at '{}'. Aborting load.", defaultpath);
                 return;
             }
             defaultUsed = true;
         }
         try (BufferedReader in = new BufferedReader (file)) {
             String line;
-            String[] fields;
-            int v;
-            Rectangle r;
             while ((line = in.readLine()) != null) {
-                fields = line.split("[\\.=]");
-                if (fields.length < 3) continue;
-                v = Integer.parseInt(fields[2]);
-                r = rectangle(fields[0]);
-                switch (fields[1].charAt(0)) {
-                case 'X': r.x = v; break;
-                case 'Y': r.y = v; break;
-                case 'W': r.width = v; break;
-                case 'H': r.height = v; break;
+                // --- START FIX ---
+                // Split on the first '=' only to separate key and value
+                String[] parts = line.split("=", 2);
+                if (parts.length < 2) {
+                    continue;
                 }
+                
+                String key = parts[0].trim();
+                String value = parts[1].trim();
+
+                // Check if this is a window dimension (Ends in .X, .Y, .W, .H)
+                if (key.endsWith(".X") || key.endsWith(".Y") || key.endsWith(".W") || key.endsWith(".H")) {
+                    try {
+                        String windowName = key.substring(0, key.length() - 2);
+                        char dimension = key.charAt(key.length() - 1);
+                        int v = Integer.parseInt(value);
+                        Rectangle r = rectangle(windowName);
+                        
+                        switch (dimension) {
+                            case 'X': r.x = v; break;
+                            case 'Y': r.y = v; break;
+                            case 'W': r.width = v; break;
+                            case 'H': r.height = v; break;
+                        }
+                    } catch (Exception e) {
+                        log.warn("Failed to parse window setting line: {}", line);
+                    }
+                } else {
+                    // It is a generic property (like font.ui.scale)
+                    properties.put(key, value);
+                }
+                // --- END FIX ---
             }
         } catch (Exception e) {
             log.error("Error while loading {}", filepath, e);
@@ -97,7 +133,7 @@ public class WindowSettings {
 
     public void save () {
         // Save all settings to file
-        log.debug("Saving all window settings");
+         
         try(PrintWriter out = new PrintWriter (new FileWriter (new File (filepath)))) {
             Rectangle r;
             Set<String> keys = new TreeSet<String> (settings.keySet());
@@ -108,11 +144,23 @@ public class WindowSettings {
                 out.println(name+".W="+r.width);
                 out.println(name+".H="+r.height);
             }
+            
+            // --- START FIX ---
+            // Save generic properties
+            Set<String> propKeys = new TreeSet<>(properties.keySet());
+  
+
+            for (String key : propKeys) {
+                String val = properties.get(key);
+                out.println(key + "=" + val);
+            }
+            
+            out.flush(); // Force write to disk
+
+
         } catch (Exception e) {
             log.error ("Exception while saving window settings", e);
+            e.printStackTrace();
         }
     }
-
-
 }
-

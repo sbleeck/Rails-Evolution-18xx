@@ -56,7 +56,7 @@ public class PrussianFormationRound extends Round implements I_MapRenderableRoun
 public static class PresidencySwapChoice extends PossibleAction {
         private static final long serialVersionUID = 1L;
         private final int optionIndex;
-        // FIX: Cast null to (RailsRoot)
+        // Cast null to (RailsRoot)
         public PresidencySwapChoice(int index) { super((RailsRoot)null); this.optionIndex = index; } 
         public int getOptionIndex() { return optionIndex; }
         @Override public String toString() { return "SwapOption:" + optionIndex; }
@@ -77,7 +77,6 @@ public static class PresidencySwapChoice extends PossibleAction {
     // StringState uses a static factory (.create)
     private final StringState startingPlayerName = StringState.create(this, "StartingPlayerName", null);
 
-    // Kept from previous fix
     private final IntegerState mergeTurnCount = IntegerState.create(this, "MergeTurnCount", 0);
 
     // Transient reference (re-fetched via startingPlayerName)
@@ -741,11 +740,21 @@ public void start() {
             return false;
         }
         possibleActions.clear();
-
         this.currentPlayer = playerManager.getCurrentPlayer();
 
-        // Safety fallback if player is null (happens during reloads/undos if not
-        // synced)
+        // Update the Sidebar Header to reflect the player currently required to act.
+        // This ensures the name changes as the turn passes during the exchange phase.
+        if (this.currentPlayer != null) {
+            try {
+                Class<?> orPanelClass = Class.forName("net.sf.rails.ui.swing.ORPanel");
+                java.lang.reflect.Method setHeader = orPanelClass.getMethod("setGlobalCustomHeader", String.class, String.class);
+                setHeader.invoke(null, "Prussian Formation", this.currentPlayer.getName() + ": ?");
+            } catch (Throwable t) {
+                // Ignore if UI class not found
+            }
+        }
+
+        // Safety fallback if player is null (happens during reloads/undos if not synced)
         if (this.currentPlayer == null) {
             if (this.startingPlayer != null) {
                 this.currentPlayer = this.startingPlayer;
@@ -813,6 +822,14 @@ public void start() {
 
             if (currentPlayer == null) {
                    return false;
+            }
+            // Skepsis check: If there are no companies to fold, do not ask the player.
+            // Automatically advance to the next player's turn or next step.
+            if (foldablePrePrussians.isEmpty()) {
+                log.info("PFR-MERGE: {} has no exchangeable companies. Auto-skipping.", currentPlayer.getName());
+                // We execute a NullAction DONE internally to advance the state machine
+                finishTurn();
+                return setPossibleActions(); // Recurse for the next player
             }
 
             String playerName = currentPlayer.getName();
@@ -973,6 +990,4 @@ public void start() {
 
         ReportBuffer.add(this, LocalText.getText("IS_NOW_PRES_OF", newCandidate.getName(), prussian.getId()));
     }
-    // --- END FIX ---
-
 }

@@ -3010,7 +3010,6 @@ protected void initTurn() {
             int cashToRaise = Math.max(0, pricePaid - companyCash);
             if (action.isForcedBuyIfHasRoute() || action.isForcedBuyIfNoRoute()) {
 
-                // --- START FIX ---
                 // REVERT: Removing "Bank Bailout" House Rule.
                 // We restore the standard logic which allows the president to sell shares
                 // via startShareSellingRound if they have enough assets.
@@ -4608,6 +4607,11 @@ nextStep(); // Advance from INITIAL to LAY_TRACK (or whatever comes next)
             if (stl != null) {
                 stl.setExercised();
                 currentSpecialTokenLays.remove(action);
+            }
+            // Update the state to enforce the "one token per turn" limit for all games.
+            // 'extra' is true for Special Properties or Home City lays.
+            if (!extra) {
+                normalTokenLaidThisTurn.set(true);
             }
 
             // Jump out if we aren't in the token laying step or it is a correction lay

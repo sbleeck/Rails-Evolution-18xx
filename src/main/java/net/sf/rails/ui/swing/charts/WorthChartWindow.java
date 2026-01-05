@@ -347,7 +347,6 @@ public class WorthChartWindow extends JDialog {
             this.history = new LinkedHashMap<>(gm.getPlayerWorthHistory());
             this.assetHistory = gm.getPlayerAssetHistory();
             
-            // --- START FIX: Add "Time Adj" Round ---
             if (this.history.containsKey("End")) {
                 Map<String, Double> endSnapshot = this.history.get("End");
                 Map<String, Double> adjSnapshot = new java.util.HashMap<>(endSnapshot);
@@ -362,7 +361,6 @@ public class WorthChartWindow extends JDialog {
                 
                 this.history.put("Time Adj", adjSnapshot);
             }
-            // --- END FIX ---
             
             this.majorCompanies = gm.getAllPublicCompanies().stream()
                 .filter(c -> c.hasParPrice() && !c.getId().matches("M\\d+"))

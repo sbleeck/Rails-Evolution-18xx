@@ -218,7 +218,14 @@ public class GameUIManager implements DialogOwner {
             // TODO: confirm game close if in turn and polling?
         }
         OpenGamesManager.getInstance().removeGame(this);
+
+if (windowSettings != null) {
+    log.info("GameUIManager: Closing game. Saving font.ui.scale '{}' to WindowSettings.", this.currentFontScale);
+            windowSettings.setProperty("font.ui.scale", String.valueOf(this.currentFontScale));
+        }
         getWindowSettings().save();
+
+        
         if (startRoundWindow != null) {
             startRoundWindow.close();
         }
@@ -249,8 +256,11 @@ public class GameUIManager implements DialogOwner {
 
 public void terminate() {
         // Save Window Positions
+if (windowSettings != null) {
+             windowSettings.setProperty("font.ui.scale", String.valueOf(this.currentFontScale));
+        }
         getWindowSettings().save();
-        
+
         // Save Font Scale
         Config.set("font.ui.scale", String.valueOf(this.currentFontScale));
         
@@ -325,8 +335,22 @@ public void terminate() {
             }
         }
 
-        // --- NEW: Restore Saved Scale ---
-        String savedScale = Config.get("font.ui.scale");
+// Check WindowSettings first (preferred storage), then Config (fallback)
+       String savedScale = null;
+       if (windowSettings != null) {
+            savedScale = windowSettings.getProperty("font.ui.scale");
+            log.info("GameUIManager: Loaded saved font scale from WindowSettings: '{}'", savedScale);
+        } else {
+            log.warn("GameUIManager: WindowSettings is null during initFontSettings!");
+        }
+
+        if (!Util.hasValue(savedScale)) {
+            savedScale = Config.get("font.ui.scale");
+            log.info("GameUIManager: Fallback to Config for font scale: '{}'", savedScale);
+        }
+
+     
+
         if (Util.hasValue(savedScale)) {
             try {
                 this.currentFontScale = Double.parseDouble(savedScale);
@@ -628,8 +652,8 @@ public void updateUI() {
                         setMeVisible(orWindow, orWindowVisibilityHint);
                         previousORWindowVisibilityHint = orWindowVisibilityHint;
                     }
-                    if (orWindowVisibilityHint)
-                        setMeToFront(orWindow);
+                    // if (orWindowVisibilityHint)
+                    //     setMeToFront(orWindow);
                     break;
                 case START_ROUND:
                     // Handled elsewhere
@@ -711,7 +735,6 @@ showPlayerWorthChart();        }
         // effectively stealing the focus back if they took it.
 if (activeWindow == startRoundWindow && startRoundWindow != null) {
             SwingUtilities.invokeLater(() -> {
-                // --- START FIX ---
                 // CRITICAL: Check for null AGAIN inside the thread. 
                 // The window might have been closed/nulled while this event was waiting in the queue.
                 if (startRoundWindow != null && startRoundWindow.isVisible()) {
@@ -1431,8 +1454,9 @@ private void updateWindowsLookAndFeel() {
         if (this.currentFontScale == newScale)
             return; // No change
 
-
         this.currentFontScale = newScale;
+
+
 
         // Re-get the base font from config
         String fontType = Config.getGameSpecific(railsRoot.getGameName(), "font.ui.name");
@@ -1457,6 +1481,10 @@ private void updateWindowsLookAndFeel() {
         updateWindowsLookAndFeel();
     }
 
+    public double getFontScale() {
+        return this.currentFontScale;
+    }
+    
     // Forwards the format() method to the server
     // EV: Not really. The client also knows about the Bank
     // and all static configuration details. All the complexities
@@ -1953,9 +1981,7 @@ public void fitMapToWidth() {
             if (getGameManager() != null) {
                 historyText = getGameManager().getLastActionSummary();
                 
-                // --- START FIX: Use ActionCountModel for official log sync ---
                 moveCount = "Move: " + getGameManager().getActionCountModel().value();
-                // --- END FIX ---
                 
                 RoundFacade currentRound = getGameManager().getCurrentRound();
                 if (currentRound != null) {
@@ -2308,7 +2334,6 @@ public void fitMapToWidth() {
         if (source == null) return;
 
         // 3. Select Certificate (Shares AND Privates)
-        // --- START FIX ---
         // Use the common interface 'Certificate' (or Ownable) for the list
         List<net.sf.rails.game.financial.Certificate> certs = new ArrayList<>();
         

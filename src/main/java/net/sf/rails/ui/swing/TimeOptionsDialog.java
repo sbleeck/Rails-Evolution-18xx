@@ -27,11 +27,9 @@ public class TimeOptionsDialog extends JDialog implements ActionListener {
     private final JSpinner startingTimeSpinner;
     private final JSpinner srIncrementSpinner;
     
-    // --- START FIX: Phase Specific Spinners ---
     private final JSpinner yellowIncrementSpinner;
     private final JSpinner greenIncrementSpinner;
     private final JSpinner brownIncrementSpinner;
-    // --- END FIX ---
     
     private final JSpinner undoPenaltySpinner;      // Minor (Self-Correction)
     private final JSpinner majorUndoPenaltySpinner; // Major (Disruption)
@@ -42,11 +40,9 @@ public class TimeOptionsDialog extends JDialog implements ActionListener {
     private final JButton okButton = new JButton("OK");
     private final JButton cancelButton = new JButton(LocalText.getText("Cancel"));
     
-    // --- START FIX: Renamed Presets based on Philosophy ---
     private final JButton hardcorePresetButton = new JButton("90m (Hardcore)");
     private final JButton champPresetButton = new JButton("100m (Championship)");
     private final JButton standardPresetButton = new JButton("120m (Standard)");
-    // --- END FIX ---
 
     // Constants for Presets (Seconds)
     // 90m Hardcore
@@ -67,7 +63,7 @@ public class TimeOptionsDialog extends JDialog implements ActionListener {
     private static final int ST_GRN = 85;
     private static final int ST_BRN = 40;
 
-    private static final int MINOR_PENALTY_PRESET = 10; 
+    private static final int MINOR_PENALTY_PRESET = 0; 
     private static final int MAJOR_PENALTY_PRESET = 30; 
     private static final double MODERATOR_BONUS = 1.1;
 
@@ -86,11 +82,9 @@ public class TimeOptionsDialog extends JDialog implements ActionListener {
 
         srIncrementSpinner = new JSpinner(new SpinnerNumberModel(gm.getTimeMgmtShareRoundIncrement(), 0, 3600, 5));
         
-        // --- START FIX: Phase Specific Spinners ---
         yellowIncrementSpinner = new JSpinner(new SpinnerNumberModel(gm.getTimeMgmtYellowIncrement(), 0, 600, 5));
         greenIncrementSpinner = new JSpinner(new SpinnerNumberModel(gm.getTimeMgmtGreenIncrement(), 0, 600, 5));
         brownIncrementSpinner = new JSpinner(new SpinnerNumberModel(gm.getTimeMgmtBrownIncrement(), 0, 600, 5));
-        // --- END FIX ---
 
         undoPenaltySpinner = new JSpinner(new SpinnerNumberModel(gm.getTimeMgmtUndoPenalty(), 0, 3600, 5));
         majorUndoPenaltySpinner = new JSpinner(new SpinnerNumberModel(gm.getTimeMgmtMajorUndoPenalty(), 0, 3600, 5));
@@ -151,7 +145,6 @@ public class TimeOptionsDialog extends JDialog implements ActionListener {
         gbc.gridy = ++row; gbc.gridx = 0; contentPanel.add(new JLabel(LocalText.getText("SRIncrement") + ":"), gbc);
         gbc.gridx = 1; contentPanel.add(srIncrementSpinner, gbc);
 
-        // --- START FIX: Layout for Phase Increments ---
         gbc.gridy = ++row; gbc.gridx = 0; contentPanel.add(new JLabel("Yellow Phase Increment:"), gbc); 
         gbc.gridx = 1; contentPanel.add(yellowIncrementSpinner, gbc);
 
@@ -160,7 +153,6 @@ public class TimeOptionsDialog extends JDialog implements ActionListener {
 
         gbc.gridy = ++row; gbc.gridx = 0; contentPanel.add(new JLabel("Brown Phase Increment:"), gbc); 
         gbc.gridx = 1; contentPanel.add(brownIncrementSpinner, gbc);
-        // --- END FIX ---
 
         gbc.gridy = ++row; gbc.gridx = 0; contentPanel.add(new JLabel("Penalty (Self-Correction):"), gbc);
         gbc.gridx = 1; contentPanel.add(undoPenaltySpinner, gbc);
@@ -231,11 +223,9 @@ public class TimeOptionsDialog extends JDialog implements ActionListener {
         
         gameManager.setTimeMgmtShareRoundIncrement((Integer) srIncrementSpinner.getValue());
         
-        // --- START FIX: Save Phase Values ---
         gameManager.setTimeMgmtYellowIncrement((Integer) yellowIncrementSpinner.getValue());
         gameManager.setTimeMgmtGreenIncrement((Integer) greenIncrementSpinner.getValue());
         gameManager.setTimeMgmtBrownIncrement((Integer) brownIncrementSpinner.getValue());
-        // --- END FIX ---
         
         gameManager.setTimeMgmtUndoPenalty((Integer) undoPenaltySpinner.getValue());
         gameManager.setTimeMgmtMajorUndoPenalty((Integer) majorUndoPenaltySpinner.getValue());
