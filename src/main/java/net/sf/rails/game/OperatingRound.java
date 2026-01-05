@@ -98,7 +98,8 @@ public class OperatingRound extends Round implements Observer {
      */
     protected transient Map<Player, List<PublicCompany>> excessTrainCompanies;
 
-    protected final ArrayListState<TrainCardType> trainsBoughtThisTurn = new ArrayListState<>(this, "trainsBoughtThisTurn");
+    protected final ArrayListState<TrainCardType> trainsBoughtThisTurn = new ArrayListState<>(this,
+            "trainsBoughtThisTurn");
 
     protected HashMapState<PublicCompany, Integer> loansThisRound;
     protected String thisOrNumber;
@@ -123,9 +124,7 @@ public class OperatingRound extends Round implements Observer {
     protected TrainManager trainManager = getRoot().getTrainManager();
     public transient GenericState<LayTile> pendingRelayAction = new GenericState<>(this, "pendingRelayAction");
 
-
     protected final BooleanState normalTileLaidThisTurn = new BooleanState(this, "normalTileLaidThisTurn", false);
-
 
     /*
      * =======================================
@@ -182,7 +181,7 @@ public class OperatingRound extends Round implements Observer {
             }
             if (msg.length() > 0)
                 msg.deleteCharAt(0);
-            // 
+            //
 
             if (setNextOperatingCompany(true)) {
                 setStep(GameDef.OrStep.INITIAL);
@@ -224,7 +223,7 @@ public class OperatingRound extends Round implements Observer {
     @Override
     public void resume() {
 
-        //  (FORCED CLEANUP) ---
+        // (FORCED CLEANUP) ---
         // CRITICAL: Ensure all transient/runtime lists are clean BEFORE processing any
         // saved actions.
         // This prevents crashes in the LayToken logic when a saved state is loaded.
@@ -291,9 +290,45 @@ public class OperatingRound extends Round implements Observer {
     @Override
     public boolean process(PossibleAction action) {
 
+// JIT Correction: Ensure the Operating Company matches the Saved Action.
+        // This fixes cases where the "Safe Placeholder" (set in resetTransientStateOnLoad)
+        // doesn't match the actual historical move.
+        if (gameManager.isReloading()) {
+            
+            PublicCompany actionCompany = null;
+            if (action instanceof PossibleORAction) {
+                actionCompany = ((PossibleORAction) action).getCompany();
+            } else if (action instanceof RelayTokenAction) {
+                actionCompany = ((RelayTokenAction) action).getCompany();
+            }
+
+            // If we have a company from the action, and it differs from the current state (or state is null)
+            if (actionCompany != null && actionCompany != operatingCompany.value()) {
+                
+                log.info("JIT Correction: Swapping Operating Company from {} to {} based on saved action.", 
+                        (operatingCompany.value() != null ? operatingCompany.value().getId() : "NULL"), 
+                        actionCompany.getId());
+
+                // 1. Force the correct company
+                this.operatingCompany.set(actionCompany);
+
+                // 2. Re-run initialization for this specific company
+                setStep(GameDef.OrStep.INITIAL);
+                try {
+                    initTurn();
+                } catch (Exception e) {
+                    // Suppress initialization logs/errors during JIT swap
+                }
+                nextStep();
+            }
+        }
+        
+
+        
         boolean result = false;
         doneAllowed.set(false);
 
+        
         /*--- Common OR checks ---*/
         /* Check operating company */
         if (!(action instanceof DiscardTrain) && !action.isCorrection()) {
@@ -308,8 +343,11 @@ public class OperatingRound extends Round implements Observer {
 
             // Now, perform the check if we successfully got a company
             if (company != null && company != operatingCompany.value()) {
+               // Safe check: Handle case where operatingCompany.value() is null to prevent crash
+                String currentId = (operatingCompany.value() != null) ? operatingCompany.value().getId() : "NULL";
+                
                 DisplayBuffer.add(this, LocalText.getText("WrongCompany",
-                        company.getId(), operatingCompany.value().getId()));
+                        company.getId(), currentId));
                 return false;
             }
         }
@@ -521,7 +559,7 @@ public class OperatingRound extends Round implements Observer {
      * =======================================
      */
 
-protected void initTurn() {
+    protected void initTurn() {
 
         PublicCompany company = operatingCompany.value();
 
@@ -538,23 +576,23 @@ protected void initTurn() {
             // We check the specific Operator Name and Multiplier stored in GameManager
             if (playerToIncrement != null) {
                 String operatorName = gm.getTimeMgmtOperatorName();
-                
+
                 // Compare ignoring case to be safe
                 if (operatorName != null && operatorName.equalsIgnoreCase(playerToIncrement.getId())) {
                     double multiplier = gm.getTimeMgmtOperatorMultiplier();
                     increment = (int) (increment * multiplier);
-                    
-                    ReportBuffer.add(this, LocalText.getText("OperatorBonusApplied", 
-                        playerToIncrement.getId(), 
-                        String.valueOf(increment)));
+
+                    ReportBuffer.add(this, LocalText.getText("OperatorBonusApplied",
+                            playerToIncrement.getId(),
+                            String.valueOf(increment)));
                 }
             }
 
-// We pass the current Round ID (e.g. "OR_1.1") to ensure uniqueness
-                if (increment > 0) {
-                    gm.grantTimeBonus(playerToIncrement, gm.getORId(), increment);
-                }
-                
+            // We pass the current Round ID (e.g. "OR_1.1") to ensure uniqueness
+            if (increment > 0) {
+                gm.grantTimeBonus(playerToIncrement, gm.getORId(), increment);
+            }
+
         }
 
         ReportBuffer.add(this, " ");
@@ -628,9 +666,6 @@ protected void initTurn() {
                 if (++index >= operatingCompanies.size()) {
                     return false;
                 }
-
-
-
 
                 setOperatingCompany(operatingCompanies.get(index));
             }
@@ -1011,7 +1046,6 @@ protected void initTurn() {
 
                     if (trainsToDiscardFrom.isEmpty()) {
 
-
                         continue;
                     }
 
@@ -1162,7 +1196,6 @@ protected void initTurn() {
     protected boolean executeClosePrivate(ClosePrivate action) {
 
         PrivateCompany priv = action.getPrivateCompany();
-
 
         String errMsg = null;
 
@@ -1668,7 +1701,7 @@ protected void initTurn() {
 
         if (oldAllowedNumber <= 1) {
             tileLaysPerColour.clear();
-       } else {
+        } else {
             List<String> coloursToRemove = new ArrayList<>();
             for (String key : tileLaysPerColour.viewKeySet()) {
                 if (colour.equals(key)) {
@@ -1681,7 +1714,7 @@ protected void initTurn() {
             for (String key : coloursToRemove) {
                 tileLaysPerColour.remove(key);
             }
-            
+
         }
     }
 
@@ -2801,9 +2834,10 @@ protected void initTurn() {
      * =======================================
      */
 
-// We are modifying OperatingRound.java to enforce automatic revenue calculation.
+    // We are modifying OperatingRound.java to enforce automatic revenue
+    // calculation.
 
-// ... (lines of unchanged context code) ...
+    // ... (lines of unchanged context code) ...
     /**
      * Prepares the SetDividend action for the current company.
      * This now includes a forced revenue recalculation to ensure accuracy,
@@ -2827,7 +2861,7 @@ protected void initTurn() {
             try {
                 // Call the same synchronous calculation method used in layTile
                 currentPresetRevenue = calculateCurrentPotentialRevenue(operatingCompany.value());
-               
+
             } catch (Exception e) {
                 currentPresetRevenue = operatingCompany.value().getLastRevenue(); // Existing fallback
             }
@@ -2836,18 +2870,17 @@ protected void initTurn() {
             // Create the SetDividend action using the freshly calculated revenue
             // mayUserSetRevenue = false (User cannot edit)
             SetDividend action = new SetDividend(getRoot(),
-                    currentPresetRevenue, 
+                    currentPresetRevenue,
                     false, // Locked
                     allowedRevenueActions);
-            
+
             // Pre-fill the actual revenue so the action is ready to fire immediately
-            action.setActualRevenue(currentPresetRevenue); 
-            
+            action.setActualRevenue(currentPresetRevenue);
+
             possibleActions.add(action);
         }
         // else: No running trains, so no SetDividend action is added.
     }
-
 
     protected void prepareNoMapActions() {
 
@@ -3028,7 +3061,6 @@ protected void initTurn() {
                     errMsg = LocalText.getText("BankruptcyInevitable"); // Example error message
                     break; // Stop validation
                 }
-                
 
                 // In some games (SOH) company must sell treasury shares first
                 if (GameDef.getParmAsBoolean(this, GameDef.Parm.EMERGENCY_MUST_SELL_TREASURY_SHARES)) {
@@ -3130,7 +3162,7 @@ protected void initTurn() {
                 if (cashToRaise > 0) { // President contribution needed
                     // Validate if the specified presidentCash matches the required cashToRaise
                     if (presidentCash != cashToRaise) {
-                           presidentCash = cashToRaise; // Use the calculated required amount
+                        presidentCash = cashToRaise; // Use the calculated required amount
                     }
 
                     if (playerCash >= presidentCash) {
@@ -3330,7 +3362,6 @@ protected void initTurn() {
         // the buy
         trainManager.checkTrainAvailability(train, oldOwner); //
 
-
         newPhaseChecks();
         // The newPhaseChecks() method will now handle both phase-change-detected and
         // non-detected scenarios.
@@ -3354,12 +3385,11 @@ protected void initTurn() {
 
         // if (!canBuyMore) {
 
-        //     nextStep();
+        // nextStep();
         // } else {
-        //     // Phase allows multiple buys. Stay in the BUY_TRAIN step.
+        // // Phase allows multiple buys. Stay in the BUY_TRAIN step.
 
         // }
-
 
         return true; // Signal successful processing
     } // end buy train
@@ -3913,7 +3943,7 @@ protected void initTurn() {
 
     // For logging
     public String getCompAndPresName(PublicCompany company) {
-        //  Null-Check for President (Closed Company Safety) ---
+        // Null-Check for President (Closed Company Safety) ---
         String presName = (company.getPresident() != null) ? company.getPresident().getId() : "N/A";
         return company.getId() + "(" + presName + ")";
     }
@@ -4014,7 +4044,6 @@ protected void initTurn() {
     // [REPLACE the entire 'layTile' method in OperatingRound.java with this]
 
     public boolean layTile(LayTile action) {
- 
 
         String errMsg = null;
         int cost = 0;
@@ -4081,8 +4110,7 @@ protected void initTurn() {
             return false; // Indicate action failed
         }
 
-        
-               if (tile != null) {
+        if (tile != null) {
             String costText = null;
             if (cost > 0) {
                 costText = Currency.toBank(operatingCompany.value(), cost);
@@ -4122,8 +4150,6 @@ protected void initTurn() {
         } else {
         }
 
-
-
         // - for PfB / Extra Lays / Second Tile ---
         // Check if the lay was an "extra" lay (like PfB)
         if (stl != null && stl.isExtra()) {
@@ -4145,7 +4171,7 @@ protected void initTurn() {
         return true;
     }
 
-     /**
+    /**
      * Processes the atomic LayTileAndHomeTokenAction.
      * This method executes the tile lay, and then immediately
      * executes the home token lay.
@@ -4179,33 +4205,59 @@ protected void initTurn() {
         return layBaseToken(tokenAction);
     }
 
-    public void resetTransientStateOnLoad() {
-        this.selectedAction = null;
-        this.savedAction = null;
+    // File: OperatingRound.java
+// Method: resetTransientStateOnLoad
 
-        // Relais-Zustand auf null setzen (wichtig für den Baden-Bug/Save/Load)
-        if (this.pendingRelayAction != null) {
-            this.pendingRelayAction.set(null);
+    
+    public void resetTransientStateOnLoad() {
+        // 1. Reset Flags
+        if (this.doneAllowed != null) {
+            this.doneAllowed.set(false);
         }
 
-        this.excessTrainCompanies = null;
+        // 2. SAFE RESET: Set to the first available company.
+        // We DO NOT set this to null, because that causes crashes in setPossibleActions().
+        // We DO NOT calculate the "Next" company, because 1835 logic is fragile during reload.
+        // We just pick the first one as a safe placeholder.
+        if (operatingCompanies != null && !operatingCompanies.isEmpty()) {
+            // Use the raw state object to avoid side effects
+            this.operatingCompany.set(operatingCompanies.get(0));
+        }
 
+        // 3. Reset Step to ensure initTurn() runs when the real move starts
+        setStep(GameDef.OrStep.INITIAL);
 
-        if (this.currentNormalTokenLays != null)
-            this.currentNormalTokenLays.clear();
-        if (this.currentSpecialTokenLays != null)
-            this.currentSpecialTokenLays.clear();
+        String coName = (this.operatingCompany.value() != null) ? this.operatingCompany.value().getId() : "NULL";
+        log.info("Reload: Reset OperatingRound. Safe Placeholder: {}", coName);
     }
 
     @Override
     public boolean setPossibleActions() {
 
-
-
         possibleActions.clear();
         selectedAction = null;
         boolean forced = false;
         doneAllowed.set(false);
+
+        // Safety Guard: If the operating company was reset (e.g. during reload).
+        if (operatingCompany.value() == null) {
+            if (operatingCompanies != null && !operatingCompanies.isEmpty()) {
+                // 1. PRIME THE STATE: Explicitly set to the first company.
+                // This ensures operatingCompany.value() is NOT null, protecting against 
+                // subclass logic or initTurn() crashes if setNextOperatingCompany fails.
+                setOperatingCompany(operatingCompanies.get(0));
+
+                // 2. FIND ACTUAL NEXT: Call the logic to find the correct starting company 
+                // (e.g. skipping closed/hibernated companies).
+                setNextOperatingCompany(true); 
+                
+                // 3. RESET STEP: Force step to INITIAL to ensure initTurn() is called.
+                setStep(GameDef.OrStep.INITIAL); 
+            } else {
+                // Should not happen in a valid OR, but prevents a crash if empty
+                return false; 
+            }
+        }
 
         // Get the current step *once*
         GameDef.OrStep step = getStep();
@@ -4214,14 +4266,13 @@ protected void initTurn() {
         if (step == GameDef.OrStep.INITIAL) {
             initTurn(); // This logs the turn start
 
-nextStep(); // Advance from INITIAL to LAY_TRACK (or whatever comes next)
+            nextStep(); // Advance from INITIAL to LAY_TRACK (or whatever comes next)
             step = getStep(); // Get the new step
 
         }
 
         // --- Normal Step Processing ---
         if (step == GameDef.OrStep.LAY_TRACK) {
-
 
             possibleActions.addAll(getNormalTileLays(true));
             possibleActions.addAll(getSpecialTileLays(true));
@@ -4232,7 +4283,6 @@ nextStep(); // Advance from INITIAL to LAY_TRACK (or whatever comes next)
 
         } else if (step == GameDef.OrStep.LAY_TOKEN) {
 
-           
             setNormalTokenLays();
             setSpecialTokenLays();
 
@@ -4253,9 +4303,11 @@ nextStep(); // Advance from INITIAL to LAY_TRACK (or whatever comes next)
 
         } else if (step == GameDef.OrStep.CALC_REVENUE) {
 
-// Disable "Done" (Skip) for Revenue. 
-            // Players must explicitly choose Payout, Withhold, or Split (generated by prepareRevenue...).
-            // Pressing "Done" (or 'D') previously skipped revenue entirely, resulting in 0 dividend.
+            // Disable "Done" (Skip) for Revenue.
+            // Players must explicitly choose Payout, Withhold, or Split (generated by
+            // prepareRevenue...).
+            // Pressing "Done" (or 'D') previously skipped revenue entirely, resulting in 0
+            // dividend.
             doneAllowed.set(false);
             prepareRevenueAndDividendAction();
             if (noMapMode)
@@ -4272,20 +4324,19 @@ nextStep(); // Advance from INITIAL to LAY_TRACK (or whatever comes next)
                 }
             }
             // //Auto-Skip Buy Train ---
-            // // If no trains can be bought, and it's not a forced situation (emergency.value() is false),
+            // // If no trains can be bought, and it's not a forced situation
+            // (emergency.value() is false),
             // // automatically skip this step to streamline gameplay.
             // if (!hasBuyActions && !emergency.value()) {
-            //     // Clear any actions generated so far
-            //     possibleActions.clear();
-                
-            //     // Advance to next step (Trading or Final)
-            //     nextStep();
-                
-            //     // Recursively call setPossibleActions for the NEW step
-            //     return setPossibleActions(); 
+            // // Clear any actions generated so far
+            // possibleActions.clear();
+
+            // // Advance to next step (Trading or Final)
+            // nextStep();
+
+            // // Recursively call setPossibleActions for the NEW step
+            // return setPossibleActions();
             // }
-
-
 
             // This is the DONE/SKIP logic block for BUY_TRAIN
             if (hasBuyActions) {
@@ -4448,7 +4499,7 @@ nextStep(); // Advance from INITIAL to LAY_TRACK (or whatever comes next)
         }
 
         if (doneAllowed.value()) {
-  
+
             possibleActions.add(new NullAction(getRoot(), NullAction.Mode.DONE));
         }
 
@@ -4461,7 +4512,6 @@ nextStep(); // Advance from INITIAL to LAY_TRACK (or whatever comes next)
             }
         }
 
-        
         // possibleActions.getList().size());
         return true;
     }
@@ -4478,7 +4528,6 @@ nextStep(); // Advance from INITIAL to LAY_TRACK (or whatever comes next)
         MapHex hex = action.getChosenHex();
         Stop stop = action.getChosenStop();
 
-       
         String companyName = company.getId();
 
         // Dummy loop to enable a quick jump out.
@@ -4573,8 +4622,6 @@ nextStep(); // Advance from INITIAL to LAY_TRACK (or whatever comes next)
             if (action.getType() == LayBaseToken.HOME_CITY) {
 
                 extra = true; // This is an extra action
-
-            
 
                 boolean normalLayPending = !tileLaysPerColour.isEmpty();
                 boolean specialLayPending = !getSpecialTileLays(false).isEmpty();
@@ -4786,9 +4833,9 @@ nextStep(); // Advance from INITIAL to LAY_TRACK (or whatever comes next)
 
                         action = new BuyTrain(train, train.getType(), otherCompany, minPrice, maxPrice,
                                 PriceMode.VARIABLE);
-   action.setForcedBuyIfHasRoute(mustBuyTrain);
+                        action.setForcedBuyIfHasRoute(mustBuyTrain);
                         action.setButtonLabel(createTrainButtonLabel(train, otherCompany, 0, null, mustBuyTrain));
-                                         
+
                     }
                     possibleActions.add(action);
                 }

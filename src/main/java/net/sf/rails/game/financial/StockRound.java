@@ -94,13 +94,11 @@ public class StockRound extends Round implements I_MapRenderableRound {
     public static final int BOUGHT = 0;
     public static final int SOLD = 1;
 
-
-protected final ArrayListState<String> recordedSwapChoices;
+    protected final ArrayListState<String> recordedSwapChoices;
     protected final IntegerState swapChoiceIndex;
 
     // Transient choice container (reset every action)
     public static List<Integer> manualSwapChoice = null;
-
 
     /* Rules */
     protected int sequenceRule;
@@ -136,8 +134,6 @@ protected final ArrayListState<String> recordedSwapChoices;
     private final ArrayListState<Player> canRequestTurn = new ArrayListState<>(this, "canRequestTurn");
     private final ArrayListState<Player> hasRequestedTurn = new ArrayListState<>(this, "hasRequestedTurn");
 
-
-
     /*
      * Companies started this round (shares may not be sold in SOH)
      */
@@ -153,11 +149,11 @@ protected final ArrayListState<String> recordedSwapChoices;
     public StockRound(GameManager parent, String id) {
         super(parent, id);
 
-// CRITICAL FIX: We must anchor to GameManager for persistence, BUT we must use 
-        // a unique name (based on this round's ID) to prevent collisions when 
+        // CRITICAL FIX: We must anchor to GameManager for persistence, BUT we must use
+        // a unique name (based on this round's ID) to prevent collisions when
         // subsequent Stock Rounds are created (e.g. SR 1 vs SR 2).
         // replacing spaces to be safe for state names.
-String uniqueId = id.replaceAll("\\s+", "_");
+        String uniqueId = id.replaceAll("\\s+", "_");
         recordedSwapChoices = new ArrayListState<>(parent, "recordedSwapChoices_" + uniqueId);
         swapChoiceIndex = IntegerState.create(parent, "swapChoiceIndex_" + uniqueId);
 
@@ -171,9 +167,6 @@ String uniqueId = id.replaceAll("\\s+", "_");
         guiHints.setActivePanel(GuiDef.Panel.STATUS);
     }
 
-
-
-    
     /**
      * Start the Stock Round.
      * <p>
@@ -197,7 +190,8 @@ String uniqueId = id.replaceAll("\\s+", "_");
     // NationalFormationRound, PrussianFormationRound
     public void start() {
 
-        // UI CLEANUP: Ensure any lingering buttons from previous rounds (like PFR) are wiped.
+        // UI CLEANUP: Ensure any lingering buttons from previous rounds (like PFR) are
+        // wiped.
         try {
             Class<?> orPanelClass = Class.forName("net.sf.rails.ui.swing.ORPanel");
             java.lang.reflect.Method cleanupMethod = orPanelClass.getMethod("forceGlobalCleanup");
@@ -205,7 +199,7 @@ String uniqueId = id.replaceAll("\\s+", "_");
         } catch (Throwable t) {
             // Ignore (UI might not be present)
         }
-        
+
         ReportBuffer.add(this, LocalText.getText("StartStockRound",
                 getStockRoundNumber()));
 
@@ -1338,10 +1332,9 @@ String uniqueId = id.replaceAll("\\s+", "_");
         hasActed.set(true);
         setPriority("BuyCert");
 
-        
-       // Check if presidency has changed and handle ambiguous swaps
+        // Check if presidency has changed and handle ambiguous swaps
         Player existingPres = company.getPresident();
-        
+
         // Check if the buyer (currentPlayer) has overtaken the existing president
         if (existingPres != null && existingPres != currentPlayer) {
             int newPct = currentPlayer.getPortfolioModel().getShare(company);
@@ -1353,7 +1346,7 @@ String uniqueId = id.replaceAll("\\s+", "_");
 
                 // 2. Execute Swap using the choice (if one was made/needed)
                 if (manualSwapChoice != null && !manualSwapChoice.isEmpty()) {
-                    
+
                     // Move President Cert to New Director
                     PublicCertificate presCert = company.getPresidentsShare();
                     presCert.moveTo(currentPlayer);
@@ -1587,7 +1580,8 @@ String uniqueId = id.replaceAll("\\s+", "_");
                 dumpedPlayer = company.findPlayerToDump();
                 if (dumpedPlayer != null) {
 
-                    // Only prompt for a swap choice if the sale ACTUALLY triggers a presidency change.
+                    // Only prompt for a swap choice if the sale ACTUALLY triggers a presidency
+                    // change.
                     int pShares = currentPlayer.getPortfolioModel().getShares(company);
                     int dShares = dumpedPlayer.getPortfolioModel().getShares(company);
                     int threshold = pShares - dShares;
@@ -1606,10 +1600,19 @@ String uniqueId = id.replaceAll("\\s+", "_");
 
                     // reduce the numberToSell by the president (partial) sold certificate
                     if (presidentShareNumbersToSell > 0) {
+
                         // FIX: presidentShareNumbersToSell is in UNITS (e.g. 2 for 20%).
-                        // numberToSell is in CERTIFICATES (e.g. 1).
-                        // We must subtract 1 certificate.
-                        numberToSell -= 1;
+                        // numberToSell is the count of shares being sold (which might be units OR
+                        // certificates).
+                        // We must reduce numberToSell by the equivalent count covered by the swap.
+                        // Example: Selling 20% (2 units) as 1 cert. Swap covers 2 units.
+                        // Logic: 2 units / 1 unit-per-share = 2. Subtraction correct.
+                        // Logic: 2 units / 2 units-per-share (No Split) = 1. Subtraction correct.
+
+                        // Prevent division by zero if data is malformed
+                        int divisor = (shareSizeToSell > 0) ? shareSizeToSell : 1;
+
+                        numberToSell -= (presidentShareNumbersToSell / divisor);
                     }
 
                     presCert = null;
@@ -2499,11 +2502,11 @@ String uniqueId = id.replaceAll("\\s+", "_");
         return companyBoughtThisTurnWrapper.value() != null;
     }
 
-public void resetTransientStateOnLoad() {
-log.warn("SWAP_DEBUG: resetTransientStateOnLoad. do nothing.");
+    public void resetTransientStateOnLoad() {
+        // Rewind the read-index for Director Swap choices so they are re-read from the
+        // start during replay.
+        swapChoiceIndex.set(0);
     }
-
-
 
     // ... (lines of unchanged context code) ...
     public boolean hasAmbiguousCertificatesForSell(PublicCompany company) {
@@ -2625,9 +2628,10 @@ log.warn("SWAP_DEBUG: resetTransientStateOnLoad. do nothing.");
         setPossibleActions();
     }
 
-private void promptForDirectorSwapChoice(Player newDirector, Player oldDirector, PublicCompany company) {
+    private void promptForDirectorSwapChoice(Player newDirector, Player oldDirector, PublicCompany company) {
         // 1. Guard Checks
-        if (manualSwapChoice != null) return; // Already set
+        if (manualSwapChoice != null)
+            return; // Already set
 
         // Auto-Correct for Undo
         if (swapChoiceIndex.value() > recordedSwapChoices.size()) {
@@ -2663,17 +2667,28 @@ private void promptForDirectorSwapChoice(Player newDirector, Player oldDirector,
 
         // 4. UI: Prompt User (Only if Ambiguous)
         if (uniqueChoices.size() > 1) {
-            String msg = "<html><body><b>Director Swap: Select Compensation</b><br><br>" +
-                    "<b>" + newDirector.getName() + "</b> becomes President of " + company.getId() + ".<br>" +
-                    "<b>" + oldDirector.getName() + "</b> (Old Director) must receive shares in exchange.<br>" +
-                    "Select the specific shares for " + oldDirector.getName() + " to receive:</body></html>";
+            if (gameManager.isReloading()) {
+                // CRITICAL: Never show UI during reload.
+                // If we reach here during reload, the saved choice was missing or index was
+                // wrong.
+                // Fallback to the first option to prevent a hang (Stopper).
+                manualSwapChoice = uniqueChoices.get(0);
+            } else {
+                String msg = "<html><body><b>Director Swap: Select Compensation</b><br><br>" +
+                        "<b>" + newDirector.getName() + "</b> becomes President of " + company.getId() + ".<br>" +
+                        "<b>" + oldDirector.getName() + "</b> (Old Director) must receive shares in exchange.<br>" +
+                        "Select the specific shares for " + oldDirector.getName() + " to receive:</body></html>";
 
-            int choice = JOptionPane.showOptionDialog(null, msg, "Director Swap Choice",
-                    JOptionPane.DEFAULT_OPTION, JOptionPane.QUESTION_MESSAGE, null, labels.toArray(), labels.get(0));
+                int choice = JOptionPane.showOptionDialog(null, msg, "Director Swap Choice",
+                        JOptionPane.DEFAULT_OPTION, JOptionPane.QUESTION_MESSAGE, null, labels.toArray(),
+                        labels.get(0));
 
-            if (choice >= 0) manualSwapChoice = uniqueChoices.get(choice);
-            else manualSwapChoice = uniqueChoices.get(0); // Default/Safe fallback
-            
+                if (choice >= 0)
+                    manualSwapChoice = uniqueChoices.get(choice);
+                else
+                    manualSwapChoice = uniqueChoices.get(0); // Default/Safe fallback
+            }
+
         } else if (uniqueChoices.size() == 1) {
             manualSwapChoice = uniqueChoices.get(0);
         }

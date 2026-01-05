@@ -1413,6 +1413,7 @@ public int getOrTimeBonus() {
 
         getRoot().getReportManager().getDisplayBuffer().clear();
 
+
         // Capture the active entity (Player or Company) BEFORE processing the action.
         // We will compare this with the "After" state to detect if the turn has ended.
         RoundFacade roundBefore = getCurrentRound();
@@ -2328,8 +2329,8 @@ public int getOrTimeBonus() {
 
         ReportBuffer.add(this, warningMsg);
 
-        // Show warning dialog if UI is active
-        if (!java.awt.GraphicsEnvironment.isHeadless()) {
+// Show warning dialog if UI is active AND we are not reloading
+        if (!isReloading() && !java.awt.GraphicsEnvironment.isHeadless()) {
             javax.swing.JOptionPane.showMessageDialog(null,
                     warningMsg,
                     "Game Over (House Rule)",
@@ -2616,10 +2617,8 @@ public int getOrTimeBonus() {
             currentRoundPayouts.set(new HashMap<>());
 
         }
-        // --- END FIX ---
     }
 
-    // ... (around line 2240) ...
     protected void updatePayoutTracker(PossibleAction action) {
         if (action == null)
             return;
@@ -3207,7 +3206,9 @@ public int getOrTimeBonus() {
 
     public boolean processOnReload(PossibleAction action) {
         getRoot().getReportManager().getDisplayBuffer().clear();
-
+// 1. Capture the round BEFORE processing the action
+        RoundFacade roundBefore = getCurrentRound();
+        
         // We capture the state *before* the action is processed.
         if (this.logOutputDirectory != null) {
             try {
@@ -3290,6 +3291,17 @@ public int getOrTimeBonus() {
                 // DO NOT return false.
                 log.warn("GAMEMANAGER [BruteForce]: Engine failed to process action. IGNORING and continuing replay.",
                         action);
+            }
+            // Detect if the round object has changed (e.g. PFR -> Operating Round).
+            // If it has, we MUST tell the new round to clear any stale cache (like "current player")
+            // so it can correctly identify the next actor (Rainer instead of Christian).
+            RoundFacade roundAfter = getCurrentRound();
+            if (roundAfter != null && roundAfter != roundBefore) {
+                 if (roundAfter instanceof OperatingRound) {
+                     ((OperatingRound) roundAfter).resetTransientStateOnLoad();
+                 } else if (roundAfter instanceof StockRound) {
+                     ((StockRound) roundAfter).resetTransientStateOnLoad();
+                 }
             }
 
             // This code will now be reached even if validation/process fails
