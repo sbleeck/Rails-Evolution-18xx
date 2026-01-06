@@ -28,7 +28,8 @@ import rails.game.action.*;
 import com.google.common.collect.Iterables;
 
 /**
- * This displays the Auction Window
+ * This displays the Auction Window.
+ * Refactored to remove separate Info column/button and integrate details into RailCard tooltips.
  */
 public class StartRoundWindow extends JFrame implements ActionListener, KeyListener, ActionPerformer, DialogOwner {
 
@@ -45,7 +46,6 @@ public class StartRoundWindow extends JFrame implements ActionListener, KeyListe
 
     private ActionButton undoButton;
     private ActionButton aiButton;
-
 
     protected static final String[] itemStatusTextKeys = new String[] { "Status_Unavailable", "Status_Biddable",
             "Status_Buyable",
@@ -65,7 +65,6 @@ public class StartRoundWindow extends JFrame implements ActionListener, KeyListe
 
     // Grid elements per function
     private Caption[] itemName;
-    private ClickField[] itemNameButton;
     private int[] itemNameXOffset;
     private int itemNameYOffset;
     private Field[] basePrice;
@@ -88,9 +87,9 @@ public class StartRoundWindow extends JFrame implements ActionListener, KeyListe
     private Field[] playerFree;
     private int[] playerFreeCashXOffset;
     private int playerFreeCashYOffset;
-    private Field[] info;
-    private int[] infoXOffset;
-    private int infoYOffset;
+
+    // REMOVED: Info column arrays (info, infoXOffset, infoYOffset)
+    
     private Field[] itemStatus; // Remains invisible, only used for status tooltip
 
     private int[] playerCaptionXOffset;
@@ -107,9 +106,7 @@ public class StartRoundWindow extends JFrame implements ActionListener, KeyListe
     private SpinnerNumberModel spinnerModel;
     private ActionButton passButton;
 
-    private ImageIcon infoIcon;
     private RailCard[] cards;
-
 
     private PlayerManager players;
 
@@ -130,7 +127,7 @@ public class StartRoundWindow extends JFrame implements ActionListener, KeyListe
     protected PossibleActions possibleActions;
     protected PossibleAction immediateAction;
 
-    // --- CHANGE: We don't use the ItemGroup for the click buttons anymore to avoid "sticky" selection
+    // We don't use the ItemGroup for the click buttons anymore to avoid "sticky" selection
     private final ButtonGroup itemGroup = new ButtonGroup();
     private ClickField dummyButton; 
 
@@ -139,7 +136,7 @@ public class StartRoundWindow extends JFrame implements ActionListener, KeyListe
     private boolean showBasePrices;
 
     private ORUIManager orUIManager;
-private int selectedItemIndex = -1;
+    private int selectedItemIndex = -1;
 
 
     private void initCells() {
@@ -157,7 +154,7 @@ private int selectedItemIndex = -1;
         separatorXOffset = new int[numberOfColumns];
 
         bidPerPlayer = new Field[ni][np];
-        info = new Field[ni];
+        // REMOVED: info = new Field[ni];
         itemStatus = new Field[ni];
         upperPlayerCaption = new Field[numberOfColumns][np];
         lowerPlayerCaption = new Field[np];
@@ -171,7 +168,9 @@ private int selectedItemIndex = -1;
             minBidXOffset = new int[numberOfColumns];
         bidPerPlayerXOffset = new int[numberOfColumns];
         playerCaptionXOffset = new int[numberOfColumns];
-        infoXOffset = new int[numberOfColumns];
+        
+        // REMOVED: infoXOffset array allocation
+        
         if (includeBidding != StartRound.Bidding.NO)
             playerBidsXOffset = new int[numberOfColumns];
         playerFreeCashXOffset = new int[numberOfColumns];
@@ -199,10 +198,13 @@ private int selectedItemIndex = -1;
             if (col == 0)
                 bidPerPlayerYOffset = lastY;
 
-            infoXOffset[col] = bidPerPlayerXOffset[col] + np;
-            lastX += np;
+            // REMOVED: Info column logic
+            // infoXOffset[col] = bidPerPlayerXOffset[col] + np;
+            
+            lastX += np; // Skip over the player columns
+            
             if (col == 0) {
-                infoYOffset = lastY;
+                // infoYOffset = lastY; // Removed
                 columnWidth = lastX + 1;
             }
 
@@ -268,12 +270,10 @@ private int selectedItemIndex = -1;
 
             cards[i] = new RailCard(si, itemGroup);
 
-            // 1. Enable Clicks: Register this window as the listener so "actionPerformed"
-            // fires
+            // 1. Enable Clicks
             cards[i].addActionListener(this);
 
-// Remove setText to prevent double-rendering (text behind card)
-            // Apply scaling here as requested
+            // Apply scaling 
             cards[i].setScale(1.3);
 
             // Layout
@@ -298,9 +298,7 @@ private int selectedItemIndex = -1;
                         1, 1, 0);
             }
 
-            // Info Button
-            info[i] = new Field(infoIcon);
-
+            // --- CONSOLIDATION: Info + Hex Highlighting on Card ---
             Certificate cert = si.getPrimary();
             Company comp = null;
             if (cert instanceof PublicCertificate) {
@@ -308,27 +306,17 @@ private int selectedItemIndex = -1;
             } else if (cert instanceof PrivateCompany) {
                 comp = (PrivateCompany) cert;
             }
-            
-            // --- FIX: Using getId() for safety ---
-            final String rawInfoText = comp.getInfoText();
-            String compNameSafe = comp.getId(); // Safe fallback
-            
-            final String companyTitle = comp.getType().getId() + " company: " + compNameSafe;
-            
-            info[i].setToolTipText("Click for details"); 
-            
-            final Component parentFrame = this;
-            info[i].addMouseListener(new MouseAdapter() {
-                public void mouseClicked(MouseEvent e) {
-                    JOptionPane.showMessageDialog(parentFrame, 
-                        "<html><body><div style='width: 300px;'>" + rawInfoText + "</div></body></html>", 
-                        companyTitle, 
-                        JOptionPane.INFORMATION_MESSAGE);
-                }
-            });
-            
-            HexHighlightMouseListener.addMouseListener(info[i], gameUIManager.getORUIManager(), si);
-            addField(info[i], infoXOffset[col], infoYOffset + row, 1, 1, WIDE_LEFT + WIDE_RIGHT);
+
+            if (comp != null) {
+                // 1. Set Rich Tooltip (replaces Info button click) using RailCard helper
+                // Ensure the RailCard class has this method from previous updates
+                cards[i].setCompanyDetailsTooltip(comp);
+
+                // 2. Add Hex Highlighting (Map lights up when hovering card)
+                // Passing 'si' (StartItem) as the token source
+                HexHighlightMouseListener.addMouseListener(cards[i], gameUIManager.getORUIManager(), si);
+            }
+            // --- END CONSOLIDATION ---
 
             // Invisible field, only used to hold current item status.
             itemStatus[i] = new Field(si.getStatusModel());
@@ -523,11 +511,6 @@ private int selectedItemIndex = -1;
     }
 
 
-   
-    private ImageIcon createInfoIcon() {
-        return RailsIcon.INFO.smallIcon;
-    }
-
     @Override
     public void keyPressed(KeyEvent e) {
     }
@@ -677,7 +660,7 @@ private int selectedItemIndex = -1;
             crossIndex[item.getIndex()] = i;
         }
 
-        infoIcon = createInfoIcon();
+        // REMOVED: infoIcon creation
 
         initCells();
 
@@ -728,16 +711,13 @@ private int selectedItemIndex = -1;
     public void updateStatus(boolean myTurn) {
 
 
-// Reset all cards to their default state based on game status
+        // Reset all cards to their default state based on game status
         for (int i = 0; i < round.getNumberOfStartItems(); i++) {
             StartItem si = round.getStartItem(i);
             int status = si.getStatus();
             
             // Clear previous actions
             cards[i].clearPossibleActions();
-
-            // Force the name (ID) again to ensure it doesn't revert to "cert_X"
-            // cards[i].setText(si.getPrimary().getId());
 
             // Set base visual state
             if (status == StartItem.SOLD) {
@@ -748,7 +728,20 @@ private int selectedItemIndex = -1;
                 cards[i].setToolTipText(LocalText.getText(tooltipKey));
             } else {
                 cards[i].setState(RailCard.State.PASSIVE);
-                cards[i].setToolTipText(""); // Clear tooltip
+                
+                // RESTORE RICH TOOLTIP IF AVAILABLE
+                // Because reset/setState might clear it (depending on implementation), 
+                // we re-apply the company details tooltip to ensure it persists.
+                Certificate cert = si.getPrimary();
+                Company comp = null;
+                if (cert instanceof PublicCertificate) {
+                    comp = (PublicCompany) cert.getParent();
+                } else if (cert instanceof PrivateCompany) {
+                    comp = (PrivateCompany) cert;
+                }
+                if (comp != null) {
+                    cards[i].setCompanyDetailsTooltip(comp);
+                }
             }
         }
 
@@ -814,12 +807,7 @@ private int selectedItemIndex = -1;
             if (action instanceof BuyStartItem) {
                 buyAction = (BuyStartItem) action;
                 // Assign the action so actionPerformed detects it.
-                // This must happen before setText, as setPossibleAction may overwrite the label.
                 cards[i].setPossibleAction(action);
-
-               // Enable card for immediate purchase
-// Re-apply the text fix because setPossibleAction() might have overwritten it
-                // cards[i].setText(item.getPrimary().getId());
                 
                 // Restore the visual selection state if this index is selected
                 if (i == selectedItemIndex) {
@@ -860,7 +848,7 @@ private int selectedItemIndex = -1;
                     cards[i].setPossibleAction(action);
                 }
                 
-if (selected) {
+                if (selected) {
                     cards[i].setState(RailCard.State.SELECTED);
                 } else {
                     cards[i].setState(RailCard.State.ACTIONABLE);
@@ -868,7 +856,7 @@ if (selected) {
 
                 
                 bidAllowed = selected;
-if (includeBidding == StartRound.Bidding.ON_ITEMS) {
+                if (includeBidding == StartRound.Bidding.ON_ITEMS) {
                     // Update Min Bid text
                     minBid[i].setText(Bank.format(item, item.getMinimumBid()));
                 }
@@ -916,7 +904,7 @@ if (includeBidding == StartRound.Bidding.ON_ITEMS) {
         if (source instanceof ClickField) {
             gbc = gb.getConstraints(source);
 
-// Safety Check: Ignore clicks if the card has no assigned actions (e.g. Passive/Sold)
+            // Safety Check: Ignore clicks if the card has no assigned actions (e.g. Passive/Sold)
             java.util.List<PossibleAction> actions = ((ClickField) source).getPossibleActions();
             if (actions == null || actions.isEmpty()) {
                 return;
@@ -932,7 +920,6 @@ if (includeBidding == StartRound.Bidding.ON_ITEMS) {
 
                 // 1. Identify which item was clicked
                 int clickedIndex = -1;
-                // FIX: Iterate over 'cards' instead of the null 'itemNameButton'
                 for (int k = 0; k < cards.length; k++) {
                     if (source == cards[k]) {
                         clickedIndex = k;
@@ -958,7 +945,6 @@ if (includeBidding == StartRound.Bidding.ON_ITEMS) {
                     selectedItemIndex = clickedIndex;
 
                     // Visual Feedback: Highlight the selected item, reset others
-                    // FIX: Use RailCard state management instead of manual borders
                     for (int k = 0; k < cards.length; k++) {
                         // Safety check: ensure card exists and is conceptually 'active' (enabled)
                         if (cards[k] != null && cards[k].isEnabled()) { 
