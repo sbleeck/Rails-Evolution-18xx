@@ -199,7 +199,6 @@ public class StatusWindow extends JFrame implements ActionListener, ActionPerfor
     private JMenu phasesMenu;
     private JMenu networkMenu;
 
-
     public void initMenu() {
 
         menuBar = new JMenuBar();
@@ -481,7 +480,20 @@ public class StatusWindow extends JFrame implements ActionListener, ActionPerfor
             menuItem.addActionListener(this);
             menuItem.setEnabled(true);
             developerMenu.add(menuItem);
+
         }
+
+        // 10. HELP MENU
+        JMenu helpMenu = new JMenu(LocalText.getText("HELP", "Help"));
+        helpMenu.setMnemonic(KeyEvent.VK_H);
+
+        JMenuItem hotkeysItem = new JMenuItem(LocalText.getText("HOTKEYS", "Hotkeys..."));
+        hotkeysItem.setActionCommand("ShowHotkeys");
+        hotkeysItem.setMnemonic(KeyEvent.VK_K);
+        hotkeysItem.addActionListener(this);
+        helpMenu.add(hotkeysItem);
+
+        menuBar.add(helpMenu);
 
         setJMenuBar(menuBar);
 
@@ -749,7 +761,7 @@ public class StatusWindow extends JFrame implements ActionListener, ActionPerfor
             enableAIButton(false); // Disable button immediately
             gameUIManager.performAIMove(); // Call the central AI handler
 
-     } else if (command.equals(MAP_ZOOM_IN_CMD)) {
+        } else if (command.equals(MAP_ZOOM_IN_CMD)) {
             gameUIManager.zoomMap(true); // Call zoom in
         } else if (command.equals(MAP_ZOOM_OUT_CMD)) {
             gameUIManager.zoomMap(false); // Call zoom out
@@ -760,16 +772,18 @@ public class StatusWindow extends JFrame implements ActionListener, ActionPerfor
 
         } else if (command.equals("MapFitHeight")) {
             gameUIManager.fitMapToHeight(); // Need to add this
+        } else if (command.equals("ShowHotkeys")) {
+            showHotkeysDialog();
 
-} else if (command.equals(FONT_INCREASE_CMD)) {
+        } else if (command.equals(FONT_INCREASE_CMD)) {
             // 1. Update Global State (Saves to file)
-            gameUIManager.adjustGlobalFontScale(0.1); 
+            gameUIManager.adjustGlobalFontScale(0.1);
             // 2. Update Local Visuals (Resizes headers/tables immediately)
             updateFonts(currentBaseFontSize + 1f);
         } else if (command.equals(FONT_DECREASE_CMD)) {
             gameUIManager.adjustGlobalFontScale(-0.1);
             updateFonts(Math.max(8f, currentBaseFontSize - 1f));
-            
+
         } else if (command.equals(REM_TILES_CMD) || command.equals(ORPanel.REM_TILES_CMD)) {
 
             // ARCHITECTURAL FIX: Route through ORUIManager
@@ -1073,7 +1087,7 @@ public class StatusWindow extends JFrame implements ActionListener, ActionPerfor
         // Default 14f * 1.0 = 14f. If saved 0.8 -> 11.2f
         this.currentBaseFontSize = 14f * savedScale;
         updateFonts(currentBaseFontSize);
-        
+
         // 2. Setup UI Timer
         if (uiRefreshTimer != null && uiRefreshTimer.isRunning()) {
             uiRefreshTimer.stop();
@@ -1266,7 +1280,7 @@ public class StatusWindow extends JFrame implements ActionListener, ActionPerfor
 
             // Re-apply the current scaled font to the newly created buttons
             updateFonts(this.currentBaseFontSize);
-            
+
             // Always push the Priority Deal state to the UI, regardless of Round Type.
             if (gameUIManager.getPriorityPlayer() != null) {
                 gameStatus.setPriorityPlayer(gameUIManager.getPriorityPlayer().getIndex());
@@ -1513,7 +1527,7 @@ public class StatusWindow extends JFrame implements ActionListener, ActionPerfor
     }
 
     public void updateActivityPanel(String text) {
-return;
+        return;
     }
 
     public void updateInfoMenu() {
@@ -1737,4 +1751,30 @@ return;
         }
     }
 
+    private void showHotkeysDialog() {
+ 
+        String msg = "<html><h3>Keyboard Shortcuts</h3>" +
+            "<table border='0' cellpadding='4'>" +
+            "<tr><td><b>Key</b></td><td><b>Action</b></td></tr>" +
+            "<tr><td colspan='2'><hr></td></tr>" +
+
+            "<tr><td colspan='2'><b>Global / Interface</b></td></tr>" +
+            "<tr><td><b>A</b></td><td>AI Move (Executes the AI logic for the current step)</td></tr>" +
+            "<tr><td><b>T</b></td><td>Toggle Timer (Pauses/Resumes the game timer)</td></tr>" +
+            "<tr><td><b>Space</b> or <b>Enter</b></td><td>Done / Confirm (Presses the 'Done' button)</td></tr>" +
+            "<tr><td><b>Cmd/Ctrl + Z</b></td><td>Undo</td></tr>" +
+            "<tr><td><b>Cmd/Ctrl + Y</b></td><td>Redo</td></tr>" +
+            "<tr><td><b>Cmd/Ctrl + +/-</b></td><td>Increase / Decrease Font Size</td></tr>" +
+
+            "<tr><td colspan='2'><br><b>Operating Round (Map & Tiles)</b></td></tr>" +
+            "<tr><td><b>S / D</b></td><td>Cycle available tiles for the selected hex (Previous / Next)</td></tr>" +
+            "<tr><td><b>E</b></td><td>Cycle tile upgrades (if multiple tile types fit the hex)</td></tr>" +
+            "<tr><td><b>R</b></td><td>Rotate the currently selected tile on the map</td></tr>" +
+            "<tr><td><b>L</b></td><td>Buy Train (Auto-selects the cheapest available train from IPO/Pool)</td></tr>" +
+            "<tr><td><b>N</b></td><td>Toggle Tile Numbers (Show/Hide build numbers on the map)</td></tr>" +
+            "</table></html>";
+        JOptionPane.showMessageDialog(this, msg, "Hotkeys", JOptionPane.INFORMATION_MESSAGE);
+    }
+
+    
 }
