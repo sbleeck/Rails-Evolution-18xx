@@ -46,19 +46,15 @@ public class WindowSettings {
         return rectangle (w.getClass().getSimpleName());
     }
 
-    // --- START FIX ---
-    public String getProperty(String key) {
-        String val = properties.get(key);
-        log.info("WindowSettings: Retrieval request for key '{}' returned '{}'", key, val);
-        return val;
-    }
-
     public void setProperty(String key, String value) {
-        log.info("WindowSettings: Setting property '{}' to '{}'", key, value);
         properties.put(key, value);
     }
-    // --- END FIX ---
 
+    public String getProperty(String key) {
+        return properties.get(key);
+    }
+
+ 
     public boolean isDefaultUsed() {
         return defaultUsed;
     }

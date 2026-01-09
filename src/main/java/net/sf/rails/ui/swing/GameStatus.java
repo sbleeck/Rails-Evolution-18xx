@@ -147,7 +147,7 @@ public class GameStatus extends GridPanel implements ActionListener {
     protected Caption[] compArrowCaption; // Store references to the arrows
     protected Caption[] compNameCaption;
     protected int compTokensXOffset, compTokensYOffset;
-    protected Field[] compPrivates;
+protected JPanel[] compPrivatesPanel;
     protected int compPrivatesXOffset, compPrivatesYOffset;
     protected Field[] compLoans;
     protected int compLoansXOffset, compLoansYOffset;
@@ -321,6 +321,8 @@ public class GameStatus extends GridPanel implements ActionListener {
     protected JPanel[] ipoPanels;
     protected RailCard[] ipoShareCards;
     protected javax.swing.JLabel[] ipoParLabels;
+    protected JPanel[] treasuryPanels;
+    protected RailCard[] treasuryShareCards;
 
     protected JPanel[] poolPanels;
     protected RailCard[] poolShareCards;
@@ -427,8 +429,7 @@ public class GameStatus extends GridPanel implements ActionListener {
         compTrainsButtonPanel = new JPanel[nc];
         compSubTrainButtons = new RailCard[nc][MAX_TRAIN_SLOTS];
         compTokens = new JPanel[nc];
-        compPrivates = new Field[nc];
-        compLoans = new Field[nc];
+
         if (hasRights)
             rights = new Field[nc];
         if (hasDirectCompanyIncomeInOr)
@@ -1241,7 +1242,15 @@ public class GameStatus extends GridPanel implements ActionListener {
                 }
                 cca.setAmount(amount);
                 chosenAction = cca;
-            } else if (actions.get(0) instanceof TrainCorrectionAction) {
+
+                
+            }  else if (actions.get(0) instanceof BuyPrivate) {
+            // Delegate the UI interaction to the ORUIManager to avoid code duplication
+                // and ensure consistent modal parenting (ORWindow vs StatusWindow).
+                gameUIManager.getORUIManager().processBuyPrivate((BuyPrivate) actions.get(0));
+                return; // Interaction handled by ORUIManager, so we return immediately.   
+            }
+            else if (actions.get(0) instanceof TrainCorrectionAction) {
                 chosenAction = actions.get(0);
             } else if (actions.get(0) instanceof BuyTrain) {
                 chosenAction = handleBuyTrain((BuyTrain) actions.get(0));
@@ -1803,49 +1812,68 @@ poolShareCards[i].setShareStackTooltip(pool.getCertificates(companies[i]));
     protected void setPoolCertButton(int i, boolean clickable) {
         setPoolCertButton(i, clickable, null);
     }
-    // --- END FIX ---
-    // ... (rest of class) ...
 
     protected void setTreasuryCertButton(int i, boolean clickable, Object o) {
         if (i < 0 || i >= shareRowVisibilityObservers.length || shareRowVisibilityObservers[i] == null)
             return;
 
-        setTreasuryCertButton(i, clickable); // Base call
-        // Apply tooltip for treasury shares (if the button supports it)
-        if (compCanHoldOwnShares && certInTreasuryButton[i] != null && companies[i] != null) {
-             certInTreasuryButton[i].setToolTipText(getCertStackTooltip(companies[i].getPortfolioModel(), companies[i]));
-        }
-
-        if (clickable && o != null) {
-            if (o instanceof BuyCertificate)
-                certInTreasuryButton[i].setBackground(BG_BUY);
-            else if (o instanceof SellShares)
-                certInTreasuryButton[i].setBackground(BG_SELL);
-
-            syncToolTipText(certInTreasury[i], certInTreasuryButton[i]);
-            if (o instanceof PossibleAction)
-                certInTreasuryButton[i].addPossibleAction((PossibleAction) o);
-        }
-    }
-
-    protected void setTreasuryCertButton(int i, boolean clickable) {
-        if (i < 0 || i >= shareRowVisibilityObservers.length || shareRowVisibilityObservers[i] == null)
+        // Safety check for the new array
+        if (treasuryShareCards == null || treasuryShareCards[i] == null)
             return;
 
-        boolean visible = shareRowVisibilityObservers[i].lastValue();
-        if (clickable) {
-            certInTreasuryButton[i].setText(certInTreasury[i].getText());
-            syncToolTipText(certInTreasury[i], certInTreasuryButton[i]);
+        if (stickyFont != null) treasuryShareCards[i].setFont(stickyFont);
 
-            certInTreasuryButton[i].setBackground(Color.WHITE);
-            certInTreasuryButton[i].setOpaque(true);
-            certInTreasuryButton[i].setBorder(certInTreasury[i].getBorder());
-        } else {
-            certInTreasuryButton[i].clearPossibleActions();
+        // Tooltip
+        if (compCanHoldOwnShares && companies[i] != null) {
+             treasuryShareCards[i].setShareStackTooltip(companies[i].getPortfolioModel().getCertificates(companies[i]));
         }
-        certInTreasury[i].setVisible(visible && !clickable);
-        certInTreasuryButton[i].setVisible(clickable);
+
+        boolean visible = shareRowVisibilityObservers[i].lastValue();
+        if (!visible) {
+            treasuryShareCards[i].setVisible(false);
+            return;
+        }
+
+        // Text Content
+        String shareTxt = companies[i].getPortfolioModel().getShareModel(companies[i]).toText();
+        boolean hasContent = (shareTxt != null && !shareTxt.isEmpty() && !shareTxt.equals("0"));
+        
+        treasuryShareCards[i].setVisible(hasContent);
+        treasuryShareCards[i].setCustomLabel(shareTxt);
+        treasuryShareCards[i].clearPossibleActions();
+
+        if (clickable && o != null) {
+            // ACTIVE
+            if (o instanceof BuyCertificate) {
+                treasuryShareCards[i].setBackground(BG_BUY);
+                treasuryShareCards[i].setBorder(BorderFactory.createLineBorder(Color.BLACK, 2));
+            } else if (o instanceof SellShares) {
+                treasuryShareCards[i].setBackground(BG_SELL);
+            }
+
+            if (o instanceof PossibleAction)
+                treasuryShareCards[i].addPossibleAction((PossibleAction) o);
+            
+            treasuryShareCards[i].setEnabled(true);
+            treasuryShareCards[i].setVisible(true); // Force visible if actionable
+        } else {
+            // PASSIVE
+            treasuryShareCards[i].setBackground(BG_CARD_PASSIVE);
+            treasuryShareCards[i].setBorder(BorderFactory.createCompoundBorder(
+                    BorderFactory.createLineBorder(Color.BLACK, 1),
+                    BorderFactory.createEmptyBorder(1, 1, 1, 1)));
+            treasuryShareCards[i].setEnabled(true);
+        }
     }
+
+    /**
+     * Overload to handle the "reset" call (clickable=false).
+     * We redirect this to the main method with null action.
+     */
+    protected void setTreasuryCertButton(int i, boolean clickable) {
+        setTreasuryCertButton(i, clickable, null);
+    }
+
 
     public void setPriorityPlayer(int index) {
         int np = players.getNumberOfPlayers();
@@ -1929,30 +1957,40 @@ poolShareCards[i].setShareStackTooltip(pool.getCertificates(companies[i]));
         if (playerPrivatesPanel == null)
             return;
 
-        // 1. Identify Active Privates (Scan for Special Actions)
-        // Switch to Set<String> (IDs) to avoid object reference mismatches
-        java.util.Set<String> activePrivateIds = new java.util.HashSet<>();
+// 1. Identify Active Privates (Scan for Special Actions OR Buy Actions)
+        // Map ID -> Action so we can attach it to the card later
+        java.util.Map<String, PossibleAction> activePrivateActions = new java.util.HashMap<>();
 
         // FIX: Access .getList() to check size/empty status
         if (possibleActions != null && possibleActions.getList() != null && !possibleActions.getList().isEmpty()) {
 
             for (PossibleAction pa : possibleActions.getList()) {
-                net.sf.rails.game.special.SpecialProperty sp = null;
+                net.sf.rails.game.PrivateCompany target = null;
 
                 // Check various action types that might use a Special Property
                 if (pa instanceof UseSpecialProperty) {
-                    sp = ((UseSpecialProperty) pa).getSpecialProperty();
+                    net.sf.rails.game.special.SpecialProperty sp = ((UseSpecialProperty) pa).getSpecialProperty();
+                    if (sp.getOriginalCompany() instanceof net.sf.rails.game.PrivateCompany) {
+                        target = (net.sf.rails.game.PrivateCompany) sp.getOriginalCompany();
+                    }
                 } else if (pa instanceof LayTile) {
-                    sp = ((LayTile) pa).getSpecialProperty();
-
+                    net.sf.rails.game.special.SpecialProperty sp = ((LayTile) pa).getSpecialProperty();
+                    if (sp != null && sp.getOriginalCompany() instanceof net.sf.rails.game.PrivateCompany) {
+                        target = (net.sf.rails.game.PrivateCompany) sp.getOriginalCompany();
+                    }
                 } else if (pa instanceof LayBaseToken) {
-                    sp = ((LayBaseToken) pa).getSpecialProperty();
+                    net.sf.rails.game.special.SpecialProperty sp = ((LayBaseToken) pa).getSpecialProperty();
+                    if (sp != null && sp.getOriginalCompany() instanceof net.sf.rails.game.PrivateCompany) {
+                        target = (net.sf.rails.game.PrivateCompany) sp.getOriginalCompany();
+                    }
+                } else if (pa instanceof BuyPrivate) {
+                    // NEW: Explicitly catch BuyPrivate actions
+                    target = ((BuyPrivate) pa).getPrivateCompany();
                 }
 
                 // If found, link back to the Private Company ID
-                if (sp != null && sp.getOriginalCompany() instanceof net.sf.rails.game.PrivateCompany) {
-                    String id = sp.getOriginalCompany().getId();
-                    activePrivateIds.add(id);
+                if (target != null) {
+                    activePrivateActions.put(target.getId(), pa);
                 }
             }
         }
@@ -2000,16 +2038,27 @@ poolShareCards[i].setShareStackTooltip(pool.getCertificates(companies[i]));
 
                 // 4. State & Background
                 // Check against ID set
-                boolean isActive = activePrivateIds.contains(pc.getId());
+               // 4. State & Background
+                // Check against ID map
+                if (activePrivateActions.containsKey(pc.getId())) {
+                    PossibleAction action = activePrivateActions.get(pc.getId());
+                    
+                    // CRITICAL: Attach the action to the card so clicking it works!
+                    card.addPossibleAction(action);
 
-                if (isActive) {
                     card.setBackground(BG_BUY_ACTIVE); // Green
                     card.setBorder(BorderFactory.createLineBorder(Color.BLACK, 2)); // Thicker border
                     card.setState(RailCard.State.ACTIONABLE); // Make it look clickable/active
+                    
+                    if (action instanceof BuyPrivate) {
+                        card.setToolTipText("Click to Buy " + pc.getId());
+                    }
                 } else {
                     card.setBackground(BG_CARD_PASSIVE); // Standard Beige
                     card.setState(RailCard.State.PASSIVE);
+                    card.clearPossibleActions(); // Ensure no stale actions
                 }
+
                 card.setOpaque(true);
 
                 // 5. Alignment (Center in the column)
@@ -2029,8 +2078,12 @@ poolShareCards[i].setShareStackTooltip(pool.getCertificates(companies[i]));
             // Add Glue to push items to the top
             playerPrivatesPanel[i].add(Box.createVerticalGlue());
 
-            playerPrivatesPanel[i].revalidate();
-            playerPrivatesPanel[i].repaint();
+// Ensure we only repaint if the panel is still valid
+            if (playerPrivatesPanel[i] != null) {
+                playerPrivatesPanel[i].revalidate();
+                playerPrivatesPanel[i].repaint();
+            }
+            
         }
     }
 
@@ -2112,6 +2165,54 @@ poolShareCards[i].setShareStackTooltip(pool.getCertificates(companies[i]));
         panel.revalidate();
         panel.repaint();
     }
+
+    private void updateCompanyPrivates(int i, PublicCompany c) {
+        if (compPrivatesPanel == null || compPrivatesPanel[i] == null) return;
+
+        compPrivatesPanel[i].removeAll();
+
+        java.util.Collection<net.sf.rails.game.PrivateCompany> privates =
+                c.getPortfolioModel().getPrivateCompanies();
+
+        if (privates != null && !privates.isEmpty()) {
+            for (net.sf.rails.game.PrivateCompany pc : privates) {
+                RailCard card = new RailCard(pc, buySellGroup);
+                
+                // Consistency: Use sticky font (Zoom) if present
+                if (stickyFont != null) {
+                    card.setFont(stickyFont);
+                } else {
+                    card.setFont(new Font("SansSerif", Font.BOLD, 12));
+                }
+
+                card.setCompactMode(true);
+                card.setCustomLabel(pc.getId());
+                
+                // Tooltip
+                card.setPrivateCompanyTooltip(pc);
+                
+                // Highlight on Map
+                HexHighlightMouseListener.addMouseListener(card, gameUIManager.getORUIManager(), pc, false);
+
+                // Styling: Companies usually just "hold" them; they aren't actionable buttons 
+                // in the same way Player privates are (players click to buy/act). 
+                // However, we apply the passive card style for consistency.
+                card.setBackground(BG_CARD_PASSIVE);
+                card.setBorder(BorderFactory.createCompoundBorder(
+                        BorderFactory.createLineBorder(Color.BLACK, 1),
+                        BorderFactory.createEmptyBorder(1, 1, 1, 1)));
+                
+                card.setOpaque(true);
+                card.setVisible(true);
+
+                compPrivatesPanel[i].add(card);
+            }
+        }
+
+        compPrivatesPanel[i].revalidate();
+        compPrivatesPanel[i].repaint();
+    }
+
 
     private void updateTrainCosts() {
         try {
@@ -2359,7 +2460,7 @@ poolShareCards[i].setShareStackTooltip(pool.getCertificates(companies[i]));
                     // TRANSPARENCY: Force labels to be transparent so they inherit the row color
                     poolPriceLabels[i].setOpaque(false);
                     // Ensure the label fills the space so alignment works
-                    poolPriceLabels[i].setPreferredSize(new Dimension(30, 20));
+                    // poolPriceLabels[i].setPreferredSize(new Dimension(30, 20));
 
                 } else {
                     poolPriceLabels[i].setText("");
@@ -2413,7 +2514,7 @@ poolShareCards[i].setShareStackTooltip(pool.getCertificates(companies[i]));
                         ipoParLabels[i].setFont(baseFont.deriveFont(Font.BOLD));
                     }
                     ipoParLabels[i].setHorizontalAlignment(SwingConstants.RIGHT);
-                    ipoParLabels[i].setPreferredSize(new Dimension(30, 20));
+                    // ipoParLabels[i].setPreferredSize(new Dimension(30, 20));
                 } else {
                     ipoParLabels[i].setText("");
                 }
@@ -2487,6 +2588,12 @@ poolShareCards[i].setShareStackTooltip(pool.getCertificates(companies[i]));
                 compTrainsButtonPanel[i].setOpaque(true);
             }
 
+
+            if (compCanBuyPrivates && compPrivatesPanel[i] != null) {
+                compPrivatesPanel[i].setBackground(bgRow);
+                compPrivatesPanel[i].setOpaque(true);
+                updateCompanyPrivates(i, c);
+            }
 
             // Note: We need to ensure the compCash/Revenue/Tokens fields use the new bgRow.
             // Assuming your previous code already updated these fields, we will ensure
@@ -3262,6 +3369,11 @@ poolShareCards[i].setShareStackTooltip(pool.getCertificates(companies[i]));
         if (compTokens == null || compTokens.length != nc)
             compTokens = new JPanel[nc];
 
+        if (compCanBuyPrivates) {
+            if (compPrivatesPanel == null || compPrivatesPanel.length != nc)
+                compPrivatesPanel = new JPanel[nc];
+        }
+
         // Initialize IPO Arrays
         if (ipoPanels == null || ipoPanels.length != nc)
             ipoPanels = new JPanel[nc];
@@ -3269,6 +3381,10 @@ poolShareCards[i].setShareStackTooltip(pool.getCertificates(companies[i]));
             ipoShareCards = new RailCard[nc];
         if (ipoParLabels == null || ipoParLabels.length != nc)
             ipoParLabels = new javax.swing.JLabel[nc];
+if (treasuryPanels == null || treasuryPanels.length != nc)
+            treasuryPanels = new JPanel[nc];
+        if (treasuryShareCards == null || treasuryShareCards.length != nc)
+            treasuryShareCards = new RailCard[nc];
 
         if (poolPanels == null || poolPanels.length != nc)
             poolPanels = new JPanel[nc];
@@ -3353,7 +3469,7 @@ poolShareCards[i].setShareStackTooltip(pool.getCertificates(companies[i]));
         updateTrainCosts();
     }
 
-    private void initHeaders() {
+    protected void initHeaders() {
         for (int i = 0; i < np; i++) {
             f = upperPlayerCaption[i] = new Caption(players.getPlayerByPosition(i).getName());
 
@@ -3377,7 +3493,8 @@ poolShareCards[i].setShareStackTooltip(pool.getCertificates(companies[i]));
         int height = 20;
 
         int wCard = (charWidth * 5) + 6;
-        int wPrice = (charWidth * 3) + 6;
+        // int wPrice = (charWidth * 3) + 6;
+int wPrice = fm.stringWidth("$999") + 10;
         int wTotal = wCard + wPrice + 4; // Card + Price + Gaps
 
         Dimension dimMarket = new Dimension(wTotal, height);
@@ -3416,9 +3533,17 @@ poolShareCards[i].setShareStackTooltip(pool.getCertificates(companies[i]));
         f.setBorder(BORDER_THIN);
         f.setPreferredSize(DIM_TOKENS);
         addField(f, compTokensXOffset, 1, 1, 1, 0, true);
+    if (compCanBuyPrivates) {
+            f = new Caption(LocalText.getText("PRIVATES"));
+            f.setBorder(BORDER_THIN);
+            f.setPreferredSize(DIM_STD);
+            addField(f, compPrivatesXOffset, 1, 1, 1, 0, true);
+        }
+    
+    
     }
 
-    private void initCompanyRows(int startY, PublicCompany operatingComp) {
+    protected void initCompanyRows(int startY, PublicCompany operatingComp) {
         int y = startY;
         java.util.List<PublicCompany> displayList = new java.util.ArrayList<>(gameUIManager.getAllPublicCompanies());
         compNameCaption = new Caption[nc];
@@ -3502,6 +3627,7 @@ poolShareCards[i].setShareStackTooltip(pool.getCertificates(companies[i]));
             compArrowCaption[i].setPreferredSize(DIM_ARROW);
 
             addField(compArrowCaption[i], 0, y, 1, 1, 0, visible);
+            companyCertRow.put(c, y);
 
             javax.swing.border.Border bName = BorderFactory.createMatteBorder(tHeight, 0, bHeight, 1, Color.BLACK);
             compNameCaption[i] = new Caption(c.getId());
@@ -3535,7 +3661,10 @@ poolShareCards[i].setShareStackTooltip(pool.getCertificates(companies[i]));
             // Accessories (Prices/Dots) still need a calculated width relative to font
             FontMetrics fm = java.awt.Toolkit.getDefaultToolkit().getFontMetrics(sizingFont);
             int charWidth = fm.charWidth('0');
-            int wPrice = (charWidth * 3) + 6;
+            // int wPrice = (charWidth * 3) + 6;
+            // Adjusted to fit "$123" (Currency symbol + 3 digits)
+int wPrice = fm.stringWidth("$999") + 10;
+
             int wDot = Math.max(8, masterHeight / 2);
 
            Dimension dimCard = new Dimension(wCard, masterHeight);
@@ -3615,10 +3744,29 @@ ipoParLabels[i].setOpaque(false);
             ipoPanels[i] = createShareCell(
                     ipoShareCards[i], ipoParLabels[i], dimCard, dimPrice, getBorder.apply(false, true));
             ipoPanels[i].setOpaque(true);
-
             addField(ipoPanels[i], certInIPOXOffset, y, 1, 1, 0, visible);
 
             if (compCanHoldOwnShares) {
+                // Create Treasury RailCard
+                treasuryShareCards[i] = new RailCard((net.sf.rails.game.Train) null, buySellGroup);
+                treasuryShareCards[i].addActionListener(this);
+                if (stickyFont != null)
+                    treasuryShareCards[i].setFont(stickyFont);
+
+                // Create wrapper panel (using null for accessory since Treasury usually doesn't show price/par next to card)
+                treasuryPanels[i] = createShareCell(
+                        treasuryShareCards[i], null, dimCard, null, getBorder.apply(true, false));
+                treasuryPanels[i].setBackground(isOperating ? BG_OPERATING : (isMinor || !isActive ? BG_INACTIVE : BG_POOL));
+                treasuryPanels[i].setOpaque(true);
+
+                addField(treasuryPanels[i], certInTreasuryXOffset, y, 1, 1, 0, visible);
+
+                // Note: We keep the old certInTreasuryButton for logic, but we don't add it to the GUI anymore
+                // or we reuse it just for action mapping if needed.
+                // However, setTreasuryCertButton below will handle the logic using the new Card.
+                // --- END FIX ---
+                // --- DELETE ---
+                /*
                 f = certInTreasury[i] = new Field(c.getPortfolioModel().getShareModel(c));
                 f.setBackground(isOperating ? BG_OPERATING : (isMinor || !isActive ? BG_INACTIVE : BG_POOL));
                 f.setOpaque(true);
@@ -3628,6 +3776,7 @@ ipoParLabels[i].setOpaque(false);
                 f = certInTreasuryButton[i] = new ClickField(certInTreasury[i].getText(), BUY_FROM_POOL_CMD, "", this,
                         buySellGroup);
                 addField(f, certInTreasuryXOffset, y, 1, 1, 0, false);
+                */
             }
 
             // DETAILS (Cash, Rev, Trains, Tokens)
@@ -3730,6 +3879,18 @@ ipoParLabels[i].setOpaque(false);
             compTokens[i].setPreferredSize(DIM_TOKENS);
             updateCompanyTokenDisplay(i, c, compTokens[i]);
             addField(compTokens[i], compTokensXOffset, y, 1, 1, 0, visible);
+
+            if (compCanBuyPrivates) {
+                // Use FlowLayout to stack multiple privates horizontally if necessary
+                compPrivatesPanel[i] = new JPanel(new FlowLayout(FlowLayout.CENTER, 2, 0));
+                compPrivatesPanel[i].setOpaque(true);
+                compPrivatesPanel[i].setBackground(isOperating ? BG_OPERATING : (!isActive ? BG_INACTIVE : BG_MAUVE));
+                compPrivatesPanel[i].setBorder(bDet);
+                // No fixed preference size; let it grow with content, but set minimum
+                compPrivatesPanel[i].setMinimumSize(DIM_STD);
+
+                addField(compPrivatesPanel[i], compPrivatesXOffset, y, 1, 1, 0, visible);
+            }
 
             y++;
         }
@@ -4117,7 +4278,6 @@ ipoParLabels[i].setOpaque(false);
         if (accessory != null) {
             accessory.setPreferredSize(dimAccessory);
             accessory.setMinimumSize(dimAccessory);
-            accessory.setMaximumSize(dimAccessory);
 
             gbc.gridx = 1;
             gbc.insets = new Insets(0, 0, 0, 0);

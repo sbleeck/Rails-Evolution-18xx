@@ -104,6 +104,14 @@ public class PrivateCompany extends RailsOwnableItem<PrivateCompany> implements 
         this.privateNumber = numberOfPrivateCompanies++;
     }
 
+    /**
+     * Returns the name of the private company (synonym for getLongName()).
+     * Added to support UI calls expecting getName().
+     */
+    public String getName() {
+        return getLongName();
+    }
+    
     @Override
     public void configureFromXML(Tag tag) throws ConfigurationException {
         /* Configure private company features */

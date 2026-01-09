@@ -9,7 +9,9 @@ import java.io.FileWriter;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.text.SimpleDateFormat;
+import net.sf.rails.ui.swing.WindowSettings;
 
+import net.sf.rails.ui.swing.hexmap.HexMap;
 import java.util.*;
 import java.util.List;
 import java.util.stream.IntStream;
@@ -140,6 +142,7 @@ public class GameUIManager implements DialogOwner {
     private Player currentPlayerOnTimer = null; // No longer strictly needed but fine to keep null for now
     private boolean isTimerPaused = false;
     private double currentFontScale = 1.0;
+
 
     // Player order
     // protected PlayerOrderView playerOrderView;
@@ -520,18 +523,26 @@ if (windowSettings != null) {
             String combinedMessage = Util.join(message, " ");
             
             //  Suppress Modals ---
-            // 1. Race Condition "is not allowed"
-            // 2. Share Selling "must raise cash" (blocks AI)
-            if (combinedMessage.contains("is not allowed") || 
-                combinedMessage.contains("must raise") ||
-                combinedMessage.contains("Bank is broken") ||
-                combinedMessage.contains("Correction activated") || // Suppress mode change notification
-                combinedMessage.contains("Starts at") || // Also catch "PR Starts at..." just in case
-                combinedMessage.contains("PR exchanges")) { // <--- Added this
+
+            if (combinedMessage.contains("Bank is broken") || 
+                combinedMessage.contains("Correction activated")) { 
 
                 log.info("SUPPRESSED UI MESSAGE: {}", combinedMessage);
                 return false; 
             }
+
+            // 1. Race Condition "is not allowed"
+            // 2. Share Selling "must raise cash" (blocks AI)
+            // if (combinedMessage.contains("is not allowed") || 
+            //     // combinedMessage.contains("must raise") ||
+            //     combinedMessage.contains("Bank is broken") ||
+            //     combinedMessage.contains("Correction activated") || // Suppress mode change notification
+            //     // combinedMessage.contains("Starts at") || // Also catch "PR Starts at..." just in case
+            //     combinedMessage.contains("PR exchanges")) { // <--- Added this
+
+            //     log.info("SUPPRESSED UI MESSAGE: {}", combinedMessage);
+            //     return false; 
+            // }
 
             setCurrentDialog(new MessageDialog(null, this,
                     (JFrame) activeWindow,
@@ -714,10 +725,20 @@ showPlayerWorthChart();        }
         if (startRoundWindow != null) {
             startRoundWindow.updateStatus(myTurn);
         }
+        // Wrap StatusWindow update to prevent crashes (CME) from blocking the OR Window update.
         if (statusWindow != null) {
-            statusWindow.updateStatus(myTurn);
+            try {
+                statusWindow.updateStatus(myTurn);
+            } catch (Exception e) {
+                log.error("Recovered from StatusWindow crash during updateUI. Proceeding to ORUIManager.", e);
+            }
         }
+        
         if (orUIManager != null) {
+            // Log to confirm we reached this point
+            if (currentRound instanceof OperatingRound && ((OperatingRound)currentRound).getOperatingCompany().getId().equals("S5")) {
+                log.info("1837_DEBUG: GameUIManager calling orUIManager.updateStatus for S5");
+            }
             orUIManager.updateStatus(myTurn);
         }
 
@@ -2516,5 +2537,74 @@ public void fitMapToWidth() {
             statusWindow.getGameStatus().setPlayerTimeWithoutDeltaCheck(playerIndex, newTime);
         }
     }
+
+
+    /**
+     * Saves the position and size of all active windows.
+     * @param gameName The name of the current game (e.g. "1830") for file naming.
+     */
+    public void saveWindowSettings(String gameName) {
+        // Initialize with the provided game name
+        if (windowSettings == null) {
+            windowSettings = new WindowSettings(gameName);
+        }
+
+        // 1. Update settings for known windows
+        if (statusWindow != null) windowSettings.set(statusWindow);
+        if (orWindow != null) windowSettings.set(orWindow);
+        if (reportWindow != null) windowSettings.set(reportWindow);
+
+// 2. Save Map Zoom Step
+        if (orUIManager != null && orUIManager.getMap() != null) {
+            HexMap map = orUIManager.getMap();
+            int zoomStep = map.getZoomStep();
+            windowSettings.setProperty("MapZoomStep", String.valueOf(zoomStep));
+        }
+
+
+        // 3. Write to disk
+        windowSettings.save();
+    }
+
+    /**
+     * Restores the position and size of all active windows.
+     * @param gameName The name of the current game.
+     */
+    public void loadWindowSettings(String gameName) {
+        if (windowSettings == null) {
+            windowSettings = new WindowSettings(gameName);
+        }
+
+        // 1. Apply positions
+        restoreWindow(statusWindow);
+        restoreWindow(orWindow);
+        restoreWindow(reportWindow);
+
+// 2. Restore Map Zoom Step
+        if (orUIManager != null && orUIManager.getMap() != null) {
+            HexMap map = orUIManager.getMap();
+            String zoomStr = windowSettings.getProperty("MapZoomStep");
+            if (zoomStr != null) {
+                try {
+                    int zoomStep = Integer.parseInt(zoomStr);
+                    map.setZoomStep(zoomStep);
+                } catch (NumberFormatException e) {
+                    // Ignore invalid zoom data
+                }
+            }
+        }
+        
+    }
+
+
+    private void restoreWindow(JFrame window) {
+        if (window == null) return;
+        Rectangle r = windowSettings.getBounds(window);
+        // WindowSettings returns -1,-1,-1,-1 if not found
+        if (r.width > 0 && r.height > 0) {
+            window.setBounds(r);
+        }
+    }
+
 
 }

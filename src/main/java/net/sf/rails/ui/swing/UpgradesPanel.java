@@ -12,6 +12,9 @@ import java.awt.event.MouseEvent;
 import javax.swing.*;
 import javax.swing.border.EmptyBorder;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import net.sf.rails.ui.swing.elements.GUIHexUpgrades;
 import net.sf.rails.ui.swing.elements.UpgradeLabel;
 import net.sf.rails.ui.swing.elements.RailsIcon;
@@ -20,6 +23,8 @@ import net.sf.rails.ui.swing.hexmap.*;
 
 public class UpgradesPanel extends JPanel {
     private static final long serialVersionUID = 1L;
+    
+    private static final Logger log = LoggerFactory.getLogger(UpgradesPanel.class);
 
     private static final int UPGRADE_TILE_ZOOM_STEP = 10;
 
@@ -30,36 +35,45 @@ public class UpgradesPanel extends JPanel {
     private final RailsIconButton skipButton;
     private boolean omitButtons;
     private GUIHexUpgrades hexUpgrades;
+    
+    private RemainingTilesWindow.MiniDock miniDock;
+    
+    private final int fixedTileHeight;
+    private final int fixedTileWidth;
 
     public UpgradesPanel(ORUIManager orUIManager, boolean omitButtons) {
-        this.setLayout(new BoxLayout(this, BoxLayout.PAGE_AXIS));
+        this.setLayout(new BoxLayout(this, BoxLayout.LINE_AXIS));
         this.orUIManager = orUIManager;
         this.omitButtons = omitButtons;
+        this.setAlignmentX(Component.LEFT_ALIGNMENT);
 
         Color bgColor = UIManager.getColor("Panel.background");
 
-        // Base width 135: fits text comfortably without being huge.
-        // Alignment fix below ensures it sticks to the left regardless of parent size.
-        int width = (int) Math.round(100 * (2 + GUIGlobals.getFontsScale()) / 3);
-        int height = 200;
+        int baseMetric = (int) Math.round(100 * (2 + GUIGlobals.getFontsScale()) / 3);
         
-        this.setPreferredSize(new Dimension(width, height + 50));
-        this.setMaximumSize(new Dimension(width, Short.MAX_VALUE));
+        this.fixedTileHeight = baseMetric + 15; 
+        this.fixedTileWidth = (int) (baseMetric * 0.85); 
+
+        int panelHeight = fixedTileHeight + 10;
+
+        this.setPreferredSize(new Dimension(Short.MAX_VALUE, panelHeight));
+        this.setMaximumSize(new Dimension(Short.MAX_VALUE, panelHeight));
         setVisible(true);
 
         upgradePanel = new JPanel();
         upgradePanel.setOpaque(true);
-        upgradePanel.setLayout(new BoxLayout(upgradePanel, BoxLayout.PAGE_AXIS));
+        upgradePanel.setLayout(new BoxLayout(upgradePanel, BoxLayout.LINE_AXIS));
         upgradePanel.setBackground(bgColor);
+        upgradePanel.setAlignmentX(Component.LEFT_ALIGNMENT);
 
         scrollPane = new JScrollPane(upgradePanel);
-        scrollPane.setHorizontalScrollBarPolicy(JScrollPane.HORIZONTAL_SCROLLBAR_NEVER);
-        scrollPane.setVerticalScrollBarPolicy(JScrollPane.VERTICAL_SCROLLBAR_AS_NEEDED);
-        scrollPane.setPreferredSize(new Dimension(width, height));
-        scrollPane.setMinimumSize(new Dimension(width, height));
-        scrollPane.getViewport().setBackground(bgColor);
+        scrollPane.setHorizontalScrollBarPolicy(JScrollPane.HORIZONTAL_SCROLLBAR_AS_NEEDED);
+        scrollPane.setVerticalScrollBarPolicy(JScrollPane.VERTICAL_SCROLLBAR_NEVER);
+        scrollPane.setBorder(BorderFactory.createEmptyBorder());
         
-        // --- FIX 1: ALIGN SCROLLPANE LEFT ---
+        scrollPane.setPreferredSize(new Dimension(600, panelHeight));
+        scrollPane.setMinimumSize(new Dimension(100, panelHeight));
+        scrollPane.getViewport().setBackground(bgColor);
         scrollPane.setAlignmentX(Component.LEFT_ALIGNMENT);
         
         Action confirmAction = new AbstractAction() {
@@ -89,34 +103,54 @@ public class UpgradesPanel extends JPanel {
             Dimension buttonDimension = new Dimension(Short.MAX_VALUE, 25);
             confirmButton.setMaximumSize(buttonDimension);
             skipButton.setMaximumSize(buttonDimension);
-            
-            // --- FIX 2: ALIGN BUTTONS LEFT (Was CENTER) ---
             confirmButton.setAlignmentX(Component.LEFT_ALIGNMENT);
             skipButton.setAlignmentX(Component.LEFT_ALIGNMENT);
             
+            add(Box.createHorizontalStrut(2)); 
             add(confirmButton);
+            add(Box.createHorizontalStrut(2)); 
             add(skipButton);
+            add(Box.createHorizontalStrut(5)); 
         }
-        add(scrollPane);
         
-        // --- SHORTCUT LEGEND ---
-        add(Box.createVerticalGlue()); 
+        add(scrollPane);
+
+        add(Box.createHorizontalStrut(5));
+        
+        JSeparator sep = new JSeparator(SwingConstants.VERTICAL);
+        sep.setMaximumSize(new Dimension(2, panelHeight - 10));
+        add(sep);
+        add(Box.createHorizontalStrut(5));
+
+        this.miniDock = new RemainingTilesWindow.MiniDock(orUIManager);
+        
+        Dimension dockSize = new Dimension(240, panelHeight - 4); 
+        miniDock.setPreferredSize(dockSize);
+        miniDock.setMaximumSize(dockSize);
+        miniDock.setMinimumSize(dockSize);
+        
+        add(miniDock);
+
+        add(Box.createHorizontalStrut(5)); 
         
         setButtons();
         revalidate();
     }
-    
+
+    public void refreshMiniDock() {
+        if (this.miniDock != null) {
+            this.miniDock.repaint();
+        }
+    }
 
     private void addLegendItem(JPanel panel, String key, String desc) {
         JLabel lbl = new JLabel("<html><font color='#222222' size='3'><b>[" + key + "]</b></font> " + desc + "</html>");
         lbl.setFont(new Font("SansSerif", Font.PLAIN, 11)); 
-        lbl.setAlignmentX(Component.LEFT_ALIGNMENT); // Internal items also Left
+        lbl.setAlignmentX(Component.LEFT_ALIGNMENT); 
         panel.add(lbl);
-        panel.add(Box.createVerticalStrut(3));
+        panel.add(Box.createHorizontalStrut(5)); 
     }
 
-    // ... (rest of the class is unchanged) ...
-    
     public void setHexUpgrades(GUIHexUpgrades hexUpgrades) {
         this.hexUpgrades = hexUpgrades;
     }
@@ -144,7 +178,7 @@ public class UpgradesPanel extends JPanel {
     private void resetUpgrades(boolean skip) {
         hexUpgrades.setActiveHex(null, 0);
         upgradePanel.removeAll();
-        scrollPane.getVerticalScrollBar().setValue(0);
+        scrollPane.getHorizontalScrollBar().setValue(0);
         scrollPane.repaint();
         confirmButton.setEnabled(false);
         skipButton.setEnabled(skip);
@@ -200,7 +234,10 @@ public class UpgradesPanel extends JPanel {
     
     private void showLabels() {
         upgradePanel.removeAll();
-        for (UpgradeLabel label:hexUpgrades.getUpgradeLabels()) {
+        
+        Dimension tightSize = new Dimension(fixedTileWidth, fixedTileHeight);
+        
+        for (UpgradeLabel label : hexUpgrades.getUpgradeLabels()) {
             final HexUpgrade upgrade = label.getUpgrade();
             if (upgrade.isValid()) {
                 label.addMouseListener(new MouseAdapter() {
@@ -214,7 +251,23 @@ public class UpgradesPanel extends JPanel {
                             ((TileHexUpgrade)upgrade).getUpgrade().getTargetTile(), true);
                 }
             }
+            
+            label.setHorizontalTextPosition(SwingConstants.CENTER);
+            label.setVerticalTextPosition(SwingConstants.BOTTOM);
+            label.setFont(new Font("SansSerif", Font.BOLD, 12));
+            label.setToolTipText(null);
+
+            label.setPreferredSize(tightSize);
+            label.setMaximumSize(tightSize);
+            label.setMinimumSize(tightSize);
+
             upgradePanel.add(label);
+            upgradePanel.add(Box.createHorizontalStrut(1));
         }
+        
+        upgradePanel.add(Box.createHorizontalGlue());
+        
+        upgradePanel.revalidate();
+        upgradePanel.repaint();
     }
 }

@@ -103,27 +103,28 @@ public class ORWindow extends DockingFrame implements ActionPerformer {
             addDockingFrameMenu(menuBar);
 
         } else {
-            getContentPane().setLayout(new BorderLayout());
-
-            // The ORPanel object itself is now just a component holder.
+          // The ORPanel object itself is now just a component holder.
             // We pull its contents (Sidebar and Upgrades) directly into the main window.
 
-            // 1. Create the Sidebar Wrapper
+            // --- START FIX ---
+            // 1. Sidebar Wrapper (WEST): Holds ONLY the Action Buttons (ORPanel sidebar)
+            // We strip the upgrade panel out so the sidebar gets full height.
             JPanel sidebarWrapper = new JPanel(new BorderLayout());
-            // This width must match the SIDEBAR_WIDTH defined in ORPanel for correct sizing
-            sidebarWrapper.setPreferredSize(new Dimension(180, 0));
+            sidebarWrapper.setPreferredSize(new Dimension(180, 0)); // Match ORPanel width
+            sidebarWrapper.add(orPanel.getSidebarPanel(), BorderLayout.CENTER);
 
-            // 2. Add the Control Stack (4 Phases + Footer) from ORPanel to the Wrapper's
-            // NORTH
-            sidebarWrapper.add(orPanel.getSidebarPanel(), BorderLayout.NORTH);
+            // 2. Map Wrapper (CENTER): Vertically stacks Map (Center) and Tiles (South)
+            JPanel mapWrapper = new JPanel(new BorderLayout());
+            mapWrapper.add(mapPanel, BorderLayout.CENTER);
 
-            // 3. Add the Tile Selection (Upgrades) to the Wrapper's CENTER
-            sidebarWrapper.add(upgradePanel, BorderLayout.CENTER);
+            // Place the Tiles horizontally underneath the map
+            if (upgradePanel != null) {
+                mapWrapper.add(upgradePanel, BorderLayout.SOUTH);
+            }
 
-            // 4. Layout Assembly
-            getContentPane().add(sidebarWrapper, BorderLayout.WEST); // <-- Sidebar is now correctly WEST
-            getContentPane().add(mapPanel, BorderLayout.CENTER); // <-- Map is correctly CENTER
-
+            // 3. Main Layout Assembly
+            getContentPane().add(sidebarWrapper, BorderLayout.WEST);
+            getContentPane().add(mapWrapper, BorderLayout.CENTER);    
             // The menu bar is already fully populated inside orPanel (infoMenu, zoomMenu,
             // etc.)
             // We set it as the official menu bar for the ORWindow frame.

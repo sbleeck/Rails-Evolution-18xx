@@ -1008,15 +1008,19 @@ public class StatusWindow extends JFrame implements ActionListener, ActionPerfor
         this.gameUIManager = gameUIManager;
         this.possibleActions = gameUIManager.getGameManager().getPossibleActions();
 
-        String gameStatusClassName = gameUIManager.getClassName(GuiDef.ClassName.GAME_STATUS);
-        try {
-            Class<? extends GameStatus> gameStatusClass = Class.forName(gameStatusClassName)
-                    .asSubclass(GameStatus.class);
-            gameStatus = gameStatusClass.newInstance();
-        } catch (Exception e) {
-            log.error("Cannot instantiate class {}", gameStatusClassName, e);
-            System.exit(1);
-        }
+// Extracted instantiation to createGameStatus() to allow overrides
+        gameStatus = createGameStatus();
+
+
+        // String gameStatusClassName = gameUIManager.getClassName(GuiDef.ClassName.GAME_STATUS);
+        // try {
+        //     Class<? extends GameStatus> gameStatusClass = Class.forName(gameStatusClassName)
+        //             .asSubclass(GameStatus.class);
+        //     gameStatus = gameStatusClass.newInstance();
+        // } catch (Exception e) {
+        //     log.error("Cannot instantiate class {}", gameStatusClassName, e);
+        //     System.exit(1);
+        // }
 
         gameStatus.init(this, gameUIManager);
         gameStatusPane = new JScrollPane(gameStatus); // <--- ASSIGN TO FIELD
@@ -1149,6 +1153,23 @@ public class StatusWindow extends JFrame implements ActionListener, ActionPerfor
         });
 
         gameUIManager.packAndApplySizing(this);
+    }
+
+/**
+     * Factory method to create the GameStatus panel. 
+     * Subclasses (like StatusWindow_1856) override this to provide custom panels.
+     */
+    protected GameStatus createGameStatus() {
+        String gameStatusClassName = gameUIManager.getClassName(GuiDef.ClassName.GAME_STATUS);
+        try {
+            Class<? extends GameStatus> gameStatusClass = Class.forName(gameStatusClassName)
+                    .asSubclass(GameStatus.class);
+            return gameStatusClass.newInstance();
+        } catch (Exception e) {
+            log.error("Cannot instantiate class {}", gameStatusClassName, e);
+            System.exit(1);
+            return null;
+        }
     }
 
     /**

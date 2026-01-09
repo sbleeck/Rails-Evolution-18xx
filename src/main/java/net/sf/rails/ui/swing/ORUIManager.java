@@ -1003,25 +1003,25 @@ private void addGenericTokenLays(LayBaseToken action) {
         }
     }
 
-    public void buyPrivate() {
 
-        int amount, index;
+    /**
+     * EXISTING METHOD REFACTORED:
+     * Handles the generic "Buy Private" button from the menu.
+     * Selects a private, then delegates processing to processBuyPrivate().
+     */
+    public void buyPrivate() {
         List<String> privatesForSale = new ArrayList<>();
         List<BuyPrivate> privates = getPossibleActions().getType(BuyPrivate.class);
-        String chosenOption;
-        BuyPrivate chosenAction;
-        int minPrice = 0, maxPrice = 0;
-        String priceRange;
+        
+        if (privates.isEmpty()) return;
 
+        // 1. Build the Selection List
         for (BuyPrivate action : privates) {
-            minPrice = action.getMinimumPrice();
-            maxPrice = action.getMaximumPrice();
-            if (minPrice < maxPrice) {
-                priceRange = gameUIManager.format(minPrice) + "..."
-                        + gameUIManager.format(maxPrice);
-            } else {
-                priceRange = gameUIManager.format(maxPrice);
-            }
+            int minPrice = action.getMinimumPrice();
+            int maxPrice = action.getMaximumPrice();
+            String priceRange = (minPrice < maxPrice) 
+                    ? gameUIManager.format(minPrice) + "..." + gameUIManager.format(maxPrice)
+                    : gameUIManager.format(maxPrice);
 
             privatesForSale.add(LocalText.getText("BuyPrivatePrompt",
                     action.getPrivateCompany().getId(),
@@ -1029,40 +1029,101 @@ private void addGenericTokenLays(LayBaseToken action) {
                     priceRange));
         }
 
-        if (privatesForSale.size() > 0) {
-            chosenOption = (String) JOptionPane.showInputDialog(orWindow,
-                    LocalText.getText("BUY_WHICH_PRIVATE"),
-                    LocalText.getText("WHICH_PRIVATE"),
-                    JOptionPane.QUESTION_MESSAGE, null,
-                    privatesForSale.toArray(), privatesForSale.get(0));
-            if (chosenOption != null) {
-                index = privatesForSale.indexOf(chosenOption);
-                chosenAction = privates.get(index);
-                minPrice = chosenAction.getMinimumPrice();
-                maxPrice = chosenAction.getMaximumPrice();
-                if (minPrice < maxPrice) {
-                    String price = JOptionPane.showInputDialog(orWindow,
-                            LocalText.getText("WHICH_PRIVATE_PRICE",
-                                    chosenOption,
-                                    gameUIManager.format(minPrice),
-                                    gameUIManager.format(maxPrice)),
-                            LocalText.getText("WHICH_PRICE"),
-                            JOptionPane.QUESTION_MESSAGE);
-                    try {
-                        amount = Integer.parseInt(price);
-                    } catch (NumberFormatException e) {
-                        amount = 0; // This will generally be refused.
+        // 2. Show Selection Dialog
+        String chosenOption = (String) JOptionPane.showInputDialog(orWindow,
+                LocalText.getText("BUY_WHICH_PRIVATE"),
+                LocalText.getText("WHICH_PRIVATE"),
+                JOptionPane.QUESTION_MESSAGE, null,
+                privatesForSale.toArray(), privatesForSale.get(0));
+
+        // 3. Delegate to the new worker method
+        if (chosenOption != null) {
+            int index = privatesForSale.indexOf(chosenOption);
+            processBuyPrivate(privates.get(index));
+        }
+    }
+
+    /**
+     * NEW METHOD: 
+     * Handles the specific transaction logic (Price & Confirm).
+     * Used by both buyPrivate() (above) and GameStatus clicks.
+     */
+    public void processBuyPrivate(BuyPrivate action) {
+        if (action == null) return;
+
+        int minPrice = action.getMinimumPrice();
+        int maxPrice = action.getMaximumPrice();
+        int selectedPrice = -1;
+
+        // A. Fixed Price: Just Confirm
+        if (minPrice == maxPrice) {
+            // Optional: You can skip confirmation if you prefer "One Click Buy"
+            // But usually safer to confirm.
+            int response = JOptionPane.showConfirmDialog(orWindow,
+                    LocalText.getText("ConfirmBuyPrivate", 
+                            action.getPrivateCompany().getId(), 
+                            gameUIManager.format(minPrice)),
+                    LocalText.getText("ConfirmPurchase"),
+                    JOptionPane.YES_NO_OPTION);
+            
+            if (response == JOptionPane.YES_OPTION) {
+                selectedPrice = minPrice;
+            }
+        } 
+        // B. Variable Price: Ask for Input
+        else {
+           
+            // Gather details for the dialog
+            String buyerId = action.getCompany().getId();
+            String sellerId = action.getPrivateCompany().getOwner().getId();
+            String privateId = action.getPrivateCompany().getId();
+            String privateName = action.getPrivateCompany().getName();
+            String range = gameUIManager.format(minPrice) + " - " + gameUIManager.format(maxPrice);
+
+            // Build HTML table for clear alignment
+            StringBuilder html = new StringBuilder("<html>");
+            html.append("<h3>Buy Private Company</h3>");
+            html.append("<table border='0' cellpadding='3'>");
+            html.append("<tr><td><b>Buyer:</b></td><td>").append(buyerId).append("</td></tr>");
+            html.append("<tr><td><b>Private:</b></td><td>").append(privateId).append(" (").append(privateName).append(")</td></tr>");
+            html.append("<tr><td><b>Seller:</b></td><td>").append(sellerId).append("</td></tr>");
+            html.append("<tr><td><b>Limits:</b></td><td>").append(range).append("</td></tr>");
+            html.append("</table>");
+            html.append("<br><b>Enter Agreed Price:</b>");
+            html.append("</html>");
+
+            // Pre-fill with existing price if set, or minPrice
+            int defaultPrice = (action.getPrice() > 0) ? action.getPrice() : minPrice;
+
+            String input = (String) JOptionPane.showInputDialog(orWindow, 
+                    html.toString(), 
+                    LocalText.getText("NegotiatePrice"), 
+                    JOptionPane.QUESTION_MESSAGE, 
+                    null, null, String.valueOf(defaultPrice));
+            
+            if (input != null) {
+                try {
+                    int val = Integer.parseInt(input.trim());
+                    if (val >= minPrice && val <= maxPrice) {
+                        selectedPrice = val;
+                    } else {
+                        JOptionPane.showMessageDialog(orWindow, 
+                                LocalText.getText("PriceOutOfRange", minPrice, maxPrice), 
+                                "Error", JOptionPane.ERROR_MESSAGE);
                     }
-                    chosenAction.setPrice(amount);
-                } else {
-                    chosenAction.setPrice(maxPrice);
-                }
-                if (orWindow.process(chosenAction)) {
-                    updateMessage();
+                } catch (NumberFormatException e) {
+                    // Ignore invalid input
                 }
             }
         }
 
+        // C. Execute
+        if (selectedPrice >= 0) {
+            action.setPrice(selectedPrice);
+            if (orWindow.process(action)) {
+                updateMessage();
+            }
+        }
     }
 
     /**

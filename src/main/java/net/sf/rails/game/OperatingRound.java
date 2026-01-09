@@ -3260,7 +3260,6 @@ public class OperatingRound extends Round implements Observer {
             return false; // Indicate validation failed
         }
 
-        /* --- End of validation, start of execution --- */
 
         // --- Handle Emergency Share Selling (if required for president) ---
         if (presidentMustSellShares) {
@@ -4382,13 +4381,6 @@ public class OperatingRound extends Round implements Observer {
             setDestinationActions();
             setGameSpecificPossibleActions();
 
-            // i dont' want the button
-            // // Private Company manually closure
-            // for (PrivateCompany priv : companyManager.getAllPrivateCompanies()) {
-            // if (!priv.isClosed() && priv.closesManually())
-            // possibleActions.add(new ClosePrivate(priv));
-            // }
-
             // Can private companies be bought?
             if (isPrivateSellingAllowed()) {
 
@@ -4398,26 +4390,62 @@ public class OperatingRound extends Round implements Observer {
                 int minPrice, maxPrice;
                 List<Player> players = playerManager.getPlayers();
                 int numberOfPlayers = playerManager.getNumberOfPlayers();
+                
                 for (int i = currentPlayerIndex; i < currentPlayerIndex + numberOfPlayers; i++) {
                     player = players.get(i % numberOfPlayers);
+                    
+                    // Allow game-specific logic to restrict selling (e.g. must be President)
                     if (!maySellPrivate(player))
                         continue;
+                        
                     for (PrivateCompany privComp : player.getPortfolioModel().getPrivateCompanies()) {
 
-                        // check to see if the private can be sold to a company
+                        // Check to see if the private can be sold to a company
                         if (!privComp.tradeableToCompany()) {
                             continue;
                         }
 
+                        // Determine price limits
                         minPrice = getPrivateMinimumPrice(privComp);
-
                         maxPrice = getPrivateMaximumPrice(privComp);
 
+                        // Generate the action (The UI will attach this to the Private Card)
                         BuyPrivate buyPrivate = new BuyPrivate(privComp, minPrice, maxPrice);
                         possibleActions.add(buyPrivate);
                     }
                 }
             }
+
+
+            // // Can private companies be bought?
+            // if (isPrivateSellingAllowed()) {
+
+            //     // Create a list of players with the current one in front
+            //     int currentPlayerIndex = operatingCompany.value().getPresident().getIndex();
+            //     Player player;
+            //     int minPrice, maxPrice;
+            //     List<Player> players = playerManager.getPlayers();
+            //     int numberOfPlayers = playerManager.getNumberOfPlayers();
+            //     for (int i = currentPlayerIndex; i < currentPlayerIndex + numberOfPlayers; i++) {
+            //         player = players.get(i % numberOfPlayers);
+            //         if (!maySellPrivate(player))
+            //             continue;
+            //         for (PrivateCompany privComp : player.getPortfolioModel().getPrivateCompanies()) {
+
+            //             // check to see if the private can be sold to a company
+            //             if (!privComp.tradeableToCompany()) {
+            //                 continue;
+            //             }
+
+            //             minPrice = getPrivateMinimumPrice(privComp);
+
+            //             maxPrice = getPrivateMaximumPrice(privComp);
+
+            //             BuyPrivate buyPrivate = new BuyPrivate(privComp, minPrice, maxPrice);
+            //             possibleActions.add(buyPrivate);
+            //         }
+            //     }
+            // }
 
             if (operatingCompany.value().canUseSpecialProperties()) {
 

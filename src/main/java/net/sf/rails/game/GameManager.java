@@ -1901,6 +1901,12 @@ public int getOrTimeBonus() {
             gameSaver.saveGame(file);
             // Save the exact clock times to a sidecar file
             saveTimeData(file);
+            // Save UI Window Positions & Scale
+// Save UI Window Positions & Scale, passing the Game Name
+            if (gameUIManager != null) {
+                gameUIManager.saveWindowSettings(getGameName());
+            }
+
         } catch (IOException e) {
             DisplayBuffer.add(this, LocalText.getText("SaveFailed", e.getMessage()));
             log.error("save failed", e);
@@ -2116,7 +2122,12 @@ public int getOrTimeBonus() {
 
         // 1. Restore the exact times from the sidecar file (if it exists)
         loadTimeData(new File(filepath));
+// Reload Window Positions & Scale, passing the Game Name
+        if (gameUIManager != null) {
+            gameUIManager.loadWindowSettings(getGameName());
+        }
 
+        
         // 2. Force Pause so players can orient themselves before the clock ticks
         if (isTimeManagementEnabled()) {
             setGamePaused(true);
@@ -2229,11 +2240,12 @@ public int getOrTimeBonus() {
         RoundFacade roundToResume = getInterruptedRound();
         setInterruptedRound(null);
         setRound(roundToResume);
-        // setRound(getInterruptedRound());
+      
         log.info("[FLOW] Resuming Interrupted Round (from TreasuryShareRound): {}",
-                getInterruptedRound().getRoundName()); // 'essential logging' keep!
+                roundToResume.getRoundName()); // 'essential logging' keep!
 
-        guiHints.setCurrentRoundType(getInterruptedRound().getClass());
+        guiHints.setCurrentRoundType(roundToResume.getClass());
+
         guiHints.setVisibilityHint(GuiDef.Panel.STOCK_MARKET, false);
         guiHints.setActivePanel(GuiDef.Panel.MAP);
         ((OperatingRound) getCurrentRound()).nextStep();
@@ -3549,7 +3561,6 @@ public int getOrTimeBonus() {
             String entry = "";
 
             // --- 3. FORMATTING & PASS LOGIC ---
-
             if (action instanceof BuyCertificate) {
                 BuyCertificate bc = (BuyCertificate) action;
                 // calculate correct percentage using Base Share Unit * Multiplier
@@ -3649,13 +3660,6 @@ public int getOrTimeBonus() {
                 // Extract Price
                 int price = bt.getPricePaid();
 
-                // String price = "0";
-                // if (actionString.contains("price=")) {
-                // try {
-                // price = actionString.substring(actionString.indexOf("price=") +
-                // 6).split("[,\\}]")[0];
-                // } catch (Exception e) {}
-                // }
 
                 if ("IPO".equals(sourceName)) {
                     entry = "buys fresh " + trainName;
@@ -3823,7 +3827,6 @@ for (Player p : getRoot().getPlayerManager().getPlayers()) {
             log.error("[TIME] Failed to load time sidecar", e);
         }
     }
-    // --- END FIX ---
 
 
 }

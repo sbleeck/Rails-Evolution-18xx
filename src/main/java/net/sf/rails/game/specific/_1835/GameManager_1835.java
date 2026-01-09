@@ -289,11 +289,4 @@ public class GameManager_1835 extends GameManager {
         this.setPrussianFormationOffered();
     }
 
-
-
-
-
-
-
-    
 }

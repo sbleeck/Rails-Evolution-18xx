@@ -247,6 +247,40 @@ public class PublicCompany extends RailsAbstractItem
      */
     protected BooleanState hibernating = new BooleanState (this, "hibernating");
 
+
+    /**
+     * Helper: Returns a list of all Trains owned by this company.
+     * Uses explicit casting to avoid generic type inference errors.
+     */
+    public List<Train> getTrains() {
+        if (portfolio == null || portfolio.getTrainsModel() == null) {
+            return new ArrayList<>();
+        }
+        List<Train> list = new ArrayList<>();
+        // Iterate as raw/generic items and cast safely
+        for (Object item : portfolio.getTrainsModel().getPortfolio().items()) {
+            if (item instanceof Train) {
+                list.add((Train) item);
+            }
+        }
+        return list;
+    }
+
+    /**
+     * Helper: Returns a list of all Private Companies owned by this company.
+     */
+    public List<PrivateCompany> getPrivates() {
+        if (portfolio == null || portfolio.getPrivatesOwnedModel() == null) {
+            return new ArrayList<>();
+        }
+        List<PrivateCompany> list = new ArrayList<>();
+        for (Object item : portfolio.getPrivatesOwnedModel().getPortfolio().items()) {
+            if (item instanceof PrivateCompany) {
+                list.add((PrivateCompany) item);
+            }
+        }
+        return list;
+    }
     /**
      * In-game state.
      * <p> Will only be set false if the company is closed and cannot ever be reopened.

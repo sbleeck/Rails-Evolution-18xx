@@ -1,4 +1,6 @@
-package net.sf.rails.game;
+package net.sf.rails.game.specific._1830;
+
+import net.sf.rails.game.*;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;

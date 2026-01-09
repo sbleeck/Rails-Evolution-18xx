@@ -137,13 +137,18 @@ public class OperatingRound_1837 extends OperatingRound {
             SetHomeHexLocation selectHome = (SetHomeHexLocation) action;
             PublicCompany company = selectHome.getCompany();
             MapHex chosenHome = selectHome.getSelectedHomeHex();
+if (chosenHome == null) {
+                // If no hex is selected yet, we are likely just initializing the dialog request.
+                return true;
+            }
             company.setHomeHex(chosenHome);
-            company.layHomeBaseTokens();
+                        company.layHomeBaseTokens();
             return true;
         } else {
             return false;
         }
     }
+
 
     /* (non-Javadoc)
      * @see net.sf.rails.game.OperatingRound#validateSetRevenueAndDividend(rails.game.action.SetDividend)
@@ -155,6 +160,15 @@ public class OperatingRound_1837 extends OperatingRound {
         String companyName;
         int amount, directAmount;
         int revenueAllocation;
+
+        // --- START FIX ---
+        // Log the incoming action details for debugging
+        log.info("ValidateSetDividend: Company={} Amount={} Direct={} Allocation={}", 
+            action.getCompany().getId(), 
+            action.getActualRevenue(), 
+            action.getActualCompanyTreasuryRevenue(), 
+            action.getRevenueAllocation());
+        // --- END FIX ---
 
         // Dummy loop to enable a quick jump out.
         while (true) {
@@ -168,11 +182,17 @@ public class OperatingRound_1837 extends OperatingRound {
                         LocalText.getText("WrongCompany",
                                 companyName,
                                 operatingCompany.value().getId() );
+                // --- START FIX ---
+                log.warn("Validation Failed: Wrong Company. Expected {} but got {}", operatingCompany.value().getId(), companyName);
+                // --- END FIX ---
                 break;
             }
             // Must be correct step
             if (getStep() != GameDef.OrStep.CALC_REVENUE) {
                 errMsg = LocalText.getText("WrongActionNoRevenue");
+                // --- START FIX ---
+                log.warn("Validation Failed: Wrong Step. Current step is {}", getStep());
+                // --- END FIX ---
                 break;
             }
 
@@ -182,12 +202,18 @@ public class OperatingRound_1837 extends OperatingRound {
                 errMsg =
                         LocalText.getText("NegativeAmountNotAllowed",
                                 String.valueOf(amount));
+                // --- START FIX ---
+                log.warn("Validation Failed: Negative amount {}", amount);
+                // --- END FIX ---
                 break;
             }
             if (amount % 5 != 0) {
                 errMsg =
                         LocalText.getText("AmountMustBeMultipleOf5",
                                 String.valueOf(amount));
+                // --- START FIX ---
+                log.warn("Validation Failed: Amount {} is not multiple of 5", amount);
+                // --- END FIX ---
                 break;
             }
 
@@ -198,12 +224,18 @@ public class OperatingRound_1837 extends OperatingRound {
                 errMsg =
                         LocalText.getText("NegativeAmountNotAllowed",
                                 String.valueOf(amount));
+                // --- START FIX ---
+                log.warn("Validation Failed: Negative direct amount {}", directAmount);
+                // --- END FIX ---
                 break;
             }
             if (directAmount % 5 != 0) {
                 errMsg =
                         LocalText.getText("AmountMustBeMultipleOf5",
                                 String.valueOf(amount));
+                // --- START FIX ---
+                log.warn("Validation Failed: Direct Amount {} is not multiple of 5", directAmount);
+                // --- END FIX ---
                 break;
             }
             if (amount > 0 && amount - directAmount < 10) {
@@ -211,6 +243,9 @@ public class OperatingRound_1837 extends OperatingRound {
                         String.valueOf(directAmount),
                         "10",
                         String.valueOf(amount));
+                // --- START FIX ---
+                log.warn("Validation Failed: Direct Revenue Rule (Amount - Direct < 10). Amount={} Direct={}", amount, directAmount);
+                // --- END FIX ---
                 break;
             }
 
@@ -223,6 +258,9 @@ public class OperatingRound_1837 extends OperatingRound {
                     errMsg =
                             LocalText.getText("InvalidAllocationTypeIndex",
                                     String.valueOf(revenueAllocation));
+                    // --- START FIX ---
+                    log.warn("Validation Failed: Invalid Allocation Index {}", revenueAllocation);
+                    // --- END FIX ---
                     break;
                 }
 
@@ -239,6 +277,9 @@ public class OperatingRound_1837 extends OperatingRound {
                 if (!valid) {
                     errMsg =
                             LocalText.getText(SetDividend.getAllocationNameKey(revenueAllocation));
+                    // --- START FIX ---
+                    log.warn("Validation Failed: Allocation {} not allowed for this company", revenueAllocation);
+                    // --- END FIX ---
                     break;
                 }
             } else if (revenueAllocation != SetDividend.NO_ROUTE){
@@ -257,6 +298,7 @@ public class OperatingRound_1837 extends OperatingRound {
 
         return errMsg;
     }
+
 
     /* (non-Javadoc)
      * @see net.sf.rails.game.OperatingRound#splitRevenue(int)
@@ -379,10 +421,17 @@ public class OperatingRound_1837 extends OperatingRound {
     }
 
 
+
+@Override
     protected void prepareRevenueAndDividendAction() {
+
+        // --- START FIX ---
+        log.info("Preparing Dividend Action for {}", operatingCompany.value().getId());
+        // --- END FIX ---
 
         // There is only revenue if there are any trains
         if (companyHasRunningTrains(false)) {
+            // ... (unchanged logic) ...
             int[] allowedRevenueActions =
                     operatingCompany.value().isSplitAlways()
                     ? new int[] { SetDividend.SPLIT }
@@ -393,12 +442,35 @@ public class OperatingRound_1837 extends OperatingRound {
                             SetDividend.PAYOUT,
                             SetDividend.WITHHOLD };
 
+            // --- START FIX ---
+            log.info("Dividend Action Added. SplitAlways={} SplitAllowed={}", 
+                     operatingCompany.value().isSplitAlways(), 
+                     operatingCompany.value().isSplitAllowed());
+            // --- END FIX ---
+            
             possibleActions.add(new SetDividend(getRoot(),
                     operatingCompany.value().getLastRevenue(),
                     operatingCompany.value().getLastDirectIncome(),
                     true, allowedRevenueActions,0));
+        } 
+        // --- START FIX ---
+        else {
+             log.info("No Dividend Action added: companyHasRunningTrains returned FALSE.");
         }
+        // --- END FIX ---
     }
+
+
+    /**
+     * Can the operating company buy a train now?
+     * In 1837 it is allowed if another (different) train is scrapped.
+     *
+     * @return True if the company is allowed to buy a train
+     */
+    protected boolean canBuyTrainNow() {
+        return isBelowTrainLimit();
+    }
+
 
     /**
      * If a train has already run this round for a minor,
@@ -410,6 +482,13 @@ public class OperatingRound_1837 extends OperatingRound {
     protected boolean companyHasRunningTrains(boolean display) {
         boolean hasRunningTrains = false;
         Set<Train> trains = operatingCompany.value().getPortfolioModel().getTrainList();
+        
+        // --- START FIX ---
+        if (trains.isEmpty()) {
+            log.info("companyHasRunningTrains: {} has NO trains.", operatingCompany.value().getId());
+        }
+        // --- END FIX ---
+
         for (Train train : trains) {
             if (gameManager.isTrainBlocked(train)) {
                 if (display) {
@@ -418,22 +497,19 @@ public class OperatingRound_1837 extends OperatingRound {
                     ReportBuffer.add(this, message);
                     DisplayBuffer.add(this, message);
                 }
+                // --- START FIX ---
+                log.info("Train {} is BLOCKED for {}", train.getName(), operatingCompany.value().getId());
+                // --- END FIX ---
             } else {
                 hasRunningTrains = true;
+                // --- START FIX ---
+                log.info("Train {} is RUNNING for {}", train.getName(), operatingCompany.value().getId());
+                // --- END FIX ---
             }
         }
         return hasRunningTrains;
     }
-
-    /**
-     * Can the operating company buy a train now?
-     * In 1837 it is allowed if another (different) train is scrapped.
-     *
-     * @return True if the company is allowed to buy a train
-     */
-    protected boolean canBuyTrainNow() {
-        return isBelowTrainLimit();
-    }
+    
 
     /**
      * New standard method to allow discarding trains when at the train limit.

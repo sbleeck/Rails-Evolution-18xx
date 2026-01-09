@@ -25,6 +25,8 @@ import rails.game.specific._1835.StartPrussian;
 import rails.game.specific._1835.ExchangeForPrussianShare; // Add this!
 import javax.swing.border.Border;
 import java.util.Collection;
+import java.util.Collections;
+
 import net.sf.rails.ui.swing.StatusWindow;
 
 // Add
@@ -70,6 +72,7 @@ public class ORPanel extends GridPanel
 
     public ActionButton currentDefaultButton; // For Enter key
     public int activePhase = 0; // 1=Build, 2=Token, 3=Revenue, 4=Train
+private Phase lastGamePhase = null;
 
     public JPanel trainButtonsPanel;
     public List<GUIHex> cycleableHexes = new ArrayList<>();
@@ -1081,6 +1084,10 @@ this.currentRedoAction = action;
 
             updateSidebarData();
             updateCurrentRoutes(false);
+            // Trigger MiniDock update when a new company starts
+            if (orWindow != null && orWindow.getUpgradePanel() != null) {
+                orWindow.getUpgradePanel().refreshMiniDock();
+            }
 
         } catch (Exception e) {
             e.printStackTrace();
@@ -1361,7 +1368,7 @@ else if (command.equals(CONFIRM_CMD)) {
                 lblRevenue.setBackground(Color.WHITE);
             }
             if (trainDisplay != null) {
-                trainDisplay.setTrains("-", 1);
+                trainDisplay.updateAssets(orComp);
             }
 
             // Hide Phase Panels
@@ -1780,11 +1787,11 @@ else if (command.equals(CONFIRM_CMD)) {
             lblRevenue.setForeground(infoFg);
         }
 
+      // Restore the logic that passes the text list of trains + limit
         if (trainDisplay != null) {
-            String trains = orComp.getPortfolioModel().getTrainsModel().toText();
-            int limit = orComp.getCurrentTrainLimit();
-            trainDisplay.setTrains(trains, limit);
+           trainDisplay.updateAssets(orComp);
         }
+
 
         if (sidebarPanel != null) {
             sidebarPanel.revalidate();
@@ -1855,14 +1862,15 @@ else if (command.equals(CONFIRM_CMD)) {
                 }
             }
         }
+        
     }
 
     private class TrainDisplayPanel extends JPanel {
-        // Visual Constants matching GameStatus
+        // Visual Constants
         private final Dimension DIM_TRAIN_CARD = new Dimension(60, 40);
         private final Color BG_CARD_PASSIVE = new Color(255, 255, 240); // Beige
 
-        // Dummy group to satisfy ClickField constructor constraints (fixes NPE)
+        // Dummy group to satisfy ClickField constructor constraints
         private final ButtonGroup dummyGroup = new ButtonGroup();
         
         public TrainDisplayPanel() {
@@ -1871,10 +1879,15 @@ else if (command.equals(CONFIRM_CMD)) {
             setBorder(null);
         }
 
-        public void setTrains(String trainString, int limit) {
+        // Method moved INSIDE the class
+        public void updateAssets(PublicCompany comp) {
             removeAll();
+            if (comp == null) return;
 
             // 1. Parse Trains
+            String trainString = comp.getPortfolioModel().getTrainsModel().toText();
+            int limit = comp.getCurrentTrainLimit();
+
             List<String> trains = new ArrayList<>();
             if (trainString != null && !trainString.isEmpty() && !trainString.equals("None")
                     && !trainString.equals("-")) {
@@ -1890,36 +1903,45 @@ else if (command.equals(CONFIRM_CMD)) {
             stack.setOpaque(false);
 
             int totalSlots = Math.max(limit, Math.max(trains.size(), 1));
-for (int i = 0; i < totalSlots; i++) {
-                // FIX NPE: Pass 'dummyGroup' instead of null.
-                // The parent ClickField class throws an exception if the group is null.
+            
+            // 3. Render Trains and Empty Slots
+            for (int i = 0; i < totalSlots; i++) {
+                // Pass 'dummyGroup' to avoid NPE
                 RailCard card = new RailCard((net.sf.rails.game.Train)null, dummyGroup);
-                // Scale the card by 30% (adjust 1.3 as needed for your UI)
-                card.setScale(1.3);
-                card.setPreferredSize(null); // Ensure it uses the new calculated size
+                
+                // REMOVED: card.setScale(1.3); -> Use Standard Size
+                // REMOVED: card.setPreferredSize(null);
 
-        
-                card.setCompactMode(true); // Centers text, bold font
+                card.setCompactMode(true);
                 card.setOpaque(true);
 
                 if (i < trains.size()) {
-                    // Active Card (Beige)
+                    // Active Train Card
                     String text = trains.get(i);
-                    card.setCustomLabel(text); // RailCard handles the HTML formatting
-                    card.setBackground(BG_CARD_PASSIVE); // Beige
+                    card.setCustomLabel(text); 
+                    card.setBackground(BG_CARD_PASSIVE); 
                     card.setBorder(BorderFactory.createCompoundBorder(
                             BorderFactory.createLineBorder(Color.BLACK, 1),
                             BorderFactory.createEmptyBorder(1, 1, 1, 1)));
                 } else {
-                    // Empty Slot (Gray/Dashed look)
-                    card.setCustomLabel("_"); // Subtle placeholder
+                    // Empty Slot (Placeholder)
+                    card.setCustomLabel("_"); 
                     card.setBackground(new Color(240, 240, 240));
                     card.setBorder(BorderFactory.createCompoundBorder(
                             BorderFactory.createLineBorder(Color.GRAY, 1),
                             BorderFactory.createEmptyBorder(1, 1, 1, 1)));
-                    // Make text gray for empty slots
                     card.setForeground(Color.GRAY);
                 }
+                stack.add(card);
+            }
+
+            // 4. Render Privates
+            for (PrivateCompany pc : comp.getPrivates()) {
+                RailCard card = new RailCard(pc, dummyGroup);
+                // REMOVED: card.setScale(1.3); -> Use Standard Size
+                card.setCompactMode(true);
+                card.setOpaque(true);
+                card.setBackground(new Color(255, 235, 235)); // Pinkish for Privates
                 stack.add(card);
             }
 
@@ -1927,7 +1949,11 @@ for (int i = 0; i < totalSlots; i++) {
             revalidate();
             repaint();
         }
+        
+        // Legacy stub
+        public void setTrains(String s, int i) {}
     }
+
 
     /**
      * * Visual display for Tokens (Updated to use TokenIcon)
@@ -2314,6 +2340,29 @@ public void updateDynamicActions(List<PossibleAction> actions) {
         if (detectedPhase > 0) {
             this.activePhase = detectedPhase;
         }
+
+        // --- DEBUG & FIX: WRAPPED TRIGGER ---
+        try {
+            Phase currentPhase = orUIManager.getGameUIManager().getRoot().getPhaseManager().getCurrentPhase();
+            
+            // LOGGING: Check if we are even reaching this logic
+            // log.info("ORPanel: Phase Check - Last: {}, Current: {}", lastGamePhase, currentPhase);
+
+            if (this.lastGamePhase != currentPhase) {
+                if (orWindow != null && orWindow.getUpgradePanel() != null) {
+                    log.info("ORPanel: Triggering MiniDock refresh due to Phase Change ({} -> {})", lastGamePhase, currentPhase);
+                    orWindow.getUpgradePanel().refreshMiniDock();
+                }
+                this.lastGamePhase = currentPhase;
+            }
+        } catch (Exception e) {
+            log.error("CRITICAL: ORPanel Phase Update crashed!", e);
+        }
+        // ------------------------------------
+
+        if (activePhase == 1 || activePhase == 2) {
+             enableConfirm(false); 
+        }
         
 
         if (activePhase == 1 || activePhase == 2) {
@@ -2322,11 +2371,13 @@ public void updateDynamicActions(List<PossibleAction> actions) {
 
         updateSidebarData();
         availableTrainActions.clear();
-
-        // --- 5. RENDER STANDARD BUTTONS ---
+        
+        // We do NOT populate trainButtonsPanel here. 
+        // We only collect the actions to send them to the StatusWindow later.
         for (PossibleAction pa : actions) {
             if (pa instanceof CorrectionModeAction) continue;
             if (pa instanceof UseSpecialProperty) {
+                 // ... (Special Property Logic) ...
                 ActionButton bSpecial = createSidebarButton(pa.getButtonLabel(), "SpecialProperty");
                 bSpecial.setPossibleAction(pa);
                 bSpecial.setEnabled(true);
@@ -2335,21 +2386,30 @@ public void updateDynamicActions(List<PossibleAction> actions) {
                     miscActionPanel.add(Box.createVerticalStrut(2));
                 }
             } else if (pa instanceof SetDividend) {
+                // ... (Dividend Logic) ...
                 SetDividend sd = (SetDividend) pa;
                 if (sd.isAllocationAllowed(SetDividend.PAYOUT)) enableRevenueBtn(btnRevPayout, sd, SetDividend.PAYOUT);
                 if (sd.isAllocationAllowed(SetDividend.WITHHOLD)) enableRevenueBtn(btnRevWithhold, sd, SetDividend.WITHHOLD);
                 if (sd.isAllocationAllowed(SetDividend.SPLIT)) enableRevenueBtn(btnRevSplit, sd, SetDividend.SPLIT);
             } else if (pa instanceof BuyTrain) {
+                // Just collect the action, DO NOT create a button in the sidebar
                 availableTrainActions.add((BuyTrain) pa);
             } else if (pa instanceof NullAction) {
+                // ... (Done/Pass Logic) ...
                 NullAction.Mode mode = ((NullAction) pa).getMode();
                 if (mode == NullAction.Mode.DONE || mode == NullAction.Mode.PASS) {
                     setupButton(btnDone, pa);
                 }
             }
         }
+        
+        // Ensure the panel is empty to remove any previous buttons
+        if (trainButtonsPanel != null) {
+            trainButtonsPanel.removeAll();
+            trainButtonsPanel.revalidate();
+            trainButtonsPanel.repaint();
+        }
 
-        if (activePhase == 4 && btnTrainSkip != null) btnTrainSkip.setEnabled(true);
         if (orUIManager != null && orUIManager.getGameUIManager() != null) {
             StatusWindow sw = orUIManager.getGameUIManager().getStatusWindow();
             if (sw != null && sw.getGameStatus() != null) {
@@ -2370,6 +2430,10 @@ public void updateDynamicActions(List<PossibleAction> actions) {
             if (orWindow != null && orWindow.getMapPanel() != null) orWindow.getMapPanel().clearOverlays();
             disableRoutesDisplay(); 
         }
+        // Trigger MiniDock update on every action (catches Phase changes from train buys)
+        if (orWindow != null && orWindow.getUpgradePanel() != null) {
+            orWindow.getUpgradePanel().refreshMiniDock();
+        }
 
         if (sidebarPanel != null) sidebarPanel.repaint();
         SwingUtilities.invokeLater(() -> {
@@ -2377,7 +2441,5 @@ public void updateDynamicActions(List<PossibleAction> actions) {
             this.requestFocusInWindow();
         });
     }
-
-
-
+     
 }
