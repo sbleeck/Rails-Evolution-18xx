@@ -651,6 +651,41 @@ if (!validTileLays.isEmpty() && operatingCompany != null) {
         int revenue = action.getPresetRevenue();
         int allocation = SetDividend.WITHHOLD;
 
+// FIX: Always calculate revenue using the adapter to ensure 'Direct Income' is captured.
+        // This is critical for 1837 Coal Companies. Even if the engine reports 0 (validly),
+        // or a positive number, we need the breakdown of Total vs Treasury (Direct) revenue 
+        // to make the correct Split/Withhold decision and set the action properties correctly.
+        if (operatingCompany != null) {
+            try {
+                // Use fully qualified name to ensure access without adding imports
+                net.sf.rails.algorithms.RevenueAdapter ra = net.sf.rails.algorithms.RevenueAdapter.createRevenueAdapter(
+                        gameManager.getRoot(),
+                        operatingCompany,
+                        gameManager.getCurrentPhase()
+                );
+                
+                // 'true' enables the complex calculator (Multigraph) required for 1837 Special Revenues
+                ra.initRevenueCalculator(true);
+                
+                int calculatedRevenue = ra.calculateRevenue();
+                int directRevenue = ra.getSpecialRevenue();
+
+                // Trust the calculated revenue
+                revenue = calculatedRevenue;
+
+                // IMPORTANT: Explicitly set the Direct Income on the action object.
+                // If revenue is 0 (no run possible), directRevenue will correctly be 0.
+                action.setActualRevenue(revenue);
+                action.setActualCompanyTreasuryRevenue(directRevenue);
+                
+                aiLog.info("{}AI Revenue Check: Total={} Direct={} (Preset was {})", logPrefix, revenue, directRevenue, action.getPresetRevenue());
+
+            } catch (Exception e) {
+                aiLog.error("{}AI Failed to calculate revenue during SetDividend.", logPrefix, e);
+            }
+        }
+
+
         boolean isMinor = false;
         if (operatingCompany != null && operatingCompany.getParent() instanceof CompanyType) {
             isMinor = "Minor".equals(((CompanyType) operatingCompany.getParent()).getId());

@@ -305,9 +305,7 @@ public class OperatingRound extends Round implements Observer {
             // If we have a company from the action, and it differs from the current state (or state is null)
             if (actionCompany != null && actionCompany != operatingCompany.value()) {
                 
-                log.info("JIT Correction: Swapping Operating Company from {} to {} based on saved action.", 
-                        (operatingCompany.value() != null ? operatingCompany.value().getId() : "NULL"), 
-                        actionCompany.getId());
+
 
                 // 1. Force the correct company
                 this.operatingCompany.set(actionCompany);
@@ -4227,7 +4225,6 @@ public class OperatingRound extends Round implements Observer {
         setStep(GameDef.OrStep.INITIAL);
 
         String coName = (this.operatingCompany.value() != null) ? this.operatingCompany.value().getId() : "NULL";
-        log.info("Reload: Reset OperatingRound. Safe Placeholder: {}", coName);
     }
 
     @Override

@@ -782,11 +782,9 @@ protected JPanel[] compPrivatesPanel;
         return chosenAction;
     }
 
-    /** Stub, can be overridden by game-specific subclasses */
-    // Overridden by 1826 to add bonds
-    protected void initGameSpecificActions() {
 
-    }
+
+
 
     /**
      * Initializes the CashCorrectionActions
@@ -1552,141 +1550,152 @@ protected JPanel[] compPrivatesPanel;
         }
     }
 
+
     // Method 1: WITH 'Object o' (Handles Actions & Colors)
     protected void setPlayerCertButton(int i, int j, boolean clickable, Object o) {
-        if (i < 0 || i >= shareRowVisibilityObservers.length || shareRowVisibilityObservers[i] == null)
+        // SAFETY CHECK: Prevent NPE if observers are missing
+        if (shareRowVisibilityObservers == null 
+            || i < 0 
+            || i >= shareRowVisibilityObservers.length 
+            || shareRowVisibilityObservers[i] == null) {
             return;
-        if (j < 0)
-            return;
+        }
+        if (j < 0) return;
 
         // 1. Manage Dot Visibility (Environment)
-        // Check if player has sold this specific company in the current round
-        boolean hasSold = false;
-        Player player = players.getPlayerByPosition(j);
-        if (player != null && companies[i] != null) {
-            hasSold = player.hasSoldThisRound(companies[i]);
-            // Or use: player.getSoldThisRoundModel(companies[i]).booleanValue();
-        }
+        if (playerSoldDots != null && playerSoldDots.length > i && playerSoldDots[i] != null && playerSoldDots[i].length > j && playerSoldDots[i][j] != null) {
+            boolean hasSold = false;
+            Player player = players.getPlayerByPosition(j);
+            if (player != null && companies[i] != null) {
+                hasSold = player.hasSoldThisRound(companies[i]);
+            }
 
-        // "WHITE DOT" HACK: Force alignment by keeping the dot visible but transparent
-        if (playerSoldDots[i][j] != null) {
             if (hasSold) {
-                // Active Sale: Show Red Dot
                 playerSoldDots[i][j].setVisible(true);
                 playerSoldDots[i][j].setForeground(Color.RED);
             } else if (companies[i].hasStockPrice()) {
-                // Major Company (Unsold): Show Transparent Dot (Spacer)
                 playerSoldDots[i][j].setVisible(true);
                 playerSoldDots[i][j].setForeground(new Color(0, 0, 0, 0)); // Transparent
             } else {
-                // Minors: No dot at all
                 playerSoldDots[i][j].setVisible(false);
             }
         }
 
-        // 2. Manage Card Visibility & Content (Content)
-        boolean cardHasContent = (playerShareCards[i][j] != null);
-
+        // 2. Manage Card Visibility & Content
         boolean panelVisible = shareRowVisibilityObservers[i].lastValue();
-        if (panelVisible) {
+        
+        if (playerSharePanels != null && playerSharePanels[i][j] != null && panelVisible) {
             playerSharePanels[i][j].setVisible(true);
         }
 
-        // 1. MAJOR COMPANIES (Cards)
+        // A. MAJOR COMPANIES (Cards)
         if (playerShareCards != null && playerShareCards[i][j] != null) {
-
-            boolean visible = shareRowVisibilityObservers[i].lastValue();
-            if (!visible)
+            if (!panelVisible) {
                 playerShareCards[i][j].setVisible(false);
-
-            // Always set the stack content tooltip, regardless of clickability
+            }
+            // Always set content tooltip
             playerShareCards[i][j].setShareStackTooltip(players.getPlayerByPosition(j).getPortfolioModel().getCertificates(companies[i]));
 
             if (clickable && o != null) {
-                // ACTIVE
                 if (o instanceof BuyCertificate) {
                     playerShareCards[i][j].setBackground(BG_BUY);
                     playerShareCards[i][j].setBorder(BorderFactory.createLineBorder(Color.BLACK, 2));
                     playerShareCards[i][j].addPossibleAction((PossibleAction) o);
                     playerShareCards[i][j].setVisible(true);
-                    
-                    // REMOVED: Action text appending ("ClickToSelectForBuying")
-                    // The tooltip is now strictly the content stack (e.g. "20% x 1")
-
                 } else if (o instanceof SellShares) {
                     playerShareCards[i][j].setBackground(BG_SELL);
                     playerShareCards[i][j].addPossibleAction((PossibleAction) o);
-                    
-                    // REMOVED: Action text appending ("ClickForSell")
-
                 }
+                else {
+// FALLBACK for Special Actions (e.g. StartPrussian)
+                // Force "Active Green" style
+                log.info("[UI-DEBUG] Applying GREEN Highlight to Special Action at [{},{}]", i, j);
+                
+                playerShareCards[i][j].setBackground(BG_BUY); // Green
+                playerShareCards[i][j].setBorder(BorderFactory.createLineBorder(Color.BLACK, 2)); // Thick Border
+                
+                if (o instanceof PossibleAction) {
+                    playerShareCards[i][j].addPossibleAction((PossibleAction) o);
+                }
+                playerShareCards[i][j].setVisible(true);
+                playerShareCards[i][j].setOpaque(true); // Ensure paint
+                
+                }
+
                 playerShareCards[i][j].setEnabled(true);
             } else {
-                // PASSIVE - Reset actions here instead
+                // PASSIVE
                 playerShareCards[i][j].clearPossibleActions();
-
                 playerShareCards[i][j].setBackground(BG_CARD_PASSIVE);
                 playerShareCards[i][j].setBorder(BorderFactory.createCompoundBorder(
                         BorderFactory.createLineBorder(Color.BLACK, 1),
                         BorderFactory.createEmptyBorder(1, 1, 1, 1)));
                 playerShareCards[i][j].setEnabled(true);
-                // DEFAULT HIDE: Prevent "Ghost Cards" (visible but empty beige rectangles).
-                // initTurn will explicitly call setVisible(true) if it finds valid text
-                // content.
-                playerShareCards[i][j].setVisible(false);
-
+                playerShareCards[i][j].setVisible(false); // Hide empty cards by default
             }
-            return; // Done for card
+            return;
         }
 
-        // 2. MINOR COMPANIES (Old Buttons) - FALLBACK
-        // Call the base method to set up text/visibility
-        setPlayerCertButton(i, j, clickable);
+        // B. MINOR COMPANIES (Old Buttons) - Fallback
+        // (Recursive call to Method 2 removed to prevent loops, logic inlined below)
+        
+        if (certPerPlayerButton[i][j] == null) return;
 
-        // Apply Action Styling (Colors)
-        if (clickable && o != null) {
-            if (o instanceof BuyCertificate)
-                certPerPlayerButton[i][j].setBackground(BG_BUY);
-            else if (o instanceof SellShares)
-                certPerPlayerButton[i][j].setBackground(BG_SELL);
-
+        if (clickable) {
+            certPerPlayerButton[i][j].setText(certPerPlayer[i][j].getText());
             syncToolTipText(certPerPlayer[i][j], certPerPlayerButton[i][j]);
-            if (o instanceof PossibleAction)
-                certPerPlayerButton[i][j].addPossibleAction((PossibleAction) o);
+            certPerPlayerButton[i][j].setOpaque(true);
+            certPerPlayerButton[i][j].setBackground(Color.WHITE);
+            
+            if (o instanceof BuyCertificate) certPerPlayerButton[i][j].setBackground(BG_BUY);
+            else if (o instanceof SellShares) certPerPlayerButton[i][j].setBackground(BG_SELL);
+            
+            if (o instanceof PossibleAction) certPerPlayerButton[i][j].addPossibleAction((PossibleAction) o);
+        } else {
+            certPerPlayerButton[i][j].clearPossibleActions();
         }
+        
+        if (certPerPlayer[i][j] != null) certPerPlayer[i][j].setVisible(panelVisible && !clickable);
+        certPerPlayerButton[i][j].setVisible(panelVisible && clickable);
     }
 
     // Method 2: WITHOUT 'Object o' (Base Setup)
     protected void setPlayerCertButton(int i, int j, boolean clickable) {
-        if (j < 0)
+        // SAFETY CHECK
+        if (shareRowVisibilityObservers == null 
+            || i < 0 
+            || i >= shareRowVisibilityObservers.length 
+            || shareRowVisibilityObservers[i] == null) {
             return;
-        if (i < 0 || i >= shareRowVisibilityObservers.length || shareRowVisibilityObservers[i] == null)
-            return;
+        }
+        if (j < 0) return;
 
-        // 1. MAJOR COMPANIES (Cards)
-        // Redirect to the main method to ensure consistency for Cards
+        // 1. MAJOR COMPANIES (Redirect)
         if (playerShareCards != null && playerShareCards[i][j] != null) {
             setPlayerCertButton(i, j, clickable, null);
             return;
         }
 
-        // 2. MINOR COMPANIES (Old Buttons) - ORIGINAL LOGIC RESTORED
-        // This breaks the recursion loop. We do NOT call the other method here.
+        // 2. MINOR COMPANIES (Legacy)
         boolean visible = shareRowVisibilityObservers[i].lastValue();
+
+        if (certPerPlayerButton[i][j] == null) return;
 
         if (clickable) {
             certPerPlayerButton[i][j].setText(certPerPlayer[i][j].getText());
             syncToolTipText(certPerPlayer[i][j], certPerPlayerButton[i][j]);
-
             certPerPlayerButton[i][j].setOpaque(true);
             certPerPlayerButton[i][j].setBackground(Color.WHITE);
             certPerPlayerButton[i][j].setBorder(certPerPlayer[i][j].getBorder());
         } else {
             certPerPlayerButton[i][j].clearPossibleActions();
         }
-        certPerPlayer[i][j].setVisible(visible && !clickable);
+        
+        if (certPerPlayer[i][j] != null) certPerPlayer[i][j].setVisible(visible && !clickable);
         certPerPlayerButton[i][j].setVisible(visible && clickable);
     }
+  
+
 
     protected void setIPOCertButton(int i, boolean clickable, Object o) {
         if (i < 0 || i >= shareRowVisibilityObservers.length || shareRowVisibilityObservers[i] == null)
@@ -2013,6 +2022,8 @@ poolShareCards[i].setShareStackTooltip(pool.getCertificates(companies[i]));
 
                 // Pass the existing buySellGroup
                 RailCard card = new RailCard(pc, buySellGroup);
+                card.setCompany(pc); // Tell the card it is Private Company 'pc'
+
 // Apply Font: Use stickyFont (Zoom) if present, otherwise enforce the Standard Font.
                 // This ensures Privates match the height/style of the Share cards (SansSerif, Bold, 12).
                 if (stickyFont != null) {
@@ -2177,6 +2188,7 @@ poolShareCards[i].setShareStackTooltip(pool.getCertificates(companies[i]));
         if (privates != null && !privates.isEmpty()) {
             for (net.sf.rails.game.PrivateCompany pc : privates) {
                 RailCard card = new RailCard(pc, buySellGroup);
+                card.setCompany(pc);
                 
                 // Consistency: Use sticky font (Zoom) if present
                 if (stickyFont != null) {
@@ -2547,6 +2559,7 @@ poolShareCards[i].setShareStackTooltip(pool.getCertificates(companies[i]));
                 compRevenue[i].setBackground(bgDet);
                 compRevenue[i].setOpaque(true);
             }
+           
             if (compTrains[i] != null) {
                 compTrains[i].setBackground(bgDet);
                 compTrains[i].setOpaque(true);
@@ -2577,6 +2590,13 @@ poolShareCards[i].setShareStackTooltip(pool.getCertificates(companies[i]));
                 compRevenue[i].setBackground(bgRow);
                 compRevenue[i].setOpaque(true);
             }
+            // Update Background for Fixed Income Column (1837)
+            // CRITICAL: This must be INSIDE the loop, where 'bgRow' is defined.
+            if (hasDirectCompanyIncomeInOr && compDirectRevenue[i] != null) {
+                compDirectRevenue[i].setBackground(bgRow);
+                compDirectRevenue[i].setOpaque(true);
+            }
+            
             if (compTokens[i] != null) {
                 compTokens[i].setBackground(bgRow); // Apply Mauve/Yellow/Gray
                 updateCompanyTokenDisplay(i, c, compTokens[i]); // Refresh icon count
@@ -2884,13 +2904,17 @@ poolShareCards[i].setShareStackTooltip(pool.getCertificates(companies[i]));
                         setTreasuryCertButton(index, true, share);
                 }
             }
-            initGameSpecificActions();
+            // initGameSpecificActions();
             java.util.List<NullAction> nullActions = possibleActions.getType(NullAction.class);
             if (nullActions != null) {
                 for (NullAction na : nullActions)
                     (parent).setPassButton(na);
             }
         }
+
+        // Force check for Game Specific Actions (like Prussian Formation)
+        // This must run even if 'myTurn' logic is ambiguous during interrupts.
+        initGameSpecificActions();
 
         updateFixedIncome();
         updatePlayerPrivates();
@@ -3525,6 +3549,15 @@ int wPrice = fm.stringWidth("$999") + 10;
         f.setBorder(BORDER_THIN);
         f.setPreferredSize(DIM_STD);
         addField(f, compRevenueXOffset, 1, 1, 1, 0, true);
+        // Enable Header for Direct (Fixed) Income if active (1837)
+        if (hasDirectCompanyIncomeInOr) {
+            f = new Caption("Fixed"); // Or "Coal" or LocalText.getText("FIXED_INCOME")
+            f.setBorder(BORDER_THIN);
+            f.setPreferredSize(DIM_STD);
+            addField(f, compDirectRevXOffset, 1, 1, 1, 0, true);
+        }
+        
+        
         f = new Caption(LocalText.getText("TRAINS"));
         f.setBorder(BORDER_THIN);
         f.setPreferredSize(DIM_TRAIN);
@@ -3674,6 +3707,7 @@ int wPrice = fm.stringWidth("$999") + 10;
             // 4. PLAYER COLUMNS
             for (int j = 0; j < np; j++) {
                 playerShareCards[i][j] = new RailCard((net.sf.rails.game.Train) null, buySellGroup);
+               playerShareCards[i][j].setCompany(c); // Tell the card it belongs to Company 'c'
                 playerShareCards[i][j].addActionListener(this);
                 if (stickyFont != null)
                     playerShareCards[i][j].setFont(stickyFont);
@@ -3714,6 +3748,7 @@ int wPrice = fm.stringWidth("$999") + 10;
             // 5. POOL COLUMN
             poolShareCards[i] = new RailCard((net.sf.rails.game.Train) null, buySellGroup);
             poolShareCards[i].addActionListener(this);
+            poolShareCards[i].setCompany(c); // Ensure metadata is present for UI Search
             if (stickyFont != null)
                 poolShareCards[i].setFont(stickyFont);
 
@@ -3733,6 +3768,7 @@ int wPrice = fm.stringWidth("$999") + 10;
             // 6. IPO COLUMN
             ipoShareCards[i] = new RailCard((net.sf.rails.game.Train) null, buySellGroup);
             ipoShareCards[i].addActionListener(this);
+            ipoShareCards[i].setCompany(c); // Ensure metadata is present for UI Search
             if (stickyFont != null)
                 ipoShareCards[i].setFont(stickyFont);
 
@@ -3750,6 +3786,7 @@ ipoParLabels[i].setOpaque(false);
                 // Create Treasury RailCard
                 treasuryShareCards[i] = new RailCard((net.sf.rails.game.Train) null, buySellGroup);
                 treasuryShareCards[i].addActionListener(this);
+                treasuryShareCards[i].setCompany(c); // Ensure metadata is present for UI Search
                 if (stickyFont != null)
                     treasuryShareCards[i].setFont(stickyFont);
 
@@ -3800,7 +3837,10 @@ ipoParLabels[i].setOpaque(false);
             f = compCashButton[i] = new ClickField(compCash[i].getText(), CASH_CORRECT_CMD, "", this, buySellGroup);
             addField(f, compCashXOffset, y, 1, 1, 0, false);
 
-            f = compRevenue[i] = new Field(c.getLastRevenueModel()) {
+
+// REVENUE COLUMN: Switch to "Last Dividend" (Player/Split portion) if Direct Income exists.
+            // We inline the ternary to avoid needing to know the exact fully qualified name of the common interface (Model/State).
+            f = compRevenue[i] = new Field(hasDirectCompanyIncomeInOr ? c.getLastDividendModel() : c.getLastRevenueModel()) {
                 @Override
                 public void setText(String t) {
                     if (t == null || t.trim().length() == 0) {
@@ -3833,11 +3873,65 @@ ipoParLabels[i].setOpaque(false);
                             + "</b></font></div></html>");
                 }
             };
+             
+
             f.setBackground(isOperating ? BG_OPERATING : (!isActive ? BG_INACTIVE : BG_MAUVE));
             f.setOpaque(true);
             f.setBorder(bDet);
             f.setPreferredSize(new Dimension(60, 25));
             addField(f, compRevenueXOffset, y, 1, 1, 0, visible);
+
+            // DIRECT INCOME COLUMN (1837 Fixed Coal Income)
+            if (hasDirectCompanyIncomeInOr) {
+                f = compDirectRevenue[i] = new Field(c.getLastDirectIncomeModel()) {
+                     @Override
+                     public void setText(String t) {
+                         if (t == null || t.trim().equals("0") || t.isEmpty()) {
+                             super.setText("");
+                         } else {
+                             super.setText("<html><center><b>" + t + "</b></center></html>");
+                         }
+                     }
+                };
+                f.setBackground(isOperating ? BG_OPERATING : (!isActive ? BG_INACTIVE : BG_MAUVE));
+                f.setOpaque(true);
+                f.setBorder(bDet);
+                f.setPreferredSize(new Dimension(50, 25));
+                
+// TOOLTIP LOGIC: Show Private Company details for Coal Companies
+                // Look up the PrivateCompany definition that matches this PublicCompany's ID
+                net.sf.rails.game.PrivateCompany associatedPrivate = null;
+               if (gameUIManager != null && gameUIManager.getRoot() != null) {
+                    for (net.sf.rails.game.PrivateCompany pc : gameUIManager.getRoot().getCompanyManager().getAllPrivateCompanies()) {
+                        if (pc.getId().equals(c.getId())) {
+                            associatedPrivate = pc;
+                            break;
+                        }
+                    }
+                }
+
+                if (associatedPrivate != null) {
+                    String info = associatedPrivate.getInfoText();
+                    if (info != null && !info.toLowerCase().startsWith("<html>")) {
+                        info = "<html>" + info + "</html>";
+                    }
+                    
+                    f.setToolTipText(info);
+                    if (compNameCaption[i] != null) {
+                        compNameCaption[i].setToolTipText(info);
+                    }
+                }
+
+                
+                addField(f, compDirectRevXOffset, y, 1, 1, 0, visible);
+            }
+
+
+            // f.setBackground(isOperating ? BG_OPERATING : (!isActive ? BG_INACTIVE : BG_MAUVE));
+            // f.setOpaque(true);
+            // f.setBorder(bDet);
+            // f.setPreferredSize(new Dimension(60, 25));
+            // addField(f, compRevenueXOffset, y, 1, 1, 0, visible);
 
             // 2. USE NEW BUTTON PANEL
             // SPACING: Changed hgap from 0 to 4 to match "Future" box spacing
@@ -4287,4 +4381,94 @@ ipoParLabels[i].setOpaque(false);
         return panel;
     }
 
+
+    /**
+     * Direct accessor to retrieve a RailCard from the player grid.
+     * Used by StatusWindow to force-highlight cards when recursive search fails.
+     */
+    public net.sf.rails.ui.swing.elements.RailCard getRailCardFor(int companyIndex, int playerIndex) {
+        if (playerShareCards != null && 
+            companyIndex >= 0 && companyIndex < playerShareCards.length &&
+            playerIndex >= 0 && // Ensure valid player index
+            playerShareCards[companyIndex] != null &&
+            playerIndex < playerShareCards[companyIndex].length) {
+            
+            return playerShareCards[companyIndex][playerIndex];
+        }
+        return null;
+    }
+
+    
+// ... (lines of unchanged context code) ...
+    protected void initGameSpecificActions() {
+        if (possibleActions == null || possibleActions.isEmpty()) {
+            // Log this so we know if the UI thinks there are no actions
+            log.info("[DEBUG-UI] initGameSpecificActions: possibleActions is EMPTY or NULL.");
+            return;
+        }
+
+     net.sf.rails.game.GameManager gm = gameUIManager.getGameManager();
+        
+        // FIX: possibleActions is a wrapper, use getList().size()
+        // Added robust logging to track the button mapping process
+        int actionCount = (possibleActions != null && possibleActions.getList() != null) ? possibleActions.getList().size() : 0;
+        log.info("[DEBUG-UI] --- initGameSpecificActions START --- Total Actions: {}", actionCount);
+
+        if (possibleActions != null) {
+            for (PossibleAction pa : possibleActions.getList()) {
+                String actionName = pa.getClass().getSimpleName();
+                log.info("[DEBUG-UI] Processing Action: {}", actionName);
+
+                // 1. Try standard GM logic
+                net.sf.rails.game.PublicCompany target = null;
+                if (gm instanceof net.sf.rails.game.specific._1835.GameManager_1835) {
+                    target = ((net.sf.rails.game.specific._1835.GameManager_1835) gm).getTargetCompanyForAction(pa);
+                }
+
+                // 2. FALLBACK for StartPrussian
+                if (target == null && (actionName.equals("StartPrussian") || actionName.equals("ExchangeForPrussianShare"))) {
+                    log.info("[DEBUG-UI]   > Action {} returned NULL target. Searching for M2...", actionName);
+                    if (companies != null) {
+                        for (net.sf.rails.game.PublicCompany c : companies) {
+                            if ("M2".equals(c.getId())) {
+                                target = c;
+                                log.info("[DEBUG-UI]   > Fallback SUCCESS: Mapped to M2");
+                                break;
+                            }
+                        }
+                    }
+                }
+
+                // 3. Map to Grid
+                if (target != null) {
+                    int companyIndex = target.getPublicNumber();
+                    int playerIndex = -1;
+                    
+                    // Try finding player from action
+                    String actorName = pa.getPlayerName();
+                    if (actorName != null && players != null) {
+                        for (int k = 0; k < players.getNumberOfPlayers(); k++) {
+                            if (players.getPlayerByPosition(k).getName().equals(actorName)) {
+                                playerIndex = k;
+                                break;
+                            }
+                        }
+                    }
+
+                    // Try finding player from Company President (Crucial for M2)
+                    if (playerIndex == -1 && target.getPresident() != null) {
+                        playerIndex = target.getPresident().getIndex();
+                        log.info("[DEBUG-UI]   > Using President {} (Idx {}) for action", target.getPresident().getName(), playerIndex);
+                    }
+
+                    if (companyIndex >= 0 && companyIndex < nc && playerIndex >= 0 && playerIndex < np) {
+                        setPlayerCertButton(companyIndex, playerIndex, true, pa);
+                        log.info("[DEBUG-UI]   > Button ACTIVATED at [{}, {}]", companyIndex, playerIndex);
+                    }
+                }
+            }
+        }
+        log.info("[DEBUG-UI] --- initGameSpecificActions END ---");
+        // --- END FIX ---
+    }
 }

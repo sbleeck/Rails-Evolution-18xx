@@ -12,6 +12,7 @@ import net.sf.rails.common.DisplayBuffer;
 import net.sf.rails.common.LocalText;
 import net.sf.rails.common.ReportBuffer;
 
+import java.util.HashSet;
 import java.util.Set;
 
 /**
@@ -24,11 +25,11 @@ public class StockRound_1837 extends StockRound {
     protected final ArrayListState<PublicCompany> compWithExcessTrains =
             new ArrayListState<>(this, "compWithExcessTrains");
     protected final IntegerState discardingCompanyIndex = IntegerState.create(
-            this, "discardingCompanyIndex"); // Still needed?
+            this, "discardingCompanyIndex");
     protected final BooleanState discardingTrains = new BooleanState(this,
             "discardingTrains");
 
-    protected PublicCompany[] discardingCompanies; // Still needed?
+    protected PublicCompany[] discardingCompanies;
 
     public StockRound_1837(GameManager parent, String id) {
         super(parent, id);
@@ -56,7 +57,6 @@ public class StockRound_1837 extends StockRound {
      * Share price goes down 1 space for any number of shares sold.
      */
     @Override
-    // Copied from 1835
     protected void adjustSharePrice (PublicCompany company, Owner seller, int sharesSold, boolean soldBefore) {
         // No more changes if it has already dropped *in the same turn*
         if (!soldBefore) {
@@ -64,16 +64,103 @@ public class StockRound_1837 extends StockRound {
         }
     }
 
-
-
-    @Override
+@Override
     public boolean setPossibleActions() {
         if (discardingTrains.value()) {
             return setTrainDiscardActions();
-        } else {
-            return super.setPossibleActions();
         }
+        
+        // --- START FIX ---
+        // 1. Load standard Stock Round actions (Buy, Sell, Pass)
+        boolean actionsAdded = super.setPossibleActions();
+
+        // 2. Append Voluntary Merge actions (for Minors/Coal)
+        // This allows exchanging Minors (Sd, kk, Ug) or Coal companies for Major shares
+        // during the Stock Round as per Rule 7.2, alongside normal trading.
+        if (setMergeActions()) {
+            actionsAdded = true;
+        }
+
+        return actionsAdded;
+        // --- END FIX ---
     }
+
+    // --- START FIX ---
+    /**
+     * Identifies potential voluntary mergers for the current player and adds them as actions.
+     * Uses NullAction(root, Mode.PASS) for the "No" option.
+     */
+    protected boolean setMergeActions() {
+        boolean actionsAdded = false;
+
+        if (currentPlayer == null) return false;
+
+        Set<String> processedCompanies = new HashSet<>();
+
+        // 1. Iterate over Certificates (PublicCertificate), NOT Tokens.
+        // The Player object uses getPortfolioModel().getCertificates() to return List<PublicCertificate>
+        for (PublicCertificate cert : currentPlayer.getPortfolioModel().getCertificates()) {
+            
+            PublicCompany company = cert.getCompany();
+            // Avoid nulls or processing the same company twice (if player holds 2 shares)
+            if (company == null || processedCompanies.contains(company.getId())) continue;
+            
+            // 2. Check if it is a Minor or Coal company
+            String type = company.getType().getId();
+            if ("Minor".equals(type) || "Coal".equals(type)) {
+                
+                // 3. Find Target
+                PublicCompany target = getMergeTarget(company); 
+
+                // 4. Validate Merge Eligibility
+                // - Target must exist
+                // - Target must have floated (Rule: "Coal companies... if a corporation has floated")
+                // - Player must effectively own the minor (be the President)
+                if (target != null && target.hasFloated() && company.getPresident() == currentPlayer) {
+                     
+                     // 5. Use CORRECT Constructor: (source, target, forced=false)
+                     possibleActions.add(new MergeCompanies(company, target, false));
+                     
+                     processedCompanies.add(company.getId());
+                     actionsAdded = true;
+                }
+            }
+        }
+
+        // Note: We do NOT add a NullAction (Pass) here because super.setPossibleActions()
+        // already adds the standard Stock Round "Pass" action.
+        
+        return actionsAdded;
+    }
+    // ... (rest of the method: getMergeTarget) ...
+    /**
+     * Maps Coal/Minor companies to their Major/National targets based on 1837 rules.
+     */
+    protected PublicCompany getMergeTarget(PublicCompany source) {
+        String id = source.getId();
+        String targetId = null;
+
+        // Coal Mappings (Rules 7.3)
+        if (id.equals("EPP") || id.equals("RGTE")) targetId = "BK";
+        else if (id.equals("EOD") || id.equals("EKT")) targetId = "MS";
+        else if (id.equals("MLB")) targetId = "CL";
+        else if (id.equals("ZKB") || id.equals("SPB")) targetId = "TR";
+        else if (id.equals("LRB") || id.equals("EHS")) targetId = "TI";
+        else if (id.equals("BB"))  targetId = "BH";
+        
+        // Minor Mappings (Rules 7.2) - Simple prefix matching
+        // Sd 1-5 -> Sd, kk 1-3 -> kk, Ug 1-3 -> Ug
+        else if (id.startsWith("Sd")) targetId = "Sd"; // Southern Railway
+        else if (id.startsWith("kk")) targetId = "kk"; // k.k. National
+        else if (id.startsWith("Ug")) targetId = "Ug"; // Hungarian National
+
+        if (targetId != null) {
+            // Use getRoot() to access the CompanyManager
+            return gameManager.getRoot().getCompanyManager().getPublicCompany(targetId);
+        }
+        return null; 
+    }
+    // --- END FIX ---
 
     public void setBuyableCerts() {
         super.setBuyableCerts();
@@ -105,10 +192,7 @@ public class StockRound_1837 extends StockRound {
             if (company.getType().getId().equals("National")) {
                 if (!company.hasFloated()) floatCompany(company);
             } else if (company.getType().getId().equals("Major")) {
-                //if (action.getPlayer() != company.getPresident()) {
-                //company.checkPresidency();
                 company.checkPresidencyOnBuy(action.getPlayer());
-                //}
             }
         }
 

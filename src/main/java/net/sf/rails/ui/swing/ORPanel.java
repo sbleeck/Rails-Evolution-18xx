@@ -72,7 +72,7 @@ public class ORPanel extends GridPanel
 
     public ActionButton currentDefaultButton; // For Enter key
     public int activePhase = 0; // 1=Build, 2=Token, 3=Revenue, 4=Train
-private Phase lastGamePhase = null;
+    private Phase lastGamePhase = null;
 
     public JPanel trainButtonsPanel;
     public List<GUIHex> cycleableHexes = new ArrayList<>();
@@ -90,61 +90,59 @@ private Phase lastGamePhase = null;
     private ActionMenuItem takeLoans;
     private ActionMenuItem repayLoans;
 
-   
     // --- VISUAL CONSTANTS ---
     private static final Color BG_DETAILS = new Color(235, 230, 255); // Standard Mauve
 
     // PHASE 1: TRACK (Warm Brown/Red)
-    private static final Color PH_TILE_DARK  = Color.RED; 
+    private static final Color PH_TILE_DARK = Color.RED;
     private static final Color PH_TILE_LIGHT = new Color(255, 225, 225);
 
     // PHASE 2: TOKEN (Forest Green)
-    private static final Color PH_TOKEN_DARK  = new Color(34, 139, 34);
+    private static final Color PH_TOKEN_DARK = new Color(34, 139, 34);
     private static final Color PH_TOKEN_LIGHT = new Color(210, 255, 210);
 
     // PHASE 3: REVENUE (Strong Blue)
-    private static final Color PH_REV_DARK  = new Color(0, 60, 140);
+    private static final Color PH_REV_DARK = new Color(0, 60, 140);
     private static final Color PH_REV_LIGHT = new Color(210, 230, 255);
 
     // PHASE 4: TRAIN (Burnt Orange)
-    private static final Color PH_TRAIN_DARK  = new Color(204, 102, 0);
+    private static final Color PH_TRAIN_DARK = new Color(204, 102, 0);
     private static final Color PH_TRAIN_LIGHT = new Color(255, 235, 205);
-    
+
     // DONE / PASSIVE
     private static final Color PH_DONE_BG = UIManager.getColor("Panel.background");
     private static final Color PH_DONE = PH_DONE_BG;
- 
 
     // --- 2. UPDATE STYLE METHOD ---
     private void styleButton(ActionButton btn, Color bg, String text) {
-        if (btn == null) return;
-        
+        if (btn == null)
+            return;
+
         btn.setText(text);
         btn.setBackground(bg);
         btn.setOpaque(true);
-        
+
         // LOGIC: Always White text for Active Phases
         if (bg == PH_DONE) {
-            btn.setForeground(Color.BLACK); 
+            btn.setForeground(Color.BLACK);
         } else {
-            btn.setForeground(Color.WHITE); 
-            btn.setFont(new Font("SansSerif", Font.BOLD, 12)); 
+            btn.setForeground(Color.WHITE);
+            btn.setFont(new Font("SansSerif", Font.BOLD, 12));
         }
 
         // LOGIC: 3D Button Look (Raised Bevel)
         btn.setBorder(BorderFactory.createRaisedBevelBorder());
     }
-    
 
     // --- 3. UPDATE RESET METHOD ---
     private void resetButtonStyle(ActionButton btn) {
-        if (btn == null) return;
+        if (btn == null)
+            return;
         btn.setBackground(UIManager.getColor("Button.background"));
         btn.setForeground(Color.BLACK); // Reset text color
         btn.setFont(new Font("SansSerif", Font.PLAIN, 11)); // Reset font
         btn.setBorder(UIManager.getBorder("Button.border")); // Reset 3D border
     }
-
 
     private static final Color CARD_BG = new Color(255, 255, 240); // Beige for Cards
     private static final Color BG_HIGHLIGHT = new Color(255, 255, 200);
@@ -154,13 +152,14 @@ private Phase lastGamePhase = null;
 
     private static final Font FONT_READOUT = new Font("SansSerif", Font.BOLD, 18);
     private static final Font FONT_HEADER = new Font("SansSerif", Font.BOLD, 12);
-/**
+
+    /**
      * Retrieves the color used by the StatusWindow's train box.
      * This ensures the Sidebar and the Status Window match perfectly.
      */
     private Color getTrainHighlightColor() {
         // We use the standard Orange defined in GuiDef, which GameStatus also uses
-        return Color.ORANGE; 
+        return Color.ORANGE;
     }
 
     // --- COMPONENTS ---
@@ -517,20 +516,16 @@ private Phase lastGamePhase = null;
     }
 
     public int getRevenue(int orCompIndex) {
+        // Return the current value displayed in the button or label if needed,
+        // but primarily we track this via the actions.
         return 0;
     }
 
-    public void setRevenue(int orCompIndex, int amount) {
-
-    }
-
-    public void setDirectRevenue(int orCompIndex, int amount) {
-
-    }
-
+  
     public void setDividend(int orCompIndex, int amount) {
-
+        // Similar to setRevenue, usually handled by the generic update
     }
+
 
     public void resetActions() {
         // All Dashboard Highlighting logic removed.
@@ -544,6 +539,7 @@ private Phase lastGamePhase = null;
 
         removeAllHighlights();
     }
+
 
     // *** Apparently not used
     public void resetORCompanyTurn(int orCompIndex) {
@@ -695,14 +691,14 @@ private Phase lastGamePhase = null;
     public void enableUndo(GameAction action) {
         // undoButton.setEnabled(action != null);
         if (action != null)
-this.currentUndoAction = action;    
+            this.currentUndoAction = action;
     }
 
     public void enableRedo(GameAction action) {
         // redoButton.setEnabled(action != null);
         if (action != null)
-this.currentRedoAction = action;
-        }
+            this.currentRedoAction = action;
+    }
 
     public void enableLoanTaking(TakeLoans action) {
         if (action != null)
@@ -960,7 +956,8 @@ this.currentRedoAction = action;
     }
 
     private void setupButton(ActionButton btn, PossibleAction pa) {
-        if (btn == null) return; // Crash Protection
+        if (btn == null)
+            return; // Crash Protection
         btn.setEnabled(true);
         btn.setPossibleAction(pa);
     }
@@ -972,53 +969,78 @@ this.currentRedoAction = action;
         btn.setPossibleAction(clone);
     }
 
+
+// ... (lines 2355-2360)
     private void updateDefaultButton() {
-        currentDefaultButton = null;
-
-        // 1. Phase 1: Track (Confirm > Skip)
+        ActionButton defaultBtn = null;
+        // 1. Determine Default Button based on Active Phase
         if (activePhase == 1) {
+            // Phase 1: Tile Laying (Confirm or Skip)
             if (btnTileConfirm != null && btnTileConfirm.isEnabled()) {
-                currentDefaultButton = btnTileConfirm;
-            } else if (btnTileSkip != null && btnTileSkip.isEnabled()) {
-                currentDefaultButton = btnTileSkip;
+                defaultBtn = btnTileConfirm;
             }
-        }
-        // 2. Phase 2: Token (Confirm > Skip)
+        } 
         else if (activePhase == 2) {
+            // Phase 2: Token Laying (Confirm or Skip)
             if (btnTokenConfirm != null && btnTokenConfirm.isEnabled()) {
-                currentDefaultButton = btnTokenConfirm;
-            } else if (btnTokenSkip != null && btnTokenSkip.isEnabled()) {
-                currentDefaultButton = btnTokenSkip;
+                defaultBtn = btnTokenConfirm;
             }
         }
-        // 3. Phase 3: Revenue (Split/Minor Priority)
         else if (activePhase == 3) {
-            // PRIORITY CHANGE: Split (Minor action) must be checked before Payout (Major
-            // action),
-            // as Split is the action required to continue for minors.
-            if (btnRevSplit != null && btnRevSplit.isEnabled()) {
-                currentDefaultButton = btnRevSplit;
-            } else if (btnRevPayout != null && btnRevPayout.isEnabled()) {
-                currentDefaultButton = btnRevPayout;
-            } else if (btnRevWithhold != null && btnRevWithhold.isEnabled()) {
-                currentDefaultButton = btnRevWithhold;
+            // Phase 3: Revenue (Intelligent Selection for Majors vs Minors)
+            
+            // Case A: Standard Corporation (Major) - Payout is King
+            if (btnRevPayout != null && btnRevPayout.isEnabled()) {
+                defaultBtn = btnRevPayout;
+            }
+            // Case B: 1837 Coal/Minor Scenario - Split is King
+            // If Payout is disabled (enforced by OperatingRound), but Split is enabled.
+            else if (btnRevSplit != null && btnRevSplit.isEnabled()) {
+                defaultBtn = btnRevSplit;
+            }
+            // Case C: Fallbacks (Withhold)
+            else if (btnRevWithhold != null && btnRevWithhold.isEnabled()) {
+                defaultBtn = btnRevWithhold;
+            }
+        } 
+        else if (activePhase == 4) {
+            // Phase 4: Train Buying (Skip Buy / Done Buying)
+            if (btnTrainSkip != null && btnTrainSkip.isEnabled()) {
+                defaultBtn = btnTrainSkip;
             }
         }
-        // 4. Phase 4 (Trains) or Catch-All (Done)
         else {
-     if (activePhase == 4 && btnTrainSkip != null && btnTrainSkip.isEnabled()) {
-                currentDefaultButton = btnTrainSkip;
-            } else if (btnDone != null && btnDone.isEnabled()) {
-                currentDefaultButton = btnDone;
+            // Phase 5 (Finalize) or Fallback: Done
+            if (btnDone != null && btnDone.isEnabled()) {
+                defaultBtn = btnDone;
             }
-
         }
+        
+        // 2. Apply Default (The Fix)
+        // We MUST update the class field 'currentDefaultButton' because 
+        // the Game's hotkey/AI manager likely checks this specific field 
+        // to know what to do when 'Enter' is pressed.
+        this.currentDefaultButton = defaultBtn;
 
-        // Apply to RootPane immediately to update the visual border
-        if (this.getRootPane() != null) {
-            this.getRootPane().setDefaultButton(currentDefaultButton);
+        javax.swing.JRootPane rp = getRootPane();
+        if (rp != null) {
+            rp.setDefaultButton(defaultBtn);
         }
     }
+// ... (lines 2396-2400)
+
+
+
+    // Helper to safely extract the action from the button
+    private SetDividend getSetDividend(ActionButton btn) {
+        if (btn.getPossibleActions() != null && !btn.getPossibleActions().isEmpty()) {
+            if (btn.getPossibleActions().get(0) instanceof SetDividend) {
+                return (SetDividend) btn.getPossibleActions().get(0);
+            }
+        }
+        return null;
+    }
+
 
     public void initORCompanyTurn(PublicCompany orComp, int orCompIndex) {
         // Force reset of map numbers to clear artifacts from the previous company.
@@ -1118,44 +1140,117 @@ this.currentRedoAction = action;
     }
 
 
-   
+    // Replace the existing revenueUpdate method with this one.
+    // It correctly splits the Total (bestRevenue) into Player + Treasury portions for the display.
     @Override
     public void revenueUpdate(int bestRevenue, int specialRevenue, boolean finalResult) {
-        // 1. Always update the Sidebar Revenue Label with the calculated actual revenue
+        // 1. Update the Sidebar Label
         if (lblRevenue != null) {
-            lblRevenue.setText(orUIManager.getGameUIManager().format(bestRevenue));
+            if (specialRevenue > 0) {
+                // Show "Player + Treasury" (e.g. "20 + 15")
+                int playerShare = bestRevenue - specialRevenue;
+                lblRevenue.setText(format(playerShare) + " + " + format(specialRevenue));
+            } else {
+                lblRevenue.setText(orUIManager.getGameUIManager().format(bestRevenue));
+            }
         }
 
         if (isRevenueValueToBeSet) {
+            // Send the TOTAL to the backend (The backend logic expects the Total and will do the subtraction itself)
             setRevenue(orCompIndex, bestRevenue);
 
             if (hasDirectCompanyIncomeInOR) {
+                // 1837 Specific: Handle the split
                 setDirectRevenue(orCompIndex, specialRevenue);
-                setDividend(orCompIndex, bestRevenue - specialRevenue);
+                
+                // Calculate dividend for the button label (Total - Treasury)
+                int dividend = bestRevenue - specialRevenue;
+                
+                // FORCE UPDATE BUTTON TEXT WITH BREAKDOWN
+                updateRevenueButtonText(btnRevPayout, dividend, specialRevenue);
+                updateRevenueButtonText(btnRevWithhold, dividend, specialRevenue);
+                updateRevenueButtonText(btnRevSplit, dividend, specialRevenue);
             }
         }
+        
         if (finalResult) {
-            // 2. Handle Map Drawing (Only if Final Result AND Routes are enabled)
-            // Clear old paths first to avoid artifacts
+            // Clear old paths
             orUIManager.getMap().setTrainPaths(null);
 
-            // Only draw the new path if the user has enabled Route Highlighting
+            // Draw new path if enabled
             if (isDisplayCurrentRoutes()) {
-             try {
-                revenueAdapter.drawOptimalRunAsPath(orUIManager.getMap());
-            } catch (Exception e) {
-                log.error("ORPanel: Failed to draw route", e);
-            }
+                try {
+                    revenueAdapter.drawOptimalRunAsPath(orUIManager.getMap());
+                } catch (Exception e) {
+                    log.error("ORPanel: Failed to draw route", e);
+                }
             }
 
             if (isRevenueValueToBeSet) {
+                String runDescription = Util.convertToHtml(revenueAdapter.getOptimalRunPrettyPrint(false));
                 orUIManager.getMessagePanel().setInformation("Best Run Value = " + bestRevenue +
-                        " with " + Util.convertToHtml(revenueAdapter.getOptimalRunPrettyPrint(false)));
+                        " with " + runDescription);
                 orUIManager.getMessagePanel().setDetail(
                         Util.convertToHtml(revenueAdapter.getOptimalRunPrettyPrint(true)));
             }
         }
     }
+
+    // 1. Helper to format the button text nicely (e.g. "Payout 20 + 15")
+    private void updateRevenueButtonText(ActionButton btn, int playerPart, int treasuryPart) {
+        if (btn == null || !btn.isEnabled()) return;
+        
+        // We only change the text if there is a treasury part (1837 style)
+        if (treasuryPart > 0) {
+            String baseCmd = "";
+            if (btn == btnRevPayout) baseCmd = "Payout";
+            else if (btn == btnRevWithhold) baseCmd = "Withhold";
+            else if (btn == btnRevSplit) baseCmd = "Split";
+            
+            // Format: "Split 20 + 15"
+            btn.setText(baseCmd + " " + format(playerPart) + " + " + format(treasuryPart));
+            btn.repaint();
+        }
+    }
+
+    // 2. Helper to update the Action Object IN-PLACE (Fixes the "Revenue 0" bug)
+    private void updateRevenueButton(ActionButton btn, int amount) {
+        if (btn == null || !btn.isEnabled()) return;
+
+        List<PossibleAction> actions = btn.getPossibleActions();
+
+        if (actions != null && !actions.isEmpty() && actions.get(0) instanceof SetDividend) {
+            SetDividend sd = (SetDividend) actions.get(0);
+            // UPDATE IN PLACE: Do not clone.
+            sd.setActualRevenue(amount);
+            btn.repaint();
+        }
+    }
+    
+    // 3. Helper for 1837 Direct Revenue
+    public void setDirectRevenue(int orCompIndex, int amount) {
+        updateRevenueButtonDirect(btnRevPayout, amount);
+        updateRevenueButtonDirect(btnRevWithhold, amount);
+        updateRevenueButtonDirect(btnRevSplit, amount);
+    }
+    
+    private void updateRevenueButtonDirect(ActionButton btn, int amount) {
+        if (btn == null || !btn.isEnabled()) return;
+
+        List<PossibleAction> actions = btn.getPossibleActions();
+        if (actions != null && !actions.isEmpty() && actions.get(0) instanceof SetDividend) {
+            SetDividend sd = (SetDividend) actions.get(0);
+            sd.setActualCompanyTreasuryRevenue(amount);
+        }
+    }
+    
+    // 4. Update the standard setRevenue to use our new in-place helper
+    public void setRevenue(int orCompIndex, int amount) {
+        updateRevenueButton(btnRevPayout, amount);
+        updateRevenueButton(btnRevWithhold, amount);
+        updateRevenueButton(btnRevSplit, amount);
+    }
+
 
     private JLabel createInfoLabel(String text) {
         JLabel lbl = new JLabel(text, SwingConstants.CENTER);
@@ -1204,29 +1299,29 @@ this.currentRedoAction = action;
                     c.setEnabled(false);
                 }
             }
+            // Ensure focus returns to the main panel so the 'Enter' key works immediately
+            SwingUtilities.invokeLater(this::requestFocusInWindow);
             return;
         }
 
         // --- 3. Handle Confirm Button ---
-else if (command.equals(CONFIRM_CMD)) {
+        else if (command.equals(CONFIRM_CMD)) {
             if (orUIManager != null) {
                 // Check if we have a map selection.
                 // If YES -> Confirm.
                 // If NO -> Skip.
                 boolean hasSelection = (orUIManager.getMap().getSelectedHex() != null);
-                
+
                 if (hasSelection) {
                     orUIManager.confirmUpgrade();
                 } else {
                     // Trigger the Skip logic (Smart Default)
-                    orUIManager.skipUpgrade(); 
+                    orUIManager.skipUpgrade();
                 }
-                
-      
+
             }
             return;
         }
-
 
         // --- 4. Handle Operating Cost ---
         else if (command.equals(OPERATING_COST_CMD)) {
@@ -1484,7 +1579,6 @@ else if (command.equals(CONFIRM_CMD)) {
         return lbl;
     }
 
-
     private void applyPanelStyle(JPanel p, boolean active) {
         if (p == null)
             return;
@@ -1597,11 +1691,11 @@ else if (command.equals(CONFIRM_CMD)) {
 
         // --- 3. PHASE 1: TRACK ---
         phase1Panel = createPhasePanel("1. Track");
-        
+
         // Clean implementation: Single Smart Button
         btnTileConfirm = createSidebarButton("Skip", CONFIRM_CMD); // Default to Skip state
         phase1Panel.add(btnTileConfirm);
-        
+
         // Initialize the panel for dynamic/special actions
         miscActionPanel = new JPanel();
         miscActionPanel.setLayout(new BoxLayout(miscActionPanel, BoxLayout.Y_AXIS));
@@ -1624,11 +1718,10 @@ else if (command.equals(CONFIRM_CMD)) {
         tokenDisplay.setBackground(BG_DETAILS);
         phase2Panel.add(tokenDisplay);
 
-       
         phase2Panel.add(Box.createVerticalStrut(2));
         btnTokenConfirm = createSidebarButton("Skip", CONFIRM_CMD);
         phase2Panel.add(btnTokenConfirm);
-         sidebarPanel.add(phase2Panel);
+        sidebarPanel.add(phase2Panel);
         sidebarPanel.add(Box.createVerticalStrut(2));
 
         // --- 5. PHASE 3: REVENUE ---
@@ -1677,7 +1770,8 @@ else if (command.equals(CONFIRM_CMD)) {
         trainButtonsPanel = new JPanel(new GridBagLayout());
         trainButtonsPanel.setOpaque(false);
         phase4Panel.add(trainButtonsPanel);
-        // Set maximum size to accommodate ~4 train cards (127px) + button (28px) + border/padding
+        // Set maximum size to accommodate ~4 train cards (127px) + button (28px) +
+        // border/padding
         Dimension p4Size = new Dimension(SIDEBAR_WIDTH, 185);
         phase4Panel.setMaximumSize(p4Size);
         phase4Panel.setPreferredSize(p4Size);
@@ -1714,20 +1808,20 @@ else if (command.equals(CONFIRM_CMD)) {
 
         if (activePhase == 1) {
             phaseColor = PH_TILE_DARK;
-            instruction =    "  LAY TRACK  ";
+            instruction = "  LAY TRACK  ";
         } else if (activePhase == 2) {
             phaseColor = PH_TOKEN_DARK;
-            instruction =    "  LAY TOKEN  ";
+            instruction = "  LAY TOKEN  ";
         } else if (activePhase == 3) {
             phaseColor = PH_REV_DARK;
-            instruction =    " MANAGE REVENUE ";
+            instruction = " MANAGE REVENUE ";
         } else if (activePhase == 4) {
             // Header prompts mouse interaction with cards
             phaseColor = getTrainHighlightColor(); // Returns Color.ORANGE
             instruction = "   BUY TRAIN?   ";
         } else if (activePhase == 5) {
             // Only Phase 5 gets the Crimson Red "FINALIZE MOVE"
-            phaseColor = new Color(180, 0, 0); 
+            phaseColor = new Color(180, 0, 0);
             instruction = " FINALIZE MOVE ";
         } else if (specialMode) {
             phaseColor = new Color(255, 180, 180);
@@ -1741,7 +1835,7 @@ else if (command.equals(CONFIRM_CMD)) {
             String hexPhase = String.format("#%06x", (0xFFFFFF & phaseColor.getRGB()));
 
             String playerInfo = (orComp.getPresident() != null) ? orComp.getPresident().getName() : "";
-            
+
             // HTML Table: Top=Identity, Bottom=Action
             String logoText = "<html><table width='100%' cellpadding='0' cellspacing='0'>" +
                     "<tr bgcolor='" + hexBg + "'>" +
@@ -1762,7 +1856,8 @@ else if (command.equals(CONFIRM_CMD)) {
         // 4. Update Colors (Logic handles the panels internally)
         colorizeActivePhase(null);
 
-        // 5. Update Data Fields (Text Only - Backgrounds handled by colorizeActivePhase)
+        // 5. Update Data Fields (Text Only - Backgrounds handled by
+        // colorizeActivePhase)
         Color infoFg = FG_READOUT;
 
         if (lblCash != null) {
@@ -1787,11 +1882,10 @@ else if (command.equals(CONFIRM_CMD)) {
             lblRevenue.setForeground(infoFg);
         }
 
-      // Restore the logic that passes the text list of trains + limit
+        // Restore the logic that passes the text list of trains + limit
         if (trainDisplay != null) {
-           trainDisplay.updateAssets(orComp);
+            trainDisplay.updateAssets(orComp);
         }
-
 
         if (sidebarPanel != null) {
             sidebarPanel.revalidate();
@@ -1862,7 +1956,7 @@ else if (command.equals(CONFIRM_CMD)) {
                 }
             }
         }
-        
+
     }
 
     private class TrainDisplayPanel extends JPanel {
@@ -1872,7 +1966,7 @@ else if (command.equals(CONFIRM_CMD)) {
 
         // Dummy group to satisfy ClickField constructor constraints
         private final ButtonGroup dummyGroup = new ButtonGroup();
-        
+
         public TrainDisplayPanel() {
             setOpaque(false);
             setLayout(new GridBagLayout()); // Center the vertical stack
@@ -1882,7 +1976,8 @@ else if (command.equals(CONFIRM_CMD)) {
         // Method moved INSIDE the class
         public void updateAssets(PublicCompany comp) {
             removeAll();
-            if (comp == null) return;
+            if (comp == null)
+                return;
 
             // 1. Parse Trains
             String trainString = comp.getPortfolioModel().getTrainsModel().toText();
@@ -1903,12 +1998,12 @@ else if (command.equals(CONFIRM_CMD)) {
             stack.setOpaque(false);
 
             int totalSlots = Math.max(limit, Math.max(trains.size(), 1));
-            
+
             // 3. Render Trains and Empty Slots
             for (int i = 0; i < totalSlots; i++) {
                 // Pass 'dummyGroup' to avoid NPE
-                RailCard card = new RailCard((net.sf.rails.game.Train)null, dummyGroup);
-                
+                RailCard card = new RailCard((net.sf.rails.game.Train) null, dummyGroup);
+
                 // REMOVED: card.setScale(1.3); -> Use Standard Size
                 // REMOVED: card.setPreferredSize(null);
 
@@ -1918,14 +2013,14 @@ else if (command.equals(CONFIRM_CMD)) {
                 if (i < trains.size()) {
                     // Active Train Card
                     String text = trains.get(i);
-                    card.setCustomLabel(text); 
-                    card.setBackground(BG_CARD_PASSIVE); 
+                    card.setCustomLabel(text);
+                    card.setBackground(BG_CARD_PASSIVE);
                     card.setBorder(BorderFactory.createCompoundBorder(
                             BorderFactory.createLineBorder(Color.BLACK, 1),
                             BorderFactory.createEmptyBorder(1, 1, 1, 1)));
                 } else {
                     // Empty Slot (Placeholder)
-                    card.setCustomLabel("_"); 
+                    card.setCustomLabel("_");
                     card.setBackground(new Color(240, 240, 240));
                     card.setBorder(BorderFactory.createCompoundBorder(
                             BorderFactory.createLineBorder(Color.GRAY, 1),
@@ -1949,11 +2044,11 @@ else if (command.equals(CONFIRM_CMD)) {
             revalidate();
             repaint();
         }
-        
-        // Legacy stub
-        public void setTrains(String s, int i) {}
-    }
 
+        // Legacy stub
+        public void setTrains(String s, int i) {
+        }
+    }
 
     /**
      * * Visual display for Tokens (Updated to use TokenIcon)
@@ -2047,9 +2142,9 @@ else if (command.equals(CONFIRM_CMD)) {
         });
     }
 
-   
-    private void colorizeActivePhase(Color unusedColor) { 
-        // Note: We ignore the passed color and use our defined palette to ensure consistency.
+    private void colorizeActivePhase(Color unusedColor) {
+        // Note: We ignore the passed color and use our defined palette to ensure
+        // consistency.
 
         // 1. Reset everything to "Passive Mode" first
         resetPhasePanel(phase1Panel, btnTileConfirm);
@@ -2061,53 +2156,71 @@ else if (command.equals(CONFIRM_CMD)) {
         // 2. Apply "Active Mode" to the current phase
         if (activePhase == 1) {
             applyPhaseStyle(phase1Panel, btnTileConfirm, PH_TILE_DARK, PH_TILE_LIGHT, "Confirm Track (Enter)");
-        } 
-        else if (activePhase == 2) {
+        } else if (activePhase == 2) {
             applyPhaseStyle(phase2Panel, btnTokenConfirm, PH_TOKEN_DARK, BG_DETAILS, "Confirm Token (Enter)");
-        } 
-        else if (activePhase == 3) {
-            // Special handling for Revenue: It has multiple buttons
-            applyPhaseStyle(phase3Panel, btnRevPayout, PH_REV_DARK, PH_REV_LIGHT, "Payout (Enter)");
+        } else if (activePhase == 3) {
+
+            // Special handling for Revenue:
+            // We must determine which button is the ACTUAL primary default.
+            // 1837 Coal Companies have Payout DISABLED and Split ENABLED.
+            // We must visually highlight Split in that case.
             
-            // Ensure Payout is the visual "Primary" action
-            styleButton(btnRevPayout, PH_REV_DARK, "Payout (Enter)");
+            ActionButton primaryBtn = btnRevPayout; // Default assumption
+            String label = "Payout (Enter)";
+
+            // If Payout is disabled but Split is enabled, Split becomes the primary visual.
+            if ((btnRevPayout == null || !btnRevPayout.isEnabled()) 
+                && (btnRevSplit != null && btnRevSplit.isEnabled())) {
+                primaryBtn = btnRevSplit;
+                label = "Split (Enter)";
+            }
+
+            // Apply the style to the detected primary button
+            applyPhaseStyle(phase3Panel, primaryBtn, PH_REV_DARK, PH_REV_LIGHT, label);
+
+            // Explicitly style the buttons to match this state
+            if (primaryBtn == btnRevSplit) {
+                 // Split is King
+                 styleButton(btnRevSplit, PH_REV_DARK, "Split (Enter)");
+                 styleSecondaryButton(btnRevPayout, PH_REV_LIGHT); // Demote Payout (it's likely disabled anyway)
+            } else {
+                 // Payout is King (Standard Major)
+                 styleButton(btnRevPayout, PH_REV_DARK, "Payout (Enter)");
+                 styleSecondaryButton(btnRevSplit, PH_REV_LIGHT);
+            }
             
-            // Keep secondary buttons clean but distinct
+            // Withhold is always secondary
             styleSecondaryButton(btnRevWithhold, PH_REV_LIGHT);
-            styleSecondaryButton(btnRevSplit, PH_REV_LIGHT);
-        } 
-      else if (activePhase == 4) {
-             Color trainOrange = getTrainHighlightColor();
-             
-             // 1. Highlight the Train panel in Orange
-             boolean canBuy = (trainButtonsPanel != null && trainButtonsPanel.getComponentCount() > 0);
-             String label = canBuy ? "Skip Buy (Enter)" : "Done Buying (Enter)";
-             applyPhaseStyle(phase4Panel, btnTrainSkip, trainOrange, PH_TRAIN_LIGHT, label);
-             
-             // 2. High-Visibility Button: Matches the Status Window box
-             styleButton(btnTrainSkip, trainOrange, label);
-             
-             // 3. Keep the final Done button gray/passive during phase 4
-             styleButton(btnDone, Color.GRAY, "Done (Spc)");
-             btnDone.setForeground(Color.BLACK);
-             btnDone.setFont(new Font("SansSerif", Font.PLAIN, 12));
-        } 
-        else if (activePhase == 5) {
-             // Turn off highlighting for Phase 4
-             resetPhasePanel(phase4Panel, btnTrainSkip);
-             
-             // Only now do we show the dramatic Red button
-             styleButton(btnDone, new Color(180, 0, 0), "END TURN");
-             btnDone.setForeground(Color.WHITE); 
-             btnDone.setFont(new Font("SansSerif", Font.BOLD, 16));
-        }
-        else {
-             // General Fallback (e.g. Stock Round or spectator mode)
-             styleButton(btnDone, Color.GRAY, "Done (Spc)");
-             btnDone.setForeground(Color.BLACK);
+
+        } else if (activePhase == 4) {
+            Color trainOrange = getTrainHighlightColor();
+
+            // 1. Highlight the Train panel in Orange
+            boolean canBuy = (trainButtonsPanel != null && trainButtonsPanel.getComponentCount() > 0);
+            String label = canBuy ? "Skip Buy (Enter)" : "Done Buying (Enter)";
+            applyPhaseStyle(phase4Panel, btnTrainSkip, trainOrange, PH_TRAIN_LIGHT, label);
+
+            // 2. High-Visibility Button: Matches the Status Window box
+            styleButton(btnTrainSkip, trainOrange, label);
+
+            // 3. Keep the final Done button gray/passive during phase 4
+            styleButton(btnDone, Color.GRAY, "Done (Spc)");
+            btnDone.setForeground(Color.BLACK);
+            btnDone.setFont(new Font("SansSerif", Font.PLAIN, 12));
+        } else if (activePhase == 5) {
+            // Turn off highlighting for Phase 4
+            resetPhasePanel(phase4Panel, btnTrainSkip);
+
+            // Only now do we show the dramatic Red button
+            styleButton(btnDone, new Color(180, 0, 0), "END TURN");
+            btnDone.setForeground(Color.WHITE);
+            btnDone.setFont(new Font("SansSerif", Font.BOLD, 16));
+        } else {
+            // General Fallback (e.g. Stock Round or spectator mode)
+            styleButton(btnDone, Color.GRAY, "Done (Spc)");
+            btnDone.setForeground(Color.BLACK);
         }
     }
-
 
     // --- HELPER: RESET ---
     private void resetPhasePanel(JPanel p, ActionButton mainBtn) {
@@ -2119,11 +2232,11 @@ else if (command.equals(CONFIRM_CMD)) {
                 ((TitledBorder) p.getBorder()).setBorder(BorderFactory.createLineBorder(Color.GRAY));
             }
             // Reset children (Labels) to Mauve
-             for (Component c : p.getComponents()) {
+            for (Component c : p.getComponents()) {
                 if (c instanceof JLabel) {
                     c.setBackground(BG_DETAILS); // Match Sidebar
                 }
-             }
+            }
         }
         if (mainBtn != null) {
             resetButtonStyle(mainBtn);
@@ -2132,12 +2245,13 @@ else if (command.equals(CONFIRM_CMD)) {
 
     // --- HELPER: APPLY STYLE ---
     private void applyPhaseStyle(JPanel p, ActionButton mainBtn, Color dark, Color light, String btnLabel) {
-        if (p == null) return;
+        if (p == null)
+            return;
 
         // 1. Panel Background & Border
         p.setOpaque(true);
         p.setBackground(light); // The pastel color
-        
+
         if (p.getBorder() instanceof TitledBorder) {
             ((TitledBorder) p.getBorder()).setTitleColor(dark); // Title matches theme
             ((TitledBorder) p.getBorder()).setBorder(BorderFactory.createLineBorder(dark, 2));
@@ -2149,28 +2263,30 @@ else if (command.equals(CONFIRM_CMD)) {
         }
 
         // 3. CRITICAL FIX: Update Labels/Children to blend in
-        // This prevents the "Gray Box" effect by making children match the light background.
+        // This prevents the "Gray Box" effect by making children match the light
+        // background.
         for (Component c : p.getComponents()) {
             if (c instanceof JLabel) {
                 // Readout fields (Cash, Revenue) stay White or Light for contrast
-                 c.setBackground(Color.WHITE); 
+                c.setBackground(Color.WHITE);
             } else if (c instanceof JPanel) {
                 c.setBackground(light); // Sub-panels match
             }
         }
-        
+
         p.repaint();
     }
 
-    // Helper to make secondary buttons (Withhold/Split) look nice but less prominent
+    // Helper to make secondary buttons (Withhold/Split) look nice but less
+    // prominent
     private void styleSecondaryButton(ActionButton btn, Color bgLight) {
-        if (btn == null || !btn.isEnabled()) return;
-        btn.setBackground(Color.WHITE); 
+        if (btn == null || !btn.isEnabled())
+            return;
+        btn.setBackground(Color.WHITE);
         btn.setForeground(Color.BLACK);
         btn.setBorder(BorderFactory.createLineBorder(Color.GRAY));
 
     }
-
 
     /**
      * Updates the Confirm/Skip button based on whether a map selection exists.
@@ -2178,10 +2294,10 @@ else if (command.equals(CONFIRM_CMD)) {
      */
     public void enableConfirm(boolean hasSelection) {
         // 1. Determine which button is active
-        ActionButton targetBtn = (activePhase == 1) ? btnTileConfirm : 
-                                 (activePhase == 2) ? btnTokenConfirm : null;
+        ActionButton targetBtn = (activePhase == 1) ? btnTileConfirm : (activePhase == 2) ? btnTokenConfirm : null;
 
-        if (targetBtn == null) return;
+        if (targetBtn == null)
+            return;
 
         // 2. Configure the Button State
         targetBtn.setEnabled(true); // Always enabled! (Unless phase is locked)
@@ -2189,14 +2305,14 @@ else if (command.equals(CONFIRM_CMD)) {
         if (hasSelection) {
             // STATE: CONFIRM (User has done something on the map)
             // Use the DARK variant for the button background
-            Color phaseColor = (activePhase == 1) ? PH_TILE_DARK : PH_TOKEN_DARK; 
+            Color phaseColor = (activePhase == 1) ? PH_TILE_DARK : PH_TOKEN_DARK;
             styleButton(targetBtn, phaseColor, "Confirm (Enter)");
         } else {
             // STATE: SKIP (User has done nothing, "Enter" means Skip)
             styleButton(targetBtn, UIManager.getColor("Button.background"), "Skip (Enter)");
             targetBtn.setBorder(UIManager.getBorder("Button.border")); // Reset border
         }
-        
+
         // 3. Focus Logic
         updateDefaultButton();
         SwingUtilities.invokeLater(this::requestFocusInWindow);
@@ -2225,14 +2341,19 @@ else if (command.equals(CONFIRM_CMD)) {
     }
 
 
+    // File: net.sf.rails.ui.swing.ORPanel.java
+// File: net.sf.rails.ui.swing.ORPanel.java
 
-public void updateDynamicActions(List<PossibleAction> actions) {
-   
+    public void updateDynamicActions(List<PossibleAction> actions) {
+
         cleanupUpgradesPanel();
         resetSidebarState();
-        updateSidebarData(); 
+        
+        // FIX: updateSidebarData() removed from here. 
+        // We wait until buttons are enabled below.
 
         if (actions == null || actions.isEmpty()) {
+            updateSidebarData();
             if (sidebarPanel != null)
                 sidebarPanel.repaint();
             SwingUtilities.invokeLater(() -> {
@@ -2244,140 +2365,39 @@ public void updateDynamicActions(List<PossibleAction> actions) {
         }
 
         // --- 1. FILTER SPECIAL ACTIONS ---
-        List<PossibleAction> specialActions = new ArrayList<>();
-        boolean isPrussianContext = actions.stream()
-                .anyMatch(a -> a instanceof StartPrussian || a instanceof ExchangeForPrussianShare);
-
-        for (PossibleAction pa : actions) {
-            if ((pa instanceof LayBaseToken && ((LayBaseToken) pa).getType() == LayBaseToken.HOME_CITY) ||
-                    (pa instanceof StartPrussian) ||
-                    (pa instanceof ExchangeForPrussianShare) ||
-                    (pa instanceof DiscardTrain)) {
-                specialActions.add(pa);
-            } else if (pa instanceof NullAction) {
-                NullAction na = (NullAction) pa;
-                boolean isSpecialFlow = this.specialMode || isPrussianContext;
-                boolean isDiscardContext = actions.stream().anyMatch(a -> a instanceof DiscardTrain);
-
-                if ((isSpecialFlow || isDiscardContext)
-                        && (na.getMode() == NullAction.Mode.DONE || na.getMode() == NullAction.Mode.PASS)) {
-                    specialActions.add(pa);
-                }
+        List<PossibleAction> filteredActions = Lists.newArrayList();
+        if (actions != null) {
+            for (PossibleAction pa : actions) {
+                filteredActions.add(pa);
             }
         }
+        
+        // --- 2. GUI PHASE MANAGEMENT ---
+        activePhase = 0;
+        boolean isSpecial = false;
 
-        // --- 2. RENDER SPECIAL ACTIONS ---
-        if (!specialActions.isEmpty()) {
-            this.specialMode = true;
-            if (phase1Panel != null) phase1Panel.setVisible(false);
-            if (phase2Panel != null) phase2Panel.setVisible(false);
-            if (phase3Panel != null) phase3Panel.setVisible(false);
-            if (phase4Panel != null) phase4Panel.setVisible(false);
-            if (footerPanel != null) footerPanel.setVisible(false);
-            if (lblCash != null && lblCash.getParent() != null) lblCash.getParent().setVisible(false);
-
-            if (specialPanel != null && specialContainer != null) {
-                specialContainer.setVisible(true);
-                specialPanel.removeAll();
-                for (PossibleAction spa : specialActions) {
-                    String labelText = spa.getButtonLabel();
-                    String htmlLabel = "<html><center>" + (labelText != null ? labelText.replace(":", ":<br>") : "Action") + "</center></html>";
-                    ActionButton b = createSidebarButton(htmlLabel, "Special");
-                    b.setPossibleAction(spa);
-                    b.setEnabled(true);
-                    b.setPreferredSize(new Dimension(SIDEBAR_WIDTH - 20, 50));
-                    b.setMaximumSize(new Dimension(SIDEBAR_WIDTH - 20, 50));
-                    specialPanel.add(b);
-                    specialPanel.add(Box.createVerticalStrut(5));
-                }
-                specialPanel.revalidate();
-                specialPanel.repaint();
-            }
-            SwingUtilities.invokeLater(this::requestFocusInWindow);
-            return;
-        }
-
-        // --- 3. RESTORE STANDARD MODE ---
-        this.specialMode = false;
-        if (specialContainer != null) specialContainer.setVisible(false);
-        if (phase1Panel != null) phase1Panel.setVisible(true);
-        if (phase2Panel != null) phase2Panel.setVisible(true);
-        if (phase3Panel != null) phase3Panel.setVisible(true);
-        if (phase4Panel != null) phase4Panel.setVisible(true);
-        if (footerPanel != null) footerPanel.setVisible(true);
-        if (lblCash != null && lblCash.getParent() != null) lblCash.getParent().setVisible(true);
-
-        // --- 4. STANDARD PHASE DETECTION ---
-// --- START FIX ---
-        boolean engineOffersDone = actions.stream().anyMatch(a -> 
-            a instanceof NullAction && (((NullAction)a).getMode() == NullAction.Mode.DONE));
-
-        int detectedPhase = 0;
-        boolean canLayTile = false;
-        boolean canLayToken = false;
-        boolean canSetRevenue = false;
-        boolean canBuyTrain = false;
-
-        for (PossibleAction pa : actions) {
-            if (pa instanceof LayTile) canLayTile = true;
-            else if (pa instanceof LayToken || pa instanceof LayBaseToken) canLayToken = true;
-            else if (pa instanceof SetDividend) canSetRevenue = true;
-            else if (pa instanceof BuyTrain) {
-                canBuyTrain = true;
-            }
-        }
-
-        // Mapping Logic
-        if (canLayTile) detectedPhase = 1;
-        else if (canLayToken) detectedPhase = 2;
-        else if (canSetRevenue) detectedPhase = 3;
-        else if (canBuyTrain) detectedPhase = 4;
-        else if (engineOffersDone) detectedPhase = 5;
-
-
-        // STRUCTURAL RETENTION: We only update if we see a concrete new phase.
-        // If detectedPhase is 0 (engine offering unknown/null actions), we keep the current activePhase.
-        if (detectedPhase > 0) {
-            this.activePhase = detectedPhase;
-        }
-
-        // --- DEBUG & FIX: WRAPPED TRIGGER ---
-        try {
-            Phase currentPhase = orUIManager.getGameUIManager().getRoot().getPhaseManager().getCurrentPhase();
+        if (!filteredActions.isEmpty()) {
+            PossibleAction first = filteredActions.get(0);
+            if (first instanceof LayTile) activePhase = 1;
+            else if (first instanceof LayBaseToken) activePhase = 2;
+            else if (first instanceof SetDividend) activePhase = 3;
+            else if (first instanceof BuyTrain) activePhase = 4;
             
-            // LOGGING: Check if we are even reaching this logic
-            // log.info("ORPanel: Phase Check - Last: {}, Current: {}", lastGamePhase, currentPhase);
-
-            if (this.lastGamePhase != currentPhase) {
-                if (orWindow != null && orWindow.getUpgradePanel() != null) {
-                    log.info("ORPanel: Triggering MiniDock refresh due to Phase Change ({} -> {})", lastGamePhase, currentPhase);
-                    orWindow.getUpgradePanel().refreshMiniDock();
-                }
-                this.lastGamePhase = currentPhase;
-            }
-        } catch (Exception e) {
-            log.error("CRITICAL: ORPanel Phase Update crashed!", e);
+            if (first instanceof UseSpecialProperty) isSpecial = true;
         }
-        // ------------------------------------
 
         if (activePhase == 1 || activePhase == 2) {
-             enableConfirm(false); 
-        }
-        
-
-        if (activePhase == 1 || activePhase == 2) {
-             enableConfirm(false); 
+            enableConfirm(false);
         }
 
-        updateSidebarData();
         availableTrainActions.clear();
-        
-        // We do NOT populate trainButtonsPanel here. 
-        // We only collect the actions to send them to the StatusWindow later.
-        for (PossibleAction pa : actions) {
-            if (pa instanceof CorrectionModeAction) continue;
+
+        // --- 3. PROCESS ACTIONS & ENABLE BUTTONS ---
+        for (PossibleAction pa : filteredActions) {
+            if (pa instanceof CorrectionModeAction)
+                continue;
+
             if (pa instanceof UseSpecialProperty) {
-                 // ... (Special Property Logic) ...
                 ActionButton bSpecial = createSidebarButton(pa.getButtonLabel(), "SpecialProperty");
                 bSpecial.setPossibleAction(pa);
                 bSpecial.setEnabled(true);
@@ -2385,29 +2405,53 @@ public void updateDynamicActions(List<PossibleAction> actions) {
                     miscActionPanel.add(bSpecial);
                     miscActionPanel.add(Box.createVerticalStrut(2));
                 }
+
             } else if (pa instanceof SetDividend) {
-                // ... (Dividend Logic) ...
                 SetDividend sd = (SetDividend) pa;
-                if (sd.isAllocationAllowed(SetDividend.PAYOUT)) enableRevenueBtn(btnRevPayout, sd, SetDividend.PAYOUT);
-                if (sd.isAllocationAllowed(SetDividend.WITHHOLD)) enableRevenueBtn(btnRevWithhold, sd, SetDividend.WITHHOLD);
-                if (sd.isAllocationAllowed(SetDividend.SPLIT)) enableRevenueBtn(btnRevSplit, sd, SetDividend.SPLIT);
+
+
+                StringBuilder allowedStr = new StringBuilder();
+                if (sd.getAllowedAllocations() != null) {
+                    for (int allowed : sd.getAllowedAllocations()) {
+                        allowedStr.append(SetDividend.getAllocationNameKey(allowed)).append(" (").append(allowed).append("), ");
+                    }
+                }
+                int currentAlloc = sd.getRevenueAllocation();
+                // ---------------------------------
+
+                if (sd.isAllocationAllowed(SetDividend.PAYOUT))
+                    enableRevenueBtn(btnRevPayout, sd, SetDividend.PAYOUT);
+                if (sd.isAllocationAllowed(SetDividend.WITHHOLD))
+                    enableRevenueBtn(btnRevWithhold, sd, SetDividend.WITHHOLD);
+                if (sd.isAllocationAllowed(SetDividend.SPLIT))
+                    enableRevenueBtn(btnRevSplit, sd, SetDividend.SPLIT);
+
             } else if (pa instanceof BuyTrain) {
-                // Just collect the action, DO NOT create a button in the sidebar
+                // FIX: Just collect the actions. Removed undefined 'btnTrainBuy'.
                 availableTrainActions.add((BuyTrain) pa);
+            
+            } else if (pa instanceof LayTile) {
+                // Handled by Map
+            } else if (pa instanceof LayBaseToken) {
+                // Handled by Map
             } else if (pa instanceof NullAction) {
-                // ... (Done/Pass Logic) ...
-                NullAction.Mode mode = ((NullAction) pa).getMode();
-                if (mode == NullAction.Mode.DONE || mode == NullAction.Mode.PASS) {
-                    setupButton(btnDone, pa);
+                // Explicitly enable the Done button when the engine provides a Done/Null action
+                if (btnDone != null) {
+                    btnDone.setEnabled(true);
+                    btnDone.setPossibleAction(pa);
                 }
             }
         }
-        
-        // Ensure the panel is empty to remove any previous buttons
+
+        // --- 4. UPDATE VISUALS (THE FIX) ---
+        // MOVED HERE: Now that the loop has run and called 'enableRevenueBtn', 
+        // the buttons (Split/Payout) have their correct .setEnabled() state.
+        // updateSidebarData() calls 'colorizeActivePhase', which looks at that state 
+        // to decide whether to paint Payout or Split as the "Active" blue button.
+        updateSidebarData();
+
         if (trainButtonsPanel != null) {
             trainButtonsPanel.removeAll();
-            trainButtonsPanel.revalidate();
-            trainButtonsPanel.repaint();
         }
 
         if (orUIManager != null && orUIManager.getGameUIManager() != null) {
@@ -2417,29 +2461,31 @@ public void updateDynamicActions(List<PossibleAction> actions) {
             }
         }
 
-        // Manage Map Overlays
         if (activePhase == 1 || activePhase == 2) {
             setTileBuildNumbers(true);
             updateCurrentRoutes(false);
         } else if (activePhase == 3) {
             setTileBuildNumbers(false);
-            if (orWindow != null && orWindow.getMapPanel() != null) orWindow.getMapPanel().clearOverlays();
-            updateCurrentRoutes(false);
+            if (orWindow != null && orWindow.getMapPanel() != null)
+                orWindow.getMapPanel().clearOverlays();
+            updateCurrentRoutes(true);
         } else {
             setTileBuildNumbers(false);
-            if (orWindow != null && orWindow.getMapPanel() != null) orWindow.getMapPanel().clearOverlays();
-            disableRoutesDisplay(); 
+            if (orWindow != null && orWindow.getMapPanel() != null)
+                orWindow.getMapPanel().clearOverlays();
+            disableRoutesDisplay();
         }
-        // Trigger MiniDock update on every action (catches Phase changes from train buys)
+        
         if (orWindow != null && orWindow.getUpgradePanel() != null) {
             orWindow.getUpgradePanel().refreshMiniDock();
         }
 
-        if (sidebarPanel != null) sidebarPanel.repaint();
+        if (sidebarPanel != null)
+            sidebarPanel.repaint();
+            
         SwingUtilities.invokeLater(() -> {
             updateDefaultButton();
             this.requestFocusInWindow();
         });
     }
-     
 }

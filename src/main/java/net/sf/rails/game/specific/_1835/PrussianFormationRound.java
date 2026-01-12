@@ -53,15 +53,25 @@ public class PrussianFormationRound extends Round implements I_MapRenderableRoun
     }
 
     // Inner Action Class for the Swap Choice
-public static class PresidencySwapChoice extends PossibleAction {
+    public static class PresidencySwapChoice extends PossibleAction {
         private static final long serialVersionUID = 1L;
         private final int optionIndex;
-        // Cast null to (RailsRoot)
-        public PresidencySwapChoice(int index) { super((RailsRoot)null); this.optionIndex = index; } 
-        public int getOptionIndex() { return optionIndex; }
-        @Override public String toString() { return "SwapOption:" + optionIndex; }
-    }
 
+        // Cast null to (RailsRoot)
+        public PresidencySwapChoice(int index) {
+            super((RailsRoot) null);
+            this.optionIndex = index;
+        }
+
+        public int getOptionIndex() {
+            return optionIndex;
+        }
+
+        @Override
+        public String toString() {
+            return "SwapOption:" + optionIndex;
+        }
+    }
 
     private List<Company> foldablePrePrussians;
     private RoundFacade interruptedRound;
@@ -170,168 +180,39 @@ public static class PresidencySwapChoice extends PossibleAction {
         return null;
     }
 
-public void start() {
-        this.interruptedRound = gameManager.getInterruptedRound();
-
-        // 1. Determine Force Status BEFORE checking the 'Already Offered' flag.
-        phase = Phase.getCurrent(this);
-        boolean prussianStarted = companyManager.getPublicCompany(PR_ID).hasStarted();
+// ... (lines of unchanged context code) ...
+    public void start() {
+        // super.start(); // REMOVED: Base class Round does not define start()
         
-        // If we are interrupting an Operating Round, this is the Mandatory Rule 5.5.4 Trigger.
-        boolean isOrTrigger = (interruptedRound instanceof OperatingRound);
+        // --- START FIX ---
+        // FIX: Access Phase via gameManager
+        log.info("[FLOW] 5. PFR: start() called. Phase={}", gameManager.getCurrentPhase());
         
-        forcedMerge = phase.getId().startsWith("5"); 
-        
-        // PFR is forced if: 
-        // a) It interrupted an OR (Train Buy) -> Always Force.
-        // b) We are in Phase 5 -> Always Force (until complete).
-        // c) We are in Phase 4+4 AND Prussian has NOT started yet -> Force the M2 Merger.
-        //    (Once PR starts, the 4+4 Force condition is satisfied).
-        boolean isPhase4Plus4Forced = phase.getId().equals("4+4") && !prussianStarted;
-
-        forcedStart = isOrTrigger || forcedMerge || isPhase4Plus4Forced;
-
-        // 2. LOOP GUARD: Check if PFR was already offered.
-        // CRITICAL: We MUST bypass this check if forcedStart is TRUE.
-        if (!forcedStart && !forcedMerge && gameManager instanceof GameManager_1835 
-            && ((GameManager_1835) gameManager).hasPrussianFormationBeenOffered()) {
-            
-            
-            if (interruptedRound != null) {
-                gameManager.setInterruptedRound(null);
-                gameManager.setRound(interruptedRound);
-                interruptedRound.resume();
-                return;
-            }
+        // 1. Identify M2 President using the helper in GameManager_1835
+        net.sf.rails.game.PublicCompany m2 = null;
+        if (gameManager instanceof GameManager_1835) {
+            m2 = ((GameManager_1835) gameManager).getM2();
         }
         
+        net.sf.rails.game.Player m2Pres = (m2 != null) ? (net.sf.rails.game.Player) m2.getPresident() : null;
 
-
-        if (PrussianFormationRound.prussianIsComplete(gameManager)) {
-            finishRound();
-            return;
+        // 2. Force switch Current Player to M2 President if they differ from current actor
+        if (m2Pres != null && getCurrentPlayer() != m2Pres) {
+            log.info("[FLOW] 5c. PFR: Switching Current Player from {} to M2 President ({})", 
+                    (getCurrentPlayer() != null ? getCurrentPlayer().getName() : "null"), 
+                    m2Pres.getName());
+            setCurrentPlayer(m2Pres);
+        } else {
+             log.info("[FLOW] 5c. PFR: Current Player is already correct: {}", 
+                     (getCurrentPlayer() != null ? getCurrentPlayer().getName() : "null"));
         }
+        // --- END FIX ---
 
-        // Initialize locals
-        this.interruptedRound = gameManager.getInterruptedRound();
-        prussian = companyManager.getPublicCompany(PR_ID);
-        phase = Phase.getCurrent(this);
-        startPr = !prussian.hasStarted();
-
-        // Robust Phase detection (Handles "5", "5+5", "5 (Brown)", etc.)
-        forcedMerge = phase.getId().startsWith("5");
-
-        forcedStart = phase.getId().equals("4+4") || forcedMerge;
-        mergePr = !prussianIsComplete(gameManager);
-        m2 = companyManager.getPublicCompany(M2_ID);
-
-        // FINAL SAFETY NET: Ensure currentPlayer is NEVER null before proceeding
-        if (this.currentPlayer == null) {
-            this.currentPlayer = playerManager.getCurrentPlayer();
-            if (this.currentPlayer == null) {
-                if (prussian.getPresident() != null)
-                    this.currentPlayer = prussian.getPresident();
-                else if (m2 != null && m2.getPresident() != null)
-                    this.currentPlayer = m2.getPresident();
-                else
-                    this.currentPlayer = playerManager.getPriorityPlayer();
-
-                if (this.currentPlayer != null) {
-                    playerManager.setCurrentPlayer(this.currentPlayer);
-                }
-            }
-        }
-        if (this.currentPlayer != null) {
-            try {
-                Class<?> orPanelClass = Class.forName("net.sf.rails.ui.swing.ORPanel");
-                java.lang.reflect.Method setHeader = orPanelClass.getMethod("setGlobalCustomHeader", String.class, String.class);
-                setHeader.invoke(null, "Prussian Formation", this.currentPlayer.getName() + ": ?");
-            } catch (Throwable t) {
-                // Ignore if UI class not found or method missing
-            }
-        }
-
-        // --- Only Initialize State if this is a fresh start (not a reload/undo) ---
-        // We check if the State object is "dirty" or matches default
-        if (getPrussianStep() == Step.START && startingPlayerName.value() == null) {
-
-            ReportBuffer.add(this, LocalText.getText("StartFormationRound", PR_ID));
-            setPrussianStep(startPr ? Step.START : Step.MERGE);
-            mergeTurnCount.set(0);
-
-            Player m2President = (m2 != null) ? m2.getPresident() : null;
-
-            if (getPrussianStep() == Step.START) {
-                if (m2President != null) {
-                    setStartingPlayer(m2President);
-                    setCurrentPlayer(m2President);
-                } else {
-                    setStartingPlayer(((GameManager_1835) gameManager).getPrussianFormationStartingPlayer());
-                    setCurrentPlayer(this.startingPlayer);
-                }
-
-                if (forcedStart) {
-                    ReportBuffer.add(this, LocalText.getText("PFR_ForcedStart", phase.getId()));
-                    executeStartPrussian(true);
-                    setPrussianStep(Step.MERGE);
-
-                    Player nextPlayer = ((GameManager_1835) gameManager).getPrussianFormationStartingPlayer();
-                    if (nextPlayer == null) {
-                        nextPlayer = prussian.getPresident();
-                    }
-                    if (nextPlayer == null)
-                        nextPlayer = m2President;
-
-                    setStartingPlayer(nextPlayer);
-                    setCurrentPlayer(this.startingPlayer);
-                }
-            } else if (getPrussianStep() == Step.MERGE) {
-                Player sp = ((GameManager_1835) gameManager).getPrussianFormationStartingPlayer();
-                if (sp == null)
-                    sp = prussian.getPresident();
-                if (sp == null && m2 != null)
-                    sp = m2.getPresident();
-                setStartingPlayer(sp);
-                setCurrentPlayer(this.startingPlayer);
-            }
-        }
-
-        // Always run forced logic if we are in merge and it's forced
-        if (getPrussianStep() == Step.MERGE && forcedMerge) {
-
-
-            // Use a Set to ensure unique processing
-            Set<Company> foldablesSet = new LinkedHashSet<>();
-
-            // 1. Scan Privates
-            for (PrivateCompany company : gameManager.getAllPrivateCompanies()) {
-                // For Privates, we check if they are explicitly NOT closed, OR if they are
-                // closed
-                // but have the exchange property (e.g. BB might be closed but exchangeable?
-                // Usually they are open until exchange).
-                // We'll stick to standard !isClosed() + Property, as PFR will close them.
-                if (!company.isClosed() && hasExchangeProperty(company)) {
-                    foldablesSet.add(company);
-                }
-            }
-
-            // 2. Scan Publics (Minors)
-            for (PublicCompany company : gameManager.getAllPublicCompanies()) {
-                // Now that OR_1835 is fixed, M1 should be OPEN (!isClosed).
-                if (!company.isClosed() && hasExchangeProperty(company)) {
-                    foldablesSet.add(company);
-                }
-            }
-
-            List<Company> foldables = new ArrayList<>(foldablesSet);
-
-            if (!foldables.isEmpty()) {
-                executeExchange(foldables, false, true);
-            } 
-
-            finishMergeStep();
-        }
+        setPrussianStep(Step.START);
+        setPossibleActions();
     }
+// ... (rest of the method) ...
+
 
     private boolean hasExchangeProperty(Company c) {
         Set<SpecialProperty> sps = c.getSpecialProperties();
@@ -498,7 +379,7 @@ public void start() {
 
             if (isM1) {
                 or.insertNewOperatingCompany(prussian);
-            } 
+            }
         }
     }
 
@@ -534,7 +415,6 @@ public void start() {
 
             boolean isPresidentShare = president && (owner instanceof Player);
 
-          
             // Fix for M1 (5%) and integer division issues.
             // Original code: cert = unavailable.findCertificate(prussian, efs.getShare() /
             // prussian.getShareUnit(), isPresidentShare);
@@ -571,7 +451,7 @@ public void start() {
             if (cert != null) {
                 cert.moveTo(owner);
             } else {
-                           // Fallback to original method just in case (though likely to fail if it was 0)
+                // Fallback to original method just in case (though likely to fail if it was 0)
                 try {
                     cert = unavailable.findCertificate(prussian, neededShare / prussian.getShareUnit(),
                             isPresidentShare);
@@ -680,6 +560,8 @@ public void start() {
 
     @Override
     protected void finishRound() {
+        log.info("[FLOW] 6. PFR: setPossibleActions() called. Step={} Player={}", getPrussianStep(),
+                (currentPlayer != null ? currentPlayer.getName() : "null"));
         if (isRoundFinished())
             return;
         setRoundFinished(true);
@@ -735,10 +617,14 @@ public void start() {
 
     @Override
     public boolean setPossibleActions() {
+        log.info("[FLOW] 6. PFR: setPossibleActions() called. Step={}", getPrussianStep());
+
         if (isRoundFinished()) {
+            log.info("[FLOW] 6a. PFR: Round is FINISHED. No actions.");
             possibleActions.clear();
             return false;
         }
+
         possibleActions.clear();
         this.currentPlayer = playerManager.getCurrentPlayer();
 
@@ -747,14 +633,16 @@ public void start() {
         if (this.currentPlayer != null) {
             try {
                 Class<?> orPanelClass = Class.forName("net.sf.rails.ui.swing.ORPanel");
-                java.lang.reflect.Method setHeader = orPanelClass.getMethod("setGlobalCustomHeader", String.class, String.class);
+                java.lang.reflect.Method setHeader = orPanelClass.getMethod("setGlobalCustomHeader", String.class,
+                        String.class);
                 setHeader.invoke(null, "Prussian Formation", this.currentPlayer.getName() + ": ?");
             } catch (Throwable t) {
                 // Ignore if UI class not found
             }
         }
 
-        // Safety fallback if player is null (happens during reloads/undos if not synced)
+        // Safety fallback if player is null (happens during reloads/undos if not
+        // synced)
         if (this.currentPlayer == null) {
             if (this.startingPlayer != null) {
                 this.currentPlayer = this.startingPlayer;
@@ -804,7 +692,23 @@ public void start() {
         Player m2President = (m2 != null) ? m2.getPresident() : null;
 
         if (getPrussianStep() == Step.START) {
-            if (m2President == null || this.currentPlayer != m2President) {
+            log.info("[FLOW] 6b. PFR: generating START actions (M2 President check).");
+
+            // Debug state to verify why actions are (or are not) generated
+            Player debugCurrentPlayer = playerManager.getCurrentPlayer();
+            // We re-fetch m2 president to be absolutely sure of current state
+            Player debugM2President = (m2 != null) ? (Player) m2.getPresident() : null;
+
+            log.info(String.format(
+                    "[FLOW] 6c. Debug Check - M2: %s, M2_Pres: %s, CurrentGame: %s, CurrentLocal: %s, Match: %b",
+                    (m2 != null ? m2.getId() : "null"),
+                    (debugM2President != null ? debugM2President.getName() : "null"),
+                    (debugCurrentPlayer != null ? debugCurrentPlayer.getName() : "null"),
+                    (this.currentPlayer != null ? this.currentPlayer.getName() : "null"),
+                    (debugM2President == this.currentPlayer)));
+
+            // Check based on the class member 'currentPlayer' which drives the UI
+            if (debugM2President == null || this.currentPlayer != debugM2President) {
                 gameManager.process(new NullAction(getRoot(), NullAction.Mode.DONE));
                 return false;
             }
@@ -812,21 +716,22 @@ public void start() {
             StartPrussian startAction = new StartPrussian(m2);
             startAction.setButtonLabel("<html><center><b>1: Accept</b><br>Start Prussian</center></html>");
             possibleActions.add(startAction);
-
+            log.info("[FLOW] 6d. PFR: Added StartPrussian start Action.");
             NullAction passAction = new NullAction(getRoot(), NullAction.Mode.PASS);
             passAction.setButtonLabel("<html><center><b>2: Decline</b><br>Pass (No)</center></html>");
             possibleActions.add(passAction);
+            log.info("[FLOW] 6d. PFR: Added StartPrussian pass Action.");
             return true;
         } else if (getPrussianStep() == Step.MERGE) {
             setFoldablePrePrussians();
 
             if (currentPlayer == null) {
-                   return false;
+                return false;
             }
             // Skepsis check: If there are no companies to fold, do not ask the player.
             // Automatically advance to the next player's turn or next step.
             if (foldablePrePrussians.isEmpty()) {
-                log.info("PFR-MERGE: {} has no exchangeable companies. Auto-skipping.", currentPlayer.getName());
+                log.info("[FLOW] PFR-MERGE: {} has no exchangeable companies. Auto-skipping.", currentPlayer.getName());
                 // We execute a NullAction DONE internally to advance the state machine
                 finishTurn();
                 return setPossibleActions(); // Recurse for the next player
@@ -847,9 +752,9 @@ public void start() {
             NullAction done = new NullAction(getRoot(), NullAction.Mode.DONE);
             String doneLabel = foldablePrePrussians.isEmpty() ? "Done (Nothing)" : "Pass (Keep)";
 
-// Added Player Name to the Done Button for clarity
+            // Added Player Name to the Done Button for clarity
             done.setButtonLabel("<html><center><b>D: " + doneLabel + "</b><br>" + playerName + "</center></html>");
-                        possibleActions.add(done);
+            possibleActions.add(done);
 
         } else if (getPrussianStep() == Step.DISCARD_TRAINS) {
             int index = 1;

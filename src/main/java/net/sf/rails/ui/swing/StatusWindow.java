@@ -155,7 +155,7 @@ public class StatusWindow extends JFrame implements ActionListener, ActionPerfor
             return;
 
         // 1. Build a "Signature" of the current public companies
-        // FIX: Access CompanyManager via getRoot()
+        // Access CompanyManager via getRoot()
         String currentSignature = "";
         try {
             List<PublicCompany> comps = gameUIManager.getGameManager()
@@ -407,7 +407,7 @@ public class StatusWindow extends JFrame implements ActionListener, ActionPerfor
         menuBar.add(moveMenu);
 
         // --- 6. SPECIAL MENU (Dynamic) ---
-        // CRITICAL FIX: Initialize specialMenu before using it!
+        // Initialize specialMenu before using it!
         specialMenu = new JMenu(LocalText.getText("SPECIAL"));
         specialMenu.setBackground(Color.YELLOW);
         menuBar.add(specialMenu);
@@ -786,7 +786,7 @@ public class StatusWindow extends JFrame implements ActionListener, ActionPerfor
 
         } else if (command.equals(REM_TILES_CMD) || command.equals(ORPanel.REM_TILES_CMD)) {
 
-            // ARCHITECTURAL FIX: Route through ORUIManager
+            // Route through ORUIManager
             if (gameUIManager.getORUIManager() != null) {
                 // Pass the correct command string "RemainingTiles" defined in ORPanel
                 gameUIManager.getORUIManager().processAction(ORPanel.REM_TILES_CMD, null, this);
@@ -833,22 +833,7 @@ public class StatusWindow extends JFrame implements ActionListener, ActionPerfor
 
     @Override
     public boolean processImmediateAction() {
-        // [BUG FIX #172 / #204 START]
-        // This 'if' block was intercepting the generic DiscardTrain action
-        // and triggering the old modal dialog via gameUIManager.discardTrains().
-        // By removing it, the DiscardTrain actions are now allowed to pass
-        // through to the normal PossibleActions list, where they will be
-        // handled by ORUIManager and rendered as dynamic buttons in ORPanel.
-        /*
-         * if (immediateAction instanceof DiscardTrain) {
-         * // Make a local copy and discard the original,
-         * // so that it's not going to loop.
-         * DiscardTrain nextAction = (DiscardTrain) immediateAction;
-         * immediateAction = null;
-         * gameUIManager.discardTrains(nextAction);
-         * }
-         */
-        // [BUG FIX #172 / #204 END]
+
         return true;
     }
 
@@ -1008,18 +993,19 @@ public class StatusWindow extends JFrame implements ActionListener, ActionPerfor
         this.gameUIManager = gameUIManager;
         this.possibleActions = gameUIManager.getGameManager().getPossibleActions();
 
-// Extracted instantiation to createGameStatus() to allow overrides
+        // Extracted instantiation to createGameStatus() to allow overrides
         gameStatus = createGameStatus();
 
-
-        // String gameStatusClassName = gameUIManager.getClassName(GuiDef.ClassName.GAME_STATUS);
+        // String gameStatusClassName =
+        // gameUIManager.getClassName(GuiDef.ClassName.GAME_STATUS);
         // try {
-        //     Class<? extends GameStatus> gameStatusClass = Class.forName(gameStatusClassName)
-        //             .asSubclass(GameStatus.class);
-        //     gameStatus = gameStatusClass.newInstance();
+        // Class<? extends GameStatus> gameStatusClass =
+        // Class.forName(gameStatusClassName)
+        // .asSubclass(GameStatus.class);
+        // gameStatus = gameStatusClass.newInstance();
         // } catch (Exception e) {
-        //     log.error("Cannot instantiate class {}", gameStatusClassName, e);
-        //     System.exit(1);
+        // log.error("Cannot instantiate class {}", gameStatusClassName, e);
+        // System.exit(1);
         // }
 
         gameStatus.init(this, gameUIManager);
@@ -1125,9 +1111,7 @@ public class StatusWindow extends JFrame implements ActionListener, ActionPerfor
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         setupHotkeys();
 
-        // --- FIX: ENFORCE MINIMUM SIZE ---
         this.setMinimumSize(new Dimension(800, 400));
-        // --------------------------------
 
         final JFrame frame = this;
         final GameUIManager guiMgr = gameUIManager;
@@ -1155,8 +1139,8 @@ public class StatusWindow extends JFrame implements ActionListener, ActionPerfor
         gameUIManager.packAndApplySizing(this);
     }
 
-/**
-     * Factory method to create the GameStatus panel. 
+    /**
+     * Factory method to create the GameStatus panel.
      * Subclasses (like StatusWindow_1856) override this to provide custom panels.
      */
     protected GameStatus createGameStatus() {
@@ -1266,240 +1250,287 @@ public class StatusWindow extends JFrame implements ActionListener, ActionPerfor
     @Override
     public void updateStatus(boolean myTurn) {
 
-        // 1. Fetch the latest list of possible actions (Undo, Redo, etc.)
-        if (gameUIManager.getGameManager() != null) {
-            this.possibleActions = gameUIManager.getGameManager().getPossibleActions();
-        }
-
-        // Register the Global Hotkey Manager
-        KeyboardFocusManager.getCurrentKeyboardFocusManager()
-                .addKeyEventDispatcher(new GlobalHotkeyManager(gameUIManager));
-
-        // 2. Reset the menu items to disabled
-        initGameActions();
-
-        // 3. Enable them if the new actions list contains Undo/Redo
-        setGameActions();
-
-        // 4. Rebuild Correction Menu
-        setCorrectionMenu();
-        setSpecialMenu(); // Restore the Special Menu population logic
-        updateInfoMenu(); // Rebuild the lists
-
-        passButton.setEnabled(false);
-        autopassButton.setEnabled(false);
-
-        // Crash-Proof Dashboard Sync ---
         try {
-            // 1. FORCE RECREATE (Fixes "Green Ghost" and "Stale Names")
-            // Instead of just refreshing values, we destroy and rebuild the grid.
-            // This ensures all "Active" states are wiped clean and player order is
-            // re-fetched.
-            if (gameStatus != null) {
-                gameStatus.recreate();
+            // 1. Debug: Log Entry and Player States
+            Player uiPlayer = gameUIManager.getCurrentPlayer();
+            Player enginePlayer = null;
+            if (gameUIManager.getGameManager() != null) {
+                enginePlayer = gameUIManager.getGameManager().getCurrentPlayer();
+            }
+            log.info("[FLOW] 7. StatusWindow: updateStatus START. MyTurn={}. UI_Player={} vs Engine_Player={}",
+                    myTurn,
+                    (uiPlayer != null ? uiPlayer.getName() : "null"),
+                    (enginePlayer != null ? enginePlayer.getName() : "null"));
+
+            // 2. Refresh Actions from Engine
+            if (gameUIManager.getGameManager() != null) {
+                this.possibleActions = gameUIManager.getGameManager().getPossibleActions();
+                this.currentRound = gameUIManager.getGameManager().getCurrentRound();
+
+                // FORCE LOG: What actions does the UI actually see?
+                if (possibleActions != null) {
+                    log.info("[DEBUG-UI] StatusWindow sees {} actions. Current Round: {}",
+                            possibleActions.getList().size(),
+                            (currentRound != null ? currentRound.getClass().getSimpleName() : "null"));
+                }
             }
 
-            // Re-apply the current scaled font to the newly created buttons
-            updateFonts(this.currentBaseFontSize);
-
-            // Always push the Priority Deal state to the UI, regardless of Round Type.
-            if (gameUIManager.getPriorityPlayer() != null) {
-                gameStatus.setPriorityPlayer(gameUIManager.getPriorityPlayer().getIndex());
-            } else {
-                gameStatus.setPriorityPlayer(-1);
+            // 3. PRUSSIAN FORMATION OVERLAY (Forced Scan)
+            // We REMOVED 'if (myTurn)' to force this scan even if the UI is stale.
+            if (currentRound instanceof net.sf.rails.game.specific._1835.PrussianFormationRound) {
+                log.info("[FLOW] 8. StatusWindow: Detected PFR. Forcing highlights scan...");
+                applyExchangeHighlights();
             }
 
-            // 2. Highlight Logic
+            // ... (Rest of the standard updateStatus logic) ...
+
+            // Register the Global Hotkey Manager
+            KeyboardFocusManager.getCurrentKeyboardFocusManager()
+                    .addKeyEventDispatcher(new GlobalHotkeyManager(gameUIManager));
+
+            // Reset the menu items to disabled
+            initGameActions();
+
+            // 3. Enable them if the new actions list contains Undo/Redo
+            setGameActions();
+
+            // 4. Rebuild Correction Menu
+            setCorrectionMenu();
+            setSpecialMenu(); // Restore the Special Menu population logic
+            updateInfoMenu(); // Rebuild the lists
+
+            passButton.setEnabled(false);
+            autopassButton.setEnabled(false);
+
+            // Crash-Proof Dashboard Sync ---
+            try {
+                // 1. FORCE RECREATE (Fixes "Green Ghost" and "Stale Names")
+                // Instead of just refreshing values, we destroy and rebuild the grid.
+                // This ensures all "Active" states are wiped clean and player order is
+                // re-fetched.
+                if (gameStatus != null) {
+                    gameStatus.recreate();
+                }
+
+                // Re-apply the current scaled font to the newly created buttons
+                updateFonts(this.currentBaseFontSize);
+
+                // Always push the Priority Deal state to the UI, regardless of Round Type.
+                if (gameUIManager.getPriorityPlayer() != null) {
+                    gameStatus.setPriorityPlayer(gameUIManager.getPriorityPlayer().getIndex());
+                } else {
+                    gameStatus.setPriorityPlayer(-1);
+                }
+
+                // 2. Highlight Logic
+                if (!myTurn) {
+                    gameStatus.initTurn(getCurrentPlayer().getIndex(), false);
+                } else if (currentRound instanceof StockRound
+                        || currentRound instanceof StartRound
+                        || currentRound instanceof ShareSellingRound
+                        || currentRound instanceof TreasuryShareRound) {
+
+                    gameStatus.initTurn(getCurrentPlayer().getIndex(), true);
+                }
+
+            } catch (Exception e) {
+                // 3. DESYNC DETECTED
+                log.warn("StatusWindow: Dashboard Desync detected ({}). Attempting Hard Reset...",
+                        e.getClass().getSimpleName());
+
+                try {
+                    // 4. HARD RESET: Destroy old instance, create NEW instance
+                    if (gameStatus != null) {
+
+                        // 1. Snapshot timing data before recreation
+                        // NOTE: This relies on GameStatus.java having getLastPlayerTimes()
+                        int[] savedTimes = gameStatus.getLastPlayerTimes();
+
+                        // Create fresh instance via Reflection
+                        Class<? extends GameStatus> clazz = gameStatus.getClass();
+                        gameStatus = clazz.getDeclaredConstructor().newInstance();
+
+                        // Initialize it
+                        gameStatus.init(this, gameUIManager);
+
+                        // 2. Restore timing data if needed
+                        // NOTE: This relies on GameStatus.java having setLastPlayerTimes()
+                        if (savedTimes != null) {
+                            gameStatus.setLastPlayerTimes(savedTimes);
+                        }
+
+                        // Hot-swap it into the UI
+                        if (gameStatusPane != null) {
+                            gameStatusPane.setViewportView(gameStatus);
+                        }
+
+                        // 5. Retry Logic on the FRESH instance
+                        if (!myTurn) {
+                            gameStatus.initTurn(getCurrentPlayer().getIndex(), false);
+                        } else {
+                            if (currentRound instanceof StockRound
+                                    || currentRound instanceof ShareSellingRound
+                                    || currentRound instanceof TreasuryShareRound) {
+                                int priority = -1;
+                                if (gameUIManager.getPriorityPlayer() != null) {
+                                    priority = gameUIManager.getPriorityPlayer().getIndex();
+                                }
+                                gameStatus.initTurn(getCurrentPlayer().getIndex(), true);
+                                if (priority >= 0)
+                                    gameStatus.setPriorityPlayer(priority);
+                            }
+                        }
+                        log.info("StatusWindow: Hard Reset successful. UI restored.");
+                    }
+                } catch (Exception ex) {
+                    // 6. FAIL SAFE: If Hard Reset fails, keep game running without dashboard
+                    // highlights
+                    log.error("StatusWindow: Hard Reset failed. Dashboard may be static.", ex);
+                }
+            }
+
+            // 1. Highlight Logic
             if (!myTurn) {
                 gameStatus.initTurn(getCurrentPlayer().getIndex(), false);
-            } else if (currentRound instanceof StockRound
-                    || currentRound instanceof StartRound
-                    || currentRound instanceof ShareSellingRound
-                    || currentRound instanceof TreasuryShareRound) {
-
+            } else {
+                // Unconditionally call initTurn for the active player.
                 gameStatus.initTurn(getCurrentPlayer().getIndex(), true);
             }
 
-        } catch (Exception e) {
-            // 3. DESYNC DETECTED
-            log.warn("StatusWindow: Dashboard Desync detected ({}). Attempting Hard Reset...",
-                    e.getClass().getSimpleName());
+            log.info("[FLOW] 7. StatusWindow: updateStatus. MyTurn={}. Checking PFR...", myTurn);
 
-            try {
-                // 4. HARD RESET: Destroy old instance, create NEW instance
-                if (gameStatus != null) {
+            // FIX: Remove '&& myTurn'. We must scan for PFR highlights even if the UI
+            // player (Christian) doesn't match the PFR actor (Rainer).
+            if (currentRound instanceof net.sf.rails.game.specific._1835.PrussianFormationRound) {
+                log.info("[FLOW] 8. StatusWindow: Detected PFR. Forcing highlights scan...");
+                applyExchangeHighlights();
+            }
 
-                    // 1. Snapshot timing data before recreation
-                    // NOTE: This relies on GameStatus.java having getLastPlayerTimes()
-                    int[] savedTimes = gameStatus.getLastPlayerTimes();
+            // --- STOCK ROUND / START ROUND LOGIC ---
+            Player currentPlayer = getCurrentPlayer();
+            String activityText = "Thinking: " + currentPlayer.getName();
 
-                    // Create fresh instance via Reflection
-                    Class<? extends GameStatus> clazz = gameStatus.getClass();
-                    gameStatus = clazz.getDeclaredConstructor().newInstance();
+            if (currentRound instanceof StockRound) {
+                float certCount = currentPlayer.getPortfolioModel().getCertificateCount();
+                int certLimit = gameUIManager.getGameManager().getPlayerCertificateLimit(currentPlayer);
+                if (certCount > certLimit) {
+                    activityText = "!! " + currentPlayer.getName() + " MUST SELL shares (Over Limit " + certCount + "/"
+                            + certLimit + ")";
+                }
+            }
 
-                    // Initialize it
-                    gameStatus.init(this, gameUIManager);
+            updateActivityPanel(activityText);
 
-                    // 2. Restore timing data if needed
-                    // NOTE: This relies on GameStatus.java having setLastPlayerTimes()
-                    if (savedTimes != null) {
-                        gameStatus.setLastPlayerTimes(savedTimes);
-                    }
+            boolean enableSRButton = (currentRound instanceof StockRound) && myTurn;
+            enableAIButton(enableSRButton);
 
-                    // Hot-swap it into the UI
-                    if (gameStatusPane != null) {
-                        gameStatusPane.setViewportView(gameStatus);
-                    }
+            String customTitle = currentRound.getOwnWindowTitle();
+            if (Util.hasValue(customTitle)) {
+                setTitle(customTitle + " - " + buildTimestamp);
+            }
 
-                    // 5. Retry Logic on the FRESH instance
-                    if (!myTurn) {
-                        gameStatus.initTurn(getCurrentPlayer().getIndex(), false);
-                    } else {
-                        if (currentRound instanceof StockRound
-                                || currentRound instanceof ShareSellingRound
-                                || currentRound instanceof TreasuryShareRound) {
-                            int priority = -1;
-                            if (gameUIManager.getPriorityPlayer() != null) {
-                                priority = gameUIManager.getPriorityPlayer().getIndex();
+            if (currentRound instanceof TreasuryShareRound) {
+                if (!Util.hasValue(customTitle)) {
+                    setTitle(LocalText.getText(
+                            "TRADE_TREASURY_SHARES_TITLE",
+                            ((TreasuryShareRound) currentRound).getOperatingCompany().getId(),
+                            String.valueOf(gameUIManager.getGameManager().getORId())) + " - " + buildTimestamp);
+                }
+            } else if ((currentRound instanceof ShareSellingRound)) {
+                if (!Util.hasValue(customTitle)) {
+                    setTitle(LocalText.getText(
+                            "EMERGENCY_SHARE_SELLING_TITLE",
+                            (((ShareSellingRound) currentRound).getCompanyNeedingCash().getId())) + " - "
+                            + buildTimestamp);
+                }
+                int cash = ((ShareSellingRound) currentRound).getRemainingCashToRaise();
+                JOptionPane.showMessageDialog(this, LocalText.getText(
+                        "YouMustRaiseCash", getCurrentPlayer(),
+                        gameUIManager.format(cash)), "",
+                        JOptionPane.OK_OPTION);
+
+            } else if (currentRound instanceof StockRound) {
+                if (!Util.hasValue(customTitle)) {
+                    setTitle(LocalText.getText(
+                            "STOCK_ROUND_TITLE",
+                            String.valueOf(((StockRound) currentRound).getStockRoundNumber())) + " - "
+                            + buildTimestamp);
+                }
+            }
+
+            if (dynamicButtonPanel != null) {
+                dynamicButtonPanel.removeAll();
+            }
+
+            List<NullAction> inactiveItems = possibleActions.getType(NullAction.class);
+
+            if (inactiveItems != null) {
+                for (NullAction na : inactiveItems) {
+                    switch (na.getMode()) {
+                        case PASS:
+                            passButton.setRailsIcon(RailsIcon.PASS);
+                            passButton.setEnabled(true);
+                            passButton.setActionCommand(PASS_CMD);
+                            passButton.setMnemonic(KeyEvent.VK_P);
+                            passButton.setPossibleAction(na);
+
+                            // Contextual Rename: "Pass" -> "Decline Exchange" during Formation
+                            if (currentRound instanceof net.sf.rails.game.specific._1835.PrussianFormationRound) {
+                                passButton.setText("Decline Exchange");
+                                passButton.setToolTipText("Do not swap/exchange any (more) certificates.");
                             }
-                            gameStatus.initTurn(getCurrentPlayer().getIndex(), true);
-                            if (priority >= 0)
-                                gameStatus.setPriorityPlayer(priority);
-                        }
+
+                            break;
+                        case DONE:
+                            passButton.setRailsIcon(RailsIcon.DONE);
+                            passButton.setEnabled(true);
+                            passButton.setActionCommand(DONE_CMD);
+                            passButton.setMnemonic(KeyEvent.VK_D);
+                            passButton.setPossibleAction(na);
+                            break;
+                        case AUTOPASS:
+                            autopassButton.setEnabled(true);
+                            autopassButton.setPossibleAction(na);
+                            break;
+                        default:
+                            break;
                     }
-                    log.info("StatusWindow: Hard Reset successful. UI restored.");
-                }
-            } catch (Exception ex) {
-                // 6. FAIL SAFE: If Hard Reset fails, keep game running without dashboard
-                // highlights
-                log.error("StatusWindow: Hard Reset failed. Dashboard may be static.", ex);
-            }
-        }
-
-        // 1. Highlight Logic
-        if (!myTurn) {
-            gameStatus.initTurn(getCurrentPlayer().getIndex(), false);
-        } else {
-            // FIX: Unconditionally call initTurn for the active player.
-            // Previously, this checked for StockRound/StartRound but skipped
-            // OperatingRound,
-            // causing Privates and Fixed Income to vanish when it was your turn to operate.
-            gameStatus.initTurn(getCurrentPlayer().getIndex(), true);
-        }
-
-        // --- STOCK ROUND / START ROUND LOGIC ---
-        Player currentPlayer = getCurrentPlayer();
-        String activityText = "Thinking: " + currentPlayer.getName();
-
-        if (currentRound instanceof StockRound) {
-            float certCount = currentPlayer.getPortfolioModel().getCertificateCount();
-            int certLimit = gameUIManager.getGameManager().getPlayerCertificateLimit(currentPlayer);
-            if (certCount > certLimit) {
-                activityText = "!! " + currentPlayer.getName() + " MUST SELL shares (Over Limit " + certCount + "/"
-                        + certLimit + ")";
-            }
-        }
-
-        updateActivityPanel(activityText);
-
-        boolean enableSRButton = (currentRound instanceof StockRound) && myTurn;
-        enableAIButton(enableSRButton);
-
-        String customTitle = currentRound.getOwnWindowTitle();
-        if (Util.hasValue(customTitle)) {
-            setTitle(customTitle + " - " + buildTimestamp);
-        }
-
-        if (currentRound instanceof TreasuryShareRound) {
-            if (!Util.hasValue(customTitle)) {
-                setTitle(LocalText.getText(
-                        "TRADE_TREASURY_SHARES_TITLE",
-                        ((TreasuryShareRound) currentRound).getOperatingCompany().getId(),
-                        String.valueOf(gameUIManager.getGameManager().getORId())) + " - " + buildTimestamp);
-            }
-        } else if ((currentRound instanceof ShareSellingRound)) {
-            if (!Util.hasValue(customTitle)) {
-                setTitle(LocalText.getText(
-                        "EMERGENCY_SHARE_SELLING_TITLE",
-                        (((ShareSellingRound) currentRound).getCompanyNeedingCash().getId())) + " - " + buildTimestamp);
-            }
-            int cash = ((ShareSellingRound) currentRound).getRemainingCashToRaise();
-            JOptionPane.showMessageDialog(this, LocalText.getText(
-                    "YouMustRaiseCash", getCurrentPlayer(),
-                    gameUIManager.format(cash)), "",
-                    JOptionPane.OK_OPTION);
-
-        } else if (currentRound instanceof StockRound) {
-            if (!Util.hasValue(customTitle)) {
-                setTitle(LocalText.getText(
-                        "STOCK_ROUND_TITLE",
-                        String.valueOf(((StockRound) currentRound).getStockRoundNumber())) + " - " + buildTimestamp);
-            }
-        }
-
-        if (dynamicButtonPanel != null) {
-            dynamicButtonPanel.removeAll();
-        }
-
-        List<NullAction> inactiveItems = possibleActions.getType(NullAction.class);
-
-        if (inactiveItems != null) {
-            for (NullAction na : inactiveItems) {
-                switch (na.getMode()) {
-                    case PASS:
-                        passButton.setRailsIcon(RailsIcon.PASS);
-                        passButton.setEnabled(true);
-                        passButton.setActionCommand(PASS_CMD);
-                        passButton.setMnemonic(KeyEvent.VK_P);
-                        passButton.setPossibleAction(na);
-                        break;
-                    case DONE:
-                        passButton.setRailsIcon(RailsIcon.DONE);
-                        passButton.setEnabled(true);
-                        passButton.setActionCommand(DONE_CMD);
-                        passButton.setMnemonic(KeyEvent.VK_D);
-                        passButton.setPossibleAction(na);
-                        break;
-                    case AUTOPASS:
-                        autopassButton.setEnabled(true);
-                        autopassButton.setPossibleAction(na);
-                        break;
-                    default:
-                        break;
-                }
-            }
-        }
-
-        gameStatus.setBackground(UIManager.getColor("Panel.background"));
-        gameStatus.setOpaque(false);
-        gameStatus.repaint();
-
-        if (currentRound instanceof EndOfGameRound)
-            endOfGame();
-
-        gameUIManager.packAndApplySizing(this);
-        // Use invokeLater to reclaim focus after potential 'focus stealing' by ORWindow
-        // updates.
-        // This ensures our request runs AFTER other windows have finished their layout
-        // churn.
-        SwingUtilities.invokeLater(() -> {
-            // Focus Management:
-            // We yield focus if we are in a Start Round (Auction) OR an Operating Round
-            // (Map).
-            // We only aggressively grab focus during Stock Rounds or related phases.
-
-            boolean startIsActive = gameUIManager.isStartRoundActive();
-            boolean orIsActive = (currentRound instanceof OperatingRound);
-
-            // Only grab focus if NEITHER the Start Round NOR the OR is active.
-            if (!startIsActive && !orIsActive) {
-                toFront();
-                if (myTurn) {
-                    requestFocusInWindow();
                 }
             }
 
-        });
+            gameStatus.setBackground(UIManager.getColor("Panel.background"));
+            gameStatus.setOpaque(false);
+            gameStatus.repaint();
+
+            if (currentRound instanceof EndOfGameRound)
+                endOfGame();
+
+            gameUIManager.packAndApplySizing(this);
+            // Use invokeLater to reclaim focus after potential 'focus stealing' by ORWindow
+            // updates.
+            // This ensures our request runs AFTER other windows have finished their layout
+            // churn.
+            SwingUtilities.invokeLater(() -> {
+                // Focus Management:
+                // We yield focus if we are in a Start Round (Auction) OR an Operating Round
+                // (Map).
+                // We only aggressively grab focus during Stock Rounds or related phases.
+
+                boolean startIsActive = gameUIManager.isStartRoundActive();
+                boolean orIsActive = (currentRound instanceof OperatingRound);
+
+                // Only grab focus if NEITHER the Start Round NOR the OR is active.
+                if (!startIsActive && !orIsActive) {
+                    toFront();
+                    if (myTurn) {
+                        requestFocusInWindow();
+                    }
+                }
+
+            });
+        } catch (Exception e) {
+            log.error("CRITICAL ERROR in StatusWindow.updateStatus", e);
+        }
     }
 
     /**
@@ -1773,29 +1804,226 @@ public class StatusWindow extends JFrame implements ActionListener, ActionPerfor
     }
 
     private void showHotkeysDialog() {
- 
+
         String msg = "<html><h3>Keyboard Shortcuts</h3>" +
-            "<table border='0' cellpadding='4'>" +
-            "<tr><td><b>Key</b></td><td><b>Action</b></td></tr>" +
-            "<tr><td colspan='2'><hr></td></tr>" +
+                "<table border='0' cellpadding='4'>" +
+                "<tr><td><b>Key</b></td><td><b>Action</b></td></tr>" +
+                "<tr><td colspan='2'><hr></td></tr>" +
 
-            "<tr><td colspan='2'><b>Global / Interface</b></td></tr>" +
-            "<tr><td><b>A</b></td><td>AI Move (Executes the AI logic for the current step)</td></tr>" +
-            "<tr><td><b>T</b></td><td>Toggle Timer (Pauses/Resumes the game timer)</td></tr>" +
-            "<tr><td><b>Space</b> or <b>Enter</b></td><td>Done / Confirm (Presses the 'Done' button)</td></tr>" +
-            "<tr><td><b>Cmd/Ctrl + Z</b></td><td>Undo</td></tr>" +
-            "<tr><td><b>Cmd/Ctrl + Y</b></td><td>Redo</td></tr>" +
-            "<tr><td><b>Cmd/Ctrl + +/-</b></td><td>Increase / Decrease Font Size</td></tr>" +
+                "<tr><td colspan='2'><b>Global / Interface</b></td></tr>" +
+                "<tr><td><b>A</b></td><td>AI Move (Executes the AI logic for the current step)</td></tr>" +
+                "<tr><td><b>T</b></td><td>Toggle Timer (Pauses/Resumes the game timer)</td></tr>" +
+                "<tr><td><b>Space</b> or <b>Enter</b></td><td>Done / Confirm (Presses the 'Done' button)</td></tr>" +
+                "<tr><td><b>Cmd/Ctrl + Z</b></td><td>Undo</td></tr>" +
+                "<tr><td><b>Cmd/Ctrl + Y</b></td><td>Redo</td></tr>" +
+                "<tr><td><b>Cmd/Ctrl + +/-</b></td><td>Increase / Decrease Font Size</td></tr>" +
 
-            "<tr><td colspan='2'><br><b>Operating Round (Map & Tiles)</b></td></tr>" +
-            "<tr><td><b>S / D</b></td><td>Cycle available tiles for the selected hex (Previous / Next)</td></tr>" +
-            "<tr><td><b>E</b></td><td>Cycle tile upgrades (if multiple tile types fit the hex)</td></tr>" +
-            "<tr><td><b>R</b></td><td>Rotate the currently selected tile on the map</td></tr>" +
-            "<tr><td><b>L</b></td><td>Buy Train (Auto-selects the cheapest available train from IPO/Pool)</td></tr>" +
-            "<tr><td><b>N</b></td><td>Toggle Tile Numbers (Show/Hide build numbers on the map)</td></tr>" +
-            "</table></html>";
+                "<tr><td colspan='2'><br><b>Operating Round (Map & Tiles)</b></td></tr>" +
+                "<tr><td><b>S / D</b></td><td>Cycle available tiles for the selected hex (Previous / Next)</td></tr>" +
+                "<tr><td><b>E</b></td><td>Cycle tile upgrades (if multiple tile types fit the hex)</td></tr>" +
+                "<tr><td><b>R</b></td><td>Rotate the currently selected tile on the map</td></tr>" +
+                "<tr><td><b>L</b></td><td>Buy Train (Auto-selects the cheapest available train from IPO/Pool)</td></tr>"
+                +
+                "<tr><td><b>N</b></td><td>Toggle Tile Numbers (Show/Hide build numbers on the map)</td></tr>" +
+                "</table></html>";
         JOptionPane.showMessageDialog(this, msg, "Hotkeys", JOptionPane.INFORMATION_MESSAGE);
     }
 
-    
+    private void highlightRailCard(net.sf.rails.game.Company company, PossibleAction action, String actionName) {
+        net.sf.rails.ui.swing.elements.RailCard card = findRailCardRecursive(gameStatus, company);
+
+        if (card != null) {
+            log.info("[FLOW] 11. StatusWindow: SUCCESS. Found RailCard for {}. Setting BLUE.", company.getId());
+            log.info("StatusWindow: Highlighting Card for {}", company.getId());
+            // Visual: Blue Highlight
+            card.setState(net.sf.rails.ui.swing.elements.RailCard.State.HIGHLIGHTED);
+            // Functional: Attach Action
+            card.setPossibleAction(action);
+            // Listen
+            card.removeActionListener(this);
+            card.addActionListener(this);
+
+            card.setToolTipText("<html><b>Click to " + actionName + "</b><br>" + company.getId() + "</html>");
+            card.repaint();
+        } else {
+            log.warn("StatusWindow: Could not find RailCard for {}", company.getId());
+        }
+    }
+
+    private net.sf.rails.ui.swing.elements.RailCard findRailCardRecursive(Container parent,
+            net.sf.rails.game.Company target) {
+        if (parent == null)
+            return null;
+
+        for (Component c : parent.getComponents()) {
+            if (c instanceof net.sf.rails.ui.swing.elements.RailCard) {
+                net.sf.rails.ui.swing.elements.RailCard card = (net.sf.rails.ui.swing.elements.RailCard) c;
+
+                // Debug every card we check to see if we find M2
+                // We use getId() for safer comparison than object equality
+                String cardText = card.getText();
+                String targetId = target.getId();
+
+                // 1. Check Direct Company
+                if (card.getCompany() != null && card.getCompany().getId().equals(targetId)) {
+                    log.info("[DEBUG-SEARCH] FOUND M2 by Company Ref! Card Text: {}", cardText);
+                    return card;
+                }
+
+                // 2. Check Certificates (Crucial for "Owner" card in Player Table)
+                for (net.sf.rails.game.financial.Certificate cert : card.getCertificates()) {
+                    if (cert instanceof net.sf.rails.game.financial.PublicCertificate) {
+                        if (((net.sf.rails.game.financial.PublicCertificate) cert).getCompany().getId()
+                                .equals(targetId)) {
+                            log.info("[DEBUG-SEARCH] FOUND M2 by Certificate! Card Text: {}", cardText);
+                            return card;
+                        }
+                    } else if (cert instanceof net.sf.rails.game.PrivateCompany) {
+                        if (cert.getId().equals(targetId)) {
+                            return card;
+                        }
+                    }
+                }
+
+            } else if (c instanceof Container) {
+                net.sf.rails.ui.swing.elements.RailCard found = findRailCardRecursive((Container) c, target);
+                if (found != null)
+                    return found;
+            }
+        }
+
+        // --- DELETE ---
+        /*
+         * if (container instanceof net.sf.rails.ui.swing.elements.RailCard) {
+         * net.sf.rails.ui.swing.elements.RailCard card =
+         * (net.sf.rails.ui.swing.elements.RailCard) container;
+         * log.
+         * info("[DEBUG-SEARCH] Inspecting RailCard. Text: '{}'. Attached Company: {}",
+         * card.getText(),
+         * (card.getCompany() != null ? card.getCompany().getId() : "NULL"));
+         * }
+         */
+
+        return null;
+    }
+
+    // --- START FIX: PRUSSIAN HIGHLIGHT LOGIC ---
+    private void applyExchangeHighlights() {
+        if (possibleActions == null)
+            return;
+
+        List<PossibleAction> actions = possibleActions.getList();
+        log.info("[FLOW] 9. StatusWindow: Scanning {} actions for highlights.", actions.size());
+
+        for (PossibleAction pa : actions) {
+            net.sf.rails.game.Company targetCompany = null;
+            net.sf.rails.game.financial.Certificate targetCert = null; // New target
+            String toolTipAction = "Exchange";
+
+            // 1. Trigger Action (Start Prussian -> M2 Director's Share)
+            if (pa instanceof rails.game.specific._1835.StartPrussian) {
+                targetCompany = gameUIManager.getRoot().getCompanyManager().getPublicCompany("M2");
+                // Target the specific President's Share object
+                if (targetCompany instanceof PublicCompany) {
+                    targetCert = ((PublicCompany) targetCompany).getPresidentsShare();
+                }
+                toolTipAction = "Initiate Swap";
+            }
+            // 2. Exchange Action (Minor -> Share)
+            else if (pa instanceof rails.game.specific._1835.ExchangeForPrussianShare) {
+                targetCompany = ((rails.game.specific._1835.ExchangeForPrussianShare) pa).getCompanyToExchange();
+                toolTipAction = "Swap for Share";
+            }
+
+            // 3. Apply Highlight
+            if (targetCompany != null) {
+                highlightRailCard(targetCompany, targetCert, pa, toolTipAction);
+            }
+        }
+    }
+
+    private net.sf.rails.ui.swing.elements.RailCard findRailCardRecursive(Container parent,
+            net.sf.rails.game.Company targetCompany,
+            net.sf.rails.game.financial.Certificate targetCert) {
+
+        if (parent == null)
+            return null;
+
+        for (Component c : parent.getComponents()) {
+            if (c instanceof net.sf.rails.ui.swing.elements.RailCard) {
+                net.sf.rails.ui.swing.elements.RailCard card = (net.sf.rails.ui.swing.elements.RailCard) c;
+
+                // 1. ROBUST MATCH: Does this card hold the specific Certificate object?
+                // Requires the new method in RailCard.java
+                if (targetCert != null && card.holdsCertificate(targetCert)) {
+                    log.info("[DEBUG-SEARCH] FOUND by Object Identity! Card holds cert: {}", targetCert.getId());
+                    return card;
+                }
+
+                // 2. Fallback: Direct Company Association
+                if (card.getCompany() != null && targetCompany != null &&
+                        card.getCompany().getId().equals(targetCompany.getId())) {
+                    return card;
+                }
+
+                // 3. Fallback: Scan certificates by ID (Legacy)
+                if (targetCompany != null) {
+                    String targetId = targetCompany.getId();
+                    for (net.sf.rails.game.financial.Certificate cert : card.getCertificates()) {
+                        if (cert instanceof net.sf.rails.game.financial.PublicCertificate) {
+                            if (((net.sf.rails.game.financial.PublicCertificate) cert).getCompany().getId()
+                                    .equals(targetId)) {
+                                return card;
+                            }
+                        } else if (cert instanceof net.sf.rails.game.PrivateCompany) {
+                            if (cert.getId().equals(targetId)) {
+                                return card;
+                            }
+                        }
+                    }
+                }
+            } else if (c instanceof Container) {
+                net.sf.rails.ui.swing.elements.RailCard found = findRailCardRecursive((Container) c, targetCompany,
+                        targetCert);
+                if (found != null)
+                    return found;
+            }
+        }
+        return null;
+    }
+
+    private void highlightRailCard(net.sf.rails.game.Company company,
+            net.sf.rails.game.financial.Certificate specificCert,
+            PossibleAction action, String actionName) {
+
+        // Use the new finder signature
+        net.sf.rails.ui.swing.elements.RailCard card = findRailCardRecursive(gameStatus, company, specificCert);
+
+        // --- START FIX ---
+        // Fallback: Direct Grid Lookup via GameStatus if recursive search failed
+        if (card == null && gameStatus != null && company instanceof PublicCompany && specificCert != null) {
+            if (specificCert.getOwner() instanceof Player) {
+                int pIdx = ((Player) specificCert.getOwner()).getIndex();
+                int cIdx = ((PublicCompany) company).getPublicNumber();
+
+                card = gameStatus.getRailCardFor(cIdx, pIdx);
+                if (card != null) {
+                    log.info("[FLOW] StatusWindow: Recovered RailCard via Grid Lookup [Co={}, Pl={}]", cIdx, pIdx);
+                }
+            }
+        }
+        // --- END FIX ---
+
+        if (card != null) {
+            log.info("[FLOW] 11. StatusWindow: SUCCESS. Found RailCard for {}. Setting BLUE.", company.getId());
+            card.setState(net.sf.rails.ui.swing.elements.RailCard.State.HIGHLIGHTED);
+            card.setPossibleAction(action);
+            card.removeActionListener(this);
+            card.addActionListener(this);
+            card.setToolTipText("<html><b>Click to " + actionName + "</b><br>" + company.getId() + "</html>");
+            card.repaint();
+        } else {
+            log.warn("[FLOW] StatusWindow: Could not find RailCard for {}", company.getId());
+        }
+    }
 }

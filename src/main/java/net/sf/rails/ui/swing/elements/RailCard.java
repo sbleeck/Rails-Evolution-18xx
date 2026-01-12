@@ -18,6 +18,7 @@ import java.util.Map;
 import java.util.TreeMap;
 import net.sf.rails.game.Company; // Added for generic access
 import net.sf.rails.game.special.SpecialProperty;
+import rails.game.action.PossibleAction;
 
 import javax.swing.BorderFactory;
 import javax.swing.ButtonGroup;
@@ -53,7 +54,7 @@ public class RailCard extends ClickField {
     private static final int WIDTH_GAP_SHARES = 10; // Extra padding for Shares
 
     public enum State {
-        PASSIVE, ACTIONABLE, SELECTED, DISABLED, HIDDEN
+PASSIVE, ACTIONABLE, SELECTED, DISABLED, HIDDEN, HIGHLIGHTED // Added HIGHLIGHTED
     }
 
     private List<Certificate> certificates = new ArrayList<>();
@@ -72,16 +73,47 @@ public class RailCard extends ClickField {
     private static final Color COL_SELECTED_BG = new Color(100, 200, 100);
     private static final Color COL_SELECTED_BORDER = Color.BLUE;
 
+    private static final Color COL_HIGHLIGHT_BG = new Color(200, 240, 255); // Cyan-ish
+    private static final Color COL_HIGHLIGHT_BORDER_C = Color.BLUE;
+
+
     // Borders (Minimal)
     private static final Border BORDER_ACTIONABLE = BorderFactory.createRaisedBevelBorder();
     private static final Border BORDER_PASSIVE = BorderFactory.createLineBorder(Color.BLACK, 1);
     private static final Border BORDER_DISABLED = BorderFactory.createLoweredBevelBorder();
     private static final Border BORDER_SELECTED = BorderFactory.createLineBorder(COL_SELECTED_BORDER, 2);
+// NEW: Thick Blue Border for "Click Me" state
+private static final Border BORDER_HIGHLIGHT = BorderFactory.createLineBorder(COL_HIGHLIGHT_BORDER_C, 3);
 
     private double scaleFactor = 1.0;
 
     private JPanel contentPanel;
 
+    private Company associatedCompany; // The company this card represents
+
+    public void setCompany(Company c) {
+        this.associatedCompany = c;
+    }
+
+    public Company getCompany() {
+        return associatedCompany;
+    }
+
+    /**
+     * Assigns an action to this card, making it clickable (Blue Highlight mode).
+     */
+public void setPossibleAction(PossibleAction action) {
+        if (action != null) {
+            System.out.println("[RailCard] setPossibleAction: " + action.getClass().getSimpleName() 
+                + " on card " + getFirstAvailableLabel());
+        }
+        this.clearPossibleActions();
+        if (action != null) {
+            this.addPossibleAction(action);
+        }
+    }
+
+    
     public RailCard(StartItem startItem, ButtonGroup group) {
         super("", "", "", null, group);
         if (startItem != null) {
@@ -287,7 +319,7 @@ public class RailCard extends ClickField {
         return "";
     }
 
-    public void setState(State state) {
+public void setState(State state) {
         this.currentState = state;
         this.setEnabled(true);
         this.setOpaque(true);
@@ -317,9 +349,70 @@ public class RailCard extends ClickField {
             case HIDDEN:
                 this.setVisible(false);
                 break;
+            // --- NEW CASE ---
+            case HIGHLIGHTED:
+                this.setBorder(BORDER_HIGHLIGHT);
+                this.setBackground(COL_HIGHLIGHT_BG);
+                break;
         }
         updateView();
     }
+
+
+    // ... (lines of unchanged context code) ...
+    /**
+     * Robust Identification: Checks if this card holds the specific certificate object.
+     * Use this instead of comparing string IDs or labels.
+     */
+    // --- START FIX ---
+    public boolean holdsCertificate(Certificate target) {
+        if (target == null || certificates == null) return false;
+
+        boolean matchFound = false;
+
+        for (Certificate held : certificates) {
+            // 1. Fast Path: Identity
+            if (held == target) {
+                matchFound = true;
+            } 
+            // 2. Slow Path: Logical Identity (Class + ID + Share%)
+            else if (held.getClass().equals(target.getClass()) && held.getId().equals(target.getId())) {
+                if (held instanceof PublicCertificate && target instanceof PublicCertificate) {
+                    if (((PublicCertificate) held).getShare() == ((PublicCertificate) target).getShare()) {
+                        matchFound = true;
+                    }
+                } else {
+                    matchFound = true; // It's a match (Private/Train)
+                }
+            }
+
+            // --- DEBUG LOGGING ---
+            // Only log if we are looking for "M2" (the problem cert) to avoid spamming the log for every card
+            if (target.getId().equals("M2") || held.getId().equals("M2")) {
+                System.out.println(String.format(">> [RailCard CHECK] CardLabel='%s'", getFirstAvailableLabel()));
+                System.out.println(String.format("   TARGET: ID=%s | Share=%d%% | Class=%s | Hash=%s",
+                        target.getId(),
+                        (target instanceof PublicCertificate ? ((PublicCertificate)target).getShare() : 0),
+                        target.getClass().getSimpleName(),
+                        System.identityHashCode(target)));
+                
+                System.out.println(String.format("   HELD:   ID=%s | Share=%d%% | Class=%s | Hash=%s",
+                        held.getId(),
+                        (held instanceof PublicCertificate ? ((PublicCertificate)held).getShare() : 0),
+                        held.getClass().getSimpleName(),
+                        System.identityHashCode(held)));
+                
+                System.out.println(String.format("   >> MATCH: %s", matchFound));
+            }
+
+            if (matchFound) return true;
+        }
+
+        return false;
+    }
+
+
+
 
     @Override
     public void setFont(Font f) {

@@ -13,6 +13,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import net.sf.rails.game.special.SpecialBaseTokenLay; // Ensure this is imported
 import net.sf.rails.game.special.SpecialProperty;
+import rails.game.action.PossibleAction;
+import rails.game.specific._1835.StartPrussian;
 
 import java.util.HashSet;
 import java.util.List;
@@ -56,6 +58,8 @@ public class GameManager_1835 extends GameManager {
     public GameManager_1835(RailsRoot parent, String id) {
         super(parent, id);
     }
+
+
 
     @Override
     protected boolean runIfStartPacketIsNotCompletelySold() {
@@ -260,14 +264,14 @@ public class GameManager_1835 extends GameManager {
         return super.getPublicCompanyWorth(company);
     }
 
-    // ... (lines of unchanged context code) ...
-    public void startPrussianFormationRound(Round currentRound) {
-        // REMOVED: this.setPrussianFormationOffered();
-        // We must NOT set the flag before starting, or PFR will see it and abort (loop
-        // protection).
 
+    // File: net.sf.rails.game.specific._1835.GameManager_1835.java
+// Method: startPrussianFormationRound
+
+    public void startPrussianFormationRound(Round currentRound) {
         log.info("[FLOW] Interrupting Round {} to start PrussianFormationRound.",
                 (currentRound != null ? currentRound.getRoundName() : "null"));
+        
         setInterruptedRound(currentRound);
 
         String roundName;
@@ -279,14 +283,61 @@ public class GameManager_1835 extends GameManager {
                 roundName += "_after_" + getCurrentPhase().getId();
             }
         }
-
         roundName += "_" + getCurrentActionCount() + "_" + System.nanoTime();
 
-        // Start the round first
-        createRound(PrussianFormationRound.class, roundName).start();
+        log.info("[FLOW] Creating Round instance with name: {}", roundName);
+        
+        // Cast is necessary because createRound returns generic Round
+        PrussianFormationRound pfr = (PrussianFormationRound) createRound(PrussianFormationRound.class, roundName);
+        
+        // --- CRITICAL FIX: Tell the engine this is now the active round! ---
+        setRound(pfr);
+        // -------------------------------------------------------------------
 
-        // NOW set the flag, so future checks know it happened.
+        log.info("[FLOW] Calling pfr.start()...");
+        pfr.start();
+
+        log.info("[FLOW] pfr.start() returned. Setting 'Offered' flag.");
         this.setPrussianFormationOffered();
+        
+// CRITICAL: Force UI to acknowledge the round switch and repaint.
+        // Fix: Pass 'pfr' (Round/RailsItem) as the source, and the text as the message.
+        net.sf.rails.common.ReportBuffer.add(pfr, LocalText.getText("PRUSSIAN_FORMATION_ROUND_STARTED"));
+        
+        // Ensure the engine knows we need an interrupt check
+        log.info("[DEBUG-GM] Forced ReportBuffer update to trigger UI refresh.");
+        
     }
+
+
+        /**
+     * Helper to expose M2 company to the PrussianFormationRound.
+     * Required because PFR cannot access protected CompanyManager methods of the base GameManager.
+     */
+    public PublicCompany getM2() {
+        return getRoot().getCompanyManager().getPublicCompany(GameDef_1835.M2_ID);
+    }
+
+
+// ... (lines of unchanged context code) ...
+    /**
+     * Translates a special action into a target company for UI highlighting.
+     */
+    public PublicCompany getTargetCompanyForAction(PossibleAction action) {
+        // --- START FIX ---
+        // Log the exact class name and toString to identify mismatches
+        log.info("[DEBUG-GM] Inspecting Action: {} (Class: {})", action, action.getClass().getName());
+
+        if (action instanceof StartPrussian) {
+            log.info("[DEBUG-GM] >> MATCH: Action is StartPrussian. Returning M2.");
+            return getRoot().getCompanyManager().getPublicCompany(GameDef_1835.M2_ID);
+        }
+        
+        return null;
+        // --- END FIX ---
+    }
+// ... (rest of the method/class) ...
+
+
 
 }

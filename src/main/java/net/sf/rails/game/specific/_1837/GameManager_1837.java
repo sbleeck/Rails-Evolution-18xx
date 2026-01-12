@@ -49,6 +49,7 @@ public class GameManager_1837 extends GameManager {
     }
 
     public void nextRound(Round prevRound) {
+log.info("Transitioning Round. Previous: {} ({})", prevRound.getId(), prevRound.getClass().getSimpleName());
 
         if (prevRound instanceof StartRound) {
             // In version 2, any subsequent start round will be buy-only (no bidding).
@@ -102,6 +103,7 @@ public class GameManager_1837 extends GameManager {
             previousSRorOR.set (prevRound); // Remember where we came from!
             doneThisRound.clear();
             setInterruptedRound(prevRound);
+            log.info("Saving Interrupted Round: {}", prevRound.getId());
             if (!checkAndRunCER(null, prevRound, null)
                     && !checkAndRunNFR(null, prevRound, null)) {
                 super.nextRound(prevRound);

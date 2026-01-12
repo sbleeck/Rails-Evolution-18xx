@@ -2273,11 +2273,11 @@ if (currentRound instanceof OperatingRound || currentRound instanceof PrussianFo
                     if (action.isAllocationAllowed(SetDividend.SPLIT))
                         validAllocations.add(SetDividend.SPLIT);
 
-                    if (validAllocations.size() == 1) {
-                        action.setRevenueAllocation(validAllocations.get(0));
-                        orWindow.process(action);
-                        return;
-                    }
+                    // if (validAllocations.size() == 1) {
+                    //     action.setRevenueAllocation(validAllocations.get(0));
+                    //     orWindow.process(action);
+                    //     return;
+                    // }
                 }
             }
 

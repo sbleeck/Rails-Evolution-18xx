@@ -42,8 +42,11 @@ import java.io.FileReader;
 import java.util.*;
 
 import javax.swing.JFrame;
+import javax.swing.SwingUtilities;
 
 import com.google.common.collect.ComparisonChain;
+
+import javafx.event.ActionEvent;
 import net.sf.rails.game.ai.snapshot.JsonStateSerializer;
 import java.io.IOException; // Add this
 
@@ -1073,9 +1076,16 @@ public int getOrTimeBonus() {
         }
     }
 
-    public void setRound(RoundFacade round) {
+public void setRound(RoundFacade round) {
+        // --- START FIX ---
+        String oldRound = (currentRound.value() != null) ? currentRound.value().getId() : "null";
+        String newRound = (round != null) ? round.getId() : "null";
+        
+        log.info("[DEBUG-GM] setRound() called. Switch: {} -> {}", oldRound, newRound);
+        // --- END FIX ---
         currentRound.set(round);
     }
+
 
     public void setInterruptedRound(RoundFacade interruptedRound) {
         this.interruptedRound.set(interruptedRound);
@@ -1402,7 +1412,9 @@ public int getOrTimeBonus() {
         createRound(treasuryShareRoundClass, id).start(getInterruptedRound());
     }
 
-    /**
+
+
+        /**
      * Central processing method for game actions.
      * 
      * @param action The action to process.
@@ -1544,6 +1556,23 @@ public int getOrTimeBonus() {
             // adding Undo/Redo
             if (result && !(action instanceof GameAction) && !(startGameAction)) {
                 changeStack.close(action);
+
+
+                // FORCE UI UPDATE: Manually trigger the Observer update() method.
+                // We pass 'null' as the Observable because GameManager does not extend Observable.
+                if (gameUIManager != null && gameUIManager.getStatusWindow() != null) {
+                    log.info("[DEBUG-GM] Forcing UI Update via Direct Call...");
+                    SwingUtilities.invokeLater(() -> {
+                        Object status = gameUIManager.getStatusWindow().getGameStatus();
+                        // Explicitly check against java.util.Observer
+                        if (status instanceof java.util.Observer) {
+                            // Explicitly cast to java.util.Observer and pass NULL as the source
+                            ((java.util.Observer) status).update(null, "ForceUpdate");
+                        }
+                    });
+                }
+
+                
                 // Autosave logic: Only save if the Round changed OR the Active Actor changed.
                 // This indicates a "Full Move" (e.g. Player passed priority, or Company
                 // finished operating).
@@ -1616,6 +1645,7 @@ public int getOrTimeBonus() {
 
         return result;
     }
+
 
     protected void logActionTaken(PossibleAction action) {
         if (action instanceof NullAction
@@ -3705,6 +3735,19 @@ public int getOrTimeBonus() {
             } else {
                 entry = actionString;
             }
+
+            // Direct Logging: One line per action, with AI tag
+            if (Util.hasValue(entry)) {
+                StringBuilder sb = new StringBuilder();
+                // Match the prefix style: "[Company (Player)] Action"
+                sb.append("Move: [").append(currentLogPrefix).append("] ").append(entry);
+                
+                if (action.isAIAction()) {
+                    sb.append(" [AI]");
+                }
+                log.info(sb.toString());
+            }
+            
 
             // --- 4. SMART APPEND LOGIC ---
             String currentHistory = statusMessageState.value();

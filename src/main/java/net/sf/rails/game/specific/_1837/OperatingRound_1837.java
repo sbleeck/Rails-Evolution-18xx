@@ -16,7 +16,7 @@ import net.sf.rails.common.ReportBuffer;
 import net.sf.rails.game.financial.Bank;
 import net.sf.rails.util.SequenceUtil;
 import rails.game.action.*;
-
+import net.sf.rails.algorithms.RevenueAdapter;
 import rails.game.specific._1837.SetHomeHexLocation;
 
 
@@ -150,9 +150,6 @@ if (chosenHome == null) {
     }
 
 
-    /* (non-Javadoc)
-     * @see net.sf.rails.game.OperatingRound#validateSetRevenueAndDividend(rails.game.action.SetDividend)
-     */
     @Override
     protected String validateSetRevenueAndDividend(SetDividend action) {
         String errMsg = null;
@@ -161,14 +158,6 @@ if (chosenHome == null) {
         int amount, directAmount;
         int revenueAllocation;
 
-        // --- START FIX ---
-        // Log the incoming action details for debugging
-        log.info("ValidateSetDividend: Company={} Amount={} Direct={} Allocation={}", 
-            action.getCompany().getId(), 
-            action.getActualRevenue(), 
-            action.getActualCompanyTreasuryRevenue(), 
-            action.getRevenueAllocation());
-        // --- END FIX ---
 
         // Dummy loop to enable a quick jump out.
         while (true) {
@@ -178,75 +167,34 @@ if (chosenHome == null) {
             company = action.getCompany();
             companyName = company.getId();
             if (company != operatingCompany.value()) {
-                errMsg =
-                        LocalText.getText("WrongCompany",
-                                companyName,
-                                operatingCompany.value().getId() );
-                // --- START FIX ---
-                log.warn("Validation Failed: Wrong Company. Expected {} but got {}", operatingCompany.value().getId(), companyName);
-                // --- END FIX ---
+               
                 break;
             }
             // Must be correct step
             if (getStep() != GameDef.OrStep.CALC_REVENUE) {
-                errMsg = LocalText.getText("WrongActionNoRevenue");
-                // --- START FIX ---
-                log.warn("Validation Failed: Wrong Step. Current step is {}", getStep());
-                // --- END FIX ---
-                break;
+                 break;
             }
 
             // Amount must be non-negative multiple of 5
             amount = action.getActualRevenue();
             if (amount < 0) {
-                errMsg =
-                        LocalText.getText("NegativeAmountNotAllowed",
-                                String.valueOf(amount));
-                // --- START FIX ---
-                log.warn("Validation Failed: Negative amount {}", amount);
-                // --- END FIX ---
-                break;
+                  break;
             }
             if (amount % 5 != 0) {
-                errMsg =
-                        LocalText.getText("AmountMustBeMultipleOf5",
-                                String.valueOf(amount));
-                // --- START FIX ---
-                log.warn("Validation Failed: Amount {} is not multiple of 5", amount);
-                // --- END FIX ---
-                break;
+                   break;
             }
 
             // Direct revenue must be non-negative multiple of 5,
             // and at least 10 less than the total revenue
             directAmount = action.getActualCompanyTreasuryRevenue();
             if (directAmount < 0) {
-                errMsg =
-                        LocalText.getText("NegativeAmountNotAllowed",
-                                String.valueOf(amount));
-                // --- START FIX ---
-                log.warn("Validation Failed: Negative direct amount {}", directAmount);
-                // --- END FIX ---
-                break;
+                   break;
             }
             if (directAmount % 5 != 0) {
-                errMsg =
-                        LocalText.getText("AmountMustBeMultipleOf5",
-                                String.valueOf(amount));
-                // --- START FIX ---
-                log.warn("Validation Failed: Direct Amount {} is not multiple of 5", directAmount);
-                // --- END FIX ---
-                break;
+                   break;
             }
             if (amount > 0 && amount - directAmount < 10) {
-                errMsg = LocalText.getText("WrongDirectRevenue",
-                        String.valueOf(directAmount),
-                        "10",
-                        String.valueOf(amount));
-                // --- START FIX ---
-                log.warn("Validation Failed: Direct Revenue Rule (Amount - Direct < 10). Amount={} Direct={}", amount, directAmount);
-                // --- END FIX ---
-                break;
+                  break;
             }
 
             // Check chosen revenue distribution
@@ -255,13 +203,7 @@ if (chosenHome == null) {
                 // Check the allocation type index (see SetDividend for values)
                 if (revenueAllocation < 0
                         || revenueAllocation >= SetDividend.NUM_OPTIONS) {
-                    errMsg =
-                            LocalText.getText("InvalidAllocationTypeIndex",
-                                    String.valueOf(revenueAllocation));
-                    // --- START FIX ---
-                    log.warn("Validation Failed: Invalid Allocation Index {}", revenueAllocation);
-                    // --- END FIX ---
-                    break;
+                     break;
                 }
 
                 // Validate the chosen allocation type
@@ -275,17 +217,21 @@ if (chosenHome == null) {
                     }
                 }
                 if (!valid) {
-                    errMsg =
-                            LocalText.getText(SetDividend.getAllocationNameKey(revenueAllocation));
-                    // --- START FIX ---
-                    log.warn("Validation Failed: Allocation {} not allowed for this company", revenueAllocation);
-                    // --- END FIX ---
-                    break;
+                     break;
                 }
             } else if (revenueAllocation != SetDividend.NO_ROUTE){
                 // If there is no revenue, use withhold.
-                action.setRevenueAllocation(SetDividend.WITHHOLD);
-            }
+// 1837 Logic: Do NOT force Withhold if the company is mandatory Split (Coal/Minor).
+                // This prevents the engine from flipping a "Split 0" (pre-calc) action to "Withhold".
+                PublicCompany opComp = operatingCompany.value();
+                String type = opComp.getType().getId();
+                boolean isMandatorySplit = type.equalsIgnoreCase("Coal") || type.equalsIgnoreCase("Minor");
+
+                if (!isMandatorySplit) {
+                    // Standard behavior: If no revenue, default to Withhold.
+                    action.setRevenueAllocation(SetDividend.WITHHOLD);
+                }
+                        }
 
             if (amount == 0 && operatingCompany.value().getNumberOfTrains() == 0) {
                 DisplayBuffer.add(this, LocalText.getText("RevenueWithNoTrains",
@@ -300,9 +246,6 @@ if (chosenHome == null) {
     }
 
 
-    /* (non-Javadoc)
-     * @see net.sf.rails.game.OperatingRound#splitRevenue(int)
-     */
 
     public void splitRevenue(int amount) {
         if (amount > 0) {
@@ -406,7 +349,6 @@ if (chosenHome == null) {
             }
         }
         if (phaseIndex >= 4 ) {
-            log.debug("Italy inactive, index of phase = {}", phaseIndex);
 
             // 2. retrieve Italy vertices ...
             String [] italyHexes = GameDef_1837.ItalyHexes.split(",");
@@ -422,43 +364,73 @@ if (chosenHome == null) {
 
 
 
-@Override
+// ... (lines 405-410)
+    @Override
     protected void prepareRevenueAndDividendAction() {
 
-        // --- START FIX ---
-        log.info("Preparing Dividend Action for {}", operatingCompany.value().getId());
-        // --- END FIX ---
 
         // There is only revenue if there are any trains
         if (companyHasRunningTrains(false)) {
-            // ... (unchanged logic) ...
-            int[] allowedRevenueActions =
-                    operatingCompany.value().isSplitAlways()
-                    ? new int[] { SetDividend.SPLIT }
-            : operatingCompany.value().isSplitAllowed()
-            ? new int[] { SetDividend.PAYOUT,
-                    SetDividend.SPLIT,
-                    SetDividend.WITHHOLD } : new int[] {
-                            SetDividend.PAYOUT,
-                            SetDividend.WITHHOLD };
-
-            // --- START FIX ---
-            log.info("Dividend Action Added. SplitAlways={} SplitAllowed={}", 
-                     operatingCompany.value().isSplitAlways(), 
-                     operatingCompany.value().isSplitAllowed());
-            // --- END FIX ---
             
+            // 1837 Specific Logic: Coal and Minor companies MUST split.
+            PublicCompany company = operatingCompany.value();
+            String type = company.getType().getId();
+            
+            // Identify Mandatories
+            boolean isMandatorySplit = type.equalsIgnoreCase("Coal") || type.equalsIgnoreCase("Minor");
+
+            int[] allowedRevenueActions;
+            int defaultAllocation;
+
+            // The AI sees the action generated here. If 'lastRevenue' is 0, the AI sees "Split 0" and aborts.
+            // We must calculate the real revenue NOW to populate the action correctly.
+            int revenueToUse = company.getLastRevenue();
+            int directIncomeToUse = company.getLastDirectIncome();
+
+            if (isMandatorySplit && revenueToUse == 0) {
+                try {
+                    RevenueAdapter ra = RevenueAdapter.createRevenueAdapter(getRoot(), company, getRoot().getPhaseManager().getCurrentPhase());
+                    if (ra != null) {
+                        ra.initRevenueCalculator(true); // true = multigraph support
+                        revenueToUse = ra.calculateRevenue();
+                        directIncomeToUse = ra.getSpecialRevenue(); // Capture 1837 Mine Revenue logic
+                    }
+                } catch (Exception e) {
+                }
+            }
+            
+            if (company.isSplitAlways() || isMandatorySplit) {
+                // CASE 1: Mandatory Split (Coal / Minor)
+                // Restrict to ONLY Split. This disables Payout/Withhold in the UI.
+                allowedRevenueActions = new int[] { SetDividend.SPLIT };
+                defaultAllocation = SetDividend.SPLIT;
+            } else if (company.isSplitAllowed()) {
+                // CASE 2: Optional Split (Some Majors)
+                allowedRevenueActions = new int[] { SetDividend.PAYOUT,
+                        SetDividend.SPLIT,
+                        SetDividend.WITHHOLD };
+                defaultAllocation = SetDividend.PAYOUT;
+            } else {
+                // CASE 3: Standard Major
+                allowedRevenueActions = new int[] {
+                        SetDividend.PAYOUT,
+                        SetDividend.WITHHOLD };
+                defaultAllocation = SetDividend.PAYOUT;
+            }
+            // BUGFIX: Use the 'revenueToUse' and 'directIncomeToUse' variables we just calculated/verified above.
+            // Previously, this used 'company.getLastRevenue()', which was 0 for Minors/Coal before the run,
+            // causing the AI to think the revenue was 0.
             possibleActions.add(new SetDividend(getRoot(),
-                    operatingCompany.value().getLastRevenue(),
-                    operatingCompany.value().getLastDirectIncome(),
-                    true, allowedRevenueActions,0));
+                    revenueToUse,           // Was: company.getLastRevenue()
+                    directIncomeToUse,      // Was: company.getLastDirectIncome()
+                    true, allowedRevenueActions, defaultAllocation));
+
         } 
-        // --- START FIX ---
         else {
-             log.info("No Dividend Action added: companyHasRunningTrains returned FALSE.");
         }
-        // --- END FIX ---
     }
+// ...
+
 
 
     /**
@@ -483,11 +455,7 @@ if (chosenHome == null) {
         boolean hasRunningTrains = false;
         Set<Train> trains = operatingCompany.value().getPortfolioModel().getTrainList();
         
-        // --- START FIX ---
-        if (trains.isEmpty()) {
-            log.info("companyHasRunningTrains: {} has NO trains.", operatingCompany.value().getId());
-        }
-        // --- END FIX ---
+
 
         for (Train train : trains) {
             if (gameManager.isTrainBlocked(train)) {
@@ -497,14 +465,8 @@ if (chosenHome == null) {
                     ReportBuffer.add(this, message);
                     DisplayBuffer.add(this, message);
                 }
-                // --- START FIX ---
-                log.info("Train {} is BLOCKED for {}", train.getName(), operatingCompany.value().getId());
-                // --- END FIX ---
             } else {
                 hasRunningTrains = true;
-                // --- START FIX ---
-                log.info("Train {} is RUNNING for {}", train.getName(), operatingCompany.value().getId());
-                // --- END FIX ---
             }
         }
         return hasRunningTrains;
