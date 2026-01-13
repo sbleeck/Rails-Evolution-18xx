@@ -1656,7 +1656,9 @@ public void setRound(RoundFacade round) {
             String summary;
             if (action instanceof LayTile) {
                 LayTile lt = (LayTile) action;
-                summary = String.format("Lays tile %s on %s", lt.getLaidTile().getId(), lt.getChosenHex().getId());
+                String tileId = (lt.getLaidTile() != null) ? lt.getLaidTile().getId() : "null";
+                String hexId = (lt.getChosenHex() != null) ? lt.getChosenHex().getId() : "null";
+                summary = String.format("Lays tile %s on %s", tileId, hexId);
             } else if (action instanceof BuyCertificate) {
                 BuyCertificate bc = (BuyCertificate) action;
                 summary = String.format("Buys %d%% %s for %s", bc.getSharePerCertificate(), bc.getCompany().getId(),

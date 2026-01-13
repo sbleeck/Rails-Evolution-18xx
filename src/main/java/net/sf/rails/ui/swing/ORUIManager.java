@@ -33,6 +33,7 @@ import net.sf.rails.game.round.RoundFacade;
 import net.sf.rails.game.special.SpecialProperty;
 import net.sf.rails.game.special.SpecialSingleTileLay;
 import net.sf.rails.game.special.SpecialTileLay;
+import net.sf.rails.game.specific._1835.PrussianFormationRound;
 import net.sf.rails.game.special.SpecialBaseTokenLay;
 import net.sf.rails.game.state.Owner;
 import net.sf.rails.sound.SoundManager;
@@ -54,7 +55,6 @@ import com.google.common.collect.Lists;
 import com.google.common.collect.Multimap;
 import com.google.common.collect.Sets;
 import java.awt.Component;
-import net.sf.rails.game.specific._1835.PrussianFormationRound;
 import net.sf.rails.game.ai.TokenLayOption; // *** ADD THIS IMPORT ***
 import net.sf.rails.game.ai.TileLayOption; // *** ADD THIS IMPORT ***
 
@@ -115,14 +115,8 @@ public class ORUIManager implements DialogOwner {
         this.networkAdapter = NetworkAdapter.create(gameUIManager.getRoot());
     }
 
-public String getPrussianStep() {
-    // getCurrentRound() returns a RoundFacade. 
-    // In this API, the Facade IS the Round implementation.
-    net.sf.rails.game.round.RoundFacade facade = gameUIManager.getGameManager().getCurrentRound();
-    
-    if (facade instanceof PrussianFormationRound) {
-        return ((PrussianFormationRound) facade).getPrussianStep();
-    }
+    public String getPrussianStep() {
+   
     return "";
 }
 
@@ -432,9 +426,7 @@ private void addGenericTokenLays(LayBaseToken action) {
         // Add a guard to prevent processing actions if the game is not in an
         // OperatingRound. This stops "ghost" buttons from the ORPanel
         // from firing actions during a StockRound.
-        if (!(gameUIManager.getCurrentRound() instanceof OperatingRound)
-                && !(gameUIManager.getCurrentRound() instanceof PrussianFormationRound)) {
-
+if (!(gameUIManager.getCurrentRound() instanceof OperatingRound)) {
             return;
         }
 
@@ -545,8 +537,7 @@ private void addGenericTokenLays(LayBaseToken action) {
         // }
 
         // Only grab focus if we are actually in an Operating Round
-        if (gameUIManager.getCurrentRound() instanceof OperatingRound 
-             || gameUIManager.getCurrentRound() instanceof PrussianFormationRound) {
+if (gameUIManager.getCurrentRound() instanceof OperatingRound) {
              
             if (this.getORWindow() != null && this.getORWindow().isVisible()) {
                 this.getORWindow().requestFocus();
@@ -2046,7 +2037,7 @@ public void setMapRelatedActions(PossibleActions actions) {
         //     orWindow.requestFocus(); // Ensure window is "Active"
         // }
 
-if (currentRound instanceof OperatingRound || currentRound instanceof PrussianFormationRound) {
+if (currentRound instanceof OperatingRound) {
             // CRITICAL: Reclaim window focus immediately after Status Window updates.
             if (orWindow != null && orWindow.isVisible()) {
                 orWindow.toFront(); // Ensure window is z-ordered top
@@ -2089,30 +2080,6 @@ if (currentRound instanceof OperatingRound || currentRound instanceof PrussianFo
             return;
         }
 
-        // --- Prussian Formation Round (PFR) ---
-        if (currentRound instanceof PrussianFormationRound) {
-            if (orPanel != null) {
-                orPanel.setSpecialMode(true);
-                orPanel.initTrainBuying(new ArrayList<>());
-                orPanel.initTileLayingStep();
-            }
-            orPanel.updateDynamicActions(possibleActions.getList());
-
-            String stepName = ((PrussianFormationRound) currentRound).getPrussianStep().toString();
-            String actorText = "<html><font color='blue' size='4'>" + "Prussian Formation Round" + "</font><br>"
-                    + "<font color='red' size='6'>Thinking: <b>"
-                    + getRoot().getPlayerManager().getCurrentPlayer().getId() + "</b> - " + stepName + "</font></html>";
-
-            messagePanel.setMessage(actorText);
-            if (gameUIManager.statusWindow != null) {
-                gameUIManager.statusWindow.updateActivityPanel(actorText);
-            }
-
-            orPanel.enableUndo(undoAction);
-            orPanel.enableRedo(redoAction);
-            orPanel.redisplay();
-            return;
-        }
 
         // --- Operating Round (Standard) ---
         if (!(currentRound instanceof OperatingRound)) {

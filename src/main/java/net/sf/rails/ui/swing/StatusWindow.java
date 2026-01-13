@@ -1275,14 +1275,9 @@ public class StatusWindow extends JFrame implements ActionListener, ActionPerfor
                 }
             }
 
-            // 3. PRUSSIAN FORMATION OVERLAY (Forced Scan)
-            // We REMOVED 'if (myTurn)' to force this scan even if the UI is stale.
-            if (currentRound instanceof net.sf.rails.game.specific._1835.PrussianFormationRound) {
-                log.info("[FLOW] 8. StatusWindow: Detected PFR. Forcing highlights scan...");
-                applyExchangeHighlights();
-            }
-
-            // ... (Rest of the standard updateStatus logic) ...
+            // 3. Delegate to Subclass (Polymorphism)
+            // We removed the hardcoded 1835 PFR check.
+            updateGameSpecificHighlights();
 
             // Register the Global Hotkey Manager
             KeyboardFocusManager.getCurrentKeyboardFocusManager()
@@ -1399,12 +1394,6 @@ public class StatusWindow extends JFrame implements ActionListener, ActionPerfor
 
             log.info("[FLOW] 7. StatusWindow: updateStatus. MyTurn={}. Checking PFR...", myTurn);
 
-            // FIX: Remove '&& myTurn'. We must scan for PFR highlights even if the UI
-            // player (Christian) doesn't match the PFR actor (Rainer).
-            if (currentRound instanceof net.sf.rails.game.specific._1835.PrussianFormationRound) {
-                log.info("[FLOW] 8. StatusWindow: Detected PFR. Forcing highlights scan...");
-                applyExchangeHighlights();
-            }
 
             // --- STOCK ROUND / START ROUND LOGIC ---
             Player currentPlayer = getCurrentPlayer();
@@ -1531,6 +1520,15 @@ public class StatusWindow extends JFrame implements ActionListener, ActionPerfor
         } catch (Exception e) {
             log.error("CRITICAL ERROR in StatusWindow.updateStatus", e);
         }
+    }
+
+
+    /**
+     * Hook for subclasses (e.g., StatusWindow_1835) to apply specific highlighting
+     * without polluting the generic parent class.
+     */
+    protected void updateGameSpecificHighlights() {
+        // Default implementation does nothing.
     }
 
     /**
@@ -1907,86 +1905,33 @@ public class StatusWindow extends JFrame implements ActionListener, ActionPerfor
         return null;
     }
 
-    // --- START FIX: PRUSSIAN HIGHLIGHT LOGIC ---
-    private void applyExchangeHighlights() {
-        if (possibleActions == null)
-            return;
-
-        List<PossibleAction> actions = possibleActions.getList();
-        log.info("[FLOW] 9. StatusWindow: Scanning {} actions for highlights.", actions.size());
-
-        for (PossibleAction pa : actions) {
-            net.sf.rails.game.Company targetCompany = null;
-            net.sf.rails.game.financial.Certificate targetCert = null; // New target
-            String toolTipAction = "Exchange";
-
-            // 1. Trigger Action (Start Prussian -> M2 Director's Share)
-            if (pa instanceof rails.game.specific._1835.StartPrussian) {
-                targetCompany = gameUIManager.getRoot().getCompanyManager().getPublicCompany("M2");
-                // Target the specific President's Share object
-                if (targetCompany instanceof PublicCompany) {
-                    targetCert = ((PublicCompany) targetCompany).getPresidentsShare();
-                }
-                toolTipAction = "Initiate Swap";
-            }
-            // 2. Exchange Action (Minor -> Share)
-            else if (pa instanceof rails.game.specific._1835.ExchangeForPrussianShare) {
-                targetCompany = ((rails.game.specific._1835.ExchangeForPrussianShare) pa).getCompanyToExchange();
-                toolTipAction = "Swap for Share";
-            }
-
-            // 3. Apply Highlight
-            if (targetCompany != null) {
-                highlightRailCard(targetCompany, targetCert, pa, toolTipAction);
-            }
-        }
-    }
-
-    private net.sf.rails.ui.swing.elements.RailCard findRailCardRecursive(Container parent,
+/**
+     * Protected helper to allow subclasses (like 1835) to find specific cards
+     * to apply highlighting logic.
+     */
+    protected net.sf.rails.ui.swing.elements.RailCard findRailCardRecursive(Container parent,
             net.sf.rails.game.Company targetCompany,
             net.sf.rails.game.financial.Certificate targetCert) {
 
-        if (parent == null)
-            return null;
+        if (parent == null) return null;
 
         for (Component c : parent.getComponents()) {
             if (c instanceof net.sf.rails.ui.swing.elements.RailCard) {
                 net.sf.rails.ui.swing.elements.RailCard card = (net.sf.rails.ui.swing.elements.RailCard) c;
 
-                // 1. ROBUST MATCH: Does this card hold the specific Certificate object?
-                // Requires the new method in RailCard.java
+                // 1. Match by Certificate Object (Most Robust)
                 if (targetCert != null && card.holdsCertificate(targetCert)) {
-                    log.info("[DEBUG-SEARCH] FOUND by Object Identity! Card holds cert: {}", targetCert.getId());
                     return card;
                 }
 
-                // 2. Fallback: Direct Company Association
-                if (card.getCompany() != null && targetCompany != null &&
+                // 2. Match by Company ID (Fallback)
+                if (targetCompany != null && card.getCompany() != null &&
                         card.getCompany().getId().equals(targetCompany.getId())) {
                     return card;
                 }
-
-                // 3. Fallback: Scan certificates by ID (Legacy)
-                if (targetCompany != null) {
-                    String targetId = targetCompany.getId();
-                    for (net.sf.rails.game.financial.Certificate cert : card.getCertificates()) {
-                        if (cert instanceof net.sf.rails.game.financial.PublicCertificate) {
-                            if (((net.sf.rails.game.financial.PublicCertificate) cert).getCompany().getId()
-                                    .equals(targetId)) {
-                                return card;
-                            }
-                        } else if (cert instanceof net.sf.rails.game.PrivateCompany) {
-                            if (cert.getId().equals(targetId)) {
-                                return card;
-                            }
-                        }
-                    }
-                }
             } else if (c instanceof Container) {
-                net.sf.rails.ui.swing.elements.RailCard found = findRailCardRecursive((Container) c, targetCompany,
-                        targetCert);
-                if (found != null)
-                    return found;
+                net.sf.rails.ui.swing.elements.RailCard found = findRailCardRecursive((Container) c, targetCompany, targetCert);
+                if (found != null) return found;
             }
         }
         return null;
@@ -2026,4 +1971,60 @@ public class StatusWindow extends JFrame implements ActionListener, ActionPerfor
             log.warn("[FLOW] StatusWindow: Could not find RailCard for {}", company.getId());
         }
     }
+
+
+    /**
+     * WATERTIGHT SOLUTION:
+     * A generic, robust method to find a specific certificate on screen, 
+     * highlight it, and attach an action to it.
+     * * @param targetCert The specific certificate object to find.
+     * @param action     The action to execute when clicked.
+     * @param tooltip    (Optional) Text to show on hover.
+     * @return true if the card was found and highlighted.
+     */
+    public boolean attachActionToCertificate(net.sf.rails.game.financial.Certificate targetCert, 
+                                             PossibleAction action, 
+                                             String tooltip) {
+        if (targetCert == null || action == null) return false;
+
+        // 1. Find the Company associated with the cert
+        net.sf.rails.game.Company company = null;
+        if (targetCert instanceof net.sf.rails.game.financial.PublicCertificate) {
+            company = ((net.sf.rails.game.financial.PublicCertificate) targetCert).getCompany();
+        } else if (targetCert instanceof net.sf.rails.game.PrivateCompany) {
+            company = (net.sf.rails.game.Company) targetCert;
+        }
+
+        // 2. Use our Robust Recursive Finder
+        // (Reusing the existing findRailCardRecursive logic we built)
+        net.sf.rails.ui.swing.elements.RailCard card = findRailCardRecursive(gameStatus, company, targetCert);
+
+        // 3. Fallback: Grid Lookup (The "Fast Fix" logic, formalized)
+        if (card == null && gameStatus != null && company instanceof PublicCompany) {
+             if (targetCert.getOwner() instanceof Player) {
+                int pIdx = ((Player) targetCert.getOwner()).getIndex();
+                int cIdx = ((PublicCompany) company).getPublicNumber();
+                card = gameStatus.getRailCardFor(cIdx, pIdx);
+            }
+        }
+
+        // 4. Apply the Visuals
+        if (card != null) {
+            card.setState(net.sf.rails.ui.swing.elements.RailCard.State.HIGHLIGHTED);
+            card.setPossibleAction(action);
+            
+            // Clean listeners to prevent double-clicks
+            card.removeActionListener(this); 
+            card.addActionListener(this);
+            
+            if (tooltip != null) {
+                card.setToolTipText("<html><b>" + tooltip + "</b><br>" + company.getId() + "</html>");
+            }
+            card.repaint();
+            return true;
+        }
+        
+        return false;
+    }
+
 }

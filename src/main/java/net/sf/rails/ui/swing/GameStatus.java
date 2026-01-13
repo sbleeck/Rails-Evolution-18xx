@@ -1253,6 +1253,11 @@ public class GameStatus extends GridPanel implements ActionListener {
             } else if (actions.get(0).getClass().getSimpleName().equals("StartPrussian")) {
                 // Explicitly handle StartPrussian to ensure it triggers
                 chosenAction = actions.get(0);
+            } else if (actions.get(0) instanceof LayTile) {
+                // Prevent incomplete LayTile actions (from Private Cards) from being sent to GameManager
+                // This prevents the "null tile" crash and prepares for future "Jump to Map" logic.
+                System.out.println("Blocked incomplete LayTile action from RailCard: " + actions.get(0));
+                chosenAction = null;
             } else {
                 chosenAction = processGameSpecificActions(actor, actions.get(0));
             }
