@@ -319,25 +319,6 @@ public class GameManager_1835 extends GameManager {
     }
 
 
-// ... (lines of unchanged context code) ...
-    /**
-     * Translates a special action into a target company for UI highlighting.
-     */
-    public PublicCompany getTargetCompanyForAction(PossibleAction action) {
-        // --- START FIX ---
-        // Log the exact class name and toString to identify mismatches
-        log.info("[DEBUG-GM] Inspecting Action: {} (Class: {})", action, action.getClass().getName());
-
-        if (action instanceof StartPrussian) {
-            log.info("[DEBUG-GM] >> MATCH: Action is StartPrussian. Returning M2.");
-            return getRoot().getCompanyManager().getPublicCompany(GameDef_1835.M2_ID);
-        }
-        
-        return null;
-        // --- END FIX ---
-    }
-// ... (rest of the method/class) ...
-
 
 
 }

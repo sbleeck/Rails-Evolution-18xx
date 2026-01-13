@@ -24,11 +24,15 @@ import net.sf.rails.ui.swing.hexmap.HexHighlightMouseListener;
 import net.sf.rails.util.Util;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+// Ensure this is imported
 import rails.game.action.*;
 import rails.game.correct.CashCorrectionAction;
 import rails.game.correct.CorrectionType;
 import rails.game.correct.TrainCorrectionAction;
 import rails.game.specific._18EU.StartCompany_18EU;
+import rails.game.specific._1835.StartPrussian;
+import rails.game.specific._1835.ExchangeForPrussianShare;
 
 import javax.swing.*;
 import java.awt.*;
@@ -2693,10 +2697,10 @@ public class GameStatus extends GridPanel implements ActionListener {
                                 if (c.hasStockPrice()) {
                                     cleanText = "100%"; // Majors
                                 } else {
-                                    cleanText = "Owner"; // Minors
+                                    cleanText = c.getId(); //Minors
+                                    card.setCompanyDetailsTooltip(c);
                                 }
                             }
-
                             // 2. BOLD LOGIC: Only bold the President's share ("P") or Owner
                             boolean isPrez = cleanText.contains("P") || cleanText.equals("Owner");
 
@@ -2923,13 +2927,12 @@ public class GameStatus extends GridPanel implements ActionListener {
             }
         }
 
-        // Force check for Game Specific Actions (like Prussian Formation)
-        // This must run even if 'myTurn' logic is ambiguous during interrupts.
-        initGameSpecificActions();
+
 
         updateFixedIncome();
         updatePlayerPrivates();
         updateTrainCosts();
+        initGameSpecificActions();
         repaint();
     }
 
@@ -4408,71 +4411,73 @@ public class GameStatus extends GridPanel implements ActionListener {
         return null;
     }
 
-
 // ... (lines of unchanged context code) ...
     protected void initGameSpecificActions() {
-        // --- START FIX ---
-        // Force log output to confirm entry
-        System.out.println(">>> STEP 7 REACHED: initGameSpecificActions running.");
-        
-        if (possibleActions == null) {
-             System.out.println(">>> STEP 7: possibleActions is null");
+        if (possibleActions == null || players == null) {
              return;
         }
-        
-        System.out.println(">>> STEP 7: ActionCount: " + possibleActions.getList().size());
-
-        // 1. COMPREHENSIVE GRID DUMP
-        System.out.println("=== GRID STATE DUMP ===");
-        if (companies != null && players != null) {
-            for (int cIdx = 0; cIdx < companies.length; cIdx++) {
-                net.sf.rails.game.PublicCompany comp = companies[cIdx];
-                if (comp.isClosed()) continue;
-                if (!"M2".equals(comp.getId()) && !"PR".equals(comp.getId())) continue;
-
-                for (int pIdx = 0; pIdx < players.getNumberOfPlayers(); pIdx++) {
-                    net.sf.rails.game.Player player = players.getPlayerByPosition(pIdx);
-                    net.sf.rails.ui.swing.elements.RailCard card = getRailCardFor(cIdx, pIdx);
-                    
-                    String cardText = (card != null) ? card.getText() : "null";
-                    boolean isVisible = (card != null) && card.isVisible();
-                    
-                    System.out.println(String.format("[GRID] [%d][%d] %s / %s : CardText='%s', Visible=%s", 
-                            cIdx, pIdx, comp.getId(), player.getName(), cardText, isVisible));
-                }
-            }
-        }
-        System.out.println("=======================");
-
-        net.sf.rails.game.GameManager gm = gameUIManager.getGameManager();
 
         for (rails.game.action.PossibleAction pa : possibleActions.getList()) {
-            String actionName = pa.getClass().getSimpleName();
-            net.sf.rails.game.PublicCompany target = null;
+            // 1. Identify Target Company (Public OR Private)
+            net.sf.rails.game.Company target = null;
 
-            if (gm instanceof net.sf.rails.game.specific._1835.GameManager_1835) {
-                target = ((net.sf.rails.game.specific._1835.GameManager_1835) gm).getTargetCompanyForAction(pa);
+            if (pa instanceof StartPrussian) {
+                target = ((StartPrussian) pa).getCompanyToFold();
+            } else if (pa instanceof ExchangeForPrussianShare) {
+                target = ((ExchangeForPrussianShare) pa).getCompanyToExchange();
             }
 
-            // FALLBACK: Explicitly map StartPrussian to M2
-            if (target == null && (actionName.equals("StartPrussian") || actionName.equals("ExchangeForPrussianShare"))) {
-                System.out.println(">>> UI: Found " + actionName + ", manually mapping to M2.");
-                if (companies != null) {
-                    for (net.sf.rails.game.PublicCompany c : companies) {
-                        if ("M2".equals(c.getId())) {
-                            target = c;
-                            break;
+            // 2. INTERCEPT DISCARD ACTIONS (Map to Train Cards in Status Window)
+            else if (pa instanceof DiscardTrain) {
+                DiscardTrain dt = (DiscardTrain) pa;
+                net.sf.rails.game.PublicCompany company = (net.sf.rails.game.PublicCompany) dt.getCompany();
+                net.sf.rails.game.Train targetTrain = dt.getDiscardedTrain();
+                
+                int companyIndex = company.getPublicNumber();
+                
+                // Locate the Train Button Panel for this company
+                if (companyIndex >= 0 && companyIndex < nc && compSubTrainButtons[companyIndex] != null) {
+                    
+                    // We must find which button slot holds the specific train.
+                    // The buttons are populated in the same order as the company's train list.
+java.util.List<net.sf.rails.game.Train> trainList = new java.util.ArrayList<>(company.getPortfolioModel().getTrainList());
+                    int trainIdx = trainList.indexOf(targetTrain);
+                    
+                    // If valid index found, activate that specific card
+                    if (trainIdx >= 0 && trainIdx < compSubTrainButtons[companyIndex].length) {
+                        net.sf.rails.ui.swing.elements.RailCard card = compSubTrainButtons[companyIndex][trainIdx];
+                        
+                        if (card != null) {
+                            // Attach Action
+                            card.setPossibleAction(pa);
+                            
+                            // Visual Cue: CYAN for attention (consistent with PFR exchange)
+                            card.setBackground(java.awt.Color.CYAN);
+                            
+                            // Ensure it looks active
+                            card.setBorder(BorderFactory.createLineBorder(Color.BLACK, 2));
+                            card.setToolTipText("Click to Discard " + targetTrain.getName());
+                            
+                            card.setEnabled(true);
+                            card.setVisible(true);
+                            card.repaint();
                         }
                     }
                 }
+                // Continue loop to process other actions
+                continue; 
             }
 
-            if (target != null) {
-                int companyIndex = target.getPublicNumber();
+            if (target == null) continue;
+
+            // --- CASE A: PUBLIC COMPANY (Grid Logic) ---
+            if (target instanceof net.sf.rails.game.PublicCompany) {
+                int companyIndex = ((net.sf.rails.game.PublicCompany) target).getPublicNumber();
+                
+                // Determine Player Column from Action
                 int playerIndex = -1;
                 String actorName = pa.getPlayerName();
-                
-                if (actorName != null && players != null) {
+                if (actorName != null) {
                     for (int k = 0; k < players.getNumberOfPlayers(); k++) {
                         if (players.getPlayerByPosition(k).getName().equals(actorName)) {
                             playerIndex = k;
@@ -4480,22 +4485,74 @@ public class GameStatus extends GridPanel implements ActionListener {
                         }
                     }
                 }
-                
-                if (playerIndex == -1 && target.getPresident() != null) {
-                    playerIndex = target.getPresident().getIndex();
+                // Fallback to President
+                if (playerIndex == -1 && ((net.sf.rails.game.PublicCompany) target).getPresident() != null) {
+                    playerIndex = ((net.sf.rails.game.PublicCompany) target).getPresident().getIndex();
                 }
 
                 if (companyIndex >= 0 && companyIndex < nc && playerIndex >= 0 && playerIndex < np) {
-                    System.out.println(">>> UI: ACTIVATING BUTTON at [" + companyIndex + "," + playerIndex + "] for " + target.getId());
                     setPlayerCertButton(companyIndex, playerIndex, true, pa);
                     net.sf.rails.ui.swing.elements.RailCard card = getRailCardFor(companyIndex, playerIndex);
                     if (card != null) {
                         card.setBackground(java.awt.Color.CYAN);
+                        card.setVisible(true);
+                    }
+                }
+            }
+            // --- CASE B: PRIVATE COMPANY (Search All Panels) ---
+            else if (target instanceof net.sf.rails.game.PrivateCompany) {
+                // Debug Logging specifically for BB
+                boolean isBB = "BB".equals(target.getId());
+                if (isBB) {
+                    System.out.println("DEBUG-BB: Searching for BB. PlayerPanels=" + (playerPrivatesPanel == null ? "null" : playerPrivatesPanel.length));
+                }
+
+                boolean found = false;
+
+                // 1. Search PLAYER Panels
+                if (playerPrivatesPanel != null) {
+                    for (int i = 0; i < playerPrivatesPanel.length; i++) {
+                        if (playerPrivatesPanel[i] == null) continue;
+                        
+                        for (java.awt.Component comp : playerPrivatesPanel[i].getComponents()) {
+                            if (comp instanceof net.sf.rails.ui.swing.elements.RailCard) {
+                                net.sf.rails.ui.swing.elements.RailCard card = (net.sf.rails.ui.swing.elements.RailCard) comp;
+                                if (card.getCompany() == target) {
+                                    card.setPossibleAction(pa);
+                                    card.setBackground(java.awt.Color.CYAN);
+                                    card.setEnabled(true);
+                                    card.setVisible(true);
+                                    card.repaint();
+                                    found = true;
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // 2. Search COMPANY Panels (e.g. if a company owns the private)
+                if (!found && compPrivatesPanel != null) {
+                    for (int i = 0; i < compPrivatesPanel.length; i++) {
+                        if (compPrivatesPanel[i] == null) continue;
+
+                        for (java.awt.Component comp : compPrivatesPanel[i].getComponents()) {
+                            if (comp instanceof net.sf.rails.ui.swing.elements.RailCard) {
+                                net.sf.rails.ui.swing.elements.RailCard card = (net.sf.rails.ui.swing.elements.RailCard) comp;
+                                if (card.getCompany() == target) {
+                                    card.setPossibleAction(pa);
+                                    card.setBackground(java.awt.Color.CYAN);
+                                    card.setEnabled(true);
+                                    card.setVisible(true);
+                                    card.repaint();
+                                }
+                            }
+                        }
                     }
                 }
             }
         }
-        // --- END FIX ---
     }
 // ... (rest of the method) ...
+
+
 }

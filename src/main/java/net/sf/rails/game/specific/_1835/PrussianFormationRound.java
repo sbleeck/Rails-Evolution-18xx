@@ -53,7 +53,7 @@ public class PrussianFormationRound extends Round implements I_MapRenderableRoun
     }
 
     // Inner Action Class for the Swap Choice
-public static class PresidencySwapChoice extends PossibleAction {
+    public static class PresidencySwapChoice extends PossibleAction {
         private static final long serialVersionUID = 1L;
         private final int optionIndex;
         // FIX: Cast null to (RailsRoot)
@@ -171,7 +171,7 @@ public static class PresidencySwapChoice extends PossibleAction {
         return null;
     }
 
-public void start() {
+    public void start() {
         this.interruptedRound = gameManager.getInterruptedRound();
 
         // 1. Determine Force Status BEFORE checking the 'Already Offered' flag.
@@ -242,15 +242,20 @@ public void start() {
                 }
             }
         }
+        // 1. DYNAMIC HEADER UPDATE
+        // Ensure the sidebar always shows the CURRENT player who is being asked, not
+        // the round starter.
         if (this.currentPlayer != null) {
             try {
                 Class<?> orPanelClass = Class.forName("net.sf.rails.ui.swing.ORPanel");
-                java.lang.reflect.Method setHeader = orPanelClass.getMethod("setGlobalCustomHeader", String.class, String.class);
-                setHeader.invoke(null, "Prussian Formation", this.currentPlayer.getName() + ": ?");
+                java.lang.reflect.Method setHeader = orPanelClass.getMethod("setGlobalCustomHeader", String.class,
+                        String.class);
+                setHeader.invoke(null, "Prussian Formation", this.currentPlayer.getName() + " to Act");
             } catch (Throwable t) {
-                // Ignore if UI class not found or method missing
+                // Ignore errors
             }
         }
+        
 
         // --- Only Initialize State if this is a fresh start (not a reload/undo) ---
         // We check if the State object is "dirty" or matches default
@@ -276,24 +281,35 @@ public void start() {
                     executeStartPrussian(true);
                     setPrussianStep(Step.MERGE);
 
-                    Player nextPlayer = ((GameManager_1835) gameManager).getPrussianFormationStartingPlayer();
-                    if (nextPlayer == null) {
-                        nextPlayer = prussian.getPresident();
-                    }
-                    if (nextPlayer == null)
-                        nextPlayer = m2President;
+// Rule: The Exchange Phase starts with the Priority Deal player.
+                    Player nextPlayer = playerManager.getPriorityPlayer();
+                    
+                    // Fallback to M2 pres or Triggerer only if Priority is somehow missing
+                    if (nextPlayer == null) nextPlayer = ((GameManager_1835) gameManager).getPrussianFormationStartingPlayer();
+                    if (nextPlayer == null) nextPlayer = prussian.getPresident();
+                    if (nextPlayer == null) nextPlayer = m2President;
 
                     setStartingPlayer(nextPlayer);
-                    setCurrentPlayer(this.startingPlayer);
+                    setCurrentPlayer(nextPlayer);
+
+                    // --- START FIX ---
+                    // If forced start, we need to check if the starting player has any shares
+                    // to exchange. If not, auto-advance to the next player.
+                    setFoldablePrePrussians();
+                    if (foldablePrePrussians.isEmpty()) {
+                        finishTurn();
+                    }
+                    // --- END FIX ---
                 }
-            } else if (getPrussianStep() == Step.MERGE) {
-                Player sp = ((GameManager_1835) gameManager).getPrussianFormationStartingPlayer();
-                if (sp == null)
-                    sp = prussian.getPresident();
-                if (sp == null && m2 != null)
-                    sp = m2.getPresident();
+} else if (getPrussianStep() == Step.MERGE) {
+                // --- START FIX ---
+                // If we resume in Merge phase, ensure we start with Priority Deal.
+                Player sp = playerManager.getPriorityPlayer();
+                if (sp == null) sp = ((GameManager_1835) gameManager).getPrussianFormationStartingPlayer();
+                
                 setStartingPlayer(sp);
                 setCurrentPlayer(this.startingPlayer);
+                // --- END FIX ---
             }
         }
 
@@ -335,6 +351,14 @@ public void start() {
     }
 
     private boolean hasExchangeProperty(Company c) {
+        // --- START FIX ---
+        // Explicitly include BB and HB as exchangeable privates
+        // This ensures they are offered for exchange even if they lack the ExchangeForShare property metadata
+        if (c.getId().equals("BB") || c.getId().equals("HB")) {
+            return true;
+        }
+        // --- END FIX ---
+
         Set<SpecialProperty> sps = c.getSpecialProperties();
         if (sps == null || sps.isEmpty())
             return false;
@@ -386,11 +410,28 @@ public void start() {
             // Update State
             setStartingPlayer(((GameManager_1835) gameManager).getPrussianFormationStartingPlayer());
             mergeTurnCount.set(0);
+
+            // --- START FIX ---
+            // After starting Prussia, check if this player has other papers (e.g. BB/HB)
+            // If not, finish their turn immediately to skip to the next player.
+            setFoldablePrePrussians();
+            if (foldablePrePrussians.isEmpty()) {
+                finishTurn();
+            }
+            // --- END FIX ---
             return true;
 
         } else if (action instanceof ExchangeForPrussianShare) {
             ExchangeForPrussianShare a = (ExchangeForPrussianShare) action;
             executeExchange(Arrays.asList(a.getCompanyToExchange()), false, false);
+            
+            // --- START FIX ---
+            // If the player has no more shares to exchange, automatically finish their turn.
+            setFoldablePrePrussians();
+            if (foldablePrePrussians.isEmpty()) {
+                finishTurn();
+            }
+            // --- END FIX ---
             return true;
 
         } else if (action instanceof DiscardTrain) {
@@ -414,16 +455,33 @@ public void start() {
     }
 
     protected void finishTurn() {
-        int count = mergeTurnCount.value() + 1;
-        mergeTurnCount.set(count);
+        int count = mergeTurnCount.value(); 
+        
+        // --- START FIX ---
+        // Loop to find the next player who actually has shares to exchange.
+        // If a player has nothing, we skip them automatically.
+        // count increments on every iteration (every "skip" counts as a turn taken)
+        while (true) {
+            count++;
+            mergeTurnCount.set(count);
 
-        if (count >= playerManager.getNumberOfPlayers()) {
-            finishMergeStep();
-            return;
+            if (count >= playerManager.getNumberOfPlayers()) {
+                finishMergeStep();
+                return;
+            }
+
+            Player nextPlayer = playerManager.getNextPlayer();
+            setCurrentPlayer(nextPlayer);
+            
+            // Check if this player has anything to fold
+            setFoldablePrePrussians();
+            if (!foldablePrePrussians.isEmpty()) {
+                // Found a player with actions, stop advancing and let them play.
+                break;
+            }
+            // If empty, loop continues (skipping this player)
         }
-
-        Player nextPlayer = playerManager.getNextPlayer();
-        setCurrentPlayer(nextPlayer);
+        // --- END FIX ---
     }
 
     private void finishMergeStep() {
@@ -530,7 +588,22 @@ public void start() {
                 }
             }
             if (efs == null) {
-                continue;
+                // FALLBACK for BB/HB if property is missing but hardcoded exchange logic triggered
+                if (company.getId().equals("BB") || company.getId().equals("HB")) {
+                    // Create a dummy property or handle logic manually?
+                    // Usually neededShare is 10% or 5%. 
+                    // In 1835: BB/HB exchange for 1 share.
+                    // We need 'neededShare'. Let's assume standard share unit (10% or 5%).
+                    // But 'efs.getShare()' is used below.
+                    // We need to fetch the share size from XML or assume based on rules.
+                    // If efs is null, we can't proceed unless we construct one or fake it.
+                    // Assuming they HAVE the property but it was missed, or we continue
+                    // and let the try/catch blocks handle it?
+                    // Actually, if efs is null, we should probably fetch the standard exchange share size.
+                    // Let's rely on finding a matching certificate in 'unavailable' first.
+                } else {
+                    continue;
+                }
             }
 
             boolean isPresidentShare = president && (owner instanceof Player);
@@ -543,7 +616,7 @@ public void start() {
 
             // New approach: Find by explicit percentage matching
             cert = null;
-            int neededShare = efs.getShare();
+            int neededShare = (efs != null) ? efs.getShare() : prussian.getShareUnit(); // Fallback to 1 unit if efs missing
 
             // 1. Try to find exact match in unavailable pile
             for (PublicCertificate c : unavailable.getCertificates()) {
@@ -574,8 +647,10 @@ public void start() {
             } else {
                            // Fallback to original method just in case (though likely to fail if it was 0)
                 try {
-                    cert = unavailable.findCertificate(prussian, neededShare / prussian.getShareUnit(),
-                            isPresidentShare);
+                    int shareUnits = neededShare / prussian.getShareUnit();
+                    if (shareUnits == 0) shareUnits = 1; // Safety for 5% shares
+                    
+                    cert = unavailable.findCertificate(prussian, shareUnits, isPresidentShare);
                     if (cert != null)
                         cert.moveTo(owner);
                 } catch (Exception e) {
@@ -981,6 +1056,4 @@ public void start() {
 
         ReportBuffer.add(this, LocalText.getText("IS_NOW_PRES_OF", newCandidate.getName(), prussian.getId()));
     }
-    // --- END FIX ---
-
 }

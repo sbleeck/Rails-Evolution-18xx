@@ -2418,6 +2418,16 @@ public void updateDynamicActions(List<PossibleAction> actions) {
                 specialPanel.removeAll();
 
                 for (PossibleAction spa : specialActions) {
+
+                    // Hide redundant buttons that are now driven by Status Window Cards.
+                    // This forces the "Card UI" design language.
+                    if (spa instanceof StartPrussian || 
+                        spa instanceof ExchangeForPrussianShare || 
+                        spa instanceof DiscardTrain) {
+                        continue;
+                    }
+
+                    
                     String labelText = spa.getButtonLabel();
                     if (spa instanceof NullAction) {
                         NullAction na = (NullAction) spa;
