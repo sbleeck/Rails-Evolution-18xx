@@ -115,6 +115,18 @@ public class ORUIManager implements DialogOwner {
         this.networkAdapter = NetworkAdapter.create(gameUIManager.getRoot());
     }
 
+public String getPrussianStep() {
+    // getCurrentRound() returns a RoundFacade. 
+    // In this API, the Facade IS the Round implementation.
+    net.sf.rails.game.round.RoundFacade facade = gameUIManager.getGameManager().getCurrentRound();
+    
+    if (facade instanceof PrussianFormationRound) {
+        return ((PrussianFormationRound) facade).getPrussianStep();
+    }
+    return "";
+}
+
+
     void init(ORWindow orWindow) {
 
         this.orWindow = orWindow;
