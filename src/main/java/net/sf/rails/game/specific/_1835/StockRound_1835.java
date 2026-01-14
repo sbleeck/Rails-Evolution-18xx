@@ -146,14 +146,17 @@ public class StockRound_1835 extends StockRound {
      */
     @Override
     protected void adjustSharePrice(PublicCompany company, Owner seller, int sharesSold, boolean soldBefore) {
-        // Always call super to enforce the price drop on the stock market.
-        // This ensures that selling 10% then 10% results in TWO drops.
-        super.adjustSharePrice(company, seller, sharesSold, soldBefore);
-
-        // Track last sold for UI/Undo purposes
+// If shares were already sold this turn, the price has already dropped.
+        // We do NOT drop it again automatically.
         if (soldBefore) {
+            // Track last sold company to allow manual "Adjust Price" action if strict rules are preferred
             lastSoldCompany = company;
+            return;
         }
+
+        // Always drop exactly 1 space on the first sale, regardless of the quantity sold.
+        super.adjustSharePrice(company, seller, 1, soldBefore);
+        
     }
 
     private static final Logger log = LoggerFactory.getLogger(StockRound_1835.class);

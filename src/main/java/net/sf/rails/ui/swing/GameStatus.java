@@ -1229,22 +1229,8 @@ public class GameStatus extends GridPanel implements ActionListener {
                     ((BuyCertificate) chosenAction).setNumberBought(buyAmounts.get(index));
                 }
             } else if (actions.get(0) instanceof CashCorrectionAction) {
-                CashCorrectionAction cca = (CashCorrectionAction) actions.get(0);
-                String amountString = (String) JOptionPane.showInputDialog(this,
-                        LocalText.getText("CorrectCashDialogMessage", cca.getCashHolderName()),
-                        LocalText.getText("CorrectCashDialogTitle"),
-                        JOptionPane.QUESTION_MESSAGE, null, null, 0);
-                if (amountString.charAt(0) == '+')
-                    amountString = amountString.substring(1);
-                int amount;
-                try {
-                    amount = Integer.parseInt(amountString);
-                } catch (NumberFormatException e) {
-                    amount = 0;
-                }
-                cca.setAmount(amount);
-                chosenAction = cca;
-
+                // Delegate to GameUIManager
+                chosenAction = actions.get(0);
             } else if (actions.get(0) instanceof BuyPrivate) {
                 // Delegate the UI interaction to the ORUIManager to avoid code duplication
                 // and ensure consistent modal parenting (ORWindow vs StatusWindow).

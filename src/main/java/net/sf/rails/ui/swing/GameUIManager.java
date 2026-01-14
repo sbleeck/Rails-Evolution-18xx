@@ -2154,6 +2154,30 @@ public void fitMapToWidth() {
             }
         }
 
+        // Intercept Cash Correction Actions to handle UI inputs locally
+        if (action instanceof rails.game.correct.CashCorrectionAction) {
+            rails.game.correct.CashCorrectionAction cca = (rails.game.correct.CashCorrectionAction) action;
+            
+            String amountString = (String) JOptionPane.showInputDialog(statusWindow,
+                    LocalText.getText("CorrectCashDialogMessage", cca.getCashHolderName()),
+                    LocalText.getText("CorrectCashDialogTitle"),
+                    JOptionPane.QUESTION_MESSAGE, null, null, "0");
+
+            if (amountString == null) return false;
+
+            if (amountString.length() > 0 && amountString.charAt(0) == '+')
+                amountString = amountString.substring(1);
+
+            try {
+                int amount = Integer.parseInt(amountString);
+                cca.setAmount(amount);
+            } catch (NumberFormatException e) {
+                return false;
+            }
+            // Fall through to processOnServer below
+        }
+        
+
 
         if (action == null) {
             result = previousResult;
