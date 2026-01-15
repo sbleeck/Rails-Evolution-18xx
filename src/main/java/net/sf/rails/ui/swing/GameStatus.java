@@ -77,7 +77,8 @@ public class GameStatus extends GridPanel implements ActionListener {
     // Flexible height for privates (Point 4b) - Width 85, Height 0 (auto)
     private final Dimension DIM_TRAIN = new Dimension(40, 20);
 
-    public static final Color BG_BUY_ACTIVE = new Color(144, 238, 144); // Light Green (#90EE90) - Standard "Buy"
+    public static final Color BG_BUY_ACTIVE = new Color(144, 238, 144); // Light Green (#90EE90) - Standard "Buy"\
+    // public static final Color BG_SPECIAL_ACTIVE = Color.CYAN; // Global constant for Special Actions
     private final Color BG_SELL_ALERT = new Color(250, 128, 114); // Salmon Pink (#FA8072) - Shares Sell
     public static final Color BG_CARD_PASSIVE = new Color(255, 255, 240); // Beige (Must be static for static method
                                                                           // usage)
@@ -250,7 +251,7 @@ public class GameStatus extends GridPanel implements ActionListener {
 
     protected ClickField futureTrainsButton;
     // Config
-    private final int MAX_POOL_SLOTS = 4;
+    private final int MAX_POOL_SLOTS = 3;
 
     // 1. Restore the missing panel array
     protected JPanel[] compTrainsButtonPanel;
@@ -1229,9 +1230,8 @@ public class GameStatus extends GridPanel implements ActionListener {
                     ((BuyCertificate) chosenAction).setNumberBought(buyAmounts.get(index));
                 }
             } else if (actions.get(0) instanceof CashCorrectionAction) {
-                // Delegate to GameUIManager
+                // Delegate to GameUIManagers
                 chosenAction = actions.get(0);
-log.info("DEBUG: GameStatus clicked Cash Correction for " + ((CashCorrectionAction)chosenAction).getCashHolder().getId());
             } else if (actions.get(0) instanceof BuyPrivate) {
                 // Delegate the UI interaction to the ORUIManager to avoid code duplication
                 // and ensure consistent modal parenting (ORWindow vs StatusWindow).
@@ -2059,13 +2059,10 @@ log.info("DEBUG: GameStatus clicked Cash Correction for " + ((CashCorrectionActi
                 // Check against ID map
                 if (activePrivateActions.containsKey(pc.getId())) {
                     PossibleAction action = activePrivateActions.get(pc.getId());
-
-                    // CRITICAL: Attach the action to the card so clicking it works!
+                    // Attach the action to the card so clicking it works!
                     card.addPossibleAction(action);
-
-                    card.setBackground(Color.CYAN); // Green
-                    card.setBorder(BorderFactory.createLineBorder(Color.BLACK, 2)); // Thicker border
-                    card.setState(RailCard.State.ACTIONABLE); // Make it look clickable/active
+// The card will check its internal logic and paint itself Cyan (COL_HIGHLIGHT_BG).
+                    card.setState(RailCard.State.HIGHLIGHTED);
 
                     if (action instanceof BuyPrivate) {
                         card.setToolTipText("Click to Buy " + pc.getId());
@@ -4099,9 +4096,6 @@ log.info("DEBUG: GameStatus clicked Cash Correction for " + ((CashCorrectionActi
         poolTrainButtons = new RailCard[MAX_POOL_SLOTS];
         poolTrainInfoLabels = new javax.swing.JLabel[MAX_POOL_SLOTS];
 
-        // TEMP FIX: Limit loop to 1 to enforce single-column width
-        int visiblePoolSlots = 1;
-
         for (int i = 0; i < MAX_POOL_SLOTS; i++) {
             // Create a Slot Panel (Vertical Box) to hold Button + Label
             JPanel slot = new JPanel(new BorderLayout());
@@ -4118,7 +4112,7 @@ log.info("DEBUG: GameStatus clicked Cash Correction for " + ((CashCorrectionActi
             poolTrainInfoLabels[i].setFont(new Font("SansSerif", Font.PLAIN, 10));
             slot.add(poolTrainInfoLabels[i], BorderLayout.CENTER);
 
-            if (i < visiblePoolSlots)
+            if (i < MAX_POOL_SLOTS)
                 poolTrainsPanel.add(slot);
         }
 
@@ -4481,8 +4475,7 @@ java.util.List<net.sf.rails.game.Train> trainList = new java.util.ArrayList<>(co
                     setPlayerCertButton(companyIndex, playerIndex, true, pa);
                     net.sf.rails.ui.swing.elements.RailCard card = getRailCardFor(companyIndex, playerIndex);
                     if (card != null) {
-                        card.setBackground(java.awt.Color.CYAN);
-                        card.setVisible(true);
+                        card.setState(RailCard.State.HIGHLIGHTED);
                     }
                 }
             }
@@ -4506,9 +4499,7 @@ java.util.List<net.sf.rails.game.Train> trainList = new java.util.ArrayList<>(co
                                 net.sf.rails.ui.swing.elements.RailCard card = (net.sf.rails.ui.swing.elements.RailCard) comp;
                                 if (card.getCompany() == target) {
                                     card.setPossibleAction(pa);
-                                    card.setBackground(java.awt.Color.CYAN);
-                                    card.setEnabled(true);
-                                    card.setVisible(true);
+                                    card.setState(RailCard.State.HIGHLIGHTED);
                                     card.repaint();
                                     found = true;
                                 }
@@ -4527,9 +4518,7 @@ java.util.List<net.sf.rails.game.Train> trainList = new java.util.ArrayList<>(co
                                 net.sf.rails.ui.swing.elements.RailCard card = (net.sf.rails.ui.swing.elements.RailCard) comp;
                                 if (card.getCompany() == target) {
                                     card.setPossibleAction(pa);
-                                    card.setBackground(java.awt.Color.CYAN);
-                                    card.setEnabled(true);
-                                    card.setVisible(true);
+                                    card.setState(RailCard.State.HIGHLIGHTED);
                                     card.repaint();
                                 }
                             }
@@ -4539,7 +4528,6 @@ java.util.List<net.sf.rails.game.Train> trainList = new java.util.ArrayList<>(co
             }
         }
     }
-// ... (rest of the method) ...
 
 
 }

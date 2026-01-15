@@ -36,8 +36,12 @@ public class JsonStateSerializer {
         data.stockRoundNumber = gm.getSRNumber();
         data.absoluteORNumber = gm.getAbsoluteORNumber();
         data.relativeORNumber = gm.getRelativeORNumber();
-        data.currentPlayerId = gm.getCurrentPlayer().getId();
-        data.priorityPlayerId = gm.getRoot().getPlayerManager().getPriorityPlayer().getId();
+if (gm.getCurrentPlayer() != null) {
+            data.currentPlayerId = gm.getCurrentPlayer().getId();
+        } else {
+            data.currentPlayerId = "System"; // Fallback value
+        }
+                data.priorityPlayerId = gm.getRoot().getPlayerManager().getPriorityPlayer().getId();
         return data;
     }
 

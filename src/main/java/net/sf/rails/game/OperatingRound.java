@@ -321,7 +321,18 @@ public class OperatingRound extends Round implements Observer {
             }
         }
         
-
+// SAFETY NET: Zombie Company Detection
+        // If the operating company is closed (e.g., merged M1) and we are not explicitly
+        // handling a discard action (which might be the cause of the closure), 
+        // we must not allow it to operate.
+        if (operatingCompany.value() != null && operatingCompany.value().isClosed()) {
+            if (!(action instanceof DiscardTrain)) {
+                log.warn("OperatingRound: Detected closed company {} attempting to act. Forcing finishTurn().", 
+                        operatingCompany.value().getId());
+                finishTurn();
+                return true;
+            }
+        }
         
         boolean result = false;
         doneAllowed.set(false);

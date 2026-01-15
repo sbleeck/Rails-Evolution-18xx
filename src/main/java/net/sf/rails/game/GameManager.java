@@ -1414,6 +1414,109 @@ public void setRound(RoundFacade round) {
 
 
 
+    /**
+     * EMERGENCY DEBUG TOOL: Forces the Operating Round to jump to the next company.
+     * Use this if the game hangs on a closed company (Zombie Company).
+     */
+    public void forceSkipStuckCompany() {
+        RoundFacade current = getCurrentRound();
+        if (current == null || !(current instanceof OperatingRound)) {
+            log.warn("ForceSkip: Not in an Operating Round. Ignoring.");
+            return;
+        }
+
+        log.error("!!! FORCE SKIP INITIATED !!! Attempting to surgically advance company index...");
+
+        try {
+            OperatingRound or = (OperatingRound) current;
+            
+            // 1. Access the internal list of operating companies
+            // We use the getter provided in OperatingRound to avoid reflection if possible.
+            // (Assuming getOperatingCompanies() is public/protected, otherwise we use reflection)
+            List<PublicCompany> companies = or.getOperatingCompanies(); 
+            PublicCompany stuckComp = or.getOperatingCompany();
+            
+            if (companies == null || companies.isEmpty()) {
+                 log.error("ForceSkip: No operating companies list found.");
+                 return;
+            }
+
+            // 2. Find current index
+            int currentIndex = companies.indexOf(stuckComp);
+            log.info("ForceSkip: Stuck Company = {}, Index = {}", stuckComp.getId(), currentIndex);
+
+            // 3. Find next valid company
+            // We search forward until we find a company that is NOT closed and HAS floated.
+            int nextIndex = currentIndex;
+            int attempts = 0;
+            PublicCompany nextComp = null;
+            
+            while (attempts < companies.size()) {
+                nextIndex = (nextIndex + 1) % companies.size();
+                PublicCompany candidate = companies.get(nextIndex);
+                
+                // CRITICAL CHECK: Skip if closed (Zombie) OR if it hasn't floated yet
+                if (!candidate.isClosed() && candidate.hasFloated()) {
+                    nextComp = candidate;
+                    break;
+                }
+                attempts++;
+            }
+
+            if (nextComp != null) {
+                log.info("ForceSkip: Advancing to {}", nextComp.getId());
+                
+                // 4. Force state update using Reflection
+                // We must update the 'operatingCompany' field and the 'orCompIndex' field.
+                
+                // Set 'orCompIndex'
+                try {
+                    java.lang.reflect.Field indexField = OperatingRound.class.getDeclaredField("orCompIndex");
+                    indexField.setAccessible(true);
+                    indexField.setInt(or, nextIndex);
+                } catch (NoSuchFieldException e) {
+                    // Fallback for different variable names in older versions
+                    log.warn("ForceSkip: Could not set 'orCompIndex'. Trying to continue via setOperatingCompany.");
+                }
+
+                // Set 'operatingCompany' (The State object)
+                // Note: operatingCompany is a GenericState<PublicCompany>
+                java.lang.reflect.Field stateField = OperatingRound.class.getDeclaredField("operatingCompany");
+                stateField.setAccessible(true);
+                @SuppressWarnings("unchecked")
+                GenericState<PublicCompany> opCompState = (GenericState<PublicCompany>) stateField.get(or);
+                opCompState.set(nextComp);
+                
+                // 5. Reset Step to INITIAL to ensure the new company starts fresh
+                java.lang.reflect.Method setStepMethod = OperatingRound.class.getDeclaredMethod("setStep", GameDef.OrStep.class);
+                setStepMethod.setAccessible(true);
+                setStepMethod.invoke(or, GameDef.OrStep.INITIAL);
+
+                // 6. Force the Round to initialize the turn for the new company
+                // This triggers the UI refresh (ORPanel update)
+                java.lang.reflect.Method initTurnMethod = OperatingRound.class.getDeclaredMethod("initTurn");
+                initTurnMethod.setAccessible(true);
+                initTurnMethod.invoke(or);
+
+                DisplayBuffer.add(this, "FORCE SKIP SUCCESS: Advanced to " + nextComp.getId());
+                
+                // 7. Force UI Repaint
+                 if (gameUIManager != null && gameUIManager.getStatusWindow() != null) {
+                    SwingUtilities.invokeLater(() -> gameUIManager.getStatusWindow().repaint());
+                }
+
+            } else {
+                log.error("ForceSkip: Could not find any valid next company.");
+                DisplayBuffer.add(this, "Force Skip Failed: No valid next company found.");
+            }
+
+        } catch (Exception e) {
+            log.error("ForceSkip: Failed to modify state.", e);
+            DisplayBuffer.add(this, "Force Skip Failed: " + e.getMessage());
+        }
+    }
+
+    
         /**
      * Central processing method for game actions.
      * 
@@ -1422,6 +1525,13 @@ public void setRound(RoundFacade round) {
      */
     public boolean process(PossibleAction action) {
         // log.debug("process({})", action); // Existing log
+
+        // EMERGENCY OVERRIDE: Check for "FORCE_SKIP" signal
+        // This allows recovering a stuck game state where a company loops infinitely.
+        if (action != null && action.toString().contains("FORCE_SKIP")) {
+             forceSkipStuckCompany();
+             return true;
+        }
 
         getRoot().getReportManager().getDisplayBuffer().clear();
 

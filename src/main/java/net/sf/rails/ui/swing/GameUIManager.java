@@ -501,8 +501,13 @@ if (windowSettings != null) {
         String actionSource = action.isAIAction() ? "AI" : "Human"; // Check the flag
 
         action.setActed();
-        action.setPlayerName(getCurrentPlayer().getId());
-
+Player currentPlayer = getCurrentPlayer();
+        if (currentPlayer != null) {
+            action.setPlayerName(currentPlayer.getId());
+        } else {
+            action.setPlayerName("System"); // Fallback for administrative actions
+        }
+        log.info("ProcessOnServer: Action={} Player={}", action, action.getPlayerName());
 
 
 

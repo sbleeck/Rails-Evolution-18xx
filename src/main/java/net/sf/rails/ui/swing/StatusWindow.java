@@ -451,6 +451,13 @@ public class StatusWindow extends JFrame implements ActionListener, ActionPerfor
         correctionMenu.setMnemonic(KeyEvent.VK_C);
         correctionMenu.setEnabled(true);
         // menuBar.add(moderatorMenu);
+
+
+        
+
+
+
+
         menuBar.add(correctionMenu); // Add as a top-level menu item
 
         // --- 9. DEVELOPER (Conditional) ---
@@ -569,6 +576,32 @@ public class StatusWindow extends JFrame implements ActionListener, ActionPerfor
 
             correctionMenu.add(item);
         }
+        // Re-add the Debug Item (Must be done here because removeAll() clears it)
+        correctionMenu.addSeparator();
+        JMenuItem forceSkipItem = new JMenuItem("Force Skip Stuck Turn (Debug)");
+        forceSkipItem.setToolTipText("Use this ONLY if the game hangs on a closed company (Zombie Turn).");
+        forceSkipItem.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                int response = JOptionPane.showConfirmDialog(
+                    StatusWindow.this,
+                    "This is a debug tool to bypass a stuck turn (e.g., a closed company acting).\n"
+                    + "It forcibly advances the internal company index.\n\n"
+                    + "Are you sure you want to force the engine to skip the current actor?",
+                    "Force Skip Confirmation",
+                    JOptionPane.YES_NO_OPTION,
+                    JOptionPane.WARNING_MESSAGE
+                );
+
+                if (response == JOptionPane.YES_OPTION) {
+                    if (gameUIManager != null && gameUIManager.getGameManager() != null) {
+                        gameUIManager.getGameManager().forceSkipStuckCompany();
+                    }
+                }
+            }
+        });
+        correctionMenu.add(forceSkipItem);
+        
     }
 
     public boolean setupFor(RoundFacade round) {
@@ -1279,6 +1312,32 @@ public class StatusWindow extends JFrame implements ActionListener, ActionPerfor
             // We removed the hardcoded 1835 PFR check.
             updateGameSpecificHighlights();
 
+            // RESOLVE EFFECTIVE PLAYER (Centralized Fix)
+            // If the Engine reports NULL (during interruptions like Discard Train),
+            // we infer the active player from the Operating Company.
+            Player effectivePlayer = getCurrentPlayer();
+            if (effectivePlayer == null && gameUIManager.getGameManager() != null) {
+                RoundFacade rf = gameUIManager.getGameManager().getCurrentRound();
+                if (rf instanceof OperatingRound) {
+                    PublicCompany pc = ((OperatingRound) rf).getOperatingCompany();
+                    if (pc != null && pc.getPresident() != null) {
+                        effectivePlayer = pc.getPresident();
+                        log.info("StatusWindow: Interruption detected. Inferred Active Player: {}",
+                                effectivePlayer.getName());
+                    }
+                }
+            }
+            // Use this safe index for ALL initTurn calls below
+            final int effectivePlayerIndex = (effectivePlayer != null) ? effectivePlayer.getIndex() : -1;
+
+            // 1. Highlight Logic
+            if (!myTurn) {
+                gameStatus.initTurn(effectivePlayerIndex, false);
+            } else {
+                // Unconditionally call initTurn for the active player.
+                gameStatus.initTurn(effectivePlayerIndex, true);
+            }
+
             // Register the Global Hotkey Manager
             KeyboardFocusManager.getCurrentKeyboardFocusManager()
                     .addKeyEventDispatcher(new GlobalHotkeyManager(gameUIManager));
@@ -1319,13 +1378,13 @@ public class StatusWindow extends JFrame implements ActionListener, ActionPerfor
 
                 // 2. Highlight Logic
                 if (!myTurn) {
-                    gameStatus.initTurn(getCurrentPlayer().getIndex(), false);
+                    gameStatus.initTurn(effectivePlayerIndex, false);
                 } else if (currentRound instanceof StockRound
                         || currentRound instanceof StartRound
                         || currentRound instanceof ShareSellingRound
                         || currentRound instanceof TreasuryShareRound) {
 
-                    gameStatus.initTurn(getCurrentPlayer().getIndex(), true);
+                    gameStatus.initTurn(effectivePlayerIndex, true);
                 }
 
             } catch (Exception e) {
@@ -1361,7 +1420,7 @@ public class StatusWindow extends JFrame implements ActionListener, ActionPerfor
 
                         // 5. Retry Logic on the FRESH instance
                         if (!myTurn) {
-                            gameStatus.initTurn(getCurrentPlayer().getIndex(), false);
+                            gameStatus.initTurn(effectivePlayerIndex, false);
                         } else {
                             if (currentRound instanceof StockRound
                                     || currentRound instanceof ShareSellingRound
@@ -1370,7 +1429,7 @@ public class StatusWindow extends JFrame implements ActionListener, ActionPerfor
                                 if (gameUIManager.getPriorityPlayer() != null) {
                                     priority = gameUIManager.getPriorityPlayer().getIndex();
                                 }
-                                gameStatus.initTurn(getCurrentPlayer().getIndex(), true);
+                                gameStatus.initTurn(effectivePlayerIndex, true);
                                 if (priority >= 0)
                                     gameStatus.setPriorityPlayer(priority);
                             }
@@ -1385,19 +1444,19 @@ public class StatusWindow extends JFrame implements ActionListener, ActionPerfor
             }
 
             // 1. Highlight Logic
+
             if (!myTurn) {
-                gameStatus.initTurn(getCurrentPlayer().getIndex(), false);
+                gameStatus.initTurn(effectivePlayerIndex, false);
             } else {
                 // Unconditionally call initTurn for the active player.
-                gameStatus.initTurn(getCurrentPlayer().getIndex(), true);
+                gameStatus.initTurn(effectivePlayerIndex, true);
             }
 
             log.info("[FLOW] 7. StatusWindow: updateStatus. MyTurn={}. Checking PFR...", myTurn);
 
-
             // --- STOCK ROUND / START ROUND LOGIC ---
-            Player currentPlayer = getCurrentPlayer();
-            String activityText = "Thinking: " + currentPlayer.getName();
+            Player currentPlayer = effectivePlayer;
+            String activityText = (currentPlayer != null) ? "Thinking: " + currentPlayer.getName() : "Thinking...";
 
             if (currentRound instanceof StockRound) {
                 float certCount = currentPlayer.getPortfolioModel().getCertificateCount();
@@ -1521,7 +1580,6 @@ public class StatusWindow extends JFrame implements ActionListener, ActionPerfor
             log.error("CRITICAL ERROR in StatusWindow.updateStatus", e);
         }
     }
-
 
     /**
      * Hook for subclasses (e.g., StatusWindow_1835) to apply specific highlighting
@@ -1905,7 +1963,7 @@ public class StatusWindow extends JFrame implements ActionListener, ActionPerfor
         return null;
     }
 
-/**
+    /**
      * Protected helper to allow subclasses (like 1835) to find specific cards
      * to apply highlighting logic.
      */
@@ -1913,7 +1971,8 @@ public class StatusWindow extends JFrame implements ActionListener, ActionPerfor
             net.sf.rails.game.Company targetCompany,
             net.sf.rails.game.financial.Certificate targetCert) {
 
-        if (parent == null) return null;
+        if (parent == null)
+            return null;
 
         for (Component c : parent.getComponents()) {
             if (c instanceof net.sf.rails.ui.swing.elements.RailCard) {
@@ -1930,8 +1989,10 @@ public class StatusWindow extends JFrame implements ActionListener, ActionPerfor
                     return card;
                 }
             } else if (c instanceof Container) {
-                net.sf.rails.ui.swing.elements.RailCard found = findRailCardRecursive((Container) c, targetCompany, targetCert);
-                if (found != null) return found;
+                net.sf.rails.ui.swing.elements.RailCard found = findRailCardRecursive((Container) c, targetCompany,
+                        targetCert);
+                if (found != null)
+                    return found;
             }
         }
         return null;
@@ -1972,20 +2033,21 @@ public class StatusWindow extends JFrame implements ActionListener, ActionPerfor
         }
     }
 
-
     /**
      * WATERTIGHT SOLUTION:
-     * A generic, robust method to find a specific certificate on screen, 
+     * A generic, robust method to find a specific certificate on screen,
      * highlight it, and attach an action to it.
      * * @param targetCert The specific certificate object to find.
-     * @param action     The action to execute when clicked.
-     * @param tooltip    (Optional) Text to show on hover.
+     * 
+     * @param action  The action to execute when clicked.
+     * @param tooltip (Optional) Text to show on hover.
      * @return true if the card was found and highlighted.
      */
-    public boolean attachActionToCertificate(net.sf.rails.game.financial.Certificate targetCert, 
-                                             PossibleAction action, 
-                                             String tooltip) {
-        if (targetCert == null || action == null) return false;
+    public boolean attachActionToCertificate(net.sf.rails.game.financial.Certificate targetCert,
+            PossibleAction action,
+            String tooltip) {
+        if (targetCert == null || action == null)
+            return false;
 
         // 1. Find the Company associated with the cert
         net.sf.rails.game.Company company = null;
@@ -2001,7 +2063,7 @@ public class StatusWindow extends JFrame implements ActionListener, ActionPerfor
 
         // 3. Fallback: Grid Lookup (The "Fast Fix" logic, formalized)
         if (card == null && gameStatus != null && company instanceof PublicCompany) {
-             if (targetCert.getOwner() instanceof Player) {
+            if (targetCert.getOwner() instanceof Player) {
                 int pIdx = ((Player) targetCert.getOwner()).getIndex();
                 int cIdx = ((PublicCompany) company).getPublicNumber();
                 card = gameStatus.getRailCardFor(cIdx, pIdx);
@@ -2012,18 +2074,18 @@ public class StatusWindow extends JFrame implements ActionListener, ActionPerfor
         if (card != null) {
             card.setState(net.sf.rails.ui.swing.elements.RailCard.State.HIGHLIGHTED);
             card.setPossibleAction(action);
-            
+
             // Clean listeners to prevent double-clicks
-            card.removeActionListener(this); 
+            card.removeActionListener(this);
             card.addActionListener(this);
-            
+
             if (tooltip != null) {
                 card.setToolTipText("<html><b>" + tooltip + "</b><br>" + company.getId() + "</html>");
             }
             card.repaint();
             return true;
         }
-        
+
         return false;
     }
 

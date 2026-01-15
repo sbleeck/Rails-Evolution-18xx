@@ -99,7 +99,7 @@ public class OperatingRound_1835 extends OperatingRound {
 
                         // Prevent the end-of-turn loop from triggering this again
                         pfrTriggeredThisOR.set(true);
-                        needPrussianFormationCall.set(false);
+                        // needPrussianFormationCall.set(false);
                     }
                 }
             }
@@ -136,172 +136,6 @@ public class OperatingRound_1835 extends OperatingRound {
         }
         return true;
     }
-
-    @Override
-    protected void privatesPayOut() {
-        int count = 0;
-        for (PrivateCompany priv : companyManager.getAllPrivateCompanies()) {
-            if (!priv.isClosed()) {
-                if (priv.getOwner() instanceof MoneyOwner) {
-                    Owner recipient = priv.getOwner();
-                    int revenue = priv.getRevenueByPhase(Phase.getCurrent(this));
-                    if (count++ == 0)
-                        ReportBuffer.add(this, "");
-                    String revText = Currency.fromBank(revenue, (MoneyOwner) recipient);
-                    ReportBuffer.add(this, LocalText.getText("ReceivesFor",
-                            recipient.getId(),
-                            revText,
-                            priv.getId()));
-
-                    if (recipient instanceof Player && priv.getSpecialProperties() != null
-                            && priv.getSpecialProperties().size() > 0) {
-                        SpecialProperty sp = Iterables.get(priv.getSpecialProperties(), 0);
-                        if (sp instanceof ExchangeForShare) {
-                            ExchangeForShare efs = (ExchangeForShare) sp;
-                            if (efs.getPublicCompanyName().equalsIgnoreCase(GameDef_1835.PR_ID)) {
-                                int share = efs.getShare();
-                                Player player = (Player) recipient;
-                                addIncomeDenialShare(player, share);
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    private void addIncomeDenialShare(Player player, int share) {
-        if (!deniedIncomeShare.containsKey(player)) {
-            deniedIncomeShare.put(player, share);
-        } else {
-            deniedIncomeShare.put(player, share + deniedIncomeShare.get(player));
-        }
-    }
-
-
-    
-// ... (lines of unchanged context code) ...
-    @Override
-    protected Map<MoneyOwner, Integer> countSharesPerRecipient() {
-
-        // 1. Get the standard distribution from the engine
-        Map<MoneyOwner, Integer> sharesPerRecipient = super.countSharesPerRecipient();
-        
-        // --- DEBUG: LOGGING START ---
-        if (operatingCompany.value().getId().equals("PR")) {
-            log.info("=== PRUSSIAN REVENUE CALCULATION START ===");
-            log.info("1. RAW OWNERSHIP (From Engine):");
-            for (Map.Entry<MoneyOwner, Integer> entry : sharesPerRecipient.entrySet()) {
-                // --- START FIX ---
-                // MoneyOwner interface might not have getName(), safely get a string representation
-                String name = entry.getKey().getId(); 
-                if (entry.getKey() instanceof Player) {
-                    name = ((Player)entry.getKey()).getName();
-                } else if (entry.getKey() instanceof Company) {
-                    // Fix: Company interface uses getId(), not getName()
-                    name = ((Company)entry.getKey()).getId();
-                }
-                
-                log.info("   - {}: {} shares ({}%)", 
-                    name, 
-                    entry.getValue(), 
-                    entry.getValue() * operatingCompany.value().getShareUnit());
-                // --- END FIX ---
-            }
-            
-            log.info("2. DENIED INCOME LIST (Shares exchanged this turn):");
-            if (deniedIncomeShare == null || deniedIncomeShare.isEmpty()) {
-                log.info("   - (Empty)");
-            } else {
-                // HashMapState does not support entrySet(), use viewKeySet() instead
-                for (Player p : deniedIncomeShare.viewKeySet()) {
-                    log.info("   - {}: Deny {}%", p.getName(), deniedIncomeShare.get(p));
-                }
-            }
-        }
-        // --- DEBUG: LOGGING END ---
-
-        // 2. Apply 1835-Specific Logic: Denied Income (Rule 4.6)
-        if (deniedIncomeShare != null && !deniedIncomeShare.isEmpty()) {
-
-            for (Player player : deniedIncomeShare.viewKeySet()) {
-                if (!sharesPerRecipient.containsKey(player)) {
-                    // Log if we are trying to deny income to someone who apparently owns nothing
-                    if (operatingCompany.value().getId().equals("PR")) {
-                        log.info("   ! WARNING: Trying to deny income for {} but they hold 0 shares in the Raw Map.", player.getName());
-                    }
-                    continue;
-                }
-
-                // 1. Calculate the intended deduction
-                int sharePercentageDenied = deniedIncomeShare.get(player);
-                int sharesToDeduct = sharePercentageDenied / operatingCompany.value().getShareUnit();
-
-                // 2. Get what the player ACTUALLY has
-                int currentShares = sharesPerRecipient.get(player);
-
-                // --- DEBUG ---
-                if (operatingCompany.value().getId().equals("PR")) {
-                    log.info("   > Processing {}: Owns {} shares, Must Deny {} shares ({}%)", 
-                            player.getName(), currentShares, sharesToDeduct, sharePercentageDenied);
-                }
-                // --- DEBUG ---
-
-                // 3. CLAMP the deduction (Fix for Negative/Crash issue)
-                int actualDeduction = Math.min(sharesToDeduct, currentShares);
-
-                if (actualDeduction > 0) {
-                    // 4. Remove shares from the Player
-                    int remainingShares = currentShares - actualDeduction;
-                    
-                    if (remainingShares > 0) {
-                        sharesPerRecipient.put(player, remainingShares);
-                    } else {
-                        sharesPerRecipient.remove(player);
-                    }
-
-                    // 5. REDIRECT to the Prussian Treasury (Rule 4.6)
-                    MoneyOwner treasury = operatingCompany.value();
-                    int currentTreasuryShares = sharesPerRecipient.getOrDefault(treasury, 0);
-                    sharesPerRecipient.put(treasury, currentTreasuryShares + actualDeduction);
-
-                    // --- DEBUG ---
-                    if (operatingCompany.value().getId().equals("PR")) {
-                        log.info("     -> Deducted {} shares. Remaining: {}. Redirected to Treasury.", actualDeduction, remainingShares);
-                    }
-                    // --- DEBUG ---
-
-                    ReportBuffer.add(this, LocalText.getText("NoIncomeForPreviousOperation",
-                            player.getId(),
-                            actualDeduction * operatingCompany.value().getShareUnit(),
-                            GameDef_1835.PR_ID));
-                }
-            }
-        }
-        
-        // --- DEBUG: FINAL RESULT ---
-        if (operatingCompany.value().getId().equals("PR")) {
-            log.info("3. FINAL PAYOUT MAP:");
-            for (Map.Entry<MoneyOwner, Integer> entry : sharesPerRecipient.entrySet()) {
-                // --- START FIX ---
-                String name = entry.getKey().getId(); 
-                if (entry.getKey() instanceof Player) {
-                    name = ((Player)entry.getKey()).getName();
-                } else if (entry.getKey() instanceof Company) {
-                    // Fix: Company interface uses getId(), not getName()
-                    name = ((Company)entry.getKey()).getId();
-                }
-
-                log.info("   - {}: {} shares", name, entry.getValue());
-                // --- END FIX ---
-            }
-            log.info("=== PRUSSIAN REVENUE CALCULATION END ===");
-        }
-        // --- DEBUG ---
-        
-        return sharesPerRecipient;
-    }
-
 
     @Override
     protected boolean validateSpecialTileLay(LayTile layTile) {
@@ -407,6 +241,78 @@ public class OperatingRound_1835 extends OperatingRound {
                 if (gameManager.getInterruptedRound() != null) {
                     return true;
                 }
+
+                // If the operating company (e.g. M1) closed due to merging into Prussia during the discard phase,
+                // we must NOT switch to Prussia. Instead, we must advance to the NEXT valid operating company (e.g. M5).
+                if (operatingCompany.value().isClosed()) {
+                    List<PublicCompany> companies = getOperatingCompanies();
+                    PublicCompany current = operatingCompany.value();
+                    int currentIndex = companies.indexOf(current);
+                    
+                    // Fallback if not found in list
+                    if (currentIndex == -1) currentIndex = 0;
+
+                    PublicCompany nextComp = null;
+                    int nextIndex = currentIndex;
+                    int attempts = 0;
+
+                    // Cycle forward to find the next OPEN and FLOATED company
+                    while (attempts < companies.size()) {
+                        nextIndex = (nextIndex + 1) % companies.size();
+                        PublicCompany candidate = companies.get(nextIndex);
+                        
+                        if (!candidate.isClosed() && candidate.hasFloated()) {
+                            nextComp = candidate;
+                            break;
+                        }
+                        attempts++;
+                    }
+
+                    if (nextComp != null) {
+                        log.info("Operating Company {} is closed. Advancing to next operational company: {}", 
+                            current.getId(), nextComp.getId());
+                        
+                        // 1. Update the State
+                        operatingCompany.set(nextComp);
+                        
+// We walk the hierarchy to find the field, and ignore errors if not found.
+                        try {
+                            java.lang.reflect.Field indexField = null;
+                            Class<?> clazz = this.getClass();
+                            
+                            // Walk up looking for likely index field names
+                            while (clazz != null && indexField == null) {
+                                try {
+                                    indexField = clazz.getDeclaredField("orCompIndex");
+                                } catch (NoSuchFieldException e1) {
+                                    try {
+                                        indexField = clazz.getDeclaredField("index");
+                                    } catch (NoSuchFieldException e2) {
+                                        // Keep looking
+                                    }
+                                }
+                                if (indexField == null) clazz = clazz.getSuperclass();
+                            }
+
+                            if (indexField != null) {
+                                indexField.setAccessible(true);
+                                indexField.setInt(this, nextIndex);
+                            }
+                        } catch (Exception e) {
+                            // Silent fail: The field might not exist, but setting operatingCompany above 
+                            // is usually sufficient to drive the engine.
+                            log.debug("Index update skipped: " + e.getMessage());
+                        }
+                        
+                        // 3. Reset Step to INITIAL so the new company starts its turn properly
+                        setStep(GameDef.OrStep.INITIAL);
+                        
+                        // 4. Initialize the turn (clears UI, sets up tokens, etc)
+                        initTurn();
+                    }
+                }
+
+                
                 playerManager.setCurrentPlayer(operatingCompany.value().getPresident());
                 stepObject.set(GameDef.OrStep.BUY_TRAIN);
             }
@@ -534,29 +440,11 @@ public class OperatingRound_1835 extends OperatingRound {
     }
 
     @Override
-    public boolean process(PossibleAction action) {
-        boolean result = super.process(action);
-
-        if (action instanceof BuyTrain) {
-            newPhaseChecks();
-            if (needPrussianFormationCall.value()) {
-                needPrussianFormationCall.set(false);
-                if (!PrussianFormationRound.prussianIsComplete(gameManager)) {
-                    ((GameManager_1835) gameManager).startPrussianFormationRound(this);
-                }
-            }
-        }
-        return result;
-    }
-
-
-    // ... (lines of unchanged context code) ...
-    @Override
     public boolean layTile(LayTile action) {
-        // SAFETY NET: Force cleanup of closed private properties immediately before processing.
+        // SAFETY NET: Force cleanup of closed private properties immediately before
+        // processing.
         forceCleanupGhosts();
 
-       
         PublicCompany company = action.getCompany();
         boolean isBAHomeLay = company.getId().equals("BA") &&
                 !company.hasOperated() &&
@@ -574,21 +462,21 @@ public class OperatingRound_1835 extends OperatingRound {
         // Execute the parent action
         boolean result = super.layTile(action);
 
-
         // --- PfB/PF State Restoration Logic ---
         // (Handles the specific complexity of PfB/PF multi-step interactions)
         boolean isPfB = false;
         SpecialProperty actionSp = action.getSpecialProperty();
-        if (result && actionSp != null && 
-            actionSp.getOriginalCompany() != null && 
-            ("PfB".equals(actionSp.getOriginalCompany().getId()) || "PF".equals(actionSp.getOriginalCompany().getId()))) {
+        if (result && actionSp != null &&
+                actionSp.getOriginalCompany() != null &&
+                ("PfB".equals(actionSp.getOriginalCompany().getId())
+                        || "PF".equals(actionSp.getOriginalCompany().getId()))) {
             isPfB = true;
         }
-        
+
         if (result && isPfB) {
             normalTileLaidThisTurn.set(wasNormalLaid);
-            tileLaysPerColour.clear(); 
-            tileLaysPerColour.initFromMap(laysSnapshot); 
+            tileLaysPerColour.clear();
+            tileLaysPerColour.initFromMap(laysSnapshot);
             if (getStep() != stepBefore && !action.getChosenHex().getId().equals("L6")) {
                 setStep(stepBefore);
             }
@@ -632,12 +520,14 @@ public class OperatingRound_1835 extends OperatingRound {
 
         // --- START FIX: WATERTIGHT SEQUENCE ENFORCEMENT ---
         // Goal: Support "Normal Tile -> Special Tile" sequence ROBUSTLY.
-        // Logic: If the engine auto-advanced the step, but we still have a usable special property,
-        // we FORCE the step back to LAY_TRACK. This compels the user to either use the property
-        // or explicitly click "Done", which writes a NullAction to the log. 
+        // Logic: If the engine auto-advanced the step, but we still have a usable
+        // special property,
+        // we FORCE the step back to LAY_TRACK. This compels the user to either use the
+        // property
+        // or explicitly click "Done", which writes a NullAction to the log.
         // This explicitly recorded "Done" ensures future replays never desync.
-        if (result && getStep() != GameDef.OrStep.LAY_TRACK 
-                && company.equals(operatingCompany.value()) 
+        if (result && getStep() != GameDef.OrStep.LAY_TRACK
+                && company.equals(operatingCompany.value())
                 && !awaitingBadenHomeToken.value()) {
 
             boolean hasUsableSpecial = false;
@@ -646,7 +536,8 @@ public class OperatingRound_1835 extends OperatingRound {
             if (specials != null) {
                 for (SpecialTileLay sp : specials) {
                     // Filter 1: Already used?
-                    if (sp.isExercised()) continue;
+                    if (sp.isExercised())
+                        continue;
 
                     // Filter 2: OBB Limit (already laid M15/M17 this turn?)
                     if (sp instanceof SpecialSingleTileLay) {
@@ -675,7 +566,6 @@ public class OperatingRound_1835 extends OperatingRound {
         return result;
     }
 
-
     private void forceCleanupGhosts() {
         for (PrivateCompany pc : companyManager.getAllPrivateCompanies()) {
             if (pc.isClosed()) {
@@ -683,23 +573,28 @@ public class OperatingRound_1835 extends OperatingRound {
             }
         }
     }
- 
+
     private void removeSpecialProperties(PrivateCompany pc) {
         if (pc == null)
             return;
 
         try {
             java.lang.reflect.Field portfolioSetField = getFieldInHierarchy(pc.getClass(), "specialProperties");
-            if (portfolioSetField == null) return;
+            if (portfolioSetField == null)
+                return;
             portfolioSetField.setAccessible(true);
             Object portfolioSetObj = portfolioSetField.get(pc);
-            if (portfolioSetObj == null) return;
+            if (portfolioSetObj == null)
+                return;
 
-            java.lang.reflect.Field internalPortfolioField = getFieldInHierarchy(portfolioSetObj.getClass(), "portfolio");
-            if (internalPortfolioField == null) return;
+            java.lang.reflect.Field internalPortfolioField = getFieldInHierarchy(portfolioSetObj.getClass(),
+                    "portfolio");
+            if (internalPortfolioField == null)
+                return;
             internalPortfolioField.setAccessible(true);
             Object treeSetStateObj = internalPortfolioField.get(portfolioSetObj);
-            if (treeSetStateObj == null) return;
+            if (treeSetStateObj == null)
+                return;
 
             try {
                 java.lang.reflect.Method clearMethod = treeSetStateObj.getClass().getMethod("clear");
@@ -750,12 +645,13 @@ public class OperatingRound_1835 extends OperatingRound {
         boolean isInterruption = awaitingBadenHomeToken.value();
         boolean isSpecial = (action.getType() != LayBaseToken.GENERIC);
 
-// Use the proper State object check. This ensures strict 1-token limits AND supports Undo/Redo.
-        // Previous logic using local 'tokensLaidCount' failed on Undo and didn't update the UI state.
+        // Use the proper State object check. This ensures strict 1-token limits AND
+        // supports Undo/Redo.
+        // Previous logic using local 'tokensLaidCount' failed on Undo and didn't update
+        // the UI state.
         if (!isSpecial && normalTokenLaidThisTurn.value()) {
             return false;
         }
-
 
         boolean result = super.layBaseToken(action);
 
@@ -772,14 +668,16 @@ public class OperatingRound_1835 extends OperatingRound {
                 operatingCompany.set(originalCompany);
                 playerManager.setCurrentPlayer(originalCompany.getPresident());
                 interruptedCompany.set(null);
-                
+
                 // CRITICAL FIX: Restoration of Step for Original Company
                 // The original company (likely BY) was interrupted during Tile Laying.
                 // We must return the game state to LAY_TRACK so they can finish their turn.
                 setStep(GameDef.OrStep.LAY_TRACK);
-                
-                // We also ensure the transient token list for BY is clear to avoid state pollution
-                if (currentNormalTokenLays != null) currentNormalTokenLays.clear();
+
+                // We also ensure the transient token list for BY is clear to avoid state
+                // pollution
+                if (currentNormalTokenLays != null)
+                    currentNormalTokenLays.clear();
             }
             return true;
         }
@@ -860,7 +758,7 @@ public class OperatingRound_1835 extends OperatingRound {
                 boolean remove = sp.getOriginalCompany() instanceof PrivateCompany &&
                         ((PrivateCompany) sp.getOriginalCompany()).isClosed();
                 if (remove) {
-                
+
                 }
                 return remove;
             });
@@ -872,10 +770,11 @@ public class OperatingRound_1835 extends OperatingRound {
     public boolean setPossibleActions() {
         if (awaitingBadenHomeToken.value()) {
             possibleActions.clear();
-            // CRITICAL FIX: Reset the doneAllowed flag. 
-            // Since we do not call super.setPossibleActions(), this flag retains its 
+            // CRITICAL FIX: Reset the doneAllowed flag.
+            // Since we do not call super.setPossibleActions(), this flag retains its
             // 'true' state from the previous player's (BY) LAY_TRACK step.
-            // This prevents the generation of a 'SKIP' action which causes an infinite loop.
+            // This prevents the generation of a 'SKIP' action which causes an infinite
+            // loop.
             doneAllowed.set(false);
 
             PublicCompany ba = companyManager.getPublicCompany("BA");
@@ -972,7 +871,7 @@ public class OperatingRound_1835 extends OperatingRound {
         if (result && !possibleActions.isEmpty()) {
             pruneGhostActions();
         }
-        
+
         return result;
     }
 
@@ -981,7 +880,7 @@ public class OperatingRound_1835 extends OperatingRound {
             return;
 
         List<PossibleAction> actions = new ArrayList<>(possibleActions.getList());
-        
+
         for (PossibleAction action : actions) {
             SpecialProperty sp = null;
             if (action instanceof LayBaseToken) {
@@ -997,4 +896,160 @@ public class OperatingRound_1835 extends OperatingRound {
             }
         }
     }
+
+
+    @Override
+    protected void privatesPayOut() {
+        int count = 0;
+        for (PrivateCompany priv : companyManager.getAllPrivateCompanies()) {
+            if (!priv.isClosed()) {
+                if (priv.getOwner() instanceof MoneyOwner) {
+                    Owner recipient = priv.getOwner();
+                    int revenue = priv.getRevenueByPhase(Phase.getCurrent(this));
+                    if (count++ == 0)
+                        ReportBuffer.add(this, "");
+                    String revText = Currency.fromBank(revenue, (MoneyOwner) recipient);
+                    ReportBuffer.add(this, LocalText.getText("ReceivesFor",
+                            recipient.getId(),
+                            revText,
+                            priv.getId()));
+                }
+            }
+        }
+    }
+
+
+    /**
+     * Called directly by PrussianFormationRound to register an exchange.
+     */
+    public void registerPrussianExchange(Player player, net.sf.rails.game.Company c) {
+        String cId = (c != null) ? c.getId() : "";
+        if ("B".equals(cId)) cId = "BB"; // Handle alias
+
+        boolean shouldDeny = false;
+
+        // 1. Private Companies -> Always Deny
+        if (c instanceof PrivateCompany || "BB".equals(cId) || "HB".equals(cId)) {
+            shouldDeny = true;
+        } 
+        // 2. Public Companies
+        else if (c instanceof PublicCompany) {
+            PublicCompany minor = (PublicCompany) c;
+            // Deny if it is the current operator OR has already operated
+            if (operatingCompany.value() == minor || minor.hasOperated()) {
+                shouldDeny = true;
+            }
+        }
+        // 3. Fallback
+        else if (c == null) {
+            shouldDeny = true;
+        }
+
+        if (shouldDeny) {
+            int deniedPercent = 10;
+            // 5% Shares: M1, M3, M5, M6
+            if ("M1".equals(cId) || "M3".equals(cId) || "M5".equals(cId) || "M6".equals(cId)) {
+                deniedPercent = 5;
+            }
+            addIncomeDenialShare(player, deniedPercent);
+            log.info("PFR Exchange Registered: {} by {} -> Denied {}%", cId, player.getName(), deniedPercent);
+        } else {
+            log.info("PFR Exchange Registered: {} by {} -> Allowed (Future Company).", cId, player.getName());
+        }
+    }
+
+
+    private void addIncomeDenialShare(Player player, int share) {
+        if (!deniedIncomeShare.containsKey(player)) {
+            deniedIncomeShare.put(player, share);
+        } else {
+            deniedIncomeShare.put(player, share + deniedIncomeShare.get(player));
+        }
+    }
+
+    @Override
+    public boolean process(PossibleAction action) {
+
+        boolean result = super.process(action);
+
+        if (action instanceof BuyTrain) {
+            newPhaseChecks();
+            if (needPrussianFormationCall.value()) {
+                needPrussianFormationCall.set(false);
+                if (!PrussianFormationRound.prussianIsComplete(gameManager)) {
+                    ((GameManager_1835) gameManager).startPrussianFormationRound(this);
+                }
+            }
+        }
+        return result;
+    }
+
+    @Override
+    protected Map<MoneyOwner, Integer> countSharesPerRecipient() {
+
+        // 1. Get the standard distribution from the engine
+        Map<MoneyOwner, Integer> sharesPerRecipient = super.countSharesPerRecipient();
+
+        // 2. Apply 1835-Specific Logic: Denied Income (Rule 4.6)
+        if (deniedIncomeShare != null && !deniedIncomeShare.isEmpty()) {
+
+            for (Player player : deniedIncomeShare.viewKeySet()) {
+                if (!sharesPerRecipient.containsKey(player))
+                    continue;
+
+                // 1. Calculate the intended deduction
+                int sharePercentageDenied = deniedIncomeShare.get(player);
+                int sharesToDeduct = sharePercentageDenied / operatingCompany.value().getShareUnit();
+
+                // 2. Get what the player ACTUALLY has
+                int currentShares = sharesPerRecipient.get(player);
+
+                // --- START FIX ---
+                // 3. CLAMP the deduction.
+                int actualDeduction = Math.min(sharesToDeduct, currentShares);
+
+                if (actualDeduction > 0) {
+                    // 4. Remove shares from the Player
+                    int remainingShares = currentShares - actualDeduction;
+
+                    if (remainingShares > 0) {
+                        sharesPerRecipient.put(player, remainingShares);
+                    } else {
+                        sharesPerRecipient.remove(player);
+                    }
+
+                    // 5. REDIRECT to the Prussian Treasury (Rule 4.6)
+                    MoneyOwner treasury = operatingCompany.value();
+                    int currentTreasuryShares = sharesPerRecipient.getOrDefault(treasury, 0);
+                    sharesPerRecipient.put(treasury, currentTreasuryShares + actualDeduction);
+
+                    ReportBuffer.add(this, LocalText.getText("NoIncomeForPreviousOperation",
+                            player.getId(),
+                            actualDeduction * operatingCompany.value().getShareUnit(),
+                            GameDef_1835.PR_ID));
+                }
+                // --- END FIX ---
+            }
+        }
+
+        // --- DEBUG: LOG FINAL PAYOUT MAP ---
+        if (operatingCompany.value().getId().equals("PR")) {
+            log.info("=== PRUSSIAN PAYOUT MAP (Who gets paid for how many shares?) ===");
+            for (Map.Entry<MoneyOwner, Integer> entry : sharesPerRecipient.entrySet()) {
+                String name = entry.getKey().getId();
+                if (entry.getKey() instanceof Player) {
+                    name = ((Player) entry.getKey()).getName();
+                } else if (entry.getKey() instanceof Company) {
+                    name = ((Company) entry.getKey()).getId();
+                }
+                log.info("   - {}: {} shares ({}%)", name, entry.getValue(),
+                        entry.getValue() * operatingCompany.value().getShareUnit());
+            }
+            log.info("==============================================================");
+        }
+        // --- DEBUG END ---
+
+        return sharesPerRecipient;
+    }
+
 }

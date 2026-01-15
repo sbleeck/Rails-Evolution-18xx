@@ -73,8 +73,10 @@ PASSIVE, ACTIONABLE, SELECTED, DISABLED, HIDDEN, HIGHLIGHTED // Added HIGHLIGHTE
     private static final Color COL_SELECTED_BG = new Color(100, 200, 100);
     private static final Color COL_SELECTED_BORDER = Color.BLUE;
 
-    private static final Color COL_HIGHLIGHT_BG = new Color(200, 240, 255); // Cyan-ish
+    // Change "Cyan-ish" to pure CYAN as requested, managed centrally here.
+    private static final Color COL_HIGHLIGHT_BG = Color.CYAN; 
     private static final Color COL_HIGHLIGHT_BORDER_C = Color.BLUE;
+
 
 
     // Borders (Minimal)
