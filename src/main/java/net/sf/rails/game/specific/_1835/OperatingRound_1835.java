@@ -20,6 +20,7 @@ import net.sf.rails.common.GameOption;
 import net.sf.rails.common.LocalText;
 import net.sf.rails.common.ReportBuffer;
 import net.sf.rails.game.financial.Bank;
+import net.sf.rails.game.financial.PublicCertificate;
 import net.sf.rails.game.special.ExchangeForShare;
 import net.sf.rails.game.special.SpecialProperty;
 import net.sf.rails.game.special.SpecialSingleTileLay;
@@ -177,27 +178,130 @@ public class OperatingRound_1835 extends OperatingRound {
         }
     }
 
+
+    
+// ... (lines of unchanged context code) ...
     @Override
     protected Map<MoneyOwner, Integer> countSharesPerRecipient() {
-        Map<MoneyOwner, Integer> sharesPerRecipient = super.countSharesPerRecipient();
 
-        if (operatingCompany.value().getId().equalsIgnoreCase(GameDef_1835.PR_ID)) {
+        // 1. Get the standard distribution from the engine
+        Map<MoneyOwner, Integer> sharesPerRecipient = super.countSharesPerRecipient();
+        
+        // --- DEBUG: LOGGING START ---
+        if (operatingCompany.value().getId().equals("PR")) {
+            log.info("=== PRUSSIAN REVENUE CALCULATION START ===");
+            log.info("1. RAW OWNERSHIP (From Engine):");
+            for (Map.Entry<MoneyOwner, Integer> entry : sharesPerRecipient.entrySet()) {
+                // --- START FIX ---
+                // MoneyOwner interface might not have getName(), safely get a string representation
+                String name = entry.getKey().getId(); 
+                if (entry.getKey() instanceof Player) {
+                    name = ((Player)entry.getKey()).getName();
+                } else if (entry.getKey() instanceof Company) {
+                    // Fix: Company interface uses getId(), not getName()
+                    name = ((Company)entry.getKey()).getId();
+                }
+                
+                log.info("   - {}: {} shares ({}%)", 
+                    name, 
+                    entry.getValue(), 
+                    entry.getValue() * operatingCompany.value().getShareUnit());
+                // --- END FIX ---
+            }
+            
+            log.info("2. DENIED INCOME LIST (Shares exchanged this turn):");
+            if (deniedIncomeShare == null || deniedIncomeShare.isEmpty()) {
+                log.info("   - (Empty)");
+            } else {
+                // HashMapState does not support entrySet(), use viewKeySet() instead
+                for (Player p : deniedIncomeShare.viewKeySet()) {
+                    log.info("   - {}: Deny {}%", p.getName(), deniedIncomeShare.get(p));
+                }
+            }
+        }
+        // --- DEBUG: LOGGING END ---
+
+        // 2. Apply 1835-Specific Logic: Denied Income (Rule 4.6)
+        if (deniedIncomeShare != null && !deniedIncomeShare.isEmpty()) {
+
             for (Player player : deniedIncomeShare.viewKeySet()) {
-                if (!sharesPerRecipient.containsKey(player))
+                if (!sharesPerRecipient.containsKey(player)) {
+                    // Log if we are trying to deny income to someone who apparently owns nothing
+                    if (operatingCompany.value().getId().equals("PR")) {
+                        log.info("   ! WARNING: Trying to deny income for {} but they hold 0 shares in the Raw Map.", player.getName());
+                    }
                     continue;
-                int share = deniedIncomeShare.get(player);
-                int shares = share / operatingCompany.value().getShareUnit();
-                if (this.wasInterrupted()) {
-                    sharesPerRecipient.put(player, sharesPerRecipient.get(player) - shares);
+                }
+
+                // 1. Calculate the intended deduction
+                int sharePercentageDenied = deniedIncomeShare.get(player);
+                int sharesToDeduct = sharePercentageDenied / operatingCompany.value().getShareUnit();
+
+                // 2. Get what the player ACTUALLY has
+                int currentShares = sharesPerRecipient.get(player);
+
+                // --- DEBUG ---
+                if (operatingCompany.value().getId().equals("PR")) {
+                    log.info("   > Processing {}: Owns {} shares, Must Deny {} shares ({}%)", 
+                            player.getName(), currentShares, sharesToDeduct, sharePercentageDenied);
+                }
+                // --- DEBUG ---
+
+                // 3. CLAMP the deduction (Fix for Negative/Crash issue)
+                int actualDeduction = Math.min(sharesToDeduct, currentShares);
+
+                if (actualDeduction > 0) {
+                    // 4. Remove shares from the Player
+                    int remainingShares = currentShares - actualDeduction;
+                    
+                    if (remainingShares > 0) {
+                        sharesPerRecipient.put(player, remainingShares);
+                    } else {
+                        sharesPerRecipient.remove(player);
+                    }
+
+                    // 5. REDIRECT to the Prussian Treasury (Rule 4.6)
+                    MoneyOwner treasury = operatingCompany.value();
+                    int currentTreasuryShares = sharesPerRecipient.getOrDefault(treasury, 0);
+                    sharesPerRecipient.put(treasury, currentTreasuryShares + actualDeduction);
+
+                    // --- DEBUG ---
+                    if (operatingCompany.value().getId().equals("PR")) {
+                        log.info("     -> Deducted {} shares. Remaining: {}. Redirected to Treasury.", actualDeduction, remainingShares);
+                    }
+                    // --- DEBUG ---
+
                     ReportBuffer.add(this, LocalText.getText("NoIncomeForPreviousOperation",
                             player.getId(),
-                            share,
+                            actualDeduction * operatingCompany.value().getShareUnit(),
                             GameDef_1835.PR_ID));
                 }
             }
         }
+        
+        // --- DEBUG: FINAL RESULT ---
+        if (operatingCompany.value().getId().equals("PR")) {
+            log.info("3. FINAL PAYOUT MAP:");
+            for (Map.Entry<MoneyOwner, Integer> entry : sharesPerRecipient.entrySet()) {
+                // --- START FIX ---
+                String name = entry.getKey().getId(); 
+                if (entry.getKey() instanceof Player) {
+                    name = ((Player)entry.getKey()).getName();
+                } else if (entry.getKey() instanceof Company) {
+                    // Fix: Company interface uses getId(), not getName()
+                    name = ((Company)entry.getKey()).getId();
+                }
+
+                log.info("   - {}: {} shares", name, entry.getValue());
+                // --- END FIX ---
+            }
+            log.info("=== PRUSSIAN REVENUE CALCULATION END ===");
+        }
+        // --- DEBUG ---
+        
         return sharesPerRecipient;
     }
+
 
     @Override
     protected boolean validateSpecialTileLay(LayTile layTile) {

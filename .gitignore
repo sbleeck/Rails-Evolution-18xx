@@ -63,3 +63,4 @@ python/
 *.txt
 *.rails
 *.time
+gradle.properties

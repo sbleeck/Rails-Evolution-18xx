@@ -56,12 +56,22 @@ public class PrussianFormationRound extends Round implements I_MapRenderableRoun
     public static class PresidencySwapChoice extends PossibleAction {
         private static final long serialVersionUID = 1L;
         private final int optionIndex;
-        // FIX: Cast null to (RailsRoot)
-        public PresidencySwapChoice(int index) { super((RailsRoot)null); this.optionIndex = index; } 
-        public int getOptionIndex() { return optionIndex; }
-        @Override public String toString() { return "SwapOption:" + optionIndex; }
-    }
 
+        // FIX: Cast null to (RailsRoot)
+        public PresidencySwapChoice(int index) {
+            super((RailsRoot) null);
+            this.optionIndex = index;
+        }
+
+        public int getOptionIndex() {
+            return optionIndex;
+        }
+
+        @Override
+        public String toString() {
+            return "SwapOption:" + optionIndex;
+        }
+    }
 
     private List<Company> foldablePrePrussians;
     private RoundFacade interruptedRound;
@@ -177,27 +187,28 @@ public class PrussianFormationRound extends Round implements I_MapRenderableRoun
         // 1. Determine Force Status BEFORE checking the 'Already Offered' flag.
         phase = Phase.getCurrent(this);
         boolean prussianStarted = companyManager.getPublicCompany(PR_ID).hasStarted();
-        
-        // If we are interrupting an Operating Round, this is the Mandatory Rule 5.5.4 Trigger.
+
+        // If we are interrupting an Operating Round, this is the Mandatory Rule 5.5.4
+        // Trigger.
         boolean isOrTrigger = (interruptedRound instanceof OperatingRound);
-        
-        forcedMerge = phase.getId().startsWith("5"); 
-        
-        // PFR is forced if: 
+
+        forcedMerge = phase.getId().startsWith("5");
+
+        // PFR is forced if:
         // a) It interrupted an OR (Train Buy) -> Always Force.
         // b) We are in Phase 5 -> Always Force (until complete).
-        // c) We are in Phase 4+4 AND Prussian has NOT started yet -> Force the M2 Merger.
-        //    (Once PR starts, the 4+4 Force condition is satisfied).
+        // c) We are in Phase 4+4 AND Prussian has NOT started yet -> Force the M2
+        // Merger.
+        // (Once PR starts, the 4+4 Force condition is satisfied).
         boolean isPhase4Plus4Forced = phase.getId().equals("4+4") && !prussianStarted;
 
         forcedStart = isOrTrigger || forcedMerge || isPhase4Plus4Forced;
 
         // 2. LOOP GUARD: Check if PFR was already offered.
         // CRITICAL: We MUST bypass this check if forcedStart is TRUE.
-        if (!forcedStart && !forcedMerge && gameManager instanceof GameManager_1835 
-            && ((GameManager_1835) gameManager).hasPrussianFormationBeenOffered()) {
-            
-            
+        if (!forcedStart && !forcedMerge && gameManager instanceof GameManager_1835
+                && ((GameManager_1835) gameManager).hasPrussianFormationBeenOffered()) {
+
             if (interruptedRound != null) {
                 gameManager.setInterruptedRound(null);
                 gameManager.setRound(interruptedRound);
@@ -205,8 +216,6 @@ public class PrussianFormationRound extends Round implements I_MapRenderableRoun
                 return;
             }
         }
-        
-
 
         if (PrussianFormationRound.prussianIsComplete(gameManager)) {
             finishRound();
@@ -255,7 +264,6 @@ public class PrussianFormationRound extends Round implements I_MapRenderableRoun
                 // Ignore errors
             }
         }
-        
 
         // --- Only Initialize State if this is a fresh start (not a reload/undo) ---
         // We check if the State object is "dirty" or matches default
@@ -281,13 +289,16 @@ public class PrussianFormationRound extends Round implements I_MapRenderableRoun
                     executeStartPrussian(true);
                     setPrussianStep(Step.MERGE);
 
-// Rule: The Exchange Phase starts with the Priority Deal player.
+                    // Rule: The Exchange Phase starts with the Priority Deal player.
                     Player nextPlayer = playerManager.getPriorityPlayer();
-                    
+
                     // Fallback to M2 pres or Triggerer only if Priority is somehow missing
-                    if (nextPlayer == null) nextPlayer = ((GameManager_1835) gameManager).getPrussianFormationStartingPlayer();
-                    if (nextPlayer == null) nextPlayer = prussian.getPresident();
-                    if (nextPlayer == null) nextPlayer = m2President;
+                    if (nextPlayer == null)
+                        nextPlayer = ((GameManager_1835) gameManager).getPrussianFormationStartingPlayer();
+                    if (nextPlayer == null)
+                        nextPlayer = prussian.getPresident();
+                    if (nextPlayer == null)
+                        nextPlayer = m2President;
 
                     setStartingPlayer(nextPlayer);
                     setCurrentPlayer(nextPlayer);
@@ -301,12 +312,13 @@ public class PrussianFormationRound extends Round implements I_MapRenderableRoun
                     }
                     // --- END FIX ---
                 }
-} else if (getPrussianStep() == Step.MERGE) {
+            } else if (getPrussianStep() == Step.MERGE) {
                 // --- START FIX ---
                 // If we resume in Merge phase, ensure we start with Priority Deal.
                 Player sp = playerManager.getPriorityPlayer();
-                if (sp == null) sp = ((GameManager_1835) gameManager).getPrussianFormationStartingPlayer();
-                
+                if (sp == null)
+                    sp = ((GameManager_1835) gameManager).getPrussianFormationStartingPlayer();
+
                 setStartingPlayer(sp);
                 setCurrentPlayer(this.startingPlayer);
                 // --- END FIX ---
@@ -315,7 +327,6 @@ public class PrussianFormationRound extends Round implements I_MapRenderableRoun
 
         // Always run forced logic if we are in merge and it's forced
         if (getPrussianStep() == Step.MERGE && forcedMerge) {
-
 
             // Use a Set to ensure unique processing
             Set<Company> foldablesSet = new LinkedHashSet<>();
@@ -344,7 +355,7 @@ public class PrussianFormationRound extends Round implements I_MapRenderableRoun
 
             if (!foldables.isEmpty()) {
                 executeExchange(foldables, false, true);
-            } 
+            }
 
             finishMergeStep();
         }
@@ -353,7 +364,8 @@ public class PrussianFormationRound extends Round implements I_MapRenderableRoun
     private boolean hasExchangeProperty(Company c) {
         // --- START FIX ---
         // Explicitly include BB and HB as exchangeable privates
-        // This ensures they are offered for exchange even if they lack the ExchangeForShare property metadata
+        // This ensures they are offered for exchange even if they lack the
+        // ExchangeForShare property metadata
         if (c.getId().equals("BB") || c.getId().equals("HB")) {
             return true;
         }
@@ -424,9 +436,10 @@ public class PrussianFormationRound extends Round implements I_MapRenderableRoun
         } else if (action instanceof ExchangeForPrussianShare) {
             ExchangeForPrussianShare a = (ExchangeForPrussianShare) action;
             executeExchange(Arrays.asList(a.getCompanyToExchange()), false, false);
-            
+
             // --- START FIX ---
-            // If the player has no more shares to exchange, automatically finish their turn.
+            // If the player has no more shares to exchange, automatically finish their
+            // turn.
             setFoldablePrePrussians();
             if (foldablePrePrussians.isEmpty()) {
                 finishTurn();
@@ -455,8 +468,8 @@ public class PrussianFormationRound extends Round implements I_MapRenderableRoun
     }
 
     protected void finishTurn() {
-        int count = mergeTurnCount.value(); 
-        
+        int count = mergeTurnCount.value();
+
         // --- START FIX ---
         // Loop to find the next player who actually has shares to exchange.
         // If a player has nothing, we skip them automatically.
@@ -472,7 +485,7 @@ public class PrussianFormationRound extends Round implements I_MapRenderableRoun
 
             Player nextPlayer = playerManager.getNextPlayer();
             setCurrentPlayer(nextPlayer);
-            
+
             // Check if this player has anything to fold
             setFoldablePrePrussians();
             if (!foldablePrePrussians.isEmpty()) {
@@ -557,165 +570,14 @@ public class PrussianFormationRound extends Round implements I_MapRenderableRoun
 
             if (isM1) {
                 or.insertNewOperatingCompany(prussian);
-            } 
+            }
         }
     }
 
-    private void executeExchange(List<Company> companies, boolean president, boolean display) {
-        ExchangeForShare efs;
-        PublicCertificate cert;
-        Owner owner;
-
-        for (Company company : companies) {
-            if (company instanceof PrivateCompany) {
-                owner = ((PrivateCompany) company).getOwner();
-            } else {
-                owner = ((PublicCompany) company).getPresident();
-                if (owner == null) {
-                    owner = ipo.getParent();
-                }
-            }
-
-            // Robustly find the ExchangeForShare property
-            efs = null;
-            Set<SpecialProperty> sps = company.getSpecialProperties();
-            if (sps != null) {
-                for (SpecialProperty sp : sps) {
-                    if (sp instanceof ExchangeForShare) {
-                        efs = (ExchangeForShare) sp;
-                        break;
-                    }
-                }
-            }
-            if (efs == null) {
-                // FALLBACK for BB/HB if property is missing but hardcoded exchange logic triggered
-                if (company.getId().equals("BB") || company.getId().equals("HB")) {
-                    // Create a dummy property or handle logic manually?
-                    // Usually neededShare is 10% or 5%. 
-                    // In 1835: BB/HB exchange for 1 share.
-                    // We need 'neededShare'. Let's assume standard share unit (10% or 5%).
-                    // But 'efs.getShare()' is used below.
-                    // We need to fetch the share size from XML or assume based on rules.
-                    // If efs is null, we can't proceed unless we construct one or fake it.
-                    // Assuming they HAVE the property but it was missed, or we continue
-                    // and let the try/catch blocks handle it?
-                    // Actually, if efs is null, we should probably fetch the standard exchange share size.
-                    // Let's rely on finding a matching certificate in 'unavailable' first.
-                } else {
-                    continue;
-                }
-            }
-
-            boolean isPresidentShare = president && (owner instanceof Player);
-
-          
-            // Fix for M1 (5%) and integer division issues.
-            // Original code: cert = unavailable.findCertificate(prussian, efs.getShare() /
-            // prussian.getShareUnit(), isPresidentShare);
-            // This fails for 5% shares where unit is 10% (5/10 = 0).
-
-            // New approach: Find by explicit percentage matching
-            cert = null;
-            int neededShare = (efs != null) ? efs.getShare() : prussian.getShareUnit(); // Fallback to 1 unit if efs missing
-
-            // 1. Try to find exact match in unavailable pile
-            for (PublicCertificate c : unavailable.getCertificates()) {
-                if (c.getCompany() == prussian && c.getShare() == neededShare) {
-                    // Check president status match if required
-                    if (isPresidentShare == c.isPresidentShare()) {
-                        cert = c;
-                        break;
-                    }
-                }
-            }
-
-            // 2. Fallback: If strict President match failed, try any matching size (and
-            // warn/convert?)
-            // This handles cases where maybe only a normal share is available but we wanted
-            // Pres (unlikely for PR formation but safe).
-            if (cert == null) {
-                for (PublicCertificate c : unavailable.getCertificates()) {
-                    if (c.getCompany() == prussian && c.getShare() == neededShare) {
-                        cert = c;
-                        break;
-                    }
-                }
-            }
-
-            if (cert != null) {
-                cert.moveTo(owner);
-            } else {
-                           // Fallback to original method just in case (though likely to fail if it was 0)
-                try {
-                    int shareUnits = neededShare / prussian.getShareUnit();
-                    if (shareUnits == 0) shareUnits = 1; // Safety for 5% shares
-                    
-                    cert = unavailable.findCertificate(prussian, shareUnits, isPresidentShare);
-                    if (cert != null)
-                        cert.moveTo(owner);
-                } catch (Exception e) {
-                }
-            }
-
-
-            String ownerName = owner.getId();
-            ReportBuffer.add(this, LocalText.getText("MERGE_MINOR_LOG",
-                    ownerName, company.getId(), PR_ID,
-                    company instanceof PrivateCompany ? "no" : Bank.format(this, ((PublicCompany) company).getCash()),
-                    company instanceof PrivateCompany ? "no"
-                            : ((PublicCompany) company).getPortfolioModel().getTrainList().size()));
-
-            if (company instanceof PublicCompany) {
-                PublicCompany minor = (PublicCompany) company;
-                boolean isM5 = minor.getId().equals("M5");
-
-                BaseToken minorToken = null;
-                for (BaseToken token : minor.getAllBaseTokens()) {
-                    if (token.getOwner() instanceof Stop) {
-                        minorToken = token;
-                        break;
-                    }
-                }
-
-                if (minorToken != null && minorToken.getOwner() instanceof Stop) {
-                    Stop city = (Stop) minorToken.getOwner();
-                    MapHex hex = city.getParent();
-                    minorToken.moveTo(minor);
-
-                    if (!isM5) {
-                        if (hex.layBaseToken(prussian, city)) {
-                            String msg = LocalText.getText("ExchangesBaseToken", PR_ID, minor.getId(),
-                                    city.getStationComposedId());
-                            ReportBuffer.add(this, msg);
-                            if (display)
-                                DisplayBuffer.add(this, msg);
-                            prussian.layBaseToken(hex, 0);
-                        } else if (hex.hasTokenOfCompany(prussian)) {
-                            ReportBuffer.add(this,
-                                    LocalText.getText("ReplacesMinorToken", minor.getId(), prussian.getId()));
-                        }
-                    }
-                }
-
-                if (minor.getCash() > 0)
-                    net.sf.rails.game.state.Currency.wireAll(minor, prussian);
-                List<Train> trains = new ArrayList<>(minor.getPortfolioModel().getTrainList());
-                for (Train train : trains)
-                    prussian.getPortfolioModel().addTrain(train);
-            }
-            company.setClosed();
-
-            // After receiving shares, the player might have overtaken the current PR
-            // Director.
-            if (owner instanceof Player) {
-                checkAndHandlePresidencySwap((Player) owner);
-            }
-        }
-
-    }
 
     /**
-     * Expose the step name as a String to avoid Enum visibility issues in generic UI classes.
+     * Expose the step name as a String to avoid Enum visibility issues in generic
+     * UI classes.
      */
     public String getPrussianStepName() {
         return getPrussianStep().toString();
@@ -895,7 +757,7 @@ public class PrussianFormationRound extends Round implements I_MapRenderableRoun
             setFoldablePrePrussians();
 
             if (currentPlayer == null) {
-                   return false;
+                return false;
             }
 
             String playerName = currentPlayer.getName();
@@ -913,9 +775,9 @@ public class PrussianFormationRound extends Round implements I_MapRenderableRoun
             NullAction done = new NullAction(getRoot(), NullAction.Mode.DONE);
             String doneLabel = foldablePrePrussians.isEmpty() ? "Done (Nothing)" : "Pass (Keep)";
 
-// Added Player Name to the Done Button for clarity
+            // Added Player Name to the Done Button for clarity
             done.setButtonLabel("<html><center><b>D: " + doneLabel + "</b><br>" + playerName + "</center></html>");
-                        possibleActions.add(done);
+            possibleActions.add(done);
 
         } else if (getPrussianStep() == Step.DISCARD_TRAINS) {
             int index = 1;
@@ -1056,4 +918,179 @@ public class PrussianFormationRound extends Round implements I_MapRenderableRoun
 
         ReportBuffer.add(this, LocalText.getText("IS_NOW_PRES_OF", newCandidate.getName(), prussian.getId()));
     }
+
+
+    private void executeExchange(List<Company> companies, boolean president, boolean display) {
+        ExchangeForShare efs;
+        PublicCertificate cert;
+        Owner owner;
+
+        for (Company company : companies) {
+            if (company instanceof PrivateCompany) {
+                owner = ((PrivateCompany) company).getOwner();
+            } else {
+                owner = ((PublicCompany) company).getPresident();
+                if (owner == null) {
+                    owner = ipo.getParent();
+                }
+            }
+
+            // Robustly find the ExchangeForShare property
+            efs = null;
+            Set<SpecialProperty> sps = company.getSpecialProperties();
+            if (sps != null) {
+                for (SpecialProperty sp : sps) {
+                    if (sp instanceof ExchangeForShare) {
+                        efs = (ExchangeForShare) sp;
+                        break;
+                    }
+                }
+            }
+            if (efs == null) {
+                // FALLBACK for BB/HB if property is missing but hardcoded exchange logic triggered
+                if (company.getId().equals("BB") || company.getId().equals("HB")) {
+                    // Logic handled below by neededShare fallback
+                } else {
+                    continue;
+                }
+            }
+
+            boolean isPresidentShare = president && (owner instanceof Player);
+
+        // Fix for M1 (5%) and integer division issues.
+            // New approach: Find by explicit percentage matching
+            cert = null;
+            
+            // --- START FIX ---
+            int neededShare;
+            if (efs != null) {
+                neededShare = efs.getShare();
+            } else {
+                // User defined rules:
+                // 10% Shares: BB, HB, M2, M4
+                // 5% Shares: M1, M3, M5, M6
+                String id = company.getId();
+                if ("M1".equals(id) || "M3".equals(id) || "M5".equals(id) || "M6".equals(id)) {
+                    neededShare = 5;
+                } else {
+                    // BB, HB, M2, M4 default to 10%
+                    neededShare = 10;
+                }
+            }
+  
+            // 1. Try to find exact match in UNAVAILABLE pile (ID Check + Pres Check)
+            for (PublicCertificate c : unavailable.getCertificates()) {
+                if (c.getCompany().getId().equals(prussian.getId()) && c.getShare() == neededShare) {
+                    if (isPresidentShare == c.isPresidentShare()) {
+                        cert = c;
+                        break;
+                    }
+                }
+            }
+
+            // 2. Try to find exact match in IPO pile (ID Check + Pres Check)
+            // Shares often move to IPO after the company starts, so we MUST check here too.
+            if (cert == null) {
+                for (PublicCertificate c : ipo.getCertificates()) {
+                    if (c.getCompany().getId().equals(prussian.getId()) && c.getShare() == neededShare) {
+                        if (isPresidentShare == c.isPresidentShare()) {
+                            cert = c;
+                            break;
+                        }
+                    }
+                }
+            }
+
+            // 3. Fallback: UNAVAILABLE pile - Match size only (ignore President status)
+            if (cert == null) {
+                for (PublicCertificate c : unavailable.getCertificates()) {
+                    if (c.getCompany().getId().equals(prussian.getId()) && c.getShare() == neededShare) {
+                        cert = c;
+                        break;
+                    }
+                }
+            }
+
+            // 4. Fallback: IPO pile - Match size only (ignore President status)
+            if (cert == null) {
+                for (PublicCertificate c : ipo.getCertificates()) {
+                    if (c.getCompany().getId().equals(prussian.getId()) && c.getShare() == neededShare) {
+                        cert = c;
+                        break;
+                    }
+                }
+            }
+            // --- END FIX ---
+
+            if (cert != null) {
+                cert.moveTo(owner);
+            } else {
+                // Fallback to original method just in case (though likely to fail if it was 0)
+                try {
+                    int shareUnits = neededShare / prussian.getShareUnit();
+                    if (shareUnits == 0) shareUnits = 1; // Safety for 5% shares
+
+                    cert = unavailable.findCertificate(prussian, shareUnits, isPresidentShare);
+                    if (cert != null)
+                        cert.moveTo(owner);
+                } catch (Exception e) {
+                    log.warn("Failed to find certificate for exchange via fallback method.");
+                }
+            }
+
+            String ownerName = owner.getId();
+            ReportBuffer.add(this, LocalText.getText("MERGE_MINOR_LOG",
+                    ownerName, company.getId(), PR_ID,
+                    company instanceof PrivateCompany ? "no" : Bank.format(this, ((PublicCompany) company).getCash()),
+                    company instanceof PrivateCompany ? "no"
+                            : ((PublicCompany) company).getPortfolioModel().getTrainList().size()));
+
+            if (company instanceof PublicCompany) {
+                PublicCompany minor = (PublicCompany) company;
+                boolean isM5 = minor.getId().equals("M5");
+
+                BaseToken minorToken = null;
+                for (BaseToken token : minor.getAllBaseTokens()) {
+                    if (token.getOwner() instanceof Stop) {
+                        minorToken = token;
+                        break;
+                    }
+                }
+
+                if (minorToken != null && minorToken.getOwner() instanceof Stop) {
+                    Stop city = (Stop) minorToken.getOwner();
+                    MapHex hex = city.getParent();
+                    minorToken.moveTo(minor);
+
+                    if (!isM5) {
+                        if (hex.layBaseToken(prussian, city)) {
+                            String msg = LocalText.getText("ExchangesBaseToken", PR_ID, minor.getId(),
+                                    city.getStationComposedId());
+                            ReportBuffer.add(this, msg);
+                            if (display)
+                                DisplayBuffer.add(this, msg);
+                            prussian.layBaseToken(hex, 0);
+                        } else if (hex.hasTokenOfCompany(prussian)) {
+                            ReportBuffer.add(this,
+                                    LocalText.getText("ReplacesMinorToken", minor.getId(), prussian.getId()));
+                        }
+                    }
+                }
+
+                if (minor.getCash() > 0)
+                    net.sf.rails.game.state.Currency.wireAll(minor, prussian);
+                List<Train> trains = new ArrayList<>(minor.getPortfolioModel().getTrainList());
+                for (Train train : trains)
+                    prussian.getPortfolioModel().addTrain(train);
+            }
+            company.setClosed();
+
+            // After receiving shares, the player might have overtaken the current PR
+            // Director.
+            if (owner instanceof Player) {
+                checkAndHandlePresidencySwap((Player) owner);
+            }
+        }
+    }
+
 }

@@ -1,6 +1,8 @@
 package rails.game.correct;
 
+import java.util.ArrayList;
 import java.util.List;
+import javax.swing.JOptionPane;
 
 import net.sf.rails.common.DisplayBuffer;
 import net.sf.rails.common.LocalText;
@@ -11,7 +13,6 @@ import net.sf.rails.game.PublicCompany;
 import net.sf.rails.game.financial.Bank;
 import net.sf.rails.game.state.Currency;
 import net.sf.rails.game.state.MoneyOwner;
-
 
 public class CashCorrectionManager extends CorrectionManager {
 
@@ -25,6 +26,7 @@ public class CashCorrectionManager extends CorrectionManager {
 
     @Override
     public List<CorrectionAction> createCorrections() {
+        // Keep existing logic for GameStatus buttons
         List<CorrectionAction> actions = super.createCorrections();
 
         if (isActive()) {
@@ -43,12 +45,136 @@ public class CashCorrectionManager extends CorrectionManager {
         return actions;
     }
 
+// ... (lines of unchanged context code) ...
     @Override
-    public boolean executeCorrection(CorrectionAction action){
-        if (action instanceof CashCorrectionAction)
-            return execute((CashCorrectionAction) action);
-        else
-             return super.executeCorrection(action);
+    public boolean executeCorrection(CorrectionAction action) {
+        // 1. Logging Trace
+        log.info("DEBUG: CashCorrectionManager executeCorrection action=" + action);
+
+        // 2. Intercept Menu Click (CorrectionModeAction)
+        if (action instanceof CorrectionModeAction) {
+            // If the mode is NOT active, this is a "Turn On" request.
+            if (!isActive()) {
+                // FIX: Check isReloading AND run Wizard via invokeLater to prevent
+                // "Nested Action" issues (where the Cash Action is lost because the 
+                // Menu Action is still running).
+                if (!getParent().isReloading()) {
+                    // --- START FIX ---
+                    javax.swing.SwingUtilities.invokeLater(() -> runWizard());
+                    // --- END FIX ---
+                }
+                // Return true to indicate handled. 
+                return true; 
+            }
+            return super.executeCorrection(action);
+        }
+
+        // 3. Handle Direct Action (e.g. from GameStatus button click, Replay, or Wizard completion)
+        if (action instanceof CashCorrectionAction) {
+            CashCorrectionAction cca = (CashCorrectionAction) action;
+
+            // FIX: Check isReloading. 
+            if (cca.getAmount() == 0 && !getParent().isReloading()) {
+                log.info("DEBUG: Intercepted 0-amount CashCorrection. Opening Dialog.");
+                 String input = (String) javax.swing.JOptionPane.showInputDialog(
+                    null,
+                    LocalText.getText("CorrectCashDialogMessage", cca.getCashHolder().getId()),
+                    LocalText.getText("CorrectCashDialogTitle"),
+                    javax.swing.JOptionPane.QUESTION_MESSAGE,
+                    null, null, "0"
+                );
+
+                if (input == null) return false; 
+
+                if (input.trim().startsWith("+")) input = input.trim().substring(1);
+
+                try {
+                    int val = Integer.parseInt(input.trim());
+                    if (val == 0) return false;
+                    cca.setAmount(val);
+                } catch (NumberFormatException e) {
+                    DisplayBuffer.add(this, "Invalid Amount");
+                    return false;
+                }
+            }
+            return execute(cca);
+        }
+        
+        return super.executeCorrection(action);
+    }
+// ... (rest of the method) ...
+
+    private void runWizard() {
+        log.info("DEBUG: Starting Cash Correction Wizard");
+
+        // Step 1: Gather all MoneyOwners (Players + Floated Companies)
+        java.util.List<MoneyOwner> candidates = new java.util.ArrayList<>();
+        java.util.List<String> names = new java.util.ArrayList<>();
+        
+        // Players
+        for (Player p : getRoot().getPlayerManager().getPlayers()) {
+            candidates.add(p);
+            names.add(p.getName());
+        }
+        
+        // Companies
+        for (PublicCompany c : getParent().getAllPublicCompanies()) {
+            if (c.hasFloated() && !c.isClosed()) {
+                candidates.add(c);
+                names.add(c.getId());
+            }
+        }
+        
+        // Step 2: Show Selection Dialog
+        String selectedName = (String) javax.swing.JOptionPane.showInputDialog(
+            null, 
+            "Select Entity to Correct:", 
+            "Cash Correction Wizard",
+            javax.swing.JOptionPane.QUESTION_MESSAGE, 
+            null, 
+            names.toArray(), 
+            names.get(0)
+        );
+        
+        if (selectedName == null) return;
+        
+        // Find the object
+        int index = names.indexOf(selectedName);
+        MoneyOwner selectedOwner = candidates.get(index);
+        
+        // Step 3: Ask for Amount
+        String input = (String) javax.swing.JOptionPane.showInputDialog(
+            null,
+            "Enter cash adjustment for " + selectedOwner.getId() + ":",
+            "Cash Correction",
+            javax.swing.JOptionPane.QUESTION_MESSAGE,
+            null, null, "0"
+        );
+        
+        if (input == null) return;
+        
+        try {
+            if (input.trim().startsWith("+")) input = input.trim().substring(1);
+            int amount = Integer.parseInt(input.trim());
+            if (amount == 0) return;
+            
+            // Step 4: Create Action
+            CashCorrectionAction cca;
+            if (selectedOwner instanceof Player) {
+                cca = new CashCorrectionAction(getRoot(), (Player)selectedOwner);
+            } else {
+                cca = new CashCorrectionAction((PublicCompany)selectedOwner);
+            }
+            cca.setAmount(amount);
+            
+            // --- START FIX ---
+            // Send to GameManager to record the action, then it calls back to executeCorrection()
+            getParent().process(cca); 
+            // --- END FIX ---
+            
+        } catch (NumberFormatException e) {
+             DisplayBuffer.add(this, "Invalid Amount entered");
+        }
     }
 
     private boolean execute(CashCorrectionAction cashAction) {
@@ -86,8 +212,6 @@ public class CashCorrectionManager extends CorrectionManager {
         } else {
             // no error occured
 
-
-
             String msg;
             if (amount < 0) {
                 // negative amounts: remove cash from cashholder
@@ -106,6 +230,11 @@ public class CashCorrectionManager extends CorrectionManager {
             ReportBuffer.add(this, msg);
             getParent().addToNextPlayerMessages(msg, true);
             result = true;
+            
+            // Force UI Refresh
+            if (getParent().getGameUIManager() != null) {
+                getParent().getGameUIManager().forceFullUIRefresh();
+            }
         }
 
        return result;

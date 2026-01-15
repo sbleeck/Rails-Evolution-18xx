@@ -1231,6 +1231,7 @@ public class GameStatus extends GridPanel implements ActionListener {
             } else if (actions.get(0) instanceof CashCorrectionAction) {
                 // Delegate to GameUIManager
                 chosenAction = actions.get(0);
+log.info("DEBUG: GameStatus clicked Cash Correction for " + ((CashCorrectionAction)chosenAction).getCashHolder().getId());
             } else if (actions.get(0) instanceof BuyPrivate) {
                 // Delegate the UI interaction to the ORUIManager to avoid code duplication
                 // and ensure consistent modal parenting (ORWindow vs StatusWindow).
@@ -2062,7 +2063,7 @@ public class GameStatus extends GridPanel implements ActionListener {
                     // CRITICAL: Attach the action to the card so clicking it works!
                     card.addPossibleAction(action);
 
-                    card.setBackground(BG_BUY_ACTIVE); // Green
+                    card.setBackground(Color.CYAN); // Green
                     card.setBorder(BorderFactory.createLineBorder(Color.BLACK, 2)); // Thicker border
                     card.setState(RailCard.State.ACTIONABLE); // Make it look clickable/active
 
