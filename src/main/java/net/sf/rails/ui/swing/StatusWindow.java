@@ -1300,12 +1300,7 @@ public class StatusWindow extends JFrame implements ActionListener, ActionPerfor
                 this.possibleActions = gameUIManager.getGameManager().getPossibleActions();
                 this.currentRound = gameUIManager.getGameManager().getCurrentRound();
 
-                // FORCE LOG: What actions does the UI actually see?
-                if (possibleActions != null) {
-                    log.info("[DEBUG-UI] StatusWindow sees {} actions. Current Round: {}",
-                            possibleActions.getList().size(),
-                            (currentRound != null ? currentRound.getClass().getSimpleName() : "null"));
-                }
+              
             }
 
             // 3. Delegate to Subclass (Polymorphism)

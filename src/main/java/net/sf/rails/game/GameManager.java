@@ -1081,8 +1081,7 @@ public void setRound(RoundFacade round) {
         String oldRound = (currentRound.value() != null) ? currentRound.value().getId() : "null";
         String newRound = (round != null) ? round.getId() : "null";
         
-        log.info("[DEBUG-GM] setRound() called. Switch: {} -> {}", oldRound, newRound);
-        // --- END FIX ---
+
         currentRound.set(round);
     }
 
@@ -1671,7 +1670,6 @@ public void setRound(RoundFacade round) {
                 // FORCE UI UPDATE: Manually trigger the Observer update() method.
                 // We pass 'null' as the Observable because GameManager does not extend Observable.
                 if (gameUIManager != null && gameUIManager.getStatusWindow() != null) {
-                    log.info("[DEBUG-GM] Forcing UI Update via Direct Call...");
                     SwingUtilities.invokeLater(() -> {
                         Object status = gameUIManager.getStatusWindow().getGameStatus();
                         // Explicitly check against java.util.Observer

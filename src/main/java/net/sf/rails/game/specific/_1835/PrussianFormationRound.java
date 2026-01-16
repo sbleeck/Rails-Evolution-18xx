@@ -354,7 +354,7 @@ public class PrussianFormationRound extends Round implements I_MapRenderableRoun
             List<Company> foldables = new ArrayList<>(foldablesSet);
 
             if (!foldables.isEmpty()) {
-                executeExchange(foldables, false, true);
+                executeExchange(foldables, false, false);
             }
 
             finishMergeStep();

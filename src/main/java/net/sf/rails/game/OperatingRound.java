@@ -4895,4 +4895,7 @@ public class OperatingRound extends Round implements Observer {
             doneAllowed.set(!buyOptionAvailable);
         }
     }
+
+    public void cleanup() {
+    }
 }

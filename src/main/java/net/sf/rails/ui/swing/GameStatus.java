@@ -1605,10 +1605,6 @@ public class GameStatus extends GridPanel implements ActionListener {
                     playerShareCards[i][j].setBackground(BG_SELL);
                     playerShareCards[i][j].addPossibleAction((PossibleAction) o);
                 } else {
-                    // FALLBACK for Special Actions (e.g. StartPrussian)
-                    // Force "Active Green" style
-                    log.info("[UI-DEBUG] Applying GREEN Highlight to Special Action at [{},{}]", i, j);
-
                     playerShareCards[i][j].setBackground(BG_BUY); // Green
                     playerShareCards[i][j].setBorder(BorderFactory.createLineBorder(Color.BLACK, 2)); // Thick Border
 
