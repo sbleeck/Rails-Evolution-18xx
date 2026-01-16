@@ -148,7 +148,46 @@ public class StatusWindow extends JFrame implements ActionListener, ActionPerfor
     protected ActionButton aiButton;
     protected ActionButton pauseButton;
 
+    protected ActionButton undoButton;
+    protected ActionButton redoButton;
+
+
+    // DESIGN LANGUAGE CONSTANTS
+    private static final Color SYS_BLUE = new Color(30, 144, 255); // DodgerBlue
+    private static final Color SYS_CYAN = Color.CYAN; // Action Required
+    private static final Color FG_WHITE = Color.WHITE;
     private String lastCompanySignature = null;
+
+    // Helper to enforce Design Language on buttons
+    private void styleStatusButton(ActionButton btn, Color bg) {
+        if (btn == null)
+            return;
+        btn.setBackground(bg);
+        btn.setForeground(FG_WHITE);
+        btn.setOpaque(true);
+        btn.setFont(new Font("SansSerif", Font.BOLD, 12));
+        btn.setBorder(BorderFactory.createRaisedBevelBorder()); // Match ORPanel 3D look
+    }
+
+    // New Helper for "Passive/Yield" buttons (Grey + Black Text)
+    private void stylePassiveButton(ActionButton btn) {
+        if (btn == null) return;
+        btn.setBackground(Color.LIGHT_GRAY);
+        btn.setForeground(Color.BLACK); // Black text for readability on Grey
+        btn.setOpaque(true);
+        btn.setFont(new Font("SansSerif", Font.BOLD, 12));
+        btn.setBorder(BorderFactory.createRaisedBevelBorder());
+    }
+
+    // Helper to reset button to passive state
+    private void resetStatusButton(ActionButton btn) {
+        if (btn == null)
+            return;
+        btn.setBackground(UIManager.getColor("Button.background"));
+        btn.setForeground(Color.BLACK);
+        btn.setFont(new Font("SansSerif", Font.PLAIN, 12));
+        btn.setBorder(UIManager.getBorder("Button.border"));
+    }
 
     private void checkStructureChange() {
         if (gameUIManager == null || gameUIManager.getGameManager() == null)
@@ -452,12 +491,6 @@ public class StatusWindow extends JFrame implements ActionListener, ActionPerfor
         correctionMenu.setEnabled(true);
         // menuBar.add(moderatorMenu);
 
-
-        
-
-
-
-
         menuBar.add(correctionMenu); // Add as a top-level menu item
 
         // --- 9. DEVELOPER (Conditional) ---
@@ -514,6 +547,8 @@ public class StatusWindow extends JFrame implements ActionListener, ActionPerfor
         // which must always be up-to-date.
         undoItem.setEnabled(false);
         redoItem.setEnabled(false);
+        if (undoButton != null) undoButton.setEnabled(false);
+        if (redoButton != null) redoButton.setEnabled(false);
         // SAVE, RELOAD, AUTOSAVELOAD are always enabled
     }
 
@@ -526,11 +561,20 @@ public class StatusWindow extends JFrame implements ActionListener, ActionPerfor
                     case FORCED_UNDO:
                         undoItem.setEnabled(true);
                         undoItem.setPossibleAction(na);
+                        if (undoButton != null) {
+                            undoButton.setEnabled(true);
+                            undoButton.setPossibleAction(na);
+                        }
                         break;
 
                     case REDO:
                         redoItem.setEnabled(true);
                         redoItem.setPossibleAction(na);
+                        if (redoButton != null) {
+                            redoButton.setEnabled(true);
+                            redoButton.setPossibleAction(na);
+                        }
+
                         break;
                     default:
                         break;
@@ -584,14 +628,13 @@ public class StatusWindow extends JFrame implements ActionListener, ActionPerfor
             @Override
             public void actionPerformed(ActionEvent e) {
                 int response = JOptionPane.showConfirmDialog(
-                    StatusWindow.this,
-                    "This is a debug tool to bypass a stuck turn (e.g., a closed company acting).\n"
-                    + "It forcibly advances the internal company index.\n\n"
-                    + "Are you sure you want to force the engine to skip the current actor?",
-                    "Force Skip Confirmation",
-                    JOptionPane.YES_NO_OPTION,
-                    JOptionPane.WARNING_MESSAGE
-                );
+                        StatusWindow.this,
+                        "This is a debug tool to bypass a stuck turn (e.g., a closed company acting).\n"
+                                + "It forcibly advances the internal company index.\n\n"
+                                + "Are you sure you want to force the engine to skip the current actor?",
+                        "Force Skip Confirmation",
+                        JOptionPane.YES_NO_OPTION,
+                        JOptionPane.WARNING_MESSAGE);
 
                 if (response == JOptionPane.YES_OPTION) {
                     if (gameUIManager != null && gameUIManager.getGameManager() != null) {
@@ -601,7 +644,7 @@ public class StatusWindow extends JFrame implements ActionListener, ActionPerfor
             }
         });
         correctionMenu.add(forceSkipItem);
-        
+
     }
 
     public boolean setupFor(RoundFacade round) {
@@ -686,11 +729,12 @@ public class StatusWindow extends JFrame implements ActionListener, ActionPerfor
             if (gameUIManager.isTimerPaused()) {
                 gameUIManager.resumeTimer();
                 pauseButton.setText("Pause"); // Replaced LocalText.getText()
-                pauseButton.setRailsIcon(RailsIcon.PAUSE);
+                pauseButton.setRailsIcon(null);
+
             } else {
                 gameUIManager.pauseTimer();
                 pauseButton.setText("Resume"); // Replaced LocalText.getText()
-                pauseButton.setRailsIcon(RailsIcon.RESUME);
+                pauseButton.setRailsIcon(null);
             }
 
         } else if (command.equals(BUY_CMD)) {
@@ -874,9 +918,13 @@ public class StatusWindow extends JFrame implements ActionListener, ActionPerfor
         if (action != null) {
             NullAction.Mode mode = action.getMode();
             if (mode == NullAction.Mode.PASS) {
-                passButton.setRailsIcon(RailsIcon.PASS);
+                passButton.setText("Pass");
+                passButton.setIcon(null);
+                styleStatusButton(passButton, SYS_BLUE);
             } else if (mode == NullAction.Mode.DONE) {
-                passButton.setRailsIcon(RailsIcon.DONE);
+                passButton.setText("Done");
+                passButton.setIcon(null);
+                styleStatusButton(passButton, SYS_BLUE);
             }
             passButton.setEnabled(true);
             passButton.setVisible(true);
@@ -1042,42 +1090,90 @@ public class StatusWindow extends JFrame implements ActionListener, ActionPerfor
         // }
 
         gameStatus.init(this, gameUIManager);
-        gameStatusPane = new JScrollPane(gameStatus); // <--- ASSIGN TO FIELD
+        gameStatusPane = new JScrollPane(gameStatus); //
 
         // --- BUTTONS (SOUTH) ---
-        buttonPanel = new JPanel();
+// --- BUTTONS (SOUTH) ---
+        // 1. Single Row Grid (1 Row, 5 Cols) -> HGap=12 for "tiny bit more space"
+        buttonPanel = new JPanel(new GridLayout(1, 5, 12, 0)); 
 
-        aiButton = new ActionButton(RailsIcon.AI_MOVE);
+        // 2. Define Buttons
+        // We use RailsIcon.PASS as a placeholder for the constructor, then strip it for Text-Only mode.
+
+        // PAUSE
+        pauseButton = new ActionButton(RailsIcon.PAUSE);
+        pauseButton.setText("Pause");
+        pauseButton.setIcon(null);
+        pauseButton.setToolTipText("Pause/Resume the player timer");
+        pauseButton.setActionCommand(TOGGLE_PAUSE_CMD);
+        pauseButton.addActionListener(this);
+
+        // UNDO
+        undoButton = new ActionButton(RailsIcon.PASS); 
+        undoButton.setText("Undo");
+        undoButton.setIcon(null);
+        undoButton.setActionCommand(UNDO_CMD);
+        undoButton.addActionListener(this);
+        undoButton.setEnabled(false); 
+
+        // REDO 
+        redoButton = new ActionButton(RailsIcon.PASS);
+        redoButton.setText("Redo");
+        redoButton.setIcon(null);
+        redoButton.setActionCommand(REDO_CMD);
+        redoButton.addActionListener(this);
+        redoButton.setEnabled(false); 
+
+        // AI
+        aiButton = new ActionButton(RailsIcon.AI_MOVE); 
+        aiButton.setText("AI");
+        aiButton.setIcon(null); 
         aiButton.setActionCommand(AI_MOVE_CMD);
         aiButton.setToolTipText("Let AI make the next Operating Round move");
         aiButton.addActionListener(this);
-        aiButton.setEnabled(true);
-        aiButton.setVisible(true);
 
-        passButton = new ActionButton(RailsIcon.PASS);
+        // PASS
+        passButton = new ActionButton(RailsIcon.PASS); 
+        passButton.setText("Pass");
+        passButton.setIcon(null); 
         passButton.setMnemonic(KeyEvent.VK_P);
         passButton.setActionCommand(DONE_CMD);
         passButton.addActionListener(this);
 
-        autopassButton = new ActionButton(RailsIcon.AUTOPASS);
-        autopassButton.setMnemonic(KeyEvent.VK_A);
+        // --- START FIX: INITIALIZE AUTOPASS (Prevents NPE Crash) ---
+        // We do NOT add this to the buttonPanel (keeping your 5-button layout),
+        // but we must initialize it so updateStatus() doesn't crash.
+        autopassButton = new ActionButton(RailsIcon.DONE);
+        autopassButton.setText("Auto Pass");
+        autopassButton.setIcon(null);
         autopassButton.setActionCommand(AUTOPASS_CMD);
         autopassButton.addActionListener(this);
+        // --- END FIX ---
 
-        pauseButton = new ActionButton(RailsIcon.PAUSE);
-        pauseButton.setText("Pause");
-        pauseButton.setToolTipText("Pause/Resume the player timer");
-        pauseButton.setActionCommand(TOGGLE_PAUSE_CMD);
-        pauseButton.addActionListener(this);
-        pauseButton.setEnabled(true);
-        pauseButton.setVisible(true);
-
-        // Add buttons to panel
+        // 3. Add to Panel in Order: Pause, Undo, Redo, AI, Pass
         buttonPanel.add(pauseButton);
+        buttonPanel.add(undoButton);
+        buttonPanel.add(redoButton);
         buttonPanel.add(aiButton);
         buttonPanel.add(passButton);
 
-        setSize(800, 300);
+        // 4. Style & Size
+        styleStatusButton(pauseButton, SYS_BLUE);
+        styleStatusButton(undoButton, SYS_BLUE);
+        styleStatusButton(redoButton, SYS_BLUE);
+        styleStatusButton(aiButton, SYS_BLUE);
+        styleStatusButton(passButton, SYS_BLUE);
+
+        // Force Taller Buttons (45px height)
+        Dimension btnDim = new Dimension(80, 45);
+        pauseButton.setPreferredSize(btnDim);
+        undoButton.setPreferredSize(btnDim);
+        redoButton.setPreferredSize(btnDim);
+        aiButton.setPreferredSize(btnDim);
+        passButton.setPreferredSize(btnDim);
+
+        setSize(600, 300);
+
         buttonPanel.setBorder(BorderFactory.createEtchedBorder());
         buttonPanel.setOpaque(false);
 
@@ -1510,31 +1606,53 @@ public class StatusWindow extends JFrame implements ActionListener, ActionPerfor
                 dynamicButtonPanel.removeAll();
             }
 
+            // 1. Do NOT disable immediately. This causes the "Switch Off" flicker.
+            // passButton.setEnabled(false); 
+            // autopassButton.setEnabled(false);
+            
+            boolean passFound = false;
+
             List<NullAction> inactiveItems = possibleActions.getType(NullAction.class);
 
             if (inactiveItems != null) {
                 for (NullAction na : inactiveItems) {
                     switch (na.getMode()) {
                         case PASS:
-                            passButton.setRailsIcon(RailsIcon.PASS);
+                            passButton.setRailsIcon(null);
                             passButton.setEnabled(true);
                             passButton.setActionCommand(PASS_CMD);
                             passButton.setMnemonic(KeyEvent.VK_P);
                             passButton.setPossibleAction(na);
+                            
+                            // 1. Force Enable/Visible
+                            passFound = true; 
+                            passButton.setEnabled(true);
+                            passButton.setVisible(true);
 
-                            // Contextual Rename: "Pass" -> "Decline Exchange" during Formation
+                            // 2. Contextual Text
                             if (currentRound instanceof net.sf.rails.game.specific._1835.PrussianFormationRound) {
                                 passButton.setText("Decline Exchange");
-                                passButton.setToolTipText("Do not swap/exchange any (more) certificates.");
+                                styleStatusButton(passButton, SYS_BLUE); // Exception: Keep Blue for "Decision"
+                            } else {
+                                passButton.setText("Pass");
+styleStatusButton(passButton, SYS_BLUE);
                             }
 
                             break;
                         case DONE:
-                            passButton.setRailsIcon(RailsIcon.DONE);
+                            passButton.setRailsIcon(null);
                             passButton.setEnabled(true);
                             passButton.setActionCommand(DONE_CMD);
                             passButton.setMnemonic(KeyEvent.VK_D);
                             passButton.setPossibleAction(na);
+                            
+                            passFound = true;
+                            passButton.setEnabled(true);
+                            passButton.setVisible(true);
+                            
+                            passButton.setText("Done");
+                            styleStatusButton(passButton, SYS_BLUE); // Standard: Blue
+
                             break;
                         case AUTOPASS:
                             autopassButton.setEnabled(true);
@@ -1546,6 +1664,11 @@ public class StatusWindow extends JFrame implements ActionListener, ActionPerfor
                 }
             }
 
+            // Only disable if we genuinely found no action
+            if (!passFound) {
+                passButton.setEnabled(false);
+            }
+            
             gameStatus.setBackground(UIManager.getColor("Panel.background"));
             gameStatus.setOpaque(false);
             gameStatus.repaint();
@@ -1628,9 +1751,12 @@ public class StatusWindow extends JFrame implements ActionListener, ActionPerfor
         // Enable and highlight if we found items
         specialMenu.setEnabled(hasItems);
         if (hasItems) {
-            specialMenu.setBackground(Color.YELLOW);
+            // Change Yellow to Cyan (Actionable Alert Color)
+            specialMenu.setBackground(SYS_CYAN);
+            specialMenu.setOpaque(true);
         } else {
             specialMenu.setBackground(null);
+            specialMenu.setOpaque(false);
         }
     }
 
@@ -1891,8 +2017,10 @@ public class StatusWindow extends JFrame implements ActionListener, ActionPerfor
         if (card != null) {
             log.info("[FLOW] 11. StatusWindow: SUCCESS. Found RailCard for {}. Setting BLUE.", company.getId());
             log.info("StatusWindow: Highlighting Card for {}", company.getId());
-            // Visual: Blue Highlight
-            card.setState(net.sf.rails.ui.swing.elements.RailCard.State.HIGHLIGHTED);
+            
+         // Visual: Color Code based on Action
+            applyActionColor(card, action);
+            
             // Functional: Attach Action
             card.setPossibleAction(action);
             // Listen
@@ -2022,7 +2150,7 @@ public class StatusWindow extends JFrame implements ActionListener, ActionPerfor
 
         if (card != null) {
             log.info("[FLOW] 11. StatusWindow: SUCCESS. Found RailCard for {}. Setting BLUE.", company.getId());
-            card.setState(net.sf.rails.ui.swing.elements.RailCard.State.HIGHLIGHTED);
+            applyActionColor(card, action);
             card.setPossibleAction(action);
             card.removeActionListener(this);
             card.addActionListener(this);
@@ -2072,7 +2200,7 @@ public class StatusWindow extends JFrame implements ActionListener, ActionPerfor
 
         // 4. Apply the Visuals
         if (card != null) {
-            card.setState(net.sf.rails.ui.swing.elements.RailCard.State.HIGHLIGHTED);
+            applyActionColor(card, action);
             card.setPossibleAction(action);
 
             // Clean listeners to prevent double-clicks
@@ -2088,5 +2216,34 @@ public class StatusWindow extends JFrame implements ActionListener, ActionPerfor
 
         return false;
     }
+
+    /**
+     * Applies the correct visual style (Green/Red/Blue) to a RailCard based on the action.
+     */
+    private void applyActionColor(net.sf.rails.ui.swing.elements.RailCard card, PossibleAction action) {
+        if (card == null) return;
+        
+        // Default Highlight (System Blue - Generic)
+        Color borderColor = new Color(30, 144, 255); // DodgerBlue
+        Color bgColor = new Color(225, 240, 255);    // Pale Blue
+
+        if (action instanceof SellShares) {
+            // SELLING -> RED (Destructive)
+            borderColor = new Color(255, 69, 0); // OrangeRed
+            bgColor = new Color(255, 235, 235);  // Pale Red
+        } else if (action instanceof BuyCertificate || action instanceof BuyTrain || action instanceof BuyPrivate) {
+            // BUYING -> GREEN (Acquisition)
+            borderColor = new Color(34, 139, 34); // ForestGreen
+            bgColor = new Color(230, 255, 230);   // Pale Green
+        }
+
+        // Apply State & Colors
+        card.setState(net.sf.rails.ui.swing.elements.RailCard.State.HIGHLIGHTED);
+        card.setBorder(BorderFactory.createLineBorder(borderColor, 2));
+        card.setOpaque(true);
+        card.setBackground(bgColor);
+        card.repaint();
+    }
+
 
 }

@@ -1413,7 +1413,6 @@ public void setRound(RoundFacade round) {
     }
 
 
-
     /**
      * EMERGENCY DEBUG TOOL: Forces the Operating Round to jump to the next company.
      * Use this if the game hangs on a closed company (Zombie Company).
@@ -1431,9 +1430,9 @@ public void setRound(RoundFacade round) {
             OperatingRound or = (OperatingRound) current;
             
             // 1. Access the internal list of operating companies
-            // We use the getter provided in OperatingRound to avoid reflection if possible.
-            // (Assuming getOperatingCompanies() is public/protected, otherwise we use reflection)
-            List<PublicCompany> companies = or.getOperatingCompanies(); 
+            // We use the getter provided in OperatingRound to avoid reflection if possible,
+            // otherwise we assume 'operatingCompanies' is accessible or use reflection.
+            List<PublicCompany> companies = or.getOperatingCompanies();
             PublicCompany stuckComp = or.getOperatingCompany();
             
             if (companies == null || companies.isEmpty()) {
@@ -1446,7 +1445,6 @@ public void setRound(RoundFacade round) {
             log.info("ForceSkip: Stuck Company = {}, Index = {}", stuckComp.getId(), currentIndex);
 
             // 3. Find next valid company
-            // We search forward until we find a company that is NOT closed and HAS floated.
             int nextIndex = currentIndex;
             int attempts = 0;
             PublicCompany nextComp = null;
@@ -1454,8 +1452,6 @@ public void setRound(RoundFacade round) {
             while (attempts < companies.size()) {
                 nextIndex = (nextIndex + 1) % companies.size();
                 PublicCompany candidate = companies.get(nextIndex);
-                
-                // CRITICAL CHECK: Skip if closed (Zombie) OR if it hasn't floated yet
                 if (!candidate.isClosed() && candidate.hasFloated()) {
                     nextComp = candidate;
                     break;
@@ -1466,48 +1462,28 @@ public void setRound(RoundFacade round) {
             if (nextComp != null) {
                 log.info("ForceSkip: Advancing to {}", nextComp.getId());
                 
-                // 4. Force state update using Reflection
-                // We must update the 'operatingCompany' field and the 'orCompIndex' field.
+                // 4. Force state update using Reflection to bypass 'private' access if needed,
+                // or just call the protected method if we were in the same package (we aren't).
+                // Since we are in GameManager, we might need Reflection to set 'operatingCompany'
+                // if there isn't a public setter. OperatingRound has 'setOperatingCompany' but it is protected.
                 
-                // Set 'orCompIndex'
-                try {
-                    java.lang.reflect.Field indexField = OperatingRound.class.getDeclaredField("orCompIndex");
-                    indexField.setAccessible(true);
-                    indexField.setInt(or, nextIndex);
-                } catch (NoSuchFieldException e) {
-                    // Fallback for different variable names in older versions
-                    log.warn("ForceSkip: Could not set 'orCompIndex'. Trying to continue via setOperatingCompany.");
-                }
-
-                // Set 'operatingCompany' (The State object)
-                // Note: operatingCompany is a GenericState<PublicCompany>
-                java.lang.reflect.Field stateField = OperatingRound.class.getDeclaredField("operatingCompany");
-                stateField.setAccessible(true);
-                @SuppressWarnings("unchecked")
-                GenericState<PublicCompany> opCompState = (GenericState<PublicCompany>) stateField.get(or);
-                opCompState.set(nextComp);
+                java.lang.reflect.Method setMethod = OperatingRound.class.getDeclaredMethod("setOperatingCompany", PublicCompany.class);
+                setMethod.setAccessible(true);
+                setMethod.invoke(or, nextComp);
                 
-                // 5. Reset Step to INITIAL to ensure the new company starts fresh
+                // 5. Reset Step
                 java.lang.reflect.Method setStepMethod = OperatingRound.class.getDeclaredMethod("setStep", GameDef.OrStep.class);
                 setStepMethod.setAccessible(true);
                 setStepMethod.invoke(or, GameDef.OrStep.INITIAL);
 
-                // 6. Force the Round to initialize the turn for the new company
-                // This triggers the UI refresh (ORPanel update)
+                // 6. Init Turn
                 java.lang.reflect.Method initTurnMethod = OperatingRound.class.getDeclaredMethod("initTurn");
                 initTurnMethod.setAccessible(true);
                 initTurnMethod.invoke(or);
 
                 DisplayBuffer.add(this, "FORCE SKIP SUCCESS: Advanced to " + nextComp.getId());
-                
-                // 7. Force UI Repaint
-                 if (gameUIManager != null && gameUIManager.getStatusWindow() != null) {
-                    SwingUtilities.invokeLater(() -> gameUIManager.getStatusWindow().repaint());
-                }
-
             } else {
                 log.error("ForceSkip: Could not find any valid next company.");
-                DisplayBuffer.add(this, "Force Skip Failed: No valid next company found.");
             }
 
         } catch (Exception e) {
@@ -1516,7 +1492,6 @@ public void setRound(RoundFacade round) {
         }
     }
 
-    
         /**
      * Central processing method for game actions.
      * 
@@ -1585,10 +1560,26 @@ public void setRound(RoundFacade round) {
             // Validation checks (Keep these)
             String actionPlayerName = action.getPlayerName();
             String currentPlayerName = getCurrentPlayer().getId();
-            if (!actionPlayerName.equals(currentPlayerName)) {
+
+            // Fix for "AI" player name bug: Relax validation for whitespace, case, and AI-flagged actions
+            boolean nameMatch = actionPlayerName.equals(currentPlayerName);
+
+            if (!nameMatch) {
+                // 1. Try relaxed check (trim + ignore case)
+                if (actionPlayerName.trim().equalsIgnoreCase(currentPlayerName.trim())) {
+                    nameMatch = true;
+                } 
+                // 2. Trust explicit AI actions even if name format differs (e.g. "AI " vs "AI")
+                else if (action.isAIAction()) {
+                    nameMatch = true;
+                }
+            }
+
+            if (!nameMatch) {
                 DisplayBuffer.add(this, LocalText.getText("WrongPlayer", actionPlayerName, currentPlayerName));
                 return false; // Return early, DO NOT count
             }
+            
             if (!possibleActions.validate(action)) {
                 DisplayBuffer.add(this, LocalText.getText("ActionNotAllowed", action.toString()));
                 return false; // Return early, DO NOT count

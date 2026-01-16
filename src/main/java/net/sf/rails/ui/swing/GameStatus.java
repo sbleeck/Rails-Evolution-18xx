@@ -56,7 +56,8 @@ public class GameStatus extends GridPanel implements ActionListener {
     // Width Definitions
     // STRUCTURAL CONSTANTS FOR "SLOT" SYSTEM
 
-    private final Dimension DIM_ARROW = new Dimension(20, 20); // 1. Visible Arrow
+    // private final Dimension DIM_ARROW = new Dimension(20, 20); // 1. Visible
+    // Arrow
     private final Dimension DIM_STD = new Dimension(52, 20); // 5. Fix clipping (was 45, now 52)
     private final Dimension DIM_MINOR = new Dimension(52, 20); // Sync with STD
     private final Dimension DIM_DOT = new Dimension(8, 20);
@@ -78,28 +79,51 @@ public class GameStatus extends GridPanel implements ActionListener {
     private final Dimension DIM_TRAIN = new Dimension(40, 20);
 
     public static final Color BG_BUY_ACTIVE = new Color(144, 238, 144); // Light Green (#90EE90) - Standard "Buy"\
-    // public static final Color BG_SPECIAL_ACTIVE = Color.CYAN; // Global constant for Special Actions
+    // public static final Color BG_SPECIAL_ACTIVE = Color.CYAN; // Global constant
+    // for Special Actions
     private final Color BG_SELL_ALERT = new Color(250, 128, 114); // Salmon Pink (#FA8072) - Shares Sell
     public static final Color BG_CARD_PASSIVE = new Color(255, 255, 240); // Beige (Must be static for static method
-                                                                          // usage)
 
-    private final Color BG_INACTIVE = new Color(235, 235, 235); // Constant Grey (Point 9)
+
+    // 1. DEFINE MASTER GREY (Standardize 235 vs 225 clash)
+    private static final Color BG_UNIFIED_GREY = new Color(225, 225, 225); // The chosen "Spotlight Inactive" Grey
+
+    // 2. APPLY TO CONSTANTS
+    private final Color BG_INACTIVE = BG_UNIFIED_GREY; // Fixes Inactive Rows
+
+
+                                                                          
     private final Color BG_POOL = new Color(230, 240, 255);
     private final Color BG_IPO = new Color(255, 235, 235); // Distinct Reddish/Pink (Point 13)
 
     private final Color BG_MAUVE = new Color(235, 230, 255); // Standard Company Data Background
-    private final Color BG_OPERATING = new Color(255, 255, 200); // Yellow
+    private final Color BG_OPERATING = Color.WHITE;
 
     // Promoted from initTurn to avoid shadowing/reallocation
     private final Color BG_PASSED = new Color(150, 255, 150);
     private final Color BG_CERT_OK = new Color(200, 255, 200);
     private final Color BG_CERT_LIMIT = new Color(255, 200, 200);
 
+    // Spotlight System Constants
+    private static final Color BG_SPOTLIGHT_ACTIVE = Color.WHITE;
+    private static final Color BG_SPOTLIGHT_INACTIVE = BG_UNIFIED_GREY;
+    private static final javax.swing.border.Border BORDER_SPOTLIGHT = BorderFactory.createMatteBorder(0, 0, 3, 0,
+            new Color(255, 215, 0)); // Gold Underline
+    private static final javax.swing.border.Border BORDER_DEFAULT = BorderFactory.createMatteBorder(0, 0, 1, 1,
+            Color.GRAY);
+
     // Alias for Share Buying to match Trains
     final Color BG_BUY = BG_BUY_ACTIVE; // Use Light Green
     final Color BG_SELL = BG_SELL_ALERT; // Use Muted Rose Red
 
     final Color BG_SLOT_AVAILABLE = new Color(220, 255, 220);
+
+    // Visual Constants for "Beige + Border" Style
+    private static final Color BORDER_COL_BUY = new Color(0, 160, 0); // Strong Green
+    private static final Color BORDER_COL_SELL = new Color(220, 20, 60); // Crimson Red
+    private static final int BORDER_THICKNESS = 3;
+    // 1. HEADER COLOR: Uniform Light Grey for all column headers
+    private static final Color BG_HEADER = new Color(224, 224, 224);
 
     // 2. Larger Train Cards
     private static final Dimension DIM_TRAIN_BTN = new Dimension(32, 18);
@@ -149,7 +173,7 @@ public class GameStatus extends GridPanel implements ActionListener {
     protected Field[] compTrains;
     protected int compTrainsXOffset, compTrainsYOffset;
     protected JPanel[] compTokens;
-    protected Caption[] compArrowCaption; // Store references to the arrows
+    // protected Caption[] compArrowCaption; // Store references to the arrows
     protected Caption[] compNameCaption;
     protected int compTokensXOffset, compTokensYOffset;
     protected JPanel[] compPrivatesPanel;
@@ -168,7 +192,7 @@ public class GameStatus extends GridPanel implements ActionListener {
     protected int playerWorthXOffset, playerWorthYOffset;
     protected Field[] playerORWorthIncrease;
     protected int playerORWorthIncreaseXOffset, playerORWorthIncreaseYOffset;
-    protected Field[] playerCertCount;
+    protected CertLimitGauge[] playerCertCount;
     protected int playerCertCountXOffset, playerCertCountYOffset;
     protected Field bankCash;
     protected int newTrainsXOffset, newTrainsYOffset;
@@ -444,7 +468,7 @@ public class GameStatus extends GridPanel implements ActionListener {
         playerCashButton = new ClickField[np];
         playerWorth = new Field[np];
         playerORWorthIncrease = new Field[np];
-        playerCertCount = new Field[np];
+
         playerTimer = new Field[np];
         upperPlayerCaption = new Caption[np];
 
@@ -531,7 +555,7 @@ public class GameStatus extends GridPanel implements ActionListener {
 
         playerWorth = new Field[np];
         playerORWorthIncrease = new Field[np];
-        playerCertCount = new Field[np];
+        playerCertCount = new CertLimitGauge[np];
         // Initialize time tracking array and pull current time values
         lastPlayerTimes = new int[np];
         for (int i = 0; i < np; i++) {
@@ -1245,8 +1269,10 @@ public class GameStatus extends GridPanel implements ActionListener {
                 // Explicitly handle StartPrussian to ensure it triggers
                 chosenAction = actions.get(0);
             } else if (actions.get(0) instanceof LayTile) {
-                // Prevent incomplete LayTile actions (from Private Cards) from being sent to GameManager
-                // This prevents the "null tile" crash and prepares for future "Jump to Map" logic.
+                // Prevent incomplete LayTile actions (from Private Cards) from being sent to
+                // GameManager
+                // This prevents the "null tile" crash and prepares for future "Jump to Map"
+                // logic.
                 System.out.println("Blocked incomplete LayTile action from RailCard: " + actions.get(0));
                 chosenAction = null;
             } else {
@@ -1409,10 +1435,12 @@ public class GameStatus extends GridPanel implements ActionListener {
                     }
                 }
 
-                // Apply Styles manually since we aren't using the static helper anymore
+                // Apply Styles manually: Use Beige + Green Border instead of solid Green
                 if (canBuy) {
-                    cf.setBackground(BG_BUY_ACTIVE);
-                    cf.setBorder(BorderFactory.createLineBorder(Color.BLACK, 2));
+                    // OLD: cf.setBackground(BG_BUY_ACTIVE);
+                    cf.setBackground(BG_CARD_PASSIVE); // Beige
+                    cf.setBorder(BorderFactory.createLineBorder(BORDER_COL_BUY, 3)); // Thick Green Border
+                    
                     cf.setToolTipText("Click to Buy " + train.getName());
                     cf.setEnabled(true);
                 } else {
@@ -1596,13 +1624,19 @@ public class GameStatus extends GridPanel implements ActionListener {
                     players.getPlayerByPosition(j).getPortfolioModel().getCertificates(companies[i]));
 
             if (clickable && o != null) {
+                // "Beige + Border" Style Implementation
                 if (o instanceof BuyCertificate) {
-                    playerShareCards[i][j].setBackground(BG_BUY);
-                    playerShareCards[i][j].setBorder(BorderFactory.createLineBorder(Color.BLACK, 2));
+                    playerShareCards[i][j].setBackground(BG_CARD_PASSIVE); // Keep Beige
+                    playerShareCards[i][j].setBorder(BorderFactory.createLineBorder(BORDER_COL_BUY, BORDER_THICKNESS)); // Thick
+                                                                                                                        // Green
+                                                                                                                        // Border
                     playerShareCards[i][j].addPossibleAction((PossibleAction) o);
                     playerShareCards[i][j].setVisible(true);
                 } else if (o instanceof SellShares) {
-                    playerShareCards[i][j].setBackground(BG_SELL);
+                    playerShareCards[i][j].setBackground(BG_CARD_PASSIVE); // Keep Beige
+                    playerShareCards[i][j].setBorder(BorderFactory.createLineBorder(BORDER_COL_SELL, BORDER_THICKNESS)); // Thick
+                                                                                                                         // Red
+                                                                                                                         // Border
                     playerShareCards[i][j].addPossibleAction((PossibleAction) o);
                 } else {
                     // FALLBACK for Special Actions (e.g. StartPrussian)
@@ -1733,12 +1767,12 @@ public class GameStatus extends GridPanel implements ActionListener {
         ipoShareCards[i].clearPossibleActions();
 
         if (clickable && o != null) {
-            // ACTIVE STATE
             if (o instanceof BuyCertificate) {
-                ipoShareCards[i].setBackground(BG_BUY);
-                ipoShareCards[i].setBorder(BorderFactory.createLineBorder(Color.BLACK, 2));
+                ipoShareCards[i].setBackground(BG_CARD_PASSIVE);
+                ipoShareCards[i].setBorder(BorderFactory.createLineBorder(BORDER_COL_BUY, BORDER_THICKNESS));
             } else if (o instanceof SellShares) {
-                ipoShareCards[i].setBackground(BG_SELL);
+                ipoShareCards[i].setBackground(BG_CARD_PASSIVE);
+                ipoShareCards[i].setBorder(BorderFactory.createLineBorder(BORDER_COL_SELL, BORDER_THICKNESS));
             }
 
             if (o instanceof PossibleAction) {
@@ -1798,12 +1832,13 @@ public class GameStatus extends GridPanel implements ActionListener {
         poolShareCards[i].clearPossibleActions();
 
         if (clickable && o != null) {
-            // ACTIVE
+            // ACTIVE - Beige Background with Thick Colored Borders
             if (o instanceof BuyCertificate) {
-                poolShareCards[i].setBackground(BG_BUY);
-                poolShareCards[i].setBorder(BorderFactory.createLineBorder(Color.BLACK, 2));
+                poolShareCards[i].setBackground(BG_CARD_PASSIVE);
+                poolShareCards[i].setBorder(BorderFactory.createLineBorder(BORDER_COL_BUY, BORDER_THICKNESS));
             } else if (o instanceof SellShares) {
-                poolShareCards[i].setBackground(BG_SELL);
+                poolShareCards[i].setBackground(BG_CARD_PASSIVE);
+                poolShareCards[i].setBorder(BorderFactory.createLineBorder(BORDER_COL_SELL, BORDER_THICKNESS));
             }
 
             if (o instanceof PossibleAction)
@@ -1857,12 +1892,12 @@ public class GameStatus extends GridPanel implements ActionListener {
         treasuryShareCards[i].clearPossibleActions();
 
         if (clickable && o != null) {
-            // ACTIVE
             if (o instanceof BuyCertificate) {
-                treasuryShareCards[i].setBackground(BG_BUY);
-                treasuryShareCards[i].setBorder(BorderFactory.createLineBorder(Color.BLACK, 2));
+                treasuryShareCards[i].setBackground(BG_SPOTLIGHT_INACTIVE);
+                treasuryShareCards[i].setBorder(BorderFactory.createLineBorder(BORDER_COL_BUY, BORDER_THICKNESS));
             } else if (o instanceof SellShares) {
-                treasuryShareCards[i].setBackground(BG_SELL);
+                treasuryShareCards[i].setBackground(BG_SPOTLIGHT_INACTIVE);
+                treasuryShareCards[i].setBorder(BorderFactory.createLineBorder(BORDER_COL_SELL, BORDER_THICKNESS));
             }
 
             if (o instanceof PossibleAction)
@@ -2013,6 +2048,8 @@ public class GameStatus extends GridPanel implements ActionListener {
                 continue;
 
             playerPrivatesPanel[i].removeAll();
+            // Add top spacing so cards don't look "stuck" to the top border
+playerPrivatesPanel[i].add(Box.createVerticalStrut(5));
 
             net.sf.rails.game.Player p = players.getPlayerByPosition(i);
             if (p == null)
@@ -2061,7 +2098,8 @@ public class GameStatus extends GridPanel implements ActionListener {
                     PossibleAction action = activePrivateActions.get(pc.getId());
                     // Attach the action to the card so clicking it works!
                     card.addPossibleAction(action);
-// The card will check its internal logic and paint itself Cyan (COL_HIGHLIGHT_BG).
+                    // The card will check its internal logic and paint itself Cyan
+                    // (COL_HIGHLIGHT_BG).
                     card.setState(RailCard.State.HIGHLIGHTED);
 
                     if (action instanceof BuyPrivate) {
@@ -2381,10 +2419,10 @@ public class GameStatus extends GridPanel implements ActionListener {
             boolean isOperating = (opCompId != null) && c.getId().equals(opCompId);
 
             boolean isMinor = !c.hasStockPrice();
-            // Update Arrow Logic dynamically
-            if (compArrowCaption != null && compArrowCaption[i] != null) {
-                compArrowCaption[i].setText(isOperating ? "▶" : "");
-            }
+            // // Update Arrow Logic dynamically
+            // if (compArrowCaption != null && compArrowCaption[i] != null) {
+            // compArrowCaption[i].setText(isOperating ? "▶" : "");
+            // }
 
             boolean hasOwner = c.getPresidentsShare() != null && c.getPresidentsShare().getOwner() instanceof Player;
             // Check if shares are available in the IPO
@@ -2411,8 +2449,10 @@ public class GameStatus extends GridPanel implements ActionListener {
                 bgCurr = BG_INACTIVE;
             } else {
                 // 3. Active -> Standard Colors
-                bgPool = isMinor ? BG_INACTIVE : BG_POOL;
-                bgIpo = isMinor ? BG_INACTIVE : BG_IPO;
+bgPool = BG_SPOTLIGHT_INACTIVE;
+                bgIpo = BG_SPOTLIGHT_INACTIVE; 
+                bgCurr = BG_SPOTLIGHT_INACTIVE;
+
                 bgDet = BG_MAUVE;
                 bgCurr = BG_POOL;
             }
@@ -2632,16 +2672,19 @@ public class GameStatus extends GridPanel implements ActionListener {
                 if (!hasOldField && !hasNewPanel)
                     continue;
 
-                // 3. Determine Background Color
+// 3. Determine Background Color
+                // PRIORITY 1: Operating Row (Horizontal White Line)
+                // If this company is operating, the whole row MUST be white to create the "cut through" effect.
+                // PRIORITY 2: Active Player (Vertical Spotlight)
+                // PRIORITY 3: Inactive (Grey)
+                
                 Color cellBg;
-                if (pIdx == actorIndex) {
-                    cellBg = BG_OPERATING;
-                } else if (isOperating) {
-                    cellBg = BG_OPERATING;
-                } else if (!isActive) {
-                    cellBg = BG_INACTIVE;
+                if (isOperating) {
+                    cellBg = Color.WHITE; // Force continuous white line
+                } else if (pIdx == actorIndex) {
+                    cellBg = BG_SPOTLIGHT_ACTIVE; // White Spotlight
                 } else {
-                    cellBg = Color.WHITE;
+                    cellBg = BG_SPOTLIGHT_INACTIVE; // Grey Dimmed
                 }
 
                 // 4. Update Logic (Branching)
@@ -2681,7 +2724,7 @@ public class GameStatus extends GridPanel implements ActionListener {
                                 if (c.hasStockPrice()) {
                                     cleanText = "100%"; // Majors
                                 } else {
-                                    cleanText = c.getId(); //Minors
+                                    cleanText = c.getId(); // Minors
                                     card.setCompanyDetailsTooltip(c);
                                 }
                             }
@@ -2722,14 +2765,38 @@ public class GameStatus extends GridPanel implements ActionListener {
 
         // 2. PLAYER FOOTERS
         for (int i = 0; i < np; i++) {
-            Color pBg = (i == actorIndex) ? BG_OPERATING : Color.WHITE;
-            // 6. Merge Status Logic into Header
+            // 1. Spotlight Logic
+            boolean isSpotlight = (i == actorIndex);
+            Color pBg = isSpotlight ? BG_SPOTLIGHT_ACTIVE : BG_SPOTLIGHT_INACTIVE;
+
+// 2. Header Logic
+            // TIDY UP: Only show "Passed" status if there is an active actor (actorIndex != -1).
+            // If actorIndex is -1 (End of Round), we force a clean slate.
             Player p = players.getPlayerByPosition(i);
             String log = gameUIManager.getGameManager().getPassedPlayersLog();
-            boolean passed = log != null && java.util.Arrays.asList(log.split(", ")).contains(p.getName());
+            
+            boolean passed = (actorIndex != -1) && log != null && java.util.Arrays.asList(log.split(", ")).contains(p.getName());
 
-            // Highlight Name Cell Green if Passed
             Color headerBg = passed ? BG_PASSED : pBg;
+
+            if (upperPlayerCaption[i] != null) {
+                upperPlayerCaption[i].setBackground(headerBg);
+                upperPlayerCaption[i].setOpaque(true);
+      
+                // REMOVED: The distracting thick border. 
+                // We now use BORDER_DEFAULT for everyone. The Background Color (White vs Grey) is the indicator.
+                upperPlayerCaption[i].setBorder(BORDER_DEFAULT); 
+                
+                // Keep text color logic if you want (Black vs Dark Gray) or unify it
+                if (isSpotlight) {
+                    upperPlayerCaption[i].setForeground(Color.BLACK);
+                } else {
+                    upperPlayerCaption[i].setForeground(Color.DARK_GRAY);
+                }
+
+
+                
+            }
 
             if (playerCash[i] != null) {
                 playerCash[i].setBackground(pBg);
@@ -2762,20 +2829,29 @@ public class GameStatus extends GridPanel implements ActionListener {
             }
 
             if (playerCertCount[i] != null) {
-                String t = playerCertCount[i].getText();
-                Color certBg = BG_CERT_OK;
-                if (t != null && t.contains("/")) {
-                    try {
-                        String[] parts = t.split("/");
-                        int held = Integer.parseInt(parts[0].trim());
-                        int limit = Integer.parseInt(parts[1].trim());
-                        if (held >= limit)
-                            certBg = BG_CERT_LIMIT;
-                    } catch (Exception e) {
+               
+// 1. Update Background (Spotlight Logic: White vs Grey)
+                playerCertCount[i].setBackground(pBg);
+
+               // 2. Fetch Data Directly (No String Parsing, No ModelObject casting)
+                // We use the same logic as StatusWindow to get authoritative numbers.
+                try {
+net.sf.rails.game.Player targetPlayer = players.getPlayerByPosition(i);
+                    if (p != null) {
+                        // getCertificateCount returns float (for 1835 partials), cast to int for display
+                        int held = (int) p.getPortfolioModel().getCertificateCount();
+                        
+                        // Access GameManager via the UI Manager to get the dynamic limit
+                        int limit = gameUIManager.getGameManager().getPlayerCertificateLimit(p);
+                        
+                        playerCertCount[i].update(held, limit);
                     }
+                } catch (Exception e) {
+                    // Fallback to safe defaults to prevent visual glitch
+                    playerCertCount[i].update(0, 1);
                 }
-                playerCertCount[i].setBackground(certBg);
-                playerCertCount[i].setOpaque(true);
+
+
             }
         }
 
@@ -2911,13 +2987,78 @@ public class GameStatus extends GridPanel implements ActionListener {
             }
         }
 
-
-
         updateFixedIncome();
         updatePlayerPrivates();
         updateTrainCosts();
         initGameSpecificActions();
         repaint();
+    }
+
+
+    /**
+     * A Custom Flat Progress Bar for Certificate Limits.
+     * Visualizes "Held vs Limit" with color coding and text overlay.
+     */
+    private static class CertLimitGauge extends JPanel {
+        private int held = 0;
+        private int limit = 1;
+        private String text = "-/-";
+
+        public CertLimitGauge() {
+            setOpaque(true);
+            setFont(new Font("SansSerif", Font.BOLD, 12));
+        }
+
+        public void update(int held, int limit) {
+            this.held = held;
+            this.limit = limit;
+            this.text = held + "/" + limit;
+            repaint();
+        }
+
+        @Override
+        protected void paintComponent(Graphics g) {
+            super.paintComponent(g); // Draws the Spotlight Background (White/Grey)
+
+            int w = getWidth();
+            int h = getHeight();
+
+            // 1. Calculate Fill Percentage
+            float ratio = (float) held / (float) Math.max(limit, 1);
+            if (ratio > 1.0f) ratio = 1.0f;
+            int fillWidth = (int) (w * ratio);
+
+            // 2. Determine Color (Green = Safe, Red = Full/Over)
+            Color barColor;
+            if (held >= limit) {
+                barColor = new Color(255, 180, 180); // Pastel Red (Full)
+            } else {
+                barColor = new Color(180, 255, 180); // Pastel Green (Safe)
+            }
+
+            // 3. Draw The Bar
+            g.setColor(barColor);
+            g.fillRect(0, 0, fillWidth, h);
+
+            // 4. Draw The Text (Centered)
+            g.setColor(Color.BLACK);
+            // Anti-aliasing for text
+            if (g instanceof Graphics2D) {
+                ((Graphics2D) g).setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
+            }
+            
+            FontMetrics fm = g.getFontMetrics();
+            int tx = (w - fm.stringWidth(text)) / 2;
+            int ty = (h - fm.getAscent()) / 2 + fm.getAscent();
+            
+            g.drawString(text, tx, ty);
+            
+            // 5. Border: Red border if full
+            if (held >= limit) {
+                g.setColor(Color.RED);
+                g.drawRect(0, 0, w - 1, h - 1);
+            }
+        }
     }
 
     @Override
@@ -3223,27 +3364,38 @@ public class GameStatus extends GridPanel implements ActionListener {
             // We'll let the loop below handle visible ones.
         }
 
-        java.util.List<net.sf.rails.game.Train> trains = new java.util.ArrayList<>(pool.getTrainList());
+      // --- START FIX ---
+        // Group trains by name (Type) to consolidate display
+        java.util.Map<String, java.util.List<net.sf.rails.game.Train>> groups = new java.util.LinkedHashMap<>();
+        for (net.sf.rails.game.Train t : pool.getTrainList()) {
+            String cleanName = t.getName().replaceAll("_\\d+$", "");
+            groups.computeIfAbsent(cleanName, k -> new java.util.ArrayList<>()).add(t);
+        }
+
         java.util.List<BuyTrain> buyActions = clickable ? possibleActions.getType(BuyTrain.class) : null;
 
         // 3. Populate
-        for (int i = 0; i < trains.size() && i < MAX_POOL_SLOTS; i++) {
-            net.sf.rails.game.Train train = trains.get(i);
-            RailCard cf = poolTrainButtons[i];
+        int slotIndex = 0;
+        for (java.util.Map.Entry<String, java.util.List<net.sf.rails.game.Train>> entry : groups.entrySet()) {
+            if (slotIndex >= MAX_POOL_SLOTS) break;
+
+            String cleanName = entry.getKey();
+            java.util.List<net.sf.rails.game.Train> group = entry.getValue();
+            net.sf.rails.game.Train representative = group.get(0);
+            int count = group.size();
+
+            RailCard cf = poolTrainButtons[slotIndex];
 
             // Explicitly define lbl here to fix "cannot find symbol"
-            javax.swing.JLabel lbl = (poolTrainInfoLabels != null) ? poolTrainInfoLabels[i] : null;
+            javax.swing.JLabel lbl = (poolTrainInfoLabels != null) ? poolTrainInfoLabels[slotIndex] : null;
 
-            cf.setTrain(train); // Use RailCard logic
-            String cleanName = train.getName().replaceAll("_\\d+$", "");
-
+            cf.setTrain(representative); // Use RailCard logic
             cf.setCustomLabel(getAbbreviatedTrainName(cleanName));
 
-            // Set Label: (1) / Price
-            // Pool trains usually have 1 qty per slot (discarded instance).
-            int cost = train.getType().getCost();
+            // Set Label: (Count) / Price
+            int cost = representative.getType().getCost();
             if (lbl != null) {
-                lbl.setText("<html><center>(1)<br>" +
+                lbl.setText("<html><center>(" + count + ")<br>" +
                         "<font color='#000080'><b>" + gameUIManager.format(cost) + "</b></font>" +
                         "</center></html>");
             }
@@ -3251,19 +3403,23 @@ public class GameStatus extends GridPanel implements ActionListener {
             boolean canBuy = false;
             if (clickable && buyActions != null) {
                 for (BuyTrain ba : buyActions) {
-                    if (ba.getTrain() == train) {
+                    // If action targets ANY train in this group, attach it
+                    if (group.contains(ba.getTrain())) {
                         cf.addPossibleAction(ba);
                         canBuy = true;
+                        // Attach the first valid action found and stop (UI button represents the group)
                         break;
                     }
                 }
             }
 
-            // Apply Styling
+            // Apply Styles: Beige + Green Border
             if (canBuy) {
-                cf.setBackground(BG_BUY_ACTIVE);
-                cf.setBorder(BorderFactory.createLineBorder(Color.BLACK, 2));
-                cf.setToolTipText("Click to Buy " + train.getName());
+                // OLD: cf.setBackground(BG_BUY_ACTIVE);
+                cf.setBackground(BG_CARD_PASSIVE); // Beige
+                cf.setBorder(BorderFactory.createLineBorder(BORDER_COL_BUY, 3)); // Thick Green Border
+
+                cf.setToolTipText("Click to Buy " + representative.getName());
                 cf.setEnabled(true);
             } else {
                 cf.setBackground(BG_CARD_PASSIVE);
@@ -3273,8 +3429,11 @@ public class GameStatus extends GridPanel implements ActionListener {
                 cf.setToolTipText(null);
                 cf.setEnabled(true);
             }
+
             cf.setVisible(true);
+            slotIndex++;
         }
+
     }
 
     protected void setNewTrainButton(boolean clickable, PossibleAction action) {
@@ -3295,8 +3454,9 @@ public class GameStatus extends GridPanel implements ActionListener {
         if (clickable) {
             newTrainButton.setVisible(true);
             newTrainButton.setEnabled(true);
-            newTrainButton.setBackground(BG_BUY); // Green
-            newTrainButton.setBorder(BorderFactory.createLineBorder(Color.BLACK, 2));
+newTrainButton.setBackground(BG_CARD_PASSIVE); // Beige
+            newTrainButton.setBorder(BorderFactory.createLineBorder(BORDER_COL_BUY, 3)); // Thick Green Border
+
             if (action != null) {
                 newTrainButton.addPossibleAction(action);
             }
@@ -3309,7 +3469,7 @@ public class GameStatus extends GridPanel implements ActionListener {
     private static final Color BG_MINOR = Color.BLACK;
     private static final Color FG_MINOR = Color.WHITE;
     // Synchronized with ORPanel.java's getTrainHighlightColor()
-    private static final Color BG_TRAINS = Color.ORANGE;
+    private static final Color BG_TRAINS = new Color(255, 222, 173);
     private static final Color BG_BANK = new Color(176, 224, 230);
     // BG_OPERATING is already a class field (line 78)
 
@@ -3426,7 +3586,7 @@ public class GameStatus extends GridPanel implements ActionListener {
 
         // 3. Setup Columns
         int col = 0;
-        int arrowCol = col++;
+        // int arrowCol = col++;
         this.compNameCol = col++;
         certPerPlayerXOffset = col;
         col += np;
@@ -3499,6 +3659,9 @@ public class GameStatus extends GridPanel implements ActionListener {
             } else {
                 f.setBorder(BorderFactory.createMatteBorder(0, 0, 1, 1, Color.GRAY));
             }
+// Apply Uniform Header Color
+            f.setBackground(BG_HEADER);
+            f.setOpaque(true);
 
             f.setPreferredSize(DIM_PLAYER);
             gbc.weightx = 1.0;
@@ -3523,11 +3686,15 @@ public class GameStatus extends GridPanel implements ActionListener {
         f = new Caption(LocalText.getText("POOL"));
         f.setBorder(BorderFactory.createMatteBorder(0, 0, 1, 1, Color.GRAY));
         f.setPreferredSize(dimMarket); // Use dynamic width
+        f.setBackground(BG_HEADER);
+        f.setOpaque(true);
         addField(f, certInPoolXOffset, 1, 1, 1, 0, true);
 
         f = new Caption(LocalText.getText("IPO"));
         f.setBorder(BorderFactory.createMatteBorder(0, 0, 1, 4, Color.BLACK));
         f.setPreferredSize(dimMarket); // Use dynamic width
+        f.setBackground(BG_HEADER);
+        f.setOpaque(true);
         addField(f, certInIPOXOffset, 1, 1, 1, 0, true);
 
         if (compCanHoldOwnShares) {
@@ -3539,11 +3706,15 @@ public class GameStatus extends GridPanel implements ActionListener {
 
         f = new Caption(compCanHoldOwnShares ? LocalText.getText("CASH") : LocalText.getText("TREASURY"));
         f.setBorder(BORDER_THIN);
+        f.setBackground(BG_HEADER);
+        f.setOpaque(true);
         f.setPreferredSize(DIM_STD);
         addField(f, compCashXOffset, 1, 1, 1, 0, true);
 
         f = new Caption(LocalText.getText("REVENUE"));
         f.setBorder(BORDER_THIN);
+        f.setBackground(BG_HEADER);
+        f.setOpaque(true);
         f.setPreferredSize(DIM_STD);
         addField(f, compRevenueXOffset, 1, 1, 1, 0, true);
         // Enable Header for Direct (Fixed) Income if active (1837)
@@ -3556,10 +3727,14 @@ public class GameStatus extends GridPanel implements ActionListener {
 
         f = new Caption(LocalText.getText("TRAINS"));
         f.setBorder(BORDER_THIN);
+        f.setBackground(BG_HEADER);
+        f.setOpaque(true);
         f.setPreferredSize(DIM_TRAIN);
         addField(f, compTrainsXOffset, 1, 1, 1, 0, true);
         f = new Caption(LocalText.getText("TOKENS"));
         f.setBorder(BORDER_THIN);
+        f.setBackground(BG_HEADER);
+        f.setOpaque(true);
         f.setPreferredSize(DIM_TOKENS);
         addField(f, compTokensXOffset, 1, 1, 1, 0, true);
         if (compCanBuyPrivates) {
@@ -3575,7 +3750,7 @@ public class GameStatus extends GridPanel implements ActionListener {
         int y = startY;
         java.util.List<PublicCompany> displayList = new java.util.ArrayList<>(gameUIManager.getAllPublicCompanies());
         compNameCaption = new Caption[nc];
-        compArrowCaption = new Caption[nc]; // Initialize storage
+        // compArrowCaption = new Caption[nc]; // Initialize storage
 
         // 1. Sort the list
         java.util.Collections.sort(displayList, (c1, c2) -> {
@@ -3645,16 +3820,17 @@ public class GameStatus extends GridPanel implements ActionListener {
             int bHeight = isBottomChunk ? B_ZONE : (isOperating ? B_OP : B_STD);
 
             javax.swing.border.Border bDet = BorderFactory.createMatteBorder(tHeight, 0, bHeight, 1, Color.BLACK);
-            javax.swing.border.Border bArrow = BorderFactory.createMatteBorder(tHeight, 2, bHeight, 1, Color.BLACK);
+            // javax.swing.border.Border bArrow = BorderFactory.createMatteBorder(tHeight,
+            // 2, bHeight, 1, Color.BLACK);
 
-            compArrowCaption[i] = new Caption(isOperating ? "▶" : "");
-            compArrowCaption[i].setForeground(Color.RED.darker());
-            compArrowCaption[i].setBackground(Color.WHITE);
-            compArrowCaption[i].setOpaque(true);
-            compArrowCaption[i].setBorder(bArrow);
-            compArrowCaption[i].setPreferredSize(DIM_ARROW);
+            // compArrowCaption[i] = new Caption(isOperating ? "▶" : "");
+            // compArrowCaption[i].setForeground(Color.RED.darker());
+            // compArrowCaption[i].setBackground(Color.WHITE);
+            // compArrowCaption[i].setOpaque(true);
+            // compArrowCaption[i].setBorder(bArrow);
+            // compArrowCaption[i].setPreferredSize(DIM_ARROW);
 
-            addField(compArrowCaption[i], 0, y, 1, 1, 0, visible);
+            // addField(compArrowCaption[i], 0, y, 1, 1, 0, visible);
             companyCertRow.put(c, y);
 
             javax.swing.border.Border bName = BorderFactory.createMatteBorder(tHeight, 0, bHeight, 1, Color.BLACK);
@@ -3995,6 +4171,8 @@ public class GameStatus extends GridPanel implements ActionListener {
         // Cash
         f = new Caption(LocalText.getText("CASH"));
         f.setBorder(BORDER_THIN);
+        f.setBackground(Color.WHITE);
+        f.setOpaque(true);
         addField(f, compNameCol, playerCashYOffset, 1, 1, 0, true);
         for (int i = 0; i < np; i++) {
             f = playerCash[i] = new Field(players.getPlayerByPosition(i).getWallet());
@@ -4012,20 +4190,28 @@ public class GameStatus extends GridPanel implements ActionListener {
         // Certs
         f = new Caption("Certs");
         f.setBorder(BORDER_THIN);
+        f.setBackground(Color.WHITE);
+        f.setOpaque(true);
         addField(f, compNameCol, playerCertCountYOffset, 1, 1, 0, true);
+       
+        // Initialize the new Gauge Components
+        playerCertCount = new CertLimitGauge[np];
+        
         for (int i = 0; i < np; i++) {
-            f = playerCertCount[i] = new Field(players.getPlayerByPosition(i).getCertCountWithLimitModel(), false,
-                    true);
-            f.setBorder(BORDER_THIN);
-            f.setPreferredSize(DIM_PLAYER);
+            playerCertCount[i] = new CertLimitGauge();
+            playerCertCount[i].setBorder(BORDER_THIN);
+            playerCertCount[i].setPreferredSize(DIM_PLAYER);
+            
             gbc.weightx = 1.0;
-            addField(f, certPerPlayerXOffset + i, playerCertCountYOffset, 1, 1, 0, true);
+            addField(playerCertCount[i], certPerPlayerXOffset + i, playerCertCountYOffset, 1, 1, 0, true);
             gbc.weightx = 0.0;
         }
 
         // Privates
         f = new Caption(LocalText.getText("PRIVATES"));
         f.setBorder(BORDER_THIN);
+        f.setBackground(Color.WHITE);
+        f.setOpaque(true);
         addField(f, compNameCol, playerPrivatesYOffset, 1, 2, 0, true);
         playerPrivatesPanel = new JPanel[np];
         for (int i = 0; i < np; i++) {
@@ -4089,7 +4275,12 @@ public class GameStatus extends GridPanel implements ActionListener {
         // 1. POOL (USED) - RESTRICT TO 1 SLOT
         // We revert to FlowLayout (Center) but strictly limit the loop to 1.
         poolTrainsPanel = new JPanel(new FlowLayout(FlowLayout.CENTER, 3, 0));
-        poolTrainsPanel.setBorder(B_BOT_L);
+        // Add Padding (EmptyBorder) inside the Line Border (B_BOT_L)
+        poolTrainsPanel.setBorder(BorderFactory.createCompoundBorder(
+            B_BOT_L, 
+            BorderFactory.createEmptyBorder(5, 0, 0, 0) // 5px Top Padding
+        ));
+
         poolTrainsPanel.setBackground(BG_TRAINS);
         poolTrainsPanel.setOpaque(true);
 
@@ -4102,10 +4293,6 @@ public class GameStatus extends GridPanel implements ActionListener {
             slot.setOpaque(false);
 
             poolTrainButtons[i] = createTrainButton();
-
-            Dimension btnDim = poolTrainButtons[i].getPreferredSize();
-            slot.setPreferredSize(new Dimension(btnDim.width, btnDim.height + 25));
-
             slot.add(poolTrainButtons[i], BorderLayout.NORTH);
 
             poolTrainInfoLabels[i] = new javax.swing.JLabel("", javax.swing.SwingConstants.CENTER);
@@ -4123,8 +4310,11 @@ public class GameStatus extends GridPanel implements ActionListener {
         // Refactor to match Future/Pool structure exactly: FlowLayout -> Slot Panel ->
         // Button + Label
         newTrainsPanel = new JPanel(new FlowLayout(FlowLayout.CENTER, 3, 0));
-        newTrainsPanel.setBorder(B_BOT_M);
-        newTrainsPanel.setBackground(BG_TRAINS);
+newTrainsPanel.setBorder(BorderFactory.createCompoundBorder(
+            B_BOT_M, 
+            BorderFactory.createEmptyBorder(5, 0, 0, 0)
+        ));
+                newTrainsPanel.setBackground(BG_TRAINS);
         newTrainsPanel.setOpaque(true);
 
         newTrainButton = createTrainButton();
@@ -4148,8 +4338,11 @@ public class GameStatus extends GridPanel implements ActionListener {
         addField(newTrainsPanel, colCurr, trainY_Data, 1, 1, 0, true);
 
         futureTrainsPanel = new JPanel(new FlowLayout(FlowLayout.CENTER, 3, 0));
-        futureTrainsPanel.setBorder(B_BOT_R);
-        futureTrainsPanel.setBackground(BG_TRAINS);
+futureTrainsPanel.setBorder(BorderFactory.createCompoundBorder(
+            B_BOT_R, 
+            BorderFactory.createEmptyBorder(5, 0, 0, 0)
+        ));
+                futureTrainsPanel.setBackground(BG_TRAINS);
         futureTrainsPanel.setOpaque(true);
 
         futureTrainButtons = new RailCard[MAX_FUTURE_SLOTS];
@@ -4178,6 +4371,8 @@ public class GameStatus extends GridPanel implements ActionListener {
 
         f = new Caption("Fixed Inc");
         f.setBorder(BORDER_THIN);
+        f.setBackground(Color.WHITE);
+        f.setOpaque(true);
         gbc.anchor = GridBagConstraints.CENTER;
         gbc.fill = GridBagConstraints.HORIZONTAL;
         addField(f, compNameCol, playerFixedIncomeYOffset, 1, 1, 0, true);
@@ -4195,7 +4390,7 @@ public class GameStatus extends GridPanel implements ActionListener {
         f.setBackground(BG_BANK);
         f.setOpaque(true);
         f.setFont(new Font("SansSerif", Font.BOLD, 12));
-        addField(f, bankX, bankY, 1, 1, 0, true);
+        addField(f, bankX - 1, bankY - 1, 1, 1, 0, true);
 
         bankCash = new Field(bank.getPurse());
         bankCash.setBorder(BORDER_BOX);
@@ -4203,9 +4398,11 @@ public class GameStatus extends GridPanel implements ActionListener {
         bankCash.setOpaque(true);
         Font bankFont = bankCash.getFont();
         bankCash.setFont(bankFont.deriveFont(Font.BOLD, bankFont.getSize()));
-        addField(bankCash, bankX + 1, bankY, 1, 1, 0, true);
+        addField(bankCash, bankX, bankY - 1, 1, 1, 0, true);
 
         f = new Caption("Time");
+        f.setBackground(Color.WHITE);
+        f.setOpaque(true);
         f.setBorder(BORDER_THIN);
         addField(f, compNameCol, playerTimerYOffset, 1, 1, 0, true);
         for (int i = 0; i < np; i++) {
@@ -4392,10 +4589,10 @@ public class GameStatus extends GridPanel implements ActionListener {
         return null;
     }
 
-// ... (lines of unchanged context code) ...
+    // ... (lines of unchanged context code) ...
     protected void initGameSpecificActions() {
         if (possibleActions == null || players == null) {
-             return;
+            return;
         }
 
         for (rails.game.action.PossibleAction pa : possibleActions.getList()) {
@@ -4413,32 +4610,33 @@ public class GameStatus extends GridPanel implements ActionListener {
                 DiscardTrain dt = (DiscardTrain) pa;
                 net.sf.rails.game.PublicCompany company = (net.sf.rails.game.PublicCompany) dt.getCompany();
                 net.sf.rails.game.Train targetTrain = dt.getDiscardedTrain();
-                
+
                 int companyIndex = company.getPublicNumber();
-                
+
                 // Locate the Train Button Panel for this company
                 if (companyIndex >= 0 && companyIndex < nc && compSubTrainButtons[companyIndex] != null) {
-                    
+
                     // We must find which button slot holds the specific train.
                     // The buttons are populated in the same order as the company's train list.
-java.util.List<net.sf.rails.game.Train> trainList = new java.util.ArrayList<>(company.getPortfolioModel().getTrainList());
+                    java.util.List<net.sf.rails.game.Train> trainList = new java.util.ArrayList<>(
+                            company.getPortfolioModel().getTrainList());
                     int trainIdx = trainList.indexOf(targetTrain);
-                    
+
                     // If valid index found, activate that specific card
                     if (trainIdx >= 0 && trainIdx < compSubTrainButtons[companyIndex].length) {
                         net.sf.rails.ui.swing.elements.RailCard card = compSubTrainButtons[companyIndex][trainIdx];
-                        
+
                         if (card != null) {
                             // Attach Action
                             card.setPossibleAction(pa);
-                            
+
                             // Visual Cue: CYAN for attention (consistent with PFR exchange)
                             card.setBackground(java.awt.Color.CYAN);
-                            
+
                             // Ensure it looks active
                             card.setBorder(BorderFactory.createLineBorder(Color.BLACK, 2));
                             card.setToolTipText("Click to Discard " + targetTrain.getName());
-                            
+
                             card.setEnabled(true);
                             card.setVisible(true);
                             card.repaint();
@@ -4446,15 +4644,16 @@ java.util.List<net.sf.rails.game.Train> trainList = new java.util.ArrayList<>(co
                     }
                 }
                 // Continue loop to process other actions
-                continue; 
+                continue;
             }
 
-            if (target == null) continue;
+            if (target == null)
+                continue;
 
             // --- CASE A: PUBLIC COMPANY (Grid Logic) ---
             if (target instanceof net.sf.rails.game.PublicCompany) {
                 int companyIndex = ((net.sf.rails.game.PublicCompany) target).getPublicNumber();
-                
+
                 // Determine Player Column from Action
                 int playerIndex = -1;
                 String actorName = pa.getPlayerName();
@@ -4484,7 +4683,8 @@ java.util.List<net.sf.rails.game.Train> trainList = new java.util.ArrayList<>(co
                 // Debug Logging specifically for BB
                 boolean isBB = "BB".equals(target.getId());
                 if (isBB) {
-                    System.out.println("DEBUG-BB: Searching for BB. PlayerPanels=" + (playerPrivatesPanel == null ? "null" : playerPrivatesPanel.length));
+                    System.out.println("DEBUG-BB: Searching for BB. PlayerPanels="
+                            + (playerPrivatesPanel == null ? "null" : playerPrivatesPanel.length));
                 }
 
                 boolean found = false;
@@ -4492,8 +4692,9 @@ java.util.List<net.sf.rails.game.Train> trainList = new java.util.ArrayList<>(co
                 // 1. Search PLAYER Panels
                 if (playerPrivatesPanel != null) {
                     for (int i = 0; i < playerPrivatesPanel.length; i++) {
-                        if (playerPrivatesPanel[i] == null) continue;
-                        
+                        if (playerPrivatesPanel[i] == null)
+                            continue;
+
                         for (java.awt.Component comp : playerPrivatesPanel[i].getComponents()) {
                             if (comp instanceof net.sf.rails.ui.swing.elements.RailCard) {
                                 net.sf.rails.ui.swing.elements.RailCard card = (net.sf.rails.ui.swing.elements.RailCard) comp;
@@ -4511,7 +4712,8 @@ java.util.List<net.sf.rails.game.Train> trainList = new java.util.ArrayList<>(co
                 // 2. Search COMPANY Panels (e.g. if a company owns the private)
                 if (!found && compPrivatesPanel != null) {
                     for (int i = 0; i < compPrivatesPanel.length; i++) {
-                        if (compPrivatesPanel[i] == null) continue;
+                        if (compPrivatesPanel[i] == null)
+                            continue;
 
                         for (java.awt.Component comp : compPrivatesPanel[i].getComponents()) {
                             if (comp instanceof net.sf.rails.ui.swing.elements.RailCard) {
@@ -4530,4 +4732,5 @@ java.util.List<net.sf.rails.game.Train> trainList = new java.util.ArrayList<>(co
     }
 
 
+    
 }

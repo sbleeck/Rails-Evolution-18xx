@@ -275,44 +275,23 @@ public class OperatingRound_1835 extends OperatingRound {
                         // 1. Update the State
                         operatingCompany.set(nextComp);
                         
-// We walk the hierarchy to find the field, and ignore errors if not found.
+                        // 2. Update the internal index via Reflection (orCompIndex is private in parent)
                         try {
-                            java.lang.reflect.Field indexField = null;
-                            Class<?> clazz = this.getClass();
-                            
-                            // Walk up looking for likely index field names
-                            while (clazz != null && indexField == null) {
-                                try {
-                                    indexField = clazz.getDeclaredField("orCompIndex");
-                                } catch (NoSuchFieldException e1) {
-                                    try {
-                                        indexField = clazz.getDeclaredField("index");
-                                    } catch (NoSuchFieldException e2) {
-                                        // Keep looking
-                                    }
-                                }
-                                if (indexField == null) clazz = clazz.getSuperclass();
-                            }
-
-                            if (indexField != null) {
-                                indexField.setAccessible(true);
-                                indexField.setInt(this, nextIndex);
-                            }
+                            java.lang.reflect.Field indexField = OperatingRound.class.getDeclaredField("orCompIndex");
+                            indexField.setAccessible(true);
+                            indexField.setInt(this, nextIndex);
                         } catch (Exception e) {
-                            // Silent fail: The field might not exist, but setting operatingCompany above 
-                            // is usually sufficient to drive the engine.
-                            log.debug("Index update skipped: " + e.getMessage());
+                            log.error("Failed to update orCompIndex via reflection", e);
                         }
                         
                         // 3. Reset Step to INITIAL so the new company starts its turn properly
+                        // We use the setter to ensure state tracking
                         setStep(GameDef.OrStep.INITIAL);
                         
                         // 4. Initialize the turn (clears UI, sets up tokens, etc)
                         initTurn();
                     }
                 }
-
-                
                 playerManager.setCurrentPlayer(operatingCompany.value().getPresident());
                 stepObject.set(GameDef.OrStep.BUY_TRAIN);
             }

@@ -92,10 +92,13 @@ public class ORPanel extends GridPanel
 
     // --- VISUAL CONSTANTS ---
     private static final Color BG_DETAILS = new Color(235, 230, 255); // Standard Mauve
+    // SYSTEM BLUE (Standard Confirm/Done)
+    private static final Color SYS_BLUE = new Color(30, 144, 255); // DodgerBlue
 
-    // PHASE 1: TRACK (Warm Brown/Red)
-    private static final Color PH_TILE_DARK = Color.RED;
-    private static final Color PH_TILE_LIGHT = new Color(255, 225, 225);
+// PHASE 1: BUILD TRACK (Construction Brown - Distinct from Sell Red)
+    private static final Color PH_TILE_DARK = new Color(139, 69, 19); // SaddleBrown
+    private static final Color PH_TILE_LIGHT = new Color(255, 245, 235); // Pale Sand
+
 
     // PHASE 2: TOKEN (Forest Green)
     private static final Color PH_TOKEN_DARK = new Color(34, 139, 34);
@@ -1412,11 +1415,14 @@ public class ORPanel extends GridPanel
         if (btnTrainSkip != null)
             btnTrainSkip.setEnabled(false); // Fix NPE
 
+// Ensure the panel is visible and ready for new components
         if (trainButtonsPanel != null) {
             trainButtonsPanel.removeAll();
-            trainButtonsPanel.revalidate(); // Force layout refresh
+            trainButtonsPanel.setVisible(true); 
+            trainButtonsPanel.revalidate(); 
             trainButtonsPanel.repaint();
         }
+
 
         if (miscActionPanel != null) {
             miscActionPanel.removeAll();
@@ -1697,8 +1703,7 @@ public class ORPanel extends GridPanel
         sidebarPanel.add(Box.createVerticalStrut(2));
 
         // --- 3. PHASE 1: TRACK ---
-        phase1Panel = createPhasePanel("1. Track");
-
+phase1Panel = createPhasePanel("1. Build Track");
         // Clean implementation: Single Smart Button
         btnTileConfirm = createSidebarButton("Skip", CONFIRM_CMD); // Default to Skip state
         phase1Panel.add(btnTileConfirm);
@@ -1714,7 +1719,7 @@ public class ORPanel extends GridPanel
         sidebarPanel.add(Box.createVerticalStrut(2));
 
         // --- 4. PHASE 2: TOKEN ---
-        phase2Panel = createPhasePanel("2. Token");
+        phase2Panel = createPhasePanel("2. Place Token");
 
         // Token Readout
         tokenDisplay = new TokenDisplayPanel();
@@ -1732,7 +1737,7 @@ public class ORPanel extends GridPanel
         sidebarPanel.add(Box.createVerticalStrut(2));
 
         // --- 5. PHASE 3: REVENUE ---
-        phase3Panel = createPhasePanel("3. Revenue");
+phase3Panel = createPhasePanel("3. Manage Revenue"); // Renamed from "3. Revenue"
 
         // Revenue Readout
         lblRevenue = new JLabel("0", SwingConstants.CENTER);
@@ -1761,36 +1766,42 @@ public class ORPanel extends GridPanel
         sidebarPanel.add(Box.createVerticalStrut(2));
 
         // --- 6. PHASE 4: TRAINS ---
-        phase4Panel = createPhasePanel("4. Trains / Buy");
-
-        // New Visual Train Display
+// 1. Owned Trains Display (Top)
+phase4Panel = createPhasePanel("4. Trains / Buy");
         trainDisplay = new TrainDisplayPanel();
         phase4Panel.add(trainDisplay);
 
-        // Tight spacing
-        phase4Panel.add(Box.createVerticalStrut(2));
+        // 2. Separator
+        phase4Panel.add(Box.createVerticalStrut(5));
+        JSeparator sep = new JSeparator(SwingConstants.HORIZONTAL);
+        sep.setMaximumSize(new Dimension(SIDEBAR_WIDTH - 10, 2));
+        phase4Panel.add(sep);
+        phase4Panel.add(Box.createVerticalStrut(5));
 
-        btnTrainSkip = createSidebarButton("Skip Buy", TRAIN_SKIP_CMD);
-        phase4Panel.add(btnTrainSkip);
-
-        // Container for Buyable Trains (populated dynamically)
-        trainButtonsPanel = new JPanel(new GridBagLayout());
+        // 3. Container for Buyable Trains (Middle)
+        trainButtonsPanel = new JPanel();
+        trainButtonsPanel.setLayout(new BoxLayout(trainButtonsPanel, BoxLayout.Y_AXIS));
         trainButtonsPanel.setOpaque(false);
         phase4Panel.add(trainButtonsPanel);
-        // Set maximum size to accommodate ~4 train cards (127px) + button (28px) +
-        // border/padding
-        Dimension p4Size = new Dimension(SIDEBAR_WIDTH, 185);
-        phase4Panel.setMaximumSize(p4Size);
-        phase4Panel.setPreferredSize(p4Size);
+
+        // 4. Skip Button (Bottom)
+        phase4Panel.add(Box.createVerticalStrut(5));
+        btnTrainSkip = createSidebarButton("Skip Buy", TRAIN_SKIP_CMD);
+        phase4Panel.add(btnTrainSkip);
+        
+        // Remove fixed height constraint so panel expands naturally with content
+        phase4Panel.setMaximumSize(new Dimension(SIDEBAR_WIDTH, 1000));
+        phase4Panel.setPreferredSize(null); 
 
         sidebarPanel.add(phase4Panel);
         sidebarPanel.add(Box.createVerticalStrut(4));
+
 
         // --- 7. FOOTER ---
         footerPanel = new JPanel(new FlowLayout(FlowLayout.CENTER, 0, 0));
         footerPanel.setOpaque(false); // Transparent to show Mauve
 
-        btnDone = createSidebarButton("Done (Spc)", DONE_CMD);
+        btnDone = createSidebarButton("Done", DONE_CMD);
         btnDone.setFont(new Font("SansSerif", Font.BOLD, 14));
         btnDone.setPreferredSize(new Dimension(SIDEBAR_WIDTH - 10, 35));
         footerPanel.add(btnDone);
@@ -1811,14 +1822,15 @@ public class ORPanel extends GridPanel
 
         // 2. Determine Phase Info for Header
         Color phaseColor = PH_DONE_BG;
-        String instruction = "   Done?   ";
+        String instruction = "Done?";
 
-        if (activePhase == 1) {
+if (activePhase == 1) {
             phaseColor = PH_TILE_DARK;
-            instruction = "  LAY TRACK  ";
+            instruction = "BUILD TRACK"; // Renamed from "LAY TRACK"
+
         } else if (activePhase == 2) {
             phaseColor = PH_TOKEN_DARK;
-            instruction = "  LAY TOKEN  ";
+            instruction = "PLACE TOKEN"; // Renamed from "LAY TOKEN"
         } else if (activePhase == 3) {
             phaseColor = PH_REV_DARK;
             instruction = " MANAGE REVENUE ";
@@ -1838,7 +1850,7 @@ public class ORPanel extends GridPanel
             instruction = " SPECIAL ACTION ";
         }
 
-        // 3. Build the Split Header (Identity + Action)
+      // 3. Build the Split Header (Identity + Action)
         if (companyLogo != null) {
             String hexBg = String.format("#%06x", (0xFFFFFF & orComp.getBgColour().getRGB()));
             String hexFg = String.format("#%06x", (0xFFFFFF & orComp.getFgColour().getRGB()));
@@ -1847,6 +1859,8 @@ public class ORPanel extends GridPanel
             String playerInfo = (orComp.getPresident() != null) ? orComp.getPresident().getName() : "";
 
             // HTML Table: Top=Identity, Bottom=Action
+            // Added cellpadding='4' to give the text breathing room
+            // Added &nbsp; around instruction for extra horizontal padding
             String logoText = "<html><table width='100%' cellpadding='0' cellspacing='0'>" +
                     "<tr bgcolor='" + hexBg + "'>" +
                     "<td align='center' valign='center' height='55'>" +
@@ -1854,8 +1868,8 @@ public class ORPanel extends GridPanel
                     "<font color='" + hexFg + "' size='3'>" + playerInfo + "</font>" +
                     "</td></tr>" +
                     "<tr bgcolor='" + hexPhase + "'>" +
-                    "<td align='center' valign='center' height='25'>" +
-                    "<font color='white' size='4'><b>" + instruction + "</b></font>" +
+                    "<td align='center' valign='center' height='28'>" + // Slightly taller
+                    "<font color='white' size='4'><b>&nbsp;&nbsp;" + instruction + "&nbsp;&nbsp;</b></font>" + 
                     "</td></tr>" +
                     "</table></html>";
             companyLogo.setText(logoText);
@@ -2172,9 +2186,19 @@ public class ORPanel extends GridPanel
 
         // 2. Apply "Active Mode" to the current phase
         if (activePhase == 1) {
-            applyPhaseStyle(phase1Panel, btnTileConfirm, PH_TILE_DARK, PH_TILE_LIGHT, "Confirm Track (Enter)");
+            // Style the Panel (Pink/Red to indicate Track Phase identity)
+            // Pass 'null' for the button so we can style it manually below
+            applyPhaseStyle(phase1Panel, null, PH_TILE_DARK, PH_TILE_LIGHT, "Confirm Track (Enter)");
+            // Style the Button: SYSTEM BLUE (Uniform Action Color)
+            // This replaces the old Red button, solving the "Red = Sell" conflict
+            styleButton(btnTileConfirm, SYS_BLUE, "Confirm Track (Enter)");
         } else if (activePhase == 2) {
-            applyPhaseStyle(phase2Panel, btnTokenConfirm, PH_TOKEN_DARK, BG_DETAILS, "Confirm Token (Enter)");
+
+            // Style Panel: Forest Green Identity, Light Green Background (was BG_DETAILS)
+            applyPhaseStyle(phase2Panel, null, PH_TOKEN_DARK, PH_TOKEN_LIGHT, "Confirm Token (Enter)");
+
+            // Style Button: SYSTEM BLUE (Uniform Action Color)
+            styleButton(btnTokenConfirm, SYS_BLUE, "Confirm Token (Enter)");
         } else if (activePhase == 3) {
 
             // Special handling for Revenue:
@@ -2192,19 +2216,21 @@ public class ORPanel extends GridPanel
                 label = "Split (Enter)";
             }
 
-            // Apply the style to the detected primary button
-            applyPhaseStyle(phase3Panel, primaryBtn, PH_REV_DARK, PH_REV_LIGHT, label);
+            // 1. Style the Panel: Use Revenue Blue (Identity) for Border
+            // Pass 'null' for the button so we don't paint it Revenue Blue
+            applyPhaseStyle(phase3Panel, null, PH_REV_DARK, PH_REV_LIGHT, label);
 
-            // Explicitly style the buttons to match this state
+            // 2. Style the Buttons: Primary gets SYSTEM BLUE (Action)
             if (primaryBtn == btnRevSplit) {
                 // Split is King
-                styleButton(btnRevSplit, PH_REV_DARK, "Split (Enter)");
-                styleSecondaryButton(btnRevPayout, PH_REV_LIGHT); // Demote Payout (it's likely disabled anyway)
+                styleButton(btnRevSplit, SYS_BLUE, "Split (Enter)");
+                styleSecondaryButton(btnRevPayout, PH_REV_LIGHT); 
             } else {
                 // Payout is King (Standard Major)
-                styleButton(btnRevPayout, PH_REV_DARK, "Payout (Enter)");
+                styleButton(btnRevPayout, SYS_BLUE, "Payout (Enter)");
                 styleSecondaryButton(btnRevSplit, PH_REV_LIGHT);
             }
+
 
             // Withhold is always secondary
             styleSecondaryButton(btnRevWithhold, PH_REV_LIGHT);
@@ -2215,15 +2241,19 @@ public class ORPanel extends GridPanel
             // 1. Highlight the Train panel in Orange
             boolean canBuy = (trainButtonsPanel != null && trainButtonsPanel.getComponentCount() > 0);
             String label = canBuy ? "Skip Buy (Enter)" : "Done Buying (Enter)";
-            applyPhaseStyle(phase4Panel, btnTrainSkip, trainOrange, PH_TRAIN_LIGHT, label);
+            
+            // Apply style to the Panel, but NOT the skip button (pass null)
+            // This ensures the panel is Orange, but the button doesn't get overwritten
+            applyPhaseStyle(phase4Panel, null, trainOrange, PH_TRAIN_LIGHT, label);
 
-            // 2. High-Visibility Button: Matches the Status Window box
-            styleButton(btnTrainSkip, trainOrange, label);
+            // 2. Style the Skip Button: SYSTEM BLUE (Default Action)
+            // This sets the skip button to the standard Blue confirmation color
+            styleButton(btnTrainSkip, SYS_BLUE, label);
 
-            // 3. Keep the final Done button gray/passive during phase 4
-            styleButton(btnDone, Color.GRAY, "Done (Spc)");
-            btnDone.setForeground(Color.BLACK);
-            btnDone.setFont(new Font("SansSerif", Font.PLAIN, 12));
+            // // 3. Keep the final Done button gray/passive during phase 4
+            // styleButton(btnDone, Color.GRAY, "Done");
+            // btnDone.setForeground(Color.BLACK);
+            
         } else if (activePhase == 5) {
             // Turn off highlighting for Phase 4
             resetPhasePanel(phase4Panel, btnTrainSkip);
@@ -2233,9 +2263,9 @@ public class ORPanel extends GridPanel
             btnDone.setForeground(Color.WHITE);
             btnDone.setFont(new Font("SansSerif", Font.BOLD, 16));
         } else {
-            // General Fallback (e.g. Stock Round or spectator mode)
-            styleButton(btnDone, Color.GRAY, "Done (Spc)");
-            btnDone.setForeground(Color.BLACK);
+            // General Fallback -> SYSTEM BLUE
+            styleButton(btnDone, SYS_BLUE, "Done (Spc)");
+            btnDone.setForeground(Color.WHITE);
         }
     }
 
@@ -2288,6 +2318,14 @@ public class ORPanel extends GridPanel
                 c.setBackground(Color.WHITE);
             } else if (c instanceof JPanel) {
                 c.setBackground(light); // Sub-panels match
+                if (c == trainButtonsPanel) {
+                     for (Component card : ((JPanel)c).getComponents()) {
+                         // Keep the train buttons looking like "White Cards" against the colored phase background
+                         if (card instanceof ActionButton) {
+                             // Do not change card background here, they have their own style
+                         }
+                     }
+                }
             }
         }
 
@@ -2671,6 +2709,8 @@ public class ORPanel extends GridPanel
                 // Phase 4: Buy Train (Collect for Status Window & Hotkeys)
             } else if (pa instanceof BuyTrain) {
                 availableTrainActions.add((BuyTrain) pa);
+                // Add the visual "Train Card" button to the sidebar
+                addTrainBuyButton((BuyTrain) pa);
 
                 // Footer: Done / Skip
             } else if (pa instanceof NullAction) {
@@ -2724,4 +2764,62 @@ public class ORPanel extends GridPanel
         });
     }
 
+    // ... (inside ORPanel.java, scroll down to the addTrainBuyButton method)
+
+// ... (lines 2660+ at the bottom of the file)
+
+/**
+     * Creates a "Railcard" style button: One Line, Light Green, Plain Text.
+     */
+    private void addTrainBuyButton(BuyTrain action) {
+        if (trainButtonsPanel == null) return;
+
+        ActionButton btn = new ActionButton(RailsIcon.BUY_TRAIN);
+        
+        // 1. Clean Text: "Buy 4 train from IPO for 360" -> "4 Train - IPO - 360"
+        String raw = action.getButtonLabel();
+        String text = raw;
+        
+        if (raw.contains(" for ")) {
+            // Remove "Buy" and "train", replace prepositions with dashes
+            text = raw.replace("Buy ", "")
+                      .replace(" train", "")
+                      .replace(" from ", " - ")
+                      .replace(" for ", " - ");
+        }
+        
+        // 2. Set Text (One Line, Normal Weight)
+        btn.setText(text);
+        btn.setIcon(null);
+        
+        // --- START FIX ---
+        // 3. Styling: Beige Background + Green Border
+        // Color bgGreen = new Color(225, 255, 225); // DELETE (Old Solid Green)
+        
+        Color borderGreen = new Color(34, 139, 34); // Forest Green
+        
+        btn.setBackground(CARD_BG); // BEIGE (Defined in ORPanel constants)
+        btn.setOpaque(true);
+        btn.setForeground(Color.BLACK);
+        btn.setFont(new Font("SansSerif", Font.PLAIN, 12)); 
+        
+        // Thick Green Border to indicate "Buyable"
+        btn.setBorder(BorderFactory.createCompoundBorder(
+            BorderFactory.createLineBorder(borderGreen, 2), // 2px Green Border
+            BorderFactory.createEmptyBorder(3, 5, 3, 5)     // Padding
+        ));
+        // --- END FIX ---
+
+        // 4. Layout
+        btn.setAlignmentX(Component.CENTER_ALIGNMENT);
+        btn.setMaximumSize(new Dimension(SIDEBAR_WIDTH - 10, 30)); // Compact height
+        btn.setPreferredSize(new Dimension(SIDEBAR_WIDTH - 10, 30));
+        
+        btn.setPossibleAction(action);
+        btn.addActionListener(this);
+        
+        trainButtonsPanel.add(btn);
+        trainButtonsPanel.add(Box.createVerticalStrut(4));
+    }
+    
 }

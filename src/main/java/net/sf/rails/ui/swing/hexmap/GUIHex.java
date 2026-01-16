@@ -110,10 +110,13 @@ public class GUIHex implements Observer {
     public enum State {
 
         NORMAL(1.0, Color.black),
-        SELECTABLE(0.9, Color.red),
-        TOKEN_SELECTABLE(0.9, Color.GREEN),
-        SELECTED(0.8, Color.red),
-        INVALIDS (0.9, Color.pink);
+        // Phase 1: Build Track (Construction Brown)
+        SELECTABLE(0.9, new Color(139, 69, 19)),
+        // Phase 2: Lay Token (Forest Green - Matching OR Panel)
+        TOKEN_SELECTABLE(0.9, new Color(34, 139, 34)),
+        // Selected Hex (Construction Brown)
+        SELECTED(0.8, new Color(139, 69, 19)),
+        INVALIDS(0.9, Color.pink);
 
         private final double scale;
         private final Color color;
