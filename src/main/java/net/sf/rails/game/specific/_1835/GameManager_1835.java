@@ -304,9 +304,6 @@ public class GameManager_1835 extends GameManager {
         // Fix: Pass 'pfr' (Round/RailsItem) as the source, and the text as the message.
         net.sf.rails.common.ReportBuffer.add(pfr, LocalText.getText("PRUSSIAN_FORMATION_ROUND_STARTED"));
         
-        // Ensure the engine knows we need an interrupt check
-        log.info("[DEBUG-GM] Forced ReportBuffer update to trigger UI refresh.");
-        
     }
 
 
