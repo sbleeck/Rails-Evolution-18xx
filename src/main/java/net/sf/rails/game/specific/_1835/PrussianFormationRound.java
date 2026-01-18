@@ -205,8 +205,9 @@ public class PrussianFormationRound extends Round implements I_MapRenderableRoun
         forcedStart = isOrTrigger || forcedMerge || isPhase4Plus4Forced;
 
         // 2. LOOP GUARD: Check if PFR was already offered.
-        // CRITICAL: We MUST bypass this check if forcedStart is TRUE.
-        if (!forcedStart && !forcedMerge && gameManager instanceof GameManager_1835
+// We skip if it has been offered, UNLESS it is a forced merge (Phase 5) which repeats.
+        // We remove !forcedStart because checking "Offered" is sufficient to handle the "Once per OR" rule.
+        if (!forcedMerge && gameManager instanceof GameManager_1835
                 && ((GameManager_1835) gameManager).hasPrussianFormationBeenOffered()) {
 
             if (interruptedRound != null) {
@@ -303,17 +304,14 @@ public class PrussianFormationRound extends Round implements I_MapRenderableRoun
                     setStartingPlayer(nextPlayer);
                     setCurrentPlayer(nextPlayer);
 
-                    // --- START FIX ---
                     // If forced start, we need to check if the starting player has any shares
                     // to exchange. If not, auto-advance to the next player.
                     setFoldablePrePrussians();
                     if (foldablePrePrussians.isEmpty()) {
                         finishTurn();
                     }
-                    // --- END FIX ---
                 }
             } else if (getPrussianStep() == Step.MERGE) {
-                // --- START FIX ---
                 // If we resume in Merge phase, ensure we start with Priority Deal.
                 Player sp = playerManager.getPriorityPlayer();
                 if (sp == null)
@@ -321,7 +319,9 @@ public class PrussianFormationRound extends Round implements I_MapRenderableRoun
 
                 setStartingPlayer(sp);
                 setCurrentPlayer(this.startingPlayer);
-                // --- END FIX ---
+                
+                // Immediately skip if the first player has nothing to do
+                advanceToNextValidPlayer();
             }
         }
 
@@ -362,14 +362,20 @@ public class PrussianFormationRound extends Round implements I_MapRenderableRoun
     }
 
     private boolean hasExchangeProperty(Company c) {
-        // --- START FIX ---
-        // Explicitly include BB and HB as exchangeable privates
-        // This ensures they are offered for exchange even if they lack the
-        // ExchangeForShare property metadata
-        if (c.getId().equals("BB") || c.getId().equals("HB")) {
-            return true;
+
+        // Whitelist Check: Strictly limit candidates to the 6 Minors and 2 Privates defined in 1835 rules.
+        // This prevents Majors (like MS) from being selected due to "ghost" properties inherited from closed privates.
+        String id = c.getId();
+        boolean isPrussianCandidate = 
+               id.equals("M1") || id.equals("M2") || id.equals("M3") 
+            || id.equals("M4") || id.equals("M5") || id.equals("M6") 
+            || id.equals("BB") || id.equals("HB");
+        
+        if (!isPrussianCandidate) {
+            return false;
         }
-        // --- END FIX ---
+
+
 
         Set<SpecialProperty> sps = c.getSpecialProperties();
         if (sps == null || sps.isEmpty())
@@ -377,6 +383,14 @@ public class PrussianFormationRound extends Round implements I_MapRenderableRoun
         // Robust check: Search for the specific property type, don't assume index 0
         for (SpecialProperty sp : sps) {
             if (sp instanceof ExchangeForShare)
+                // If a Major Company (has stock price) has this property, it's an error/ghost.
+                // We log the property details to find out WHERE it came from.
+                if (c instanceof PublicCompany && ((PublicCompany)c).hasStockPrice()) {
+                    log.warn("!!! GHOST PROPERTY DETECTED ON MAJOR [{}] !!!", c.getId());
+                    log.warn("Property Object: {}", sp);
+                    log.warn("Property Class: {}", sp.getClass().getName());
+                    log.warn("Property Info: {}", sp.getInfo()); // Often contains "Exchangeable for..."
+                }
                 return true;
         }
         return false;
@@ -389,6 +403,30 @@ public class PrussianFormationRound extends Round implements I_MapRenderableRoun
             return;
         }
 
+        // WINDOW CHECK: The optional exchange loop is only valid between the 4-train and 5-train.
+        
+        // 1. Refresh Phase (Field 'phase' might be stale)
+        Phase currentPhase = Phase.getCurrent(this);
+        String pId = (currentPhase != null) ? currentPhase.getId() : "";
+
+        // 2. Window Opens: When 4-train is sold (Phase "4"/"4+4") or Prussia has started.
+        // We check "startsWith(5)" here to ensure the window is logically 'open' during the forced merge transition,
+        // though the 'Closed' check below will handle the exclusion.
+        boolean windowOpen = (prussian != null && prussian.hasStarted()) 
+                           || pId.contains("4") || pId.startsWith("5");
+
+        if (!windowOpen) {
+            return;
+        }
+
+        // 3. Window Closes: When 5-train is bought (Phase "5" / Brown).
+        // The start() method handles the MANDATORY forced merge for Phase 5.
+        // We must DISABLE this interactive/optional loop to prevent infinite prompts.
+        if (pId.startsWith("5")) {
+             return;
+        }
+
+
         for (PrivateCompany company : currentPlayer.getPortfolioModel().getPrivateCompanies()) {
             if (!company.isClosed() && hasExchangeProperty(company)) {
                 foldablePrePrussians.add(company);
@@ -398,6 +436,12 @@ public class PrussianFormationRound extends Round implements I_MapRenderableRoun
             if (!cert.isPresidentShare())
                 continue;
             PublicCompany company = cert.getCompany();
+            // CRITICAL FILTER: Only "Minor" companies can exchange into Prussia.
+            // Majors (like MS) might return true for hasExchangeProperty if they own a private,
+            // so we MUST explicitly exclude them by checking the company type.
+            if (!company.getType().getId().equalsIgnoreCase("Minor")) {
+                continue;
+            }
             if (!company.isClosed() && hasExchangeProperty(company)) {
                 foldablePrePrussians.add(company);
             }
@@ -423,28 +467,22 @@ public class PrussianFormationRound extends Round implements I_MapRenderableRoun
             setStartingPlayer(((GameManager_1835) gameManager).getPrussianFormationStartingPlayer());
             mergeTurnCount.set(0);
 
-            // --- START FIX ---
-            // After starting Prussia, check if this player has other papers (e.g. BB/HB)
-            // If not, finish their turn immediately to skip to the next player.
-            setFoldablePrePrussians();
-            if (foldablePrePrussians.isEmpty()) {
-                finishTurn();
-            }
-            // --- END FIX ---
+// After starting Prussia, check if this player has other papers (e.g. BB/HB)
+            // If not, auto-advance to the next valid player immediately.
+            advanceToNextValidPlayer();
             return true;
 
         } else if (action instanceof ExchangeForPrussianShare) {
             ExchangeForPrussianShare a = (ExchangeForPrussianShare) action;
             executeExchange(Arrays.asList(a.getCompanyToExchange()), false, false);
 
-            // --- START FIX ---
-            // If the player has no more shares to exchange, automatically finish their
-            // turn.
+// If the player has no more shares to exchange, automatically finish their turn.
             setFoldablePrePrussians();
             if (foldablePrePrussians.isEmpty()) {
-                finishTurn();
+                finishTurn(); 
+                // Note: finishTurn() now calls advanceToNextValidPlayer(), so we are safe.
             }
-            // --- END FIX ---
+            
             return true;
 
         } else if (action instanceof DiscardTrain) {
@@ -468,33 +506,20 @@ public class PrussianFormationRound extends Round implements I_MapRenderableRoun
     }
 
     protected void finishTurn() {
-        int count = mergeTurnCount.value();
+// We increment the count for the CURRENT player who just finished/passed
+        mergeTurnCount.add(1);
 
-        // --- START FIX ---
-        // Loop to find the next player who actually has shares to exchange.
-        // If a player has nothing, we skip them automatically.
-        // count increments on every iteration (every "skip" counts as a turn taken)
-        while (true) {
-            count++;
-            mergeTurnCount.set(count);
-
-            if (count >= playerManager.getNumberOfPlayers()) {
-                finishMergeStep();
-                return;
-            }
-
-            Player nextPlayer = playerManager.getNextPlayer();
-            setCurrentPlayer(nextPlayer);
-
-            // Check if this player has anything to fold
-            setFoldablePrePrussians();
-            if (!foldablePrePrussians.isEmpty()) {
-                // Found a player with actions, stop advancing and let them play.
-                break;
-            }
-            // If empty, loop continues (skipping this player)
+        if (mergeTurnCount.value() >= playerManager.getNumberOfPlayers()) {
+            finishMergeStep();
+            return;
         }
-        // --- END FIX ---
+
+        // Move to next player
+        Player nextPlayer = playerManager.getNextPlayer();
+        setCurrentPlayer(nextPlayer);
+
+        // Recursively skip any subsequent players who have no shares
+        advanceToNextValidPlayer();
     }
 
     private void finishMergeStep() {
@@ -573,7 +598,6 @@ public class PrussianFormationRound extends Round implements I_MapRenderableRoun
             }
         }
     }
-
 
     /**
      * Expose the step name as a String to avoid Enum visibility issues in generic
@@ -681,11 +705,21 @@ public class PrussianFormationRound extends Round implements I_MapRenderableRoun
 
     @Override
     public boolean setPossibleActions() {
+        Player m2Pres = (m2 != null) ? m2.getPresident() : null;
+        log.info("TRACE_PFR_ACTIONS: Step=[{}], M2_Pres=[{}], CurrentPlayer=[{}], RoundFinished=[{}]",
+                getPrussianStep(),
+                (m2Pres != null ? m2Pres.getName() : "null"),
+                (this.currentPlayer != null ? this.currentPlayer.getName() : "null"),
+                isRoundFinished());
+
         if (isRoundFinished()) {
             possibleActions.clear();
             return false;
         }
         possibleActions.clear();
+
+        log.info("TRACE_PFR_GEN: Generating actions for Step: {}. Acting Company: {}",
+                getPrussianStep(), (m2 != null ? m2.getId() : "null"));
 
         this.currentPlayer = playerManager.getCurrentPlayer();
 
@@ -737,21 +771,34 @@ public class PrussianFormationRound extends Round implements I_MapRenderableRoun
         }
 
         PublicCompany m2 = companyManager.getPublicCompany(M2_ID);
-        Player m2President = (m2 != null) ? m2.getPresident() : null;
 
+        // ROBUST PLAYER ENFORCEMENT
+        // If we are in the START step, M2 MUST be the active player.
+        // If the engine's cleanup logic (from OperatingRound) reverted the player
+        // to the previous Operating Company (e.g. M1), we detect it and FIX it here.
         if (getPrussianStep() == Step.START) {
-            if (m2President == null || this.currentPlayer != m2President) {
+            Player m2President = (m2 != null) ? m2.getPresident() : null;
+
+            if (m2President != null && this.currentPlayer != m2President) {
+                log.info("PFR Context Drift Detected: Player is {}, forcing {}",
+                        this.currentPlayer.getName(), m2President.getName());
+                setCurrentPlayer(m2President);
+                // The currentPlayer field is now updated, so the check below will pass.
+            }
+
+            // (The original failure block is effectively removed/bypassed by the fix above)
+            if (m2President == null) {
+                // Only fail if M2 has no president at all (impossible in active game)
                 gameManager.process(new NullAction(getRoot(), NullAction.Mode.DONE));
                 return false;
             }
 
             StartPrussian startAction = new StartPrussian(m2);
-            startAction.setButtonLabel("<html><center><b>1: Accept</b><br>Start Prussian</center></html>");
             possibleActions.add(startAction);
-
+            // Allow the user to Decline/Pass the formation offer
             NullAction passAction = new NullAction(getRoot(), NullAction.Mode.PASS);
-            passAction.setButtonLabel("<html><center><b>2: Decline</b><br>Pass (No)</center></html>");
             possibleActions.add(passAction);
+
             return true;
         } else if (getPrussianStep() == Step.MERGE) {
             setFoldablePrePrussians();
@@ -919,7 +966,6 @@ public class PrussianFormationRound extends Round implements I_MapRenderableRoun
         ReportBuffer.add(this, LocalText.getText("IS_NOW_PRES_OF", newCandidate.getName(), prussian.getId()));
     }
 
-
     private void executeExchange(List<Company> companies, boolean president, boolean display) {
         ExchangeForShare efs;
         PublicCertificate cert;
@@ -947,7 +993,8 @@ public class PrussianFormationRound extends Round implements I_MapRenderableRoun
                 }
             }
             if (efs == null) {
-                // FALLBACK for BB/HB if property is missing but hardcoded exchange logic triggered
+                // FALLBACK for BB/HB if property is missing but hardcoded exchange logic
+                // triggered
                 if (company.getId().equals("BB") || company.getId().equals("HB")) {
                     // Logic handled below by neededShare fallback
                 } else {
@@ -957,11 +1004,10 @@ public class PrussianFormationRound extends Round implements I_MapRenderableRoun
 
             boolean isPresidentShare = president && (owner instanceof Player);
 
-        // Fix for M1 (5%) and integer division issues.
+            // Fix for M1 (5%) and integer division issues.
             // New approach: Find by explicit percentage matching
             cert = null;
-            
-            // --- START FIX ---
+
             int neededShare;
             if (efs != null) {
                 neededShare = efs.getShare();
@@ -977,7 +1023,7 @@ public class PrussianFormationRound extends Round implements I_MapRenderableRoun
                     neededShare = 10;
                 }
             }
-  
+
             // 1. Try to find exact match in UNAVAILABLE pile (ID Check + Pres Check)
             for (PublicCertificate c : unavailable.getCertificates()) {
                 if (c.getCompany().getId().equals(prussian.getId()) && c.getShare() == neededShare) {
@@ -1020,7 +1066,6 @@ public class PrussianFormationRound extends Round implements I_MapRenderableRoun
                     }
                 }
             }
-            // --- END FIX ---
 
             if (cert != null) {
                 cert.moveTo(owner);
@@ -1028,7 +1073,8 @@ public class PrussianFormationRound extends Round implements I_MapRenderableRoun
                 // Fallback to original method just in case (though likely to fail if it was 0)
                 try {
                     int shareUnits = neededShare / prussian.getShareUnit();
-                    if (shareUnits == 0) shareUnits = 1; // Safety for 5% shares
+                    if (shareUnits == 0)
+                        shareUnits = 1; // Safety for 5% shares
 
                     cert = unavailable.findCertificate(prussian, shareUnits, isPresidentShare);
                     if (cert != null)
@@ -1091,6 +1137,34 @@ public class PrussianFormationRound extends Round implements I_MapRenderableRoun
                 checkAndHandlePresidencySwap((Player) owner);
             }
         }
+    }
+
+    private void advanceToNextValidPlayer() {
+        int count = 0;
+        int maxPlayers = playerManager.getNumberOfPlayers();
+
+        // Loop until we find a player with shares OR we cycled through everyone
+        while (count < maxPlayers) {
+            setFoldablePrePrussians(); // Updates foldablePrePrussians for currentPlayer
+
+            if (!foldablePrePrussians.isEmpty()) {
+                return; // Found a player with actions, let them play
+            }
+
+            // No actions possible? Log it and move to next immediately (Atomic State
+            // Change)
+            ReportBuffer.add(this, currentPlayer.getName() + " has no exchangeable shares. Auto-Pass.");
+
+            // Use standard next player logic
+            Player nextPlayer = playerManager.getNextPlayer();
+            setCurrentPlayer(nextPlayer);
+
+            mergeTurnCount.add(1); // Track turns for end condition
+            count++;
+        }
+
+        // If we loop through everyone and nobody can do anything:
+        finishMergeStep();
     }
 
 }

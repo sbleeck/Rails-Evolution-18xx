@@ -417,10 +417,7 @@ public class GameManager extends RailsManager implements Configurable, Owner {
         String key = roundId + ":" + player.getName();
 
         if (awardedBonuses.contains(key)) {
-            // Optional: Log skipped bonuses at DEBUG level to reduce clutter, or INFO for
-            // audit
-            // log.debug("[TIME-AUDIT] Bonus SKIPPED for {}. Key '{}' exists.",
-            // player.getId(), key);
+
             return;
         }
 
@@ -428,9 +425,7 @@ public class GameManager extends RailsManager implements Configurable, Owner {
         player.getTimeBankModel().add(amount);
         awardedBonuses.add(key);
         triggerUITimeFlash(player, amount);
-        // --- CENTRAL LOGGING ---
-        // log.info("[TIME-AUDIT] BONUS: +{}s to {} (New Total: {}). Reason: {}",
-        // amount, player.getId(), player.getTimeBankModel().value(), key);
+
     }
 
     /**
@@ -1294,7 +1289,6 @@ public void setRound(RoundFacade round) {
             round = Configure.create((Class<T>) roundClass, GameManager.class, this, id);
 
         } catch (Exception e) {
-            log.error("Cannot instantiate class {}", roundClassName, e); // Use the variable
             System.exit(1);
         }
         setRound(round);
@@ -1303,13 +1297,11 @@ public void setRound(RoundFacade round) {
 
     // FIXME: We need an ID!
     public <T extends RoundFacade> T createRound(Class<T> roundClass, String id) {
-        // log.error("--- GM.createRound(Class, String) CALLED. Class: {}, ID: {}",
-        // roundClass.getName(), id);
+ 
         T round = null;
         try {
             round = Configure.create(roundClass, GameManager.class, this, id);
         } catch (Exception e) {
-            log.error("Cannot instantiate class {}", roundClass.getName(), e);
             System.exit(1);
         }
         setRound(round);
@@ -1366,12 +1358,10 @@ public void setRound(RoundFacade round) {
         // currentSRorOR remembers we are in an Operating context regardless of
         // interruptions.
         if (currentSRorOR.value() instanceof OperatingRound) {
-            log.info("GameManager: Phase changed OR count to {}, but ignoring update until next Stock Round.", number);
             return;
         }
 
         if (numOfORs.value() != number) {
-            log.info("GameManager: Updating OR Count to {}", number);
             numOfORs.set(number);
         }
     }
@@ -1419,11 +1409,9 @@ public void setRound(RoundFacade round) {
     public void forceSkipStuckCompany() {
         RoundFacade current = getCurrentRound();
         if (current == null || !(current instanceof OperatingRound)) {
-            log.warn("ForceSkip: Not in an Operating Round. Ignoring.");
             return;
         }
 
-        log.error("!!! FORCE SKIP INITIATED !!! Attempting to surgically advance company index...");
 
         try {
             OperatingRound or = (OperatingRound) current;
@@ -1435,13 +1423,11 @@ public void setRound(RoundFacade round) {
             PublicCompany stuckComp = or.getOperatingCompany();
             
             if (companies == null || companies.isEmpty()) {
-                 log.error("ForceSkip: No operating companies list found.");
                  return;
             }
 
             // 2. Find current index
             int currentIndex = companies.indexOf(stuckComp);
-            log.info("ForceSkip: Stuck Company = {}, Index = {}", stuckComp.getId(), currentIndex);
 
             // 3. Find next valid company
             int nextIndex = currentIndex;
@@ -1459,7 +1445,6 @@ public void setRound(RoundFacade round) {
             }
 
             if (nextComp != null) {
-                log.info("ForceSkip: Advancing to {}", nextComp.getId());
                 
                 // 4. Force state update using Reflection to bypass 'private' access if needed,
                 // or just call the protected method if we were in the same package (we aren't).
@@ -1482,11 +1467,9 @@ public void setRound(RoundFacade round) {
 
                 DisplayBuffer.add(this, "FORCE SKIP SUCCESS: Advanced to " + nextComp.getId());
             } else {
-                log.error("ForceSkip: Could not find any valid next company.");
             }
 
         } catch (Exception e) {
-            log.error("ForceSkip: Failed to modify state.", e);
             DisplayBuffer.add(this, "Force Skip Failed: " + e.getMessage());
         }
     }
@@ -1498,7 +1481,6 @@ public void setRound(RoundFacade round) {
      * @return True if the action was successful, false otherwise.
      */
     public boolean process(PossibleAction action) {
-        // log.debug("process({})", action); // Existing log
 
         // EMERGENCY OVERRIDE: Check for "FORCE_SKIP" signal
         // This allows recovering a stuck game state where a company loops infinitely.
@@ -1534,7 +1516,6 @@ public void setRound(RoundFacade round) {
                 net.sf.rails.game.ai.snapshot.JsonStateSerializer.serialize(this, outputFile.getAbsolutePath());
             } catch (Exception e) {
                 // Don't stop the replay, just log the capture error.
-                log.error("BatchLogGenerator FAILED to save state snapshot", e);
             }
         }
 
@@ -1551,8 +1532,7 @@ public void setRound(RoundFacade round) {
             startGameAction = true;
             result = true; // START_GAME action is considered successful for flow control
             // Do not increment counter for START_GAME meta-action
-            // log.debug(">>> GameManager processing START_GAME action - counter remains
-            // {}", this.absoluteActionCounter);
+
         } else if (action != null) {
             action.setActed(); // Seems fine here
 
@@ -1599,8 +1579,7 @@ public void setRound(RoundFacade round) {
                     } else if (getCurrentRound() != null) {
                         result = getCurrentRound().process(action);
                     } else {
-                        // log.error("Action {} could not be processed: No current round and not a
-                        // correction.", action);
+          
                         result = false;
                     }
                 }
@@ -1608,8 +1587,7 @@ public void setRound(RoundFacade round) {
                 // Increment counter ONLY on successful processing of non-GameAction types
                 if (result && !(action instanceof GameAction)) {
                     this.absoluteActionCounter++;
-                    log.debug(">>> GameManager successfully processed action #{}: {}", this.absoluteActionCounter,
-                            action);
+                    
 
                     if (action.hasActed()) { // Consider if action.hasActed() check is still needed here
                         executedActions.add(action);
@@ -1623,7 +1601,6 @@ public void setRound(RoundFacade round) {
 
                 }
             } catch (Exception e) {
-                log.error("!!! Exception during GameManager.process for action {} !!!", action, e);
                 result = false; // Ensure result is false on exception
                 // Do NOT increment counter on exception
             }
@@ -1651,12 +1628,10 @@ public void setRound(RoundFacade round) {
         if (allowActionGeneration) { // Check game over state OR EndOfGameRound
 
             getCurrentRound().setPossibleActions();
-
             // Close change stack *after* successful processing, *before* auto-pass or
             // adding Undo/Redo
             if (result && !(action instanceof GameAction) && !(startGameAction)) {
                 changeStack.close(action);
-
 
                 // FORCE UI UPDATE: Manually trigger the Observer update() method.
                 // We pass 'null' as the Observable because GameManager does not extend Observable.
@@ -1703,26 +1678,11 @@ public void setRound(RoundFacade round) {
                         String filename = String.format("logs/state/state_%05d.json", this.absoluteActionCounter);
                         JsonStateSerializer.serialize(this, filename);
                     } catch (IOException e) {
-                        // log.error("Failed to save state snapshot for move {}",
-                        // this.absoluteActionCounter, e);
+                      
                     }
                 }
             }
 
-            // // Auto-pass logic
-            // if (!isGameOver() && possibleActions.containsOnlyPass()) {
-            // // log.info("Player {} may only pass, processing automatically.",
-            // // getCurrentPlayer().getId()); // Use INFO for auto actions
-            // // Make sure the recursive call doesn't cause stack overflow if pass logic is
-            // // flawed
-            // boolean passResult = process(possibleActions.getList().get(0));
-            // // If the auto-pass fails for some reason, the original 'result' might be
-            // // misleading.
-            // // Decide how to handle passResult if needed, otherwise 'result' refers to
-            // the
-            // // original action.
-            // return passResult; // Return result of the pass action
-            // }
 
             // Add correction actions
             if (!isGameOver()) // Check again in case auto-pass ended the game
@@ -1740,6 +1700,11 @@ public void setRound(RoundFacade round) {
             if (changeStack.isRedoPossible()) {
                 possibleActions.add(new GameAction(getRoot(), GameAction.Mode.REDO));
             }
+
+            
+
+
+
         } // End if (!isGameOver()) block
 
         return result;
@@ -1749,7 +1714,6 @@ public void setRound(RoundFacade round) {
     protected void logActionTaken(PossibleAction action) {
         if (action instanceof NullAction
                 && ((NullAction) action).getMode() == NullAction.Mode.START_GAME) {
-            log.info("*** Action -1: {}", action);
         } else {
             // Generate a concise summary for common actions
             String summary;
@@ -1807,10 +1771,8 @@ public void setRound(RoundFacade round) {
                 } else {
                     actor = action.getPlayerName();
                 }
-                log.info("Move {}: [{}] {}", actionCount.value(), actor, summary);
             } else {
-                log.info("Move {}: [{}] {}", actionCount.value(),
-                        action.getPlayerName(), summary);
+                
             }
             actionCount.add(1);
         }
@@ -1835,7 +1797,6 @@ public void setRound(RoundFacade round) {
         // 2. If a correction is active, clear the normal game actions.
         if (anyCorrectionActive) {
             possibleActions.clear();
-            log.info("[CORRECTION-FIX] Active Correction Mode detected. Clearing all normal game actions.");
         }
 
         // Correction Actions
@@ -1879,14 +1840,14 @@ public void setRound(RoundFacade round) {
 
             case UNDO:
             case FORCED_UNDO:
-
-                // 1. BLIND THE UI (Pre-Undo)
+// 1. BLIND THE UI (Pre-Undo)
                 if (gameUIManager != null && getCurrentPlayer() != null) {
                     gameUIManager.resetTimeHistory(getCurrentPlayer().getIndex());
                 }
 
                 // 2. CAPTURE STATE BEFORE UNDO
                 Player playerBefore = getCurrentPlayer();
+
 
                 // 3. EXECUTE UNDO (Restores state, including Victim's time)
                 if (index == -1) {
@@ -1899,6 +1860,7 @@ public void setRound(RoundFacade round) {
                 Player playerAfter = getCurrentPlayer();
 
                 if (gameUIManager != null && playerAfter != null) {
+
                     // Sync UI to the restored time immediately
                     int restoredTime = playerAfter.getTimeBankModel().value();
                     gameUIManager.setPlayerTimeAfterUndo(playerAfter.getIndex(), restoredTime);
@@ -1935,8 +1897,7 @@ public void setRound(RoundFacade round) {
 
                         // A. Apply Penalty to the restored time
                         penaltyTarget.getTimeBankModel().add(-penaltyAmount);
-                        log.info("[TIME] {} Undo. Penalizing {}: -{}s", penaltyType, penaltyTarget.getName(),
-                                penaltyAmount);
+                 
 
                         // B. FORCE RED FLASH (Uses the final time AFTER penalty)
                         triggerUITimeFlash(penaltyTarget, -penaltyAmount);
@@ -2021,7 +1982,6 @@ public void setRound(RoundFacade round) {
                 DisplayBuffer.add(this, LocalText.getText("RecoverySaveFailed", e.getMessage()));
                 recoverySaveWarning = true;
             }
-            log.error("autosave failed", e);
         }
     }
 
@@ -2040,7 +2000,6 @@ public void setRound(RoundFacade round) {
 
         } catch (IOException e) {
             DisplayBuffer.add(this, LocalText.getText("SaveFailed", e.getMessage()));
-            log.error("save failed", e);
             return false;
         }
 
@@ -2060,7 +2019,6 @@ public void setRound(RoundFacade round) {
                 // it should be relative to the current saved files
                 archiveDir = file.getParent() + File.separator + archiveDir;
             }
-            // log.debug("archiving old saved game files to {}", archiveDir);
 
             File archiveDirFile = new File(archiveDir);
             if (!archiveDirFile.exists()) {
@@ -2068,11 +2026,9 @@ public void setRound(RoundFacade round) {
                 try {
                     Files.createDirectories(Path.of(archiveDir, File.separator, "dummy"));
                 } catch (IOException e) {
-                    // log.warn("Unable to create archive directory {}", archiveDir, e);
                     archive = false;
                 }
             } else if (archiveDirFile.exists() && !archiveDirFile.isDirectory()) {
-                // log.warn("Archive directory doesn't seem to be a directory?");
                 archive = false;
             }
 
@@ -2098,8 +2054,7 @@ public void setRound(RoundFacade round) {
                         File toMove = fileList[i];
                         File destFile = new File(archiveDir + File.separator + toMove.getName());
                         if (!toMove.renameTo(destFile)) {
-                            // log.warn("Unable to archive {} to {}", toMove.getName(),
-                            // destFile.getAbsolutePath());
+                      
                         }
                     }
                 }
@@ -2118,7 +2073,6 @@ public void setRound(RoundFacade round) {
      * executes the additional action(s)
      */
     protected boolean reload(GameAction reloadAction) {
-        // log.debug("Reloading started");
 
         /* Use gameLoader to load the game data */
         GameLoader gameLoader = new GameLoader();
@@ -2134,7 +2088,6 @@ public void setRound(RoundFacade round) {
             player.getTimePenaltyModel().set(0);
         }
 
-        // log.debug("Starting to compare loaded actions");
 
         /*
          * gameLoader actions get compared to the executed actions of the current game
@@ -2147,7 +2100,6 @@ public void setRound(RoundFacade round) {
         // We must clean up all *active round references* in the GameManager
         // to clear 'transient' fields of stale data *before* we replay any actions.
 
-        log.info("Reload: Cleaning up transient state for all loaded rounds...");
 
         // Clean up the current round
         RoundFacade loadedRound = getCurrentRound();
@@ -2177,18 +2129,7 @@ public void setRound(RoundFacade round) {
 
         // Check size
         if (savedActions.size() < executedActions.size()) {
-            // log.warn("found {} actions in new file but have executed {}",
-            // savedActions.size(), executedActions.size());
-            // log.debug("last executed action: {}",
-            // executedActions.get(executedActions.size() - 1));
-            // for (int i = executedActions.size() - 1, j = 5; i >= 0 && j >= 0; i--, j--) {
-            // log.debug("executed {}: {}", i, executedActions.get(i));
-            // }
-            // log.debug("last loaded action: {}", savedActions.get(savedActions.size() -
-            // 1));
-            // for (int i = savedActions.size() - 1, j = 5; i >= 0 && j >= 0; i--, j--) {
-            // log.debug("loaded {}: {}", i, savedActions.get(i));
-            // }
+
 
             DisplayBuffer.add(this, LocalText.getText("LOAD_FAILED_MESSAGE",
                     "loaded file has less actions than current game"));
@@ -2209,9 +2150,7 @@ public void setRound(RoundFacade round) {
                 if (this.reloadActionIndex < executedActionsCount) { // <-- USE MEMBER
                     executedAction = executedActions.get(this.reloadActionIndex); // <-- USE MEMBER
                     if (!savedAction.equalsAsAction(executedAction)) {
-                        // log.warn("loaded action {} is not the same as expected game action {}",
-                        // savedAction,
-                        // executedAction);
+
                         DisplayBuffer.add(this, LocalText.getText("LoadFailed",
                                 "loaded action \"" + savedAction
                                         + "\"<br>   is not same as game action \"" + executedAction.toString()
@@ -2221,11 +2160,9 @@ public void setRound(RoundFacade round) {
                     }
                 } else {
                     if (this.reloadActionIndex == executedActionsCount) { // <-- USE MEMBER
-                        // log.info("Finished comparing old actions, starting to process new actions");
                     }
                     // Found a new action: execute it
                     if (!processOnReload(savedAction)) {
-                        log.error("Reload interrupted");
                         DisplayBuffer.add(this, LocalText.getText("LoadFailed",
                                 " loaded action \"" + savedAction.toString() + "\" is invalid"));
                         this.actionsBeingReloaded = null; // <-- CLEANUP
@@ -2234,7 +2171,6 @@ public void setRound(RoundFacade round) {
                 }
             }
         } catch (Exception e) {
-            log.error("Reload failed", e);
             DisplayBuffer.add(this, LocalText.getText("LoadFailed", e.getMessage()));
             this.actionsBeingReloaded = null; // <-- CLEANUP
             return false;
@@ -2262,7 +2198,6 @@ public void setRound(RoundFacade round) {
         // 2. Force Pause so players can orient themselves before the clock ticks
         if (isTimeManagementEnabled()) {
             setGamePaused(true);
-            log.info("[TIME] Game reloaded. Exact times restored. Timer auto-paused.");
         }
 
 
@@ -2331,7 +2266,6 @@ public void setRound(RoundFacade round) {
             result = true;
 
         } catch (IOException e) {
-            log.error("Save failed", e);
             DisplayBuffer.add(this, LocalText.getText("SaveFailed", e.getMessage()));
         }
 
@@ -2356,7 +2290,6 @@ public void setRound(RoundFacade round) {
         if (roundToResume != null) {
             guiHints.setCurrentRoundType(roundToResume.getClass());
         } else {
-            log.error("finishShareSellingRound: roundToResume is null! Cannot restore UI hints.");
         }
 
         guiHints.setVisibilityHint(GuiDef.Panel.STOCK_MARKET, false);
@@ -2372,8 +2305,6 @@ public void setRound(RoundFacade round) {
         setInterruptedRound(null);
         setRound(roundToResume);
       
-        log.info("[FLOW] Resuming Interrupted Round (from TreasuryShareRound): {}",
-                roundToResume.getRoundName()); // 'essential logging' keep!
 
         guiHints.setCurrentRoundType(roundToResume.getClass());
 
@@ -2836,7 +2767,6 @@ public void setRound(RoundFacade round) {
             showMethod.invoke(null, frame, this);
 
         } catch (Exception e) {
-            log.error("Failed to display Company Payout Chart.", e);
         }
     }
 
@@ -2863,9 +2793,7 @@ public void setRound(RoundFacade round) {
             showMethod.invoke(null, frame, this);
 
         } catch (Exception e) {
-            log.error(
-                    "Failed to display Final Ranking Report. Ensure WorthChartWindow has showRankingReport(JFrame, GameManager).",
-                    e);
+
         }
     }
 
@@ -2937,19 +2865,12 @@ public void setRound(RoundFacade round) {
     }
 
     public Object getGuiParameter(GuiDef.Parm key) {
-        // if (key == GuiDef.Parm.HAS_SPECIAL_COMPANY_INCOME) {
-        // log.debug("+++ Get {}={} OrDefault={}",
-        // key,
-        // guiParameters.get(key),
-        // guiParameters.getOrDefault(key, false));
-        // }
+
         return guiParameters.getOrDefault(key, false);
     }
 
     public void setGuiParameter(GuiDef.Parm key, boolean value) {
-        // if (key == GuiDef.Parm.HAS_SPECIAL_COMPANY_INCOME) {
-        // log.debug("+++ Set {}={}", key, value);
-        // }
+ 
         guiParameters.put(key, value);
     }
 
@@ -3024,11 +2945,9 @@ public void setRound(RoundFacade round) {
             }
             for (SpecialProperty sp : spsToMoveToGM) {
                 this.addSpecialProperty(sp);
-                // log.debug("SP {} is now a common property", sp.getInfo());
             }
             for (SpecialProperty sp : spsMoveToPlayer) {
                 sp.moveTo(owner);
-                // log.debug("SP {} is now a player property", sp.getInfo());
             }
         }
     }
@@ -3057,7 +2976,6 @@ public void setRound(RoundFacade round) {
             java.lang.reflect.Method showMethod = chartClass.getMethod("showChart", JFrame.class, GameManager.class);
             showMethod.invoke(null, (JFrame) parentFrame, this);
         } catch (Exception e) {
-            log.error("Failed to display Multiplier Chart.", e);
         }
     }
 
@@ -3097,7 +3015,6 @@ public void setRound(RoundFacade round) {
         if (cm == null) {
             cm = ct.newCorrectionManager(this);
             correctionManagers.put(ct, cm);
-            // log.debug("Added CorrectionManager for {}", ct);
         }
         return cm;
     }
@@ -3272,7 +3189,6 @@ public void setRound(RoundFacade round) {
     public Random getRandomGenerator() {
         if (randomGenerator == null) {
             long seed = Long.parseLong(getRoot().getGameOptions().get(GameOption.RANDOM_SEED));
-            // log.info("Random seed = {}", seed);
             randomGenerator = new Random(seed);
         }
         return randomGenerator;
@@ -3359,13 +3275,11 @@ public void setRound(RoundFacade round) {
                 File outputFile = new File(this.logOutputDirectory, filename);
                 net.sf.rails.game.ai.snapshot.JsonStateSerializer.serialize(this, outputFile.getAbsolutePath());
             } catch (Exception e) {
-                log.error("BatchLogGenerator FAILED to save state snapshot", e);
             }
         }
 
         // Log possible actions (normally this is outcommented)
         for (PossibleAction a : possibleActions.getList()) {
-            // log.info("{}", a);
         }
 
         logActionTaken(action);
@@ -3922,7 +3836,6 @@ public void setRound(RoundFacade round) {
             showMethod.invoke(null, frame, this);
 
         } catch (Exception e) {
-            log.error("Failed to display Worth Chart. Is WorthChartWindow.java compiled and on classpath?", e);
         }
     }
 
@@ -3935,9 +3848,7 @@ public void setRound(RoundFacade round) {
                 // Format: PlayerName=Seconds
                 writer.println(p.getName() + "=" + p.getTimeBankModel().value());
             }
-            log.info("[TIME] Saved time data to sidecar: {}", timeFile.getName());
         } catch (IOException e) {
-            log.error("[TIME] Failed to save time sidecar", e);
         }
     }
 
@@ -3946,7 +3857,6 @@ public void setRound(RoundFacade round) {
 
         File timeFile = new File(saveFile.getAbsolutePath() + ".time");
         if (!timeFile.exists()) {
-            log.info("[TIME] No sidecar file found ({}), using calculated replay time.", timeFile.getName());
             return;
         }
 
@@ -3966,9 +3876,7 @@ for (Player p : getRoot().getPlayerManager().getPlayers()) {
                     }
                 }
             }
-            log.info("[TIME] Restored exact player times from sidecar.");
         } catch (Exception e) {
-            log.error("[TIME] Failed to load time sidecar", e);
         }
     }
 

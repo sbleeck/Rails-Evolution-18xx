@@ -155,7 +155,6 @@ public class ORUIManager_1837 extends ORUIManager {
         }
     }
 
-    @Override
     protected void checkForGameSpecificActions(PublicCompany orComp,
                                                GameDef.OrStep orStep,
                                                PossibleActions possibleActions) {

@@ -307,18 +307,7 @@ public class ORWindow extends DockingFrame implements ActionPerformer {
 
         // --- 1. GENERAL/DEFAULT ACTIONS ---
 
-        // 1. SPACE KEY: Explicitly triggers 'Done' via ORPanel
-        // We use ORWindow (Global) scope so this works even if Map has focus.
-        String DONE_KEY = "doneAction";
-        inputMap.put(KeyStroke.getKeyStroke(KeyEvent.VK_SPACE, 0), DONE_KEY);
-        actionMap.put(DONE_KEY, new AbstractAction() {
-            public void actionPerformed(ActionEvent e) {
-                if (orPanel != null && orPanel.btnDone != null && orPanel.btnDone.isEnabled()) {
-                    orPanel.btnDone.doClick();
-                }
-            }
-        });
-        
+       
         // Return (Enter): Done and Accept/Confirm
         String CONFIRM_KEY = "confirmAction";
         inputMap.put(KeyStroke.getKeyStroke(KeyEvent.VK_ENTER, 0), CONFIRM_KEY);
@@ -332,9 +321,9 @@ public class ORWindow extends DockingFrame implements ActionPerformer {
             }
         });
 
-        // N KEY: Show Map Numbers
+        // SPACE KEY: Show Map Numbers (Remapped from 'N' to 'SPACE' per request)
         String SHOW_NUMBERS_KEY = "showNumbersAction";
-        inputMap.put(KeyStroke.getKeyStroke(KeyEvent.VK_N, 0), SHOW_NUMBERS_KEY);
+        inputMap.put(KeyStroke.getKeyStroke(KeyEvent.VK_SPACE, 0), SHOW_NUMBERS_KEY);
         actionMap.put(SHOW_NUMBERS_KEY, new AbstractAction() {
             public void actionPerformed(ActionEvent e) {
                 if (orPanel != null) {
@@ -342,6 +331,7 @@ public class ORWindow extends DockingFrame implements ActionPerformer {
                 }
             }
         });
+
 
         // --- 2. MAP & UPGRADE ACTIONS ---
 

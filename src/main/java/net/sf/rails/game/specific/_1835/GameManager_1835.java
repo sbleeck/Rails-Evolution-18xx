@@ -155,8 +155,7 @@ public class GameManager_1835 extends GameManager {
         String roundName = (round != null) ? round.getRoundName() : "null";
         boolean isPFR = (round instanceof PrussianFormationRound);
 
-        // log.info("[PFR_FLOW] nextRound() entering. Finished Round: {} (isPFR={})",
-        // roundName, isPFR);
+
 
         // CASE 1: A Standard Round (OR or SR) just finished.
         // We reset the flag so we can offer the PFR again at the start of the NEW
@@ -177,8 +176,7 @@ public class GameManager_1835 extends GameManager {
 
             // Resume the normal game flow
             if (this.lastStandardRound != null) {
-                // log.info("[PFR_FLOW] Resuming flow from Last Standard Round: {}",
-                // this.lastStandardRound.getRoundName());
+
                 super.nextRound(this.lastStandardRound);
             } else {
                 super.nextRound(round);
@@ -269,9 +267,7 @@ public class GameManager_1835 extends GameManager {
 // Method: startPrussianFormationRound
 
     public void startPrussianFormationRound(Round currentRound) {
-        log.info("[FLOW] Interrupting Round {} to start PrussianFormationRound.",
-                (currentRound != null ? currentRound.getRoundName() : "null"));
-        
+
         setInterruptedRound(currentRound);
 
         String roundName;
@@ -285,19 +281,13 @@ public class GameManager_1835 extends GameManager {
         }
         roundName += "_" + getCurrentActionCount() + "_" + System.nanoTime();
 
-        log.info("[FLOW] Creating Round instance with name: {}", roundName);
         
         // Cast is necessary because createRound returns generic Round
         PrussianFormationRound pfr = (PrussianFormationRound) createRound(PrussianFormationRound.class, roundName);
         
-        // --- CRITICAL FIX: Tell the engine this is now the active round! ---
         setRound(pfr);
-        // -------------------------------------------------------------------
-
-        log.info("[FLOW] Calling pfr.start()...");
         pfr.start();
 
-        log.info("[FLOW] pfr.start() returned. Setting 'Offered' flag.");
         this.setPrussianFormationOffered();
         
 // CRITICAL: Force UI to acknowledge the round switch and repaint.

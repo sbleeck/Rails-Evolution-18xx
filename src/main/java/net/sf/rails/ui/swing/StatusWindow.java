@@ -1386,11 +1386,7 @@ public class StatusWindow extends JFrame implements ActionListener, ActionPerfor
             if (gameUIManager.getGameManager() != null) {
                 enginePlayer = gameUIManager.getGameManager().getCurrentPlayer();
             }
-            log.info("[FLOW] 7. StatusWindow: updateStatus START. MyTurn={}. UI_Player={} vs Engine_Player={}",
-                    myTurn,
-                    (uiPlayer != null ? uiPlayer.getName() : "null"),
-                    (enginePlayer != null ? enginePlayer.getName() : "null"));
-
+         
             // 2. Refresh Actions from Engine
             if (gameUIManager.getGameManager() != null) {
                 this.possibleActions = gameUIManager.getGameManager().getPossibleActions();
@@ -1543,9 +1539,7 @@ public class StatusWindow extends JFrame implements ActionListener, ActionPerfor
                 gameStatus.initTurn(effectivePlayerIndex, true);
             }
 
-            log.info("[FLOW] 7. StatusWindow: updateStatus. MyTurn={}. Checking PFR...", myTurn);
 
-            // --- STOCK ROUND / START ROUND LOGIC ---
             Player currentPlayer = effectivePlayer;
             String activityText = (currentPlayer != null) ? "Thinking: " + currentPlayer.getName() : "Thinking...";
 
@@ -1618,9 +1612,9 @@ public class StatusWindow extends JFrame implements ActionListener, ActionPerfor
                             passButton.setActionCommand(PASS_CMD);
                             passButton.setMnemonic(KeyEvent.VK_P);
                             passButton.setPossibleAction(na);
-                            
+
                             // 1. Force Enable/Visible
-                            passFound = true; 
+                            passFound = true;
                             passButton.setEnabled(true);
                             passButton.setVisible(true);
 
@@ -1630,7 +1624,7 @@ public class StatusWindow extends JFrame implements ActionListener, ActionPerfor
                                 styleStatusButton(passButton, SYS_BLUE); // Exception: Keep Blue for "Decision"
                             } else {
                                 passButton.setText("Pass");
-styleStatusButton(passButton, SYS_BLUE);
+                                styleStatusButton(passButton, SYS_BLUE);
                             }
 
                             break;
@@ -2010,9 +2004,7 @@ styleStatusButton(passButton, SYS_BLUE);
         net.sf.rails.ui.swing.elements.RailCard card = findRailCardRecursive(gameStatus, company);
 
         if (card != null) {
-            log.info("[FLOW] 11. StatusWindow: SUCCESS. Found RailCard for {}. Setting BLUE.", company.getId());
-            log.info("StatusWindow: Highlighting Card for {}", company.getId());
-            
+   
          // Visual: Color Code based on Action
             applyActionColor(card, action);
             
@@ -2025,7 +2017,6 @@ styleStatusButton(passButton, SYS_BLUE);
             card.setToolTipText("<html><b>Click to " + actionName + "</b><br>" + company.getId() + "</html>");
             card.repaint();
         } else {
-            log.warn("StatusWindow: Could not find RailCard for {}", company.getId());
         }
     }
 
@@ -2045,7 +2036,6 @@ styleStatusButton(passButton, SYS_BLUE);
 
                 // 1. Check Direct Company
                 if (card.getCompany() != null && card.getCompany().getId().equals(targetId)) {
-                    log.info("[DEBUG-SEARCH] FOUND M2 by Company Ref! Card Text: {}", cardText);
                     return card;
                 }
 
@@ -2054,7 +2044,6 @@ styleStatusButton(passButton, SYS_BLUE);
                     if (cert instanceof net.sf.rails.game.financial.PublicCertificate) {
                         if (((net.sf.rails.game.financial.PublicCertificate) cert).getCompany().getId()
                                 .equals(targetId)) {
-                            log.info("[DEBUG-SEARCH] FOUND M2 by Certificate! Card Text: {}", cardText);
                             return card;
                         }
                     } else if (cert instanceof net.sf.rails.game.PrivateCompany) {
@@ -2136,15 +2125,12 @@ styleStatusButton(passButton, SYS_BLUE);
                 int cIdx = ((PublicCompany) company).getPublicNumber();
 
                 card = gameStatus.getRailCardFor(cIdx, pIdx);
-                if (card != null) {
-                    log.info("[FLOW] StatusWindow: Recovered RailCard via Grid Lookup [Co={}, Pl={}]", cIdx, pIdx);
-                }
+
             }
         }
         // --- END FIX ---
 
         if (card != null) {
-            log.info("[FLOW] 11. StatusWindow: SUCCESS. Found RailCard for {}. Setting BLUE.", company.getId());
             applyActionColor(card, action);
             card.setPossibleAction(action);
             card.removeActionListener(this);
@@ -2152,7 +2138,6 @@ styleStatusButton(passButton, SYS_BLUE);
             card.setToolTipText("<html><b>Click to " + actionName + "</b><br>" + company.getId() + "</html>");
             card.repaint();
         } else {
-            log.warn("[FLOW] StatusWindow: Could not find RailCard for {}", company.getId());
         }
     }
 

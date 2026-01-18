@@ -3,13 +3,16 @@ package rails.game.action;
 import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.util.*;
-
+import java.awt.Color; // FIX: Use AWT Color
+import rails.game.action.GuiTargetedAction;
 import net.sf.rails.common.DisplayBuffer;
 import net.sf.rails.common.LocalText;
 import net.sf.rails.game.*;
 import net.sf.rails.game.state.AbstractItem;
-import org.jetbrains.annotations.NotNull;
+import net.sf.rails.game.state.Owner;
 
+import org.jetbrains.annotations.NotNull;
+import rails.game.action.GuiTargetedAction; // Import
 import com.google.common.base.Objects;
 
 import net.sf.rails.util.RailsObjects;
@@ -36,7 +39,10 @@ import org.slf4j.LoggerFactory;
  *   that has the same train *type* as the given discardedTrain.
  *   (so the actual train id may be different).
  */
-public class DiscardTrain extends PossibleORAction {
+
+
+
+public class DiscardTrain extends PossibleORAction implements GuiTargetedAction {
 
     private static final Logger log = LoggerFactory.getLogger(DiscardTrain.class);
 
@@ -48,6 +54,31 @@ public class DiscardTrain extends PossibleORAction {
      * True if discarding trains is mandatory
      */
     private boolean forced = false;
+
+
+    @Override
+    public Color getButtonColor() {
+        return new Color(255, 100, 100); // Reddish
+    }
+
+    @Override
+    public String getGroupLabel() {
+        return "Discard Train";
+    }
+
+    @Override
+    public String getButtonLabel() {
+        return "Discard " + (discardedTrain != null ? discardedTrain.getName() : "?");
+    }
+
+    @Override
+    public Owner getActor() {
+        return company;
+    }
+
+   
+
+
 
     // Client settings
     transient private Train discardedTrain = null;

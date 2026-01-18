@@ -143,7 +143,6 @@ public class GameUIManager implements DialogOwner {
     private boolean isTimerPaused = false;
     private double currentFontScale = 1.0;
 
-
     // Player order
     // protected PlayerOrderView playerOrderView;
     /**
@@ -222,13 +221,13 @@ public class GameUIManager implements DialogOwner {
         }
         OpenGamesManager.getInstance().removeGame(this);
 
-if (windowSettings != null) {
-    log.info("GameUIManager: Closing game. Saving font.ui.scale '{}' to WindowSettings.", this.currentFontScale);
+        if (windowSettings != null) {
+            log.info("GameUIManager: Closing game. Saving font.ui.scale '{}' to WindowSettings.",
+                    this.currentFontScale);
             windowSettings.setProperty("font.ui.scale", String.valueOf(this.currentFontScale));
         }
         getWindowSettings().save();
 
-        
         if (startRoundWindow != null) {
             startRoundWindow.close();
         }
@@ -257,16 +256,16 @@ if (windowSettings != null) {
         ConfigManager.getInstance().clearTransientConfig();
     }
 
-public void terminate() {
+    public void terminate() {
         // Save Window Positions
-if (windowSettings != null) {
-             windowSettings.setProperty("font.ui.scale", String.valueOf(this.currentFontScale));
+        if (windowSettings != null) {
+            windowSettings.setProperty("font.ui.scale", String.valueOf(this.currentFontScale));
         }
         getWindowSettings().save();
 
         // Save Font Scale
         Config.set("font.ui.scale", String.valueOf(this.currentFontScale));
-        
+
         if (orWindow != null)
             orWindow.saveLayout();
         System.exit(0);
@@ -316,15 +315,14 @@ if (windowSettings != null) {
         }
     }
 
-  
     private void initFontSettings() {
         // font settings, can be game specific
         String fontType = Config.getGameSpecific(railsRoot.getGameName(), "font.ui.name");
         Font font = null;
-        
+
         if (Util.hasValue(fontType)) {
             // --- RESTORED MISSING VARIABLE ---
-            boolean boldStyle = true; 
+            boolean boldStyle = true;
             String fontStyle = Config.getGameSpecific(railsRoot.getGameName(), "font.ui.style");
             if (Util.hasValue(fontStyle)) {
                 if (fontStyle.equalsIgnoreCase("plain")) {
@@ -338,9 +336,9 @@ if (windowSettings != null) {
             }
         }
 
-// Check WindowSettings first (preferred storage), then Config (fallback)
-       String savedScale = null;
-       if (windowSettings != null) {
+        // Check WindowSettings first (preferred storage), then Config (fallback)
+        String savedScale = null;
+        if (windowSettings != null) {
             savedScale = windowSettings.getProperty("font.ui.scale");
             log.info("GameUIManager: Loaded saved font scale from WindowSettings: '{}'", savedScale);
         } else {
@@ -352,8 +350,6 @@ if (windowSettings != null) {
             log.info("GameUIManager: Fallback to Config for font scale: '{}'", savedScale);
         }
 
-     
-
         if (Util.hasValue(savedScale)) {
             try {
                 this.currentFontScale = Double.parseDouble(savedScale);
@@ -363,7 +359,7 @@ if (windowSettings != null) {
         } else {
             this.currentFontScale = GUIGlobals.getFontsScale();
         }
-        
+
         changeGlobalFont(font, this.currentFontScale);
     }
 
@@ -371,12 +367,11 @@ if (windowSettings != null) {
         return statusWindow;
     }
 
-
     public void gameUIInit(boolean newGame) {
         splashWindow.notifyOfStep(SplashWindow.STEP_STOCK_CHART);
         stockChartWindow = new StockChartWindow(this);
-        stockChartWindow.setName("StockChartWindow"); 
-        
+        stockChartWindow.setName("StockChartWindow");
+
         // --- FIX: Register Stock Window for Safe Storage ---
         registerWindowStorage(stockChartWindow);
 
@@ -390,15 +385,15 @@ if (windowSettings != null) {
         splashWindow.notifyOfStep(SplashWindow.STEP_REPORT_WINDOW);
         boolean staticReportWindow = Config.get("report.window.type").equalsIgnoreCase("static");
         reportWindow = new ReportWindow(this, staticReportWindow);
-        reportWindow.setName("ReportWindow"); 
-        
+        reportWindow.setName("ReportWindow");
+
         // --- FIX: Register Report Window for Safe Storage ---
         registerWindowStorage(reportWindow);
 
         orWindow = new ORWindow(this, splashWindow);
-        orWindow.setName("MapWindow"); 
+        orWindow.setName("MapWindow");
         orUIManager = orWindow.getORUIManager();
-        
+
         // --- FIX: Register Map Window for Safe Storage ---
         registerWindowStorage(orWindow);
 
@@ -408,18 +403,18 @@ if (windowSettings != null) {
             Class<? extends StatusWindow> statusWindowClass = Class.forName(statusWindowClassName)
                     .asSubclass(StatusWindow.class);
             statusWindow = statusWindowClass.newInstance();
-            statusWindow.setName("StatusWindow"); 
+            statusWindow.setName("StatusWindow");
 
             statusWindow.init(this);
 
-            initGameTimer(); 
+            initGameTimer();
             if (gameTimer != null) {
-                gameTimer.start(); 
-                startTimerForCurrentPlayer(); 
+                gameTimer.start();
+                startTimerForCurrentPlayer();
                 if (gameTimer != null && !gameTimer.isRunning()) {
                     gameTimer.start();
                 }
-            } 
+            }
 
         } catch (Exception e) {
             System.exit(1);
@@ -434,11 +429,11 @@ if (windowSettings != null) {
 
         splashWindow.notifyOfStep(SplashWindow.STEP_CONFIG_WINDOW);
         configWindow = new ConfigWindow(statusWindow);
-        configWindow.setName("ConfigWindow"); 
-        
+        configWindow.setName("ConfigWindow");
+
         // --- FIX: Register Config Window for Safe Storage ---
         registerWindowStorage(configWindow);
-        
+
         configWindow.init(true);
 
         splashWindow.notifyOfStep(SplashWindow.STEP_INIT_SOUND);
@@ -450,8 +445,6 @@ if (windowSettings != null) {
         new Discord(this, railsRoot);
         new Slack(this, railsRoot);
     }
-
-
 
     public void startLoadedGame() {
         gameUIInit(false); // false indicates reload
@@ -470,8 +463,6 @@ if (windowSettings != null) {
 
         statusWindow.setGameActions();
     }
-
-
 
     public void adjustSharePrice(AdjustSharePrice action) {
 
@@ -501,15 +492,12 @@ if (windowSettings != null) {
         String actionSource = action.isAIAction() ? "AI" : "Human"; // Check the flag
 
         action.setActed();
-Player currentPlayer = getCurrentPlayer();
+        Player currentPlayer = getCurrentPlayer();
         if (currentPlayer != null) {
             action.setPlayerName(currentPlayer.getId());
         } else {
             action.setPlayerName("System"); // Fallback for administrative actions
         }
-        log.info("ProcessOnServer: Action={} Player={}", action, action.getPlayerName());
-
-
 
         // Process the action on the server (this will increment the counter inside
         // GameManager)
@@ -520,33 +508,34 @@ Player currentPlayer = getCurrentPlayer();
         return result;
     }
 
-
     public boolean displayServerMessage() {
         String[] message = getDisplayBuffer().get();
         if (message != null) {
-            
-            String combinedMessage = Util.join(message, " ");
-            
-            //  Suppress Modals ---
 
-            if (combinedMessage.contains("Bank is broken") || 
-                combinedMessage.contains("Correction activated")) { 
+            String combinedMessage = Util.join(message, " ");
+
+            // Suppress Modals ---
+
+            if (combinedMessage.contains("Bank is broken") ||
+                    combinedMessage.contains("Correction activated")) {
 
                 log.info("SUPPRESSED UI MESSAGE: {}", combinedMessage);
-                return false; 
+                return false;
             }
 
             // 1. Race Condition "is not allowed"
             // 2. Share Selling "must raise cash" (blocks AI)
-            // if (combinedMessage.contains("is not allowed") || 
-            //     // combinedMessage.contains("must raise") ||
-            //     combinedMessage.contains("Bank is broken") ||
-            //     combinedMessage.contains("Correction activated") || // Suppress mode change notification
-            //     // combinedMessage.contains("Starts at") || // Also catch "PR Starts at..." just in case
-            //     combinedMessage.contains("PR exchanges")) { // <--- Added this
+            // if (combinedMessage.contains("is not allowed") ||
+            // // combinedMessage.contains("must raise") ||
+            // combinedMessage.contains("Bank is broken") ||
+            // combinedMessage.contains("Correction activated") || // Suppress mode change
+            // notification
+            // // combinedMessage.contains("Starts at") || // Also catch "PR Starts at..."
+            // just in case
+            // combinedMessage.contains("PR exchanges")) { // <--- Added this
 
-            //     log.info("SUPPRESSED UI MESSAGE: {}", combinedMessage);
-            //     return false; 
+            // log.info("SUPPRESSED UI MESSAGE: {}", combinedMessage);
+            // return false;
             // }
 
             setCurrentDialog(new MessageDialog(null, this,
@@ -559,8 +548,15 @@ Player currentPlayer = getCurrentPlayer();
         return false;
     }
 
-    
-public void updateUI() {
+    public void updateUI() {
+
+        int actionCount = railsRoot.getGameManager().getPossibleActions().getList().size();
+
+        if (actionCount == 0) {
+            System.err.println("!!! CRITICAL: UI RECEIVED EMPTY ACTION LIST !!!");
+            Thread.dumpStack(); // Trace who triggered this update
+        }
+
         previousRoundType = currentRoundType;
         previousRoundName = currentRoundName;
         previousRound = currentRound;
@@ -599,7 +595,7 @@ public void updateUI() {
                                 .forName(startRoundWindowClassName).asSubclass(StartRoundWindow.class);
                         startRoundWindow = startRoundWindowClass.newInstance();
                         // DEIN BACKUP CODE (beibehalten):
-                        startRoundWindow.init(startRound, this, orUIManager); 
+                        startRoundWindow.init(startRound, this, orUIManager);
                     } catch (Exception e) {
                         System.exit(1);
                     }
@@ -617,36 +613,32 @@ public void updateUI() {
                 if (operatingCompany != null) {
                     Player president = operatingCompany.getPresident();
                     if (president != null && statusWindow != null) {
-                        
+
                         // Use the new public accessor method
-                        int bonusTime = getGameManager().getOrTimeBonus(); 
+                        int bonusTime = getGameManager().getOrTimeBonus();
 
                         if (bonusTime > 0) {
                             // Fetch the actual current time (which already includes the bonus)
                             int newTime = president.getTimeBankModel().value();
                             int playerIndex = president.getIndex();
-                            
+
                             // Trigger the flash using the bonus amount
                             statusWindow.getGameStatus().updatePlayerTimeWithFlash(
-                                playerIndex, newTime, bonusTime);
+                                    playerIndex, newTime, bonusTime);
                         }
                     }
                 }
-
-                
 
             } else if (SwitchableUIRound.class.isAssignableFrom(currentRoundType)) {
                 statusWindow.pack();
             }
         }
-        
 
         /* Process visible round type changes */
         for (GuiHints.VisibilityHint hint : uiHints.getVisibilityHints()) {
             switch (hint.getType()) {
                 case STOCK_MARKET:
                     boolean stockChartVisibilityHint = hint.isVisible() || configuredStockChartVisibility;
-                    
 
                     if (stockChartVisibilityHint != previousStockChartVisibilityHint) {
                         stockChartWindow.setVisible(stockChartVisibilityHint);
@@ -660,7 +652,7 @@ public void updateUI() {
                         previousStatusWindowVisibilityHint = statusWindowVisibilityHint;
                     }
                     // if (statusWindowVisibilityHint)
-                    //     setMeToFront(statusWindow);
+                    // setMeToFront(statusWindow);
                     break;
                 case MAP:
                     boolean orWindowVisibilityHint = hint.isVisible();
@@ -669,41 +661,34 @@ public void updateUI() {
                         previousORWindowVisibilityHint = orWindowVisibilityHint;
                     }
                     // if (orWindowVisibilityHint)
-                    //     setMeToFront(orWindow);
+                    // setMeToFront(orWindow);
                     break;
                 case START_ROUND:
                     // Handled elsewhere
             }
         }
 
-    
         // New hint check: Delegate the check to GameManager
         // 1. Get the parameter (which is a Boolean object) from GameManager
         Object reportHint = getGameManager().getGuiParameter(GuiDef.Parm.SHOW_GAME_END_REPORT);
         boolean showReport = (reportHint instanceof Boolean) ? (Boolean) reportHint : false;
-        
+
         if (showReport) {
-            
+
             // 2. Unset the hint by calling the setter on GameManager
             getGameManager().setGuiParameter(GuiDef.Parm.SHOW_GAME_END_REPORT, false);
-            
+
             // 3. Call the method to display the report
-showPlayerWorthChart();        }
+            showPlayerWorthChart();
+        }
 
-        
         boolean correctionOverride = statusWindow.setupFor(currentRound);
-
 
         // Wir prüfen hier ZUSÄTZLICH auf das neue Interface.
         // Das ändert NICHTS an der StartRound (da diese das Interface nicht hat).
         // Das ändert NICHTS an der StockRound.
         // Es greift NUR, wenn wir später die PFR umstellen.
         boolean isMapRenderable = (currentRound instanceof net.sf.rails.game.round.I_MapRenderableRound);
-
-
-   
-
-
 
         if ((uiHints.getActivePanel() == GuiDef.Panel.MAP || isMapRenderable) && !correctionOverride) {
             activeWindow = orWindow;
@@ -730,7 +715,8 @@ showPlayerWorthChart();        }
         if (startRoundWindow != null) {
             startRoundWindow.updateStatus(myTurn);
         }
-        // Wrap StatusWindow update to prevent crashes (CME) from blocking the OR Window update.
+        // Wrap StatusWindow update to prevent crashes (CME) from blocking the OR Window
+        // update.
         if (statusWindow != null) {
             try {
                 statusWindow.updateStatus(myTurn);
@@ -738,14 +724,25 @@ showPlayerWorthChart();        }
                 log.error("Recovered from StatusWindow crash during updateUI. Proceeding to ORUIManager.", e);
             }
         }
-        
-        if (orUIManager != null) {
-            // Log to confirm we reached this point
-            if (currentRound instanceof OperatingRound && ((OperatingRound)currentRound).getOperatingCompany().getId().equals("S5")) {
-                log.info("1837_DEBUG: GameUIManager calling orUIManager.updateStatus for S5");
+if (orUIManager != null) {
+            
+            // TRAFFIC CONTROL ---
+            boolean isPFR = (currentRound != null && currentRound.getClass().getSimpleName().equals("PrussianFormationRound"));
+
+            // 1. If we are NOT in PFR, we must UNLOCK the ORPanel so standard updates (M3) can pass.
+            if (!isPFR) {
+                ORPanel.releaseSpecialMode(this);
             }
+
+            // 2. Standard Update (Will be ignored by ORPanel if PFR is active, Accepted if Released)
             orUIManager.updateStatus(myTurn);
-        }
+
+            // 3. If we ARE in PFR, force the special UI
+            if (isPFR) {
+                List<PossibleAction> actions = getGameManager().getPossibleActions().getList();
+                ORPanel.forceUpdateForManager(this, actions);
+            }
+      }
 
         if (StartRoundWindow.class.isAssignableFrom(activeWindow.getClass())) {
             startRoundWindow.setSRPlayerTurn();
@@ -759,21 +756,20 @@ showPlayerWorthChart();        }
         // we essentially "Double Stamp" it here. We use invokeLater to ensure this runs
         // AFTER StatusWindow or ORWindow have finished their updates/repaints,
         // effectively stealing the focus back if they took it.
-if (activeWindow == startRoundWindow && startRoundWindow != null) {
+        if (activeWindow == startRoundWindow && startRoundWindow != null) {
             SwingUtilities.invokeLater(() -> {
-                // CRITICAL: Check for null AGAIN inside the thread. 
-                // The window might have been closed/nulled while this event was waiting in the queue.
+                // CRITICAL: Check for null AGAIN inside the thread.
+                // The window might have been closed/nulled while this event was waiting in the
+                // queue.
                 if (startRoundWindow != null && startRoundWindow.isVisible()) {
                     // Force it to the top of the Z-order stack
-                    startRoundWindow.toFront(); 
+                    startRoundWindow.toFront();
                     // Reclaim keyboard focus
-                    startRoundWindow.requestFocus(); 
+                    startRoundWindow.requestFocus();
                 }
             });
         }
-        
 
-        
     }
 
     /**
@@ -783,51 +779,51 @@ if (activeWindow == startRoundWindow && startRoundWindow != null) {
     public JMenuItem getMenuGameEndReport() {
         // Use "Game End Report" for the menu label
         JMenuItem reportItem = new JMenuItem(LocalText.getText("GameEndReportTitle", "Game End Report"));
-        
+
         reportItem.addActionListener(e -> {
             // 1. Get the raw text report from GameManager
             java.util.List<String> reportLines = getGameManager().getGameReport();
-            
+
             // 2. Format it as HTML for the dialog to look nice
             StringBuilder html = new StringBuilder("<html><body style='font-family: sans-serif; font-size: 12pt;'>");
-            
+
             for (String line : reportLines) {
                 // Bold the header lines
                 if (line.contains("Winner") || line.contains("Final ranking")) {
-                     html.append("<b>").append(line).append("</b><br>");
+                    html.append("<b>").append(line).append("</b><br>");
                 } else if (line.trim().isEmpty()) {
-                     html.append("<br>");
+                    html.append("<br>");
                 } else {
-                     html.append(line).append("<br>");
+                    html.append(line).append("<br>");
                 }
             }
             html.append("</body></html>");
 
             // 3. Determine the Title
             String title = LocalText.getText("EoGFinalRanking", "Final ranking").replace(":", "").trim();
-            
+
             // 4. Show the "Little Window" (JOptionPane) directly
             // This bypasses the crash because it doesn't use reflection or WorthChartWindow
             JOptionPane.showMessageDialog(
-                statusWindow != null ? statusWindow : orWindow, // Parent window
-                html.toString(),                                // Content
-                title,                                          // Title
-                JOptionPane.PLAIN_MESSAGE                       // Clean style (no icon)
+                    statusWindow != null ? statusWindow : orWindow, // Parent window
+                    html.toString(), // Content
+                    title, // Title
+                    JOptionPane.PLAIN_MESSAGE // Clean style (no icon)
             );
         });
         return reportItem;
     }
 
-
     /**
-     * Checks if the Start Round Window is currently active and should hold exclusive focus.
-     * Used by other windows (Map, Status) to prevent focus stealing during auctions.
+     * Checks if the Start Round Window is currently active and should hold
+     * exclusive focus.
+     * Used by other windows (Map, Status) to prevent focus stealing during
+     * auctions.
      */
     public boolean isStartRoundActive() {
-        return (startRoundWindow != null && startRoundWindow.isVisible() && 
+        return (startRoundWindow != null && startRoundWindow.isVisible() &&
                 activeWindow == startRoundWindow);
     }
-
 
     protected void updatePlayerOrder(List<String> newPlayerOrder) {
         if (startRoundWindow != null)
@@ -1089,7 +1085,7 @@ if (activeWindow == startRoundWindow && startRoundWindow != null) {
             out.close();
             return true;
         } catch (IOException e) {
-  
+
             return false;
         }
     }
@@ -1281,7 +1277,6 @@ if (activeWindow == startRoundWindow && startRoundWindow != null) {
             return;
         }
 
-
         if (autoSaveLoadStatus != AutoLoadPoller.OFF) {
             if (!gameWasLoaded) {
                 /*
@@ -1441,7 +1436,7 @@ if (activeWindow == startRoundWindow && startRoundWindow != null) {
         setEnabledWindow(enabled, statusWindow, exceptionWindow);
     }
 
-private void updateWindowsLookAndFeel() {
+    private void updateWindowsLookAndFeel() {
         // --- gameStatus.initTurn(getCurrentPlayer().getIndex(), true); ---
         // Call our non-flickering resizer for each window
         if (statusWindow != null) {
@@ -1482,8 +1477,6 @@ private void updateWindowsLookAndFeel() {
 
         this.currentFontScale = newScale;
 
-
-
         // Re-get the base font from config
         String fontType = Config.getGameSpecific(railsRoot.getGameName(), "font.ui.name");
         Font font = null;
@@ -1510,7 +1503,7 @@ private void updateWindowsLookAndFeel() {
     public double getFontScale() {
         return this.currentFontScale;
     }
-    
+
     // Forwards the format() method to the server
     // EV: Not really. The client also knows about the Bank
     // and all static configuration details. All the complexities
@@ -1590,9 +1583,8 @@ private void updateWindowsLookAndFeel() {
                 Dimension minSize = finalFrame.getMinimumSize();
                 if (finalFrame.getWidth() < minSize.width || finalFrame.getHeight() < minSize.height) {
                     finalFrame.setSize(
-                        Math.max(finalFrame.getWidth(), minSize.width),
-                        Math.max(finalFrame.getHeight(), minSize.height)
-                    );
+                            Math.max(finalFrame.getWidth(), minSize.width),
+                            Math.max(finalFrame.getHeight(), minSize.height));
                 }
 
                 // StockChartWindow specific fix
@@ -1605,7 +1597,6 @@ private void updateWindowsLookAndFeel() {
             }
         }));
     }
-
 
     public List<String> getCurrentGuiPlayerNames() {
         return currentGuiPlayerNames;
@@ -1690,7 +1681,7 @@ private void updateWindowsLookAndFeel() {
         }
     }
 
-public JMenuItem getMenuCompanyPayoutChart() {
+    public JMenuItem getMenuCompanyPayoutChart() {
         // Use LocalText with a default, similar to other menu items
         JMenuItem chartItem = new JMenuItem(LocalText.getText("CompanyPayoutChartTitle", "Company Payout Chart"));
         chartItem.addActionListener(e -> {
@@ -1699,8 +1690,7 @@ public JMenuItem getMenuCompanyPayoutChart() {
         return chartItem;
     }
 
-
-public void showCompanyPayoutChart() {
+    public void showCompanyPayoutChart() {
         if (statusWindow != null) {
             getGameManager().displayCompanyPayoutChart(statusWindow);
         } else if (orWindow != null) {
@@ -1708,7 +1698,7 @@ public void showCompanyPayoutChart() {
         }
     }
 
-public JMenuItem getMenuMultiplierChart() {
+    public JMenuItem getMenuMultiplierChart() {
         JMenuItem item = new JMenuItem(LocalText.getText("MultiplierChart", "Investment Multiplier"));
         item.addActionListener(e -> showMultiplierChart());
         return item;
@@ -1721,8 +1711,6 @@ public JMenuItem getMenuMultiplierChart() {
             getGameManager().displayMultiplierChart(orWindow);
         }
     }
-
-
 
     public StartRoundWindow getStartRoundWindow() {
         return startRoundWindow;
@@ -1739,14 +1727,12 @@ public JMenuItem getMenuMultiplierChart() {
                 public void actionPerformed(ActionEvent e) {
                     // --- Pre-checks ---
                     // Added check for railsRoot.getGameManager().isGamePaused()
-if (isTimerPaused || railsRoot.getGameManager().isGameOver()
+                    if (isTimerPaused || railsRoot.getGameManager().isGameOver()
                             || !railsRoot.getGameManager().isTimeManagementEnabled()
-                            || railsRoot.getGameManager().isGamePaused()) { 
+                            || railsRoot.getGameManager().isGamePaused()) {
 
                         return;
                     }
-
-
 
                     RoundFacade currentRound = railsRoot.getGameManager().getCurrentRound();
                     Player playerWhoseTimeTicks = null;
@@ -1764,15 +1750,15 @@ if (isTimerPaused || railsRoot.getGameManager().isGameOver()
                     } else if (currentRound instanceof StockRound || currentRound instanceof StartRound) {
                         // In SR or IR, time ticks for the player whose turn it currently is
                         playerWhoseTimeTicks = railsRoot.getGameManager().getCurrentPlayer();
-                     } else {
-                         return; // No tick for other round types for now
+                    } else {
+                        return; // No tick for other round types for now
                     }
 
                     // --- Get Player Index ---
                     if (playerWhoseTimeTicks != null) {
                         playerIndex = playerWhoseTimeTicks.getIndex();
                         if (playerIndex == -1) {
-  
+
                             playerWhoseTimeTicks = null; // Invalidate player if index is bad
                         }
                     } else {
@@ -1798,7 +1784,6 @@ if (isTimerPaused || railsRoot.getGameManager().isGameOver()
                             }
                         });
 
-
                         // --- Apply Consequence if time ran out ---
                         if (newTime < 0) {
                             // ... [Consequence logic remains the same] ...
@@ -1821,8 +1806,7 @@ if (isTimerPaused || railsRoot.getGameManager().isGameOver()
         }
     } // End initGameTimer
 
-
-public void fitMapToWidth() {
+    public void fitMapToWidth() {
         if (orWindow != null && orWindow.getMapPanel() != null) {
             orWindow.getMapPanel().fitToWidth();
         }
@@ -1903,36 +1887,39 @@ public void fitMapToWidth() {
         return isTimerPaused;
     }
 
-
     public void performAIMove() {
         RoundFacade currentRound = getCurrentRound();
-        
-        // CRITICAL FIX: Zwinge die Engine, die Aktionen zu setzen, bevor wir weitermachen.
+
+        // CRITICAL FIX: Zwinge die Engine, die Aktionen zu setzen, bevor wir
+        // weitermachen.
         // Dies behebt die Race Condition im 'A'-Tasten-Pfad.
         try {
-            currentRound.setPossibleActions(); 
+            currentRound.setPossibleActions();
         } catch (Exception e) {
-            return; 
+            return;
         }
 
-        // Jetzt die aktualisierte Liste abrufen (die nun DiscardTrain enthalten sollte).
+        // Jetzt die aktualisierte Liste abrufen (die nun DiscardTrain enthalten
+        // sollte).
         PossibleActions currentActions = getGameManager().getPossibleActions();
-        
+
         // Safety check: The UI calls us, so ORUIManager should not be null
         if (orUIManager == null) {
             return;
         }
 
         try {
-            
+
             // --- Delegate based on Round Type ---
             if (currentRound instanceof OperatingRound) {
                 // Wir lassen ORUIManager die AI aufrufen, da es den OR-Kontext hat.
-                // ORUIManager.processAIMove() enthält den finalen KI-Aufruf, der den Discard wählt.
-                orUIManager.processAIMove(); 
-                
-            } else if (currentRound instanceof StockRound || currentRound instanceof StartRound || currentRound instanceof PrussianFormationRound) {
-                
+                // ORUIManager.processAIMove() enthält den finalen KI-Aufruf, der den Discard
+                // wählt.
+                orUIManager.processAIMove();
+
+            } else if (currentRound instanceof StockRound || currentRound instanceof StartRound
+                    || currentRound instanceof PrussianFormationRound) {
+
                 // --- Keep SR/IR/PFR AI Logic Here ---
                 AIPlayer aiBrain = new AIPlayer("AI_Generic_Round", getGameManager());
                 PossibleAction chosenAction = aiBrain.chooseMove(
@@ -1963,7 +1950,6 @@ public void fitMapToWidth() {
         }
     }
 
-    
     // Helper to find Pass/Done/Skip
     private PossibleAction findFallbackAction(PossibleActions actions) {
         if (actions == null)
@@ -1983,10 +1969,10 @@ public void fitMapToWidth() {
         this.isJsonLoad = isJson;
     }
 
-
     // ... (lines of unchanged context code) ...
     private void updateActivityPanel() {
-        if (statusWindow == null) return;
+        if (statusWindow == null)
+            return;
 
         // 1. Safety Checks (Pause state)
         boolean enginePaused = getGameManager().isGamePaused();
@@ -1994,7 +1980,8 @@ public void fitMapToWidth() {
 
         if (enginePaused || timerPaused) {
             String reason = enginePaused ? "GAME PAUSED" : "TIMER PAUSED";
-            statusWindow.updateActivityPanel("<html><center><h2 style='color:red'>*** " + reason + " ***</h2></center></html>");
+            statusWindow.updateActivityPanel(
+                    "<html><center><h2 style='color:red'>*** " + reason + " ***</h2></center></html>");
             return;
         }
 
@@ -2002,29 +1989,29 @@ public void fitMapToWidth() {
         String historyText = "";
         String roundStep = "Init";
         String moveCount = "Move: 0";
-        
+
         try {
             if (getGameManager() != null) {
                 historyText = getGameManager().getLastActionSummary();
-                
+
                 moveCount = "Move: " + getGameManager().getActionCountModel().value();
-                
+
                 RoundFacade currentRound = getGameManager().getCurrentRound();
                 if (currentRound != null) {
-                     if (currentRound instanceof OperatingRound) {
-                         roundStep = "OR " + getGameManager().getORId();
-                     } else if (currentRound instanceof StockRound) {
-                         roundStep = "SR " + getGameManager().getSRNumber();
-                     } else {
-                         String rId = currentRound.getId();
-                         roundStep = (rId != null) ? rId : "Start";
-                     }
+                    if (currentRound instanceof OperatingRound) {
+                        roundStep = "OR " + getGameManager().getORId();
+                    } else if (currentRound instanceof StockRound) {
+                        roundStep = "SR " + getGameManager().getSRNumber();
+                    } else {
+                        String rId = currentRound.getId();
+                        roundStep = (rId != null) ? rId : "Start";
+                    }
                 }
             }
         } catch (Exception e) {
             log.error("UI Header Error", e);
         }
-        
+
         if (statusWindow != null) {
             String metaString = roundStep + " | " + moveCount;
             statusWindow.updateMetadata(metaString);
@@ -2032,7 +2019,7 @@ public void fitMapToWidth() {
 
         // 3. Build "Thinking" Content
         String mainAlert = "Waiting...";
-        
+
         Player currentPlayer = getCurrentPlayer();
         RoundFacade round = getCurrentRound();
 
@@ -2054,7 +2041,7 @@ public void fitMapToWidth() {
             } else {
                 roundDesc = round.getId();
             }
-            
+
             mainAlert = "Thinking: <b>" + playerName + "</b> " + roundDesc;
         }
 
@@ -2062,56 +2049,59 @@ public void fitMapToWidth() {
         String nextText = "";
         try {
             if (round instanceof OperatingRound) {
-               // ... (Existing Next Player Logic) ...
-               OperatingRound or = (OperatingRound) round;
-               java.util.List<PublicCompany> ops = or.getOperatingCompanies();
-               PublicCompany current = or.getOperatingCompany();
-               if (ops != null && !ops.isEmpty() && current != null) {
-                   int idx = ops.indexOf(current);
-                   PublicCompany nextComp = ops.get((idx + 1) % ops.size());
-                   if (nextComp != null && nextComp.getPresident() != null) {
-                       nextText = "Next: " + nextComp.getPresident().getName() + " (" + nextComp.getId() + ")";
-                   }
-               }
+                // ... (Existing Next Player Logic) ...
+                OperatingRound or = (OperatingRound) round;
+                java.util.List<PublicCompany> ops = or.getOperatingCompanies();
+                PublicCompany current = or.getOperatingCompany();
+                if (ops != null && !ops.isEmpty() && current != null) {
+                    int idx = ops.indexOf(current);
+                    PublicCompany nextComp = ops.get((idx + 1) % ops.size());
+                    if (nextComp != null && nextComp.getPresident() != null) {
+                        nextText = "Next: " + nextComp.getPresident().getName() + " (" + nextComp.getId() + ")";
+                    }
+                }
             } else if (currentPlayer != null) {
-                 java.util.List<Player> players = getGameManager().getPlayers();
-                 if (players != null && !players.isEmpty()) {
-                     int idx = players.indexOf(currentPlayer);
-                     Player next = players.get((idx + 1) % players.size());
-                     nextText = "Next: " + next.getName();
-                 }
+                java.util.List<Player> players = getGameManager().getPlayers();
+                if (players != null && !players.isEmpty()) {
+                    int idx = players.indexOf(currentPlayer);
+                    Player next = players.get((idx + 1) % players.size());
+                    nextText = "Next: " + next.getName();
+                }
             }
-        } catch (Exception e) {}
+        } catch (Exception e) {
+        }
 
         // --- 5. THE CLEAN LAYOUT (Full Width, No Metadata) ---
         StringBuilder html = new StringBuilder("<html>");
-        
+
         // CSS Style: width 100% to fill panel
         html.append("<table width='100%' cellpadding='0' cellspacing='0' style='padding:0px;'>");
-        
+
         // ROW 1: History (Blue) - Full Width
         html.append("<tr>");
-        html.append("<td width='100%' align='left' style='padding-left:5px;'><font size='4' color='#1976D2'>").append(historyText).append("</font></td>");
+        html.append("<td width='100%' align='left' style='padding-left:5px;'><font size='4' color='#1976D2'>")
+                .append(historyText).append("</font></td>");
         html.append("</tr>");
 
         // ROW 2: MAIN ALERT (Red) - Full Width, No Wrap
         html.append("<tr>");
         // Added 'white-space:nowrap' to force single line
-        html.append("<td width='100%' align='center' style='padding-top:2px; padding-bottom:2px; white-space:nowrap;'>");
+        html.append(
+                "<td width='100%' align='center' style='padding-top:2px; padding-bottom:2px; white-space:nowrap;'>");
         html.append("<font size='6' color='#D32F2F'>").append(mainAlert).append("</font>");
         html.append("</td>");
         html.append("</tr>");
 
         // ROW 3: Footer (Green) - Full Width
         html.append("<tr>");
-        html.append("<td width='100%' align='left' style='padding-left:5px;'><font size='5' color='#388E3C'>").append(nextText).append("</font></td>");
+        html.append("<td width='100%' align='left' style='padding-left:5px;'><font size='5' color='#388E3C'>")
+                .append(nextText).append("</font></td>");
         html.append("</tr>");
-        
+
         html.append("</table></html>");
 
         statusWindow.updateActivityPanel(html.toString());
     }
-    
 
     /**
      * Checks if the current player is controlled by an AI.
@@ -2125,36 +2115,36 @@ public void fitMapToWidth() {
         return currentPlayer != null && currentPlayer.getActor() instanceof net.sf.rails.game.ai.AIPlayer;
     }
 
-
-
     private Set<PossibleAction> verifiedActions = new HashSet<>();
-
 
     public boolean processAction(PossibleAction action) {
         boolean result;
         lastAction = action;
 
         // Safety Check for Game Actions (Undo/Redo) ---
-        if (action instanceof GameAction) {
-             result = previousResult = processOnServer(action);
-             if (result) {
-                 updateUI();
-                 if (statusWindow != null) {
-                     statusWindow.setGameActions(); 
-                 }
-             }
-             return result;
+if (action instanceof GameAction) {
+
+            result = previousResult = processOnServer(action);
+            if (result) {
+                updateUI();
+                if (statusWindow != null) {
+                    statusWindow.setGameActions();
+                }
+            }
+            return result;
         }
+        
 
         // Intercept Train Correction Actions and route to Manager
         if (action instanceof TrainCorrectionAction) {
             // We delegate execution to the Manager, which runs the JOptionPane sequence
-            rails.game.correct.TrainCorrectionManager mgr = (rails.game.correct.TrainCorrectionManager) 
-                getGameManager().getCorrectionManager(rails.game.correct.CorrectionType.CORRECT_TRAINS);
-            
+            rails.game.correct.TrainCorrectionManager mgr = (rails.game.correct.TrainCorrectionManager) getGameManager()
+                    .getCorrectionManager(rails.game.correct.CorrectionType.CORRECT_TRAINS);
+
             if (mgr != null) {
                 boolean result2 = mgr.executeCorrection((rails.game.correct.CorrectionAction) action);
-                if (result2) updateUI();
+                if (result2)
+                    updateUI();
                 return result2;
             }
         }
@@ -2162,13 +2152,14 @@ public void fitMapToWidth() {
         // Intercept Cash Correction Actions to handle UI inputs locally
         if (action instanceof rails.game.correct.CashCorrectionAction) {
             rails.game.correct.CashCorrectionAction cca = (rails.game.correct.CashCorrectionAction) action;
-            
+
             String amountString = (String) JOptionPane.showInputDialog(statusWindow,
                     LocalText.getText("CorrectCashDialogMessage", cca.getCashHolderName()),
                     LocalText.getText("CorrectCashDialogTitle"),
                     JOptionPane.QUESTION_MESSAGE, null, null, "0");
 
-            if (amountString == null) return false;
+            if (amountString == null)
+                return false;
 
             if (amountString.length() > 0 && amountString.charAt(0) == '+')
                 amountString = amountString.substring(1);
@@ -2181,42 +2172,41 @@ public void fitMapToWidth() {
             }
             // Fall through to processOnServer below
         }
-        
-
 
         if (action == null) {
             result = previousResult;
         } else {
             Player oldPlayer = getCurrentPlayer();
             SoundManager.notifyOfActionProcessing(railsRoot, action);
-            
+
             result = previousResult = processOnServer(action);
-            
+
             if (result) {
                 // A. AutoSave Logic
                 if (autoSaveLoadStatus > 0) {
-                     String nextPlayerId = "System";
-                     if (getCurrentPlayer() != null) nextPlayerId = getCurrentPlayer().getId();
-                     autoSave(nextPlayerId);
+                    String nextPlayerId = "System";
+                    if (getCurrentPlayer() != null)
+                        nextPlayerId = getCurrentPlayer().getId();
+                    autoSave(nextPlayerId);
                 }
 
                 // B. CRITICAL: Refresh the Screen
                 updateUI();
-                
+
                 // This updates the 'Undo' button availability in the Menu/Key listener
                 if (statusWindow != null) {
                     statusWindow.setGameActions();
                 }
-                
+
                 // C. Reset Timer if player changed
                 Player newPlayer = getCurrentPlayer();
                 if (newPlayer != null && !newPlayer.equals(oldPlayer)) {
-                     resetTimerForNewPlayer(newPlayer);
+                    resetTimerForNewPlayer(newPlayer);
                 }
 
                 // D. Show Server Messages
                 displayServerMessage();
-                
+
                 // E. Mark Game Over
                 if (isGameOver() && !getGameManager().getGameOverReportedUI()) {
                     getGameManager().setGameOverReportedUI(true);
@@ -2224,15 +2214,16 @@ public void fitMapToWidth() {
                     showPlayerWorthChart();
                 }
             }
-            
-            if (verifiedActions.size() > 10) verifiedActions.clear();
+
+            if (verifiedActions.size() > 10)
+                verifiedActions.clear();
         }
-        return result; 
+        return result;
     }
 
-
     /**
-     * Creates the "Worth Chart" menu item, which should be added to the StatusWindow menu bar.
+     * Creates the "Worth Chart" menu item, which should be added to the
+     * StatusWindow menu bar.
      * * @return A JMenuItem configured to call showPlayerWorthChart().
      */
     public JMenuItem getMenuChart() {
@@ -2244,14 +2235,14 @@ public void fitMapToWidth() {
         return chartItem;
     }
 
-    
     /**
      * Checks if any Correction Manager (e.g., CORRECT_MAP, CORRECT_TRAINS)
      * is currently set to active by the user.
      */
     private boolean isAnyCorrectionModeActive() {
-        if (railsRoot == null) return false;
-        
+        if (railsRoot == null)
+            return false;
+
         for (rails.game.correct.CorrectionType ct : EnumSet.allOf(rails.game.correct.CorrectionType.class)) {
             if (getGameManager().getCorrectionManager(ct).isActive()) {
                 return true;
@@ -2275,13 +2266,15 @@ public void fitMapToWidth() {
             }
         }
     }
+
     /**
      * Registers a window with the WindowSettings manager.
      * 1. Applies stored size/position immediately (via packAndApplySizing).
      * 2. Adds a listener to save the window state only when it is a VALID size.
      */
     private void registerWindowStorage(JFrame frame) {
-        if (frame == null) return;
+        if (frame == null)
+            return;
 
         // 1. Initial Position Restore
         packAndApplySizing(frame);
@@ -2311,11 +2304,11 @@ public void fitMapToWidth() {
         }
     }
 
-
     public void correctStockManually() {
         // 1. Select Company
         List<PublicCompany> companies = getAllPublicCompanies();
-        if (companies.isEmpty()) return;
+        if (companies.isEmpty())
+            return;
 
         // Sort by ID for easier finding
         companies.sort((c1, c2) -> c1.getId().compareTo(c2.getId()));
@@ -2329,102 +2322,107 @@ public void fitMapToWidth() {
                 companies.toArray(),
                 companies.get(0));
 
-        if (selectedCompany == null) return; // Cancelled
+        if (selectedCompany == null)
+            return; // Cancelled
 
         // 2. Select Destination (Text Input)
-        String currentLoc = (selectedCompany.getCurrentSpace() != null) 
-                ? selectedCompany.getCurrentSpace().getId() 
+        String currentLoc = (selectedCompany.getCurrentSpace() != null)
+                ? selectedCompany.getCurrentSpace().getId()
                 : "None";
 
         String targetId = JOptionPane.showInputDialog(
-                statusWindow, 
-                "Current: " + currentLoc + "\nEnter New Coordinate (e.g. 'D2'):", 
-                "Move " + selectedCompany.getId(), 
+                statusWindow,
+                "Current: " + currentLoc + "\nEnter New Coordinate (e.g. 'D2'):",
+                "Move " + selectedCompany.getId(),
                 JOptionPane.PLAIN_MESSAGE);
 
-        if (targetId == null || targetId.trim().isEmpty()) return;
+        if (targetId == null || targetId.trim().isEmpty())
+            return;
 
         targetId = targetId.trim().toUpperCase();
 
         // 3. Validate and Move
-        net.sf.rails.game.financial.StockSpace targetSpace = 
-                getRoot().getStockMarket().getStockSpace(targetId);
+        net.sf.rails.game.financial.StockSpace targetSpace = getRoot().getStockMarket().getStockSpace(targetId);
 
         if (targetSpace != null) {
             // Use StockMarket logic to properly move tokens (update Chart/Pool)
             getRoot().getStockMarket().correctStockPrice(selectedCompany, targetSpace);
-            
+
             updateUI();
-            
+
             // Log for confirmation
             String msg = "Correction: Moved " + selectedCompany.getId() + " to " + targetId;
             log.info(msg);
             JOptionPane.showMessageDialog(statusWindow, msg);
         } else {
-            JOptionPane.showMessageDialog(statusWindow, "Invalid Coordinate: " + targetId, "Error", JOptionPane.ERROR_MESSAGE);
+            JOptionPane.showMessageDialog(statusWindow, "Invalid Coordinate: " + targetId, "Error",
+                    JOptionPane.ERROR_MESSAGE);
         }
-        
-    }
 
+    }
 
     public void correctSharesManually() {
         // 1. Gather all possible owners (Bank Pools, Players, Companies)
         List<PortfolioOwner> owners = getAllPortfolioOwners();
-        
+
         // 2. Select Source
         PortfolioOwner source = (PortfolioOwner) JOptionPane.showInputDialog(
                 statusWindow,
-                LocalText.getText("SelectSource", "Select Source"), 
+                LocalText.getText("SelectSource", "Select Source"),
                 LocalText.getText("Correction"),
                 JOptionPane.QUESTION_MESSAGE,
                 null,
                 owners.toArray(),
                 owners.get(0));
-        
-        if (source == null) return;
+
+        if (source == null)
+            return;
 
         // 3. Select Certificate (Shares AND Privates)
         // Use the common interface 'Certificate' (or Ownable) for the list
         List<net.sf.rails.game.financial.Certificate> certs = new ArrayList<>();
-        
+
         // Add Public Shares
         certs.addAll(source.getPortfolioModel().getCertificates());
-        
+
         // Add Private Companies
         certs.addAll(source.getPortfolioModel().getPrivateCompanies());
-        
+
         if (certs.isEmpty()) {
             JOptionPane.showMessageDialog(statusWindow, "No certificates found in " + source.getId());
             return;
         }
-        
+
         // Sort for readability. Both types implement toText() / toString()
         certs.sort((c1, c2) -> c1.toString().compareTo(c2.toString()));
 
         // Use the interface type for the selection variable
-        net.sf.rails.game.financial.Certificate selectedCert = (net.sf.rails.game.financial.Certificate) JOptionPane.showInputDialog(
-                statusWindow,
-                LocalText.getText("SelectCertificate", "Select Certificate"), 
-                LocalText.getText("Correction"),
-                JOptionPane.QUESTION_MESSAGE,
-                null,
-                certs.toArray(),
-                certs.get(0));
+        net.sf.rails.game.financial.Certificate selectedCert = (net.sf.rails.game.financial.Certificate) JOptionPane
+                .showInputDialog(
+                        statusWindow,
+                        LocalText.getText("SelectCertificate", "Select Certificate"),
+                        LocalText.getText("Correction"),
+                        JOptionPane.QUESTION_MESSAGE,
+                        null,
+                        certs.toArray(),
+                        certs.get(0));
         // --- END FIX ---
 
-        if (selectedCert == null) return;
+        if (selectedCert == null)
+            return;
 
         // 4. Select Destination
         PortfolioOwner dest = (PortfolioOwner) JOptionPane.showInputDialog(
                 statusWindow,
-                LocalText.getText("SelectDestination", "Select Destination"), 
+                LocalText.getText("SelectDestination", "Select Destination"),
                 LocalText.getText("Correction"),
                 JOptionPane.QUESTION_MESSAGE,
                 null,
                 owners.toArray(),
                 owners.get(0));
 
-        if (dest == null) return;
+        if (dest == null)
+            return;
 
         // 5. Execute Move
         if (source.equals(dest)) {
@@ -2446,7 +2444,7 @@ public void fitMapToWidth() {
         if (statusWindow != null && statusWindow.getGameStatus() != null) {
             statusWindow.getGameStatus().recreate();
         }
-        
+
         // 6. Refresh and Log
         updateUI();
         String msg = "Correction: Moved " + selectedCert.toString() + " from " + source.getId() + " to " + dest.getId();
@@ -2457,7 +2455,7 @@ public void fitMapToWidth() {
     private List<PortfolioOwner> getAllPortfolioOwners() {
         List<PortfolioOwner> list = new ArrayList<>();
         Bank bank = getRoot().getBank();
-        
+
         // Bank Portfolios
         list.add(bank.getIpo());
         list.add(bank.getPool());
@@ -2468,7 +2466,8 @@ public void fitMapToWidth() {
         list.addAll(getPlayers());
 
         // Companies (Treasuries)
-        // We include all public companies because any of them *might* hold shares (e.g. 1830 redeemable, or errors)
+        // We include all public companies because any of them *might* hold shares (e.g.
+        // 1830 redeemable, or errors)
         list.addAll(getAllPublicCompanies());
 
         return list;
@@ -2492,7 +2491,6 @@ public void fitMapToWidth() {
         }
     }
 
-
     /**
      * Called from the UI Menu (e.g., a StatusWindow menu item) to display the
      * Player Worth History Chart. Delegates the call to GameManager, passing the
@@ -2500,7 +2498,8 @@ public void fitMapToWidth() {
      */
     public void showPlayerWorthChart() {
         if (statusWindow != null) {
-            // statusWindow is a JFrame, which is what the GameManager method expects (via Object)
+            // statusWindow is a JFrame, which is what the GameManager method expects (via
+            // Object)
             getGameManager().displayWorthChart(statusWindow);
         } else if (orWindow != null) {
             // Fallback to orWindow if statusWindow isn't ready
@@ -2511,7 +2510,8 @@ public void fitMapToWidth() {
     /**
      * Called by the CorrectionManager to force the entire UI to re-synchronize
      * after a correction action (e.g., Cash or Share movement).
-     * This bypasses the normal flow optimizations which can leave "ghost" artifacts.
+     * This bypasses the normal flow optimizations which can leave "ghost"
+     * artifacts.
      */
     public void forceFullUIRefresh() {
         log.info("Forcing full UI refresh after Correction Mode change or Correction execution.");
@@ -2528,10 +2528,11 @@ public void fitMapToWidth() {
             statusWindow.updateStatus(true);
         }
 
-        // 3. Force the ORWindow/Map to fully redraw (if applicable, e.g., via refreshAll())
+        // 3. Force the ORWindow/Map to fully redraw (if applicable, e.g., via
+        // refreshAll())
         if (orUIManager != null) {
             // ORUIManager handles map redraw/token update
-            orUIManager.updateStatus(true); 
+            orUIManager.updateStatus(true);
         }
 
         // 4. Force a graphical repaint and focus management
@@ -2539,24 +2540,27 @@ public void fitMapToWidth() {
             ((JFrame) activeWindow).repaint();
             setMeToFront((JFrame) activeWindow);
         }
-        
-        // 5. Ensure the correction menu is rebuilt (this is part of statusWindow.updateStatus, but is good redundancy)
+
+        // 5. Ensure the correction menu is rebuilt (this is part of
+        // statusWindow.updateStatus, but is good redundancy)
         if (statusWindow != null) {
             statusWindow.setCorrectionMenu();
             statusWindow.setSpecialMenu();
         }
-        
+
     }
 
-/**
-     * Resets the time tracking history for a player to prevent visual artifacts (fake bonuses) during Undo.
+    /**
+     * Resets the time tracking history for a player to prevent visual artifacts
+     * (fake bonuses) during Undo.
      */
     public void resetTimeHistory(int playerIndex) {
         if (statusWindow != null && statusWindow.getGameStatus() != null) {
             statusWindow.getGameStatus().resetTimeHistory(playerIndex);
         }
     }
-/**
+
+    /**
      * Updates the player time display, bypassing all delta-check logic.
      * Used exclusively after an Undo action to prevent Ghost Green Flashes.
      */
@@ -2567,9 +2571,9 @@ public void fitMapToWidth() {
         }
     }
 
-
     /**
      * Saves the position and size of all active windows.
+     * 
      * @param gameName The name of the current game (e.g. "1830") for file naming.
      */
     public void saveWindowSettings(String gameName) {
@@ -2579,17 +2583,19 @@ public void fitMapToWidth() {
         }
 
         // 1. Update settings for known windows
-        if (statusWindow != null) windowSettings.set(statusWindow);
-        if (orWindow != null) windowSettings.set(orWindow);
-        if (reportWindow != null) windowSettings.set(reportWindow);
+        if (statusWindow != null)
+            windowSettings.set(statusWindow);
+        if (orWindow != null)
+            windowSettings.set(orWindow);
+        if (reportWindow != null)
+            windowSettings.set(reportWindow);
 
-// 2. Save Map Zoom Step
+        // 2. Save Map Zoom Step
         if (orUIManager != null && orUIManager.getMap() != null) {
             HexMap map = orUIManager.getMap();
             int zoomStep = map.getZoomStep();
             windowSettings.setProperty("MapZoomStep", String.valueOf(zoomStep));
         }
-
 
         // 3. Write to disk
         windowSettings.save();
@@ -2597,6 +2603,7 @@ public void fitMapToWidth() {
 
     /**
      * Restores the position and size of all active windows.
+     * 
      * @param gameName The name of the current game.
      */
     public void loadWindowSettings(String gameName) {
@@ -2609,7 +2616,7 @@ public void fitMapToWidth() {
         restoreWindow(orWindow);
         restoreWindow(reportWindow);
 
-// 2. Restore Map Zoom Step
+        // 2. Restore Map Zoom Step
         if (orUIManager != null && orUIManager.getMap() != null) {
             HexMap map = orUIManager.getMap();
             String zoomStr = windowSettings.getProperty("MapZoomStep");
@@ -2622,18 +2629,17 @@ public void fitMapToWidth() {
                 }
             }
         }
-        
+
     }
 
-
     private void restoreWindow(JFrame window) {
-        if (window == null) return;
+        if (window == null)
+            return;
         Rectangle r = windowSettings.getBounds(window);
         // WindowSettings returns -1,-1,-1,-1 if not found
         if (r.width > 0 && r.height > 0) {
             window.setBounds(r);
         }
     }
-
 
 }

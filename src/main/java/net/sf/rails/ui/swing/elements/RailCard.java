@@ -388,24 +388,24 @@ public void setState(State state) {
                 }
             }
 
-            // --- DEBUG LOGGING ---
-            // Only log if we are looking for "M2" (the problem cert) to avoid spamming the log for every card
-            if (target.getId().equals("M2") || held.getId().equals("M2")) {
-                System.out.println(String.format(">> [RailCard CHECK] CardLabel='%s'", getFirstAvailableLabel()));
-                System.out.println(String.format("   TARGET: ID=%s | Share=%d%% | Class=%s | Hash=%s",
-                        target.getId(),
-                        (target instanceof PublicCertificate ? ((PublicCertificate)target).getShare() : 0),
-                        target.getClass().getSimpleName(),
-                        System.identityHashCode(target)));
+            // // --- DEBUG LOGGING ---
+            // // Only log if we are looking for "M2" (the problem cert) to avoid spamming the log for every card
+            // if (target.getId().equals("M2") || held.getId().equals("M2")) {
+            //     System.out.println(String.format(">> [RailCard CHECK] CardLabel='%s'", getFirstAvailableLabel()));
+            //     System.out.println(String.format("   TARGET: ID=%s | Share=%d%% | Class=%s | Hash=%s",
+            //             target.getId(),
+            //             (target instanceof PublicCertificate ? ((PublicCertificate)target).getShare() : 0),
+            //             target.getClass().getSimpleName(),
+            //             System.identityHashCode(target)));
                 
-                System.out.println(String.format("   HELD:   ID=%s | Share=%d%% | Class=%s | Hash=%s",
-                        held.getId(),
-                        (held instanceof PublicCertificate ? ((PublicCertificate)held).getShare() : 0),
-                        held.getClass().getSimpleName(),
-                        System.identityHashCode(held)));
+            //     System.out.println(String.format("   HELD:   ID=%s | Share=%d%% | Class=%s | Hash=%s",
+            //             held.getId(),
+            //             (held instanceof PublicCertificate ? ((PublicCertificate)held).getShare() : 0),
+            //             held.getClass().getSimpleName(),
+            //             System.identityHashCode(held)));
                 
-                System.out.println(String.format("   >> MATCH: %s", matchFound));
-            }
+            //     System.out.println(String.format("   >> MATCH: %s", matchFound));
+            // }
 
             if (matchFound) return true;
         }
@@ -595,4 +595,38 @@ public void setState(State state) {
         setToolTipText(info);
     }
 
+    /**
+     * Returns the unique identifier of the primary object displayed on this card.
+     * Used by the UI to match Actions to Cards.
+     */
+    public String getUniqueId() {
+        // 1. If explicitly linked to a Company (e.g. in the Map or Legend)
+        if (associatedCompany != null) {
+            return associatedCompany.getId();
+        }
+        
+        // 2. If holding Certificates (Shares) -> Return the Company ID
+        if (!certificates.isEmpty()) {
+            Certificate cert = certificates.get(0);
+            if (cert instanceof PublicCertificate) {
+                return ((PublicCertificate) cert).getCompany().getId();
+            } else if (cert instanceof PrivateCompany) {
+                return ((PrivateCompany) cert).getId();
+            }
+            return cert.getId();
+        }
+
+        // 3. If holding Privates (Directly)
+        if (!privates.isEmpty()) {
+            return privates.get(0).getId();
+        }
+
+        // 4. If holding Trains
+        if (!trains.isEmpty()) {
+            return trains.get(0).getName();
+        }
+
+        return null;
+    }
+    
 }

@@ -30,9 +30,6 @@ import rails.game.action.*;
 import rails.game.correct.CashCorrectionAction;
 import rails.game.correct.CorrectionType;
 import rails.game.correct.TrainCorrectionAction;
-import rails.game.specific._18EU.StartCompany_18EU;
-import rails.game.specific._1835.StartPrussian;
-import rails.game.specific._1835.ExchangeForPrussianShare;
 
 import javax.swing.*;
 import java.awt.*;
@@ -84,15 +81,12 @@ public class GameStatus extends GridPanel implements ActionListener {
     private final Color BG_SELL_ALERT = new Color(250, 128, 114); // Salmon Pink (#FA8072) - Shares Sell
     public static final Color BG_CARD_PASSIVE = new Color(255, 255, 240); // Beige (Must be static for static method
 
-
     // 1. DEFINE MASTER GREY (Standardize 235 vs 225 clash)
     private static final Color BG_UNIFIED_GREY = new Color(225, 225, 225); // The chosen "Spotlight Inactive" Grey
 
     // 2. APPLY TO CONSTANTS
     private final Color BG_INACTIVE = BG_UNIFIED_GREY; // Fixes Inactive Rows
 
-
-                                                                          
     private final Color BG_POOL = new Color(230, 240, 255);
     private final Color BG_IPO = new Color(255, 235, 235); // Distinct Reddish/Pink (Point 13)
 
@@ -1214,7 +1208,7 @@ public class GameStatus extends GridPanel implements ActionListener {
                 int index = 0;
                 // check for instanceof StartCompany_18EU allows to continue with selecting the
                 // minor
-                if (options.size() > 1 || actions.get(0) instanceof StartCompany_18EU) {
+                if (options.size() > 1 || actions.get(0).getClass().getSimpleName().equals("StartCompany_18EU")) {
                     if (startCompany) {
                         RadioButtonDialog dialog = new RadioButtonDialog(
                                 GameUIManager.COMPANY_START_PRICE_DIALOG,
@@ -1440,7 +1434,7 @@ public class GameStatus extends GridPanel implements ActionListener {
                     // OLD: cf.setBackground(BG_BUY_ACTIVE);
                     cf.setBackground(BG_CARD_PASSIVE); // Beige
                     cf.setBorder(BorderFactory.createLineBorder(BORDER_COL_BUY, 3)); // Thick Green Border
-                    
+
                     cf.setToolTipText("Click to Buy " + train.getName());
                     cf.setEnabled(true);
                 } else {
@@ -2045,7 +2039,7 @@ public class GameStatus extends GridPanel implements ActionListener {
 
             playerPrivatesPanel[i].removeAll();
             // Add top spacing so cards don't look "stuck" to the top border
-playerPrivatesPanel[i].add(Box.createVerticalStrut(5));
+            playerPrivatesPanel[i].add(Box.createVerticalStrut(5));
 
             net.sf.rails.game.Player p = players.getPlayerByPosition(i);
             if (p == null)
@@ -2445,8 +2439,8 @@ playerPrivatesPanel[i].add(Box.createVerticalStrut(5));
                 bgCurr = BG_INACTIVE;
             } else {
                 // 3. Active -> Standard Colors
-bgPool = BG_SPOTLIGHT_INACTIVE;
-                bgIpo = BG_SPOTLIGHT_INACTIVE; 
+                bgPool = BG_SPOTLIGHT_INACTIVE;
+                bgIpo = BG_SPOTLIGHT_INACTIVE;
                 bgCurr = BG_SPOTLIGHT_INACTIVE;
 
                 bgDet = BG_MAUVE;
@@ -2668,12 +2662,13 @@ bgPool = BG_SPOTLIGHT_INACTIVE;
                 if (!hasOldField && !hasNewPanel)
                     continue;
 
-// 3. Determine Background Color
+                // 3. Determine Background Color
                 // PRIORITY 1: Operating Row (Horizontal White Line)
-                // If this company is operating, the whole row MUST be white to create the "cut through" effect.
+                // If this company is operating, the whole row MUST be white to create the "cut
+                // through" effect.
                 // PRIORITY 2: Active Player (Vertical Spotlight)
                 // PRIORITY 3: Inactive (Grey)
-                
+
                 Color cellBg;
                 if (isOperating) {
                     cellBg = Color.WHITE; // Force continuous white line
@@ -2765,24 +2760,27 @@ bgPool = BG_SPOTLIGHT_INACTIVE;
             boolean isSpotlight = (i == actorIndex);
             Color pBg = isSpotlight ? BG_SPOTLIGHT_ACTIVE : BG_SPOTLIGHT_INACTIVE;
 
-// 2. Header Logic
-            // TIDY UP: Only show "Passed" status if there is an active actor (actorIndex != -1).
+            // 2. Header Logic
+            // TIDY UP: Only show "Passed" status if there is an active actor (actorIndex !=
+            // -1).
             // If actorIndex is -1 (End of Round), we force a clean slate.
             Player p = players.getPlayerByPosition(i);
             String log = gameUIManager.getGameManager().getPassedPlayersLog();
-            
-            boolean passed = (actorIndex != -1) && log != null && java.util.Arrays.asList(log.split(", ")).contains(p.getName());
+
+            boolean passed = (actorIndex != -1) && log != null
+                    && java.util.Arrays.asList(log.split(", ")).contains(p.getName());
 
             Color headerBg = passed ? BG_PASSED : pBg;
 
             if (upperPlayerCaption[i] != null) {
                 upperPlayerCaption[i].setBackground(headerBg);
                 upperPlayerCaption[i].setOpaque(true);
-      
-                // REMOVED: The distracting thick border. 
-                // We now use BORDER_DEFAULT for everyone. The Background Color (White vs Grey) is the indicator.
-                upperPlayerCaption[i].setBorder(BORDER_DEFAULT); 
-                
+
+                // REMOVED: The distracting thick border.
+                // We now use BORDER_DEFAULT for everyone. The Background Color (White vs Grey)
+                // is the indicator.
+                upperPlayerCaption[i].setBorder(BORDER_DEFAULT);
+
                 // Keep text color logic if you want (Black vs Dark Gray) or unify it
                 if (isSpotlight) {
                     upperPlayerCaption[i].setForeground(Color.BLACK);
@@ -2790,8 +2788,6 @@ bgPool = BG_SPOTLIGHT_INACTIVE;
                     upperPlayerCaption[i].setForeground(Color.DARK_GRAY);
                 }
 
-
-                
             }
 
             if (playerCash[i] != null) {
@@ -2825,28 +2821,28 @@ bgPool = BG_SPOTLIGHT_INACTIVE;
             }
 
             if (playerCertCount[i] != null) {
-               
-// 1. Update Background (Spotlight Logic: White vs Grey)
+
+                // 1. Update Background (Spotlight Logic: White vs Grey)
                 playerCertCount[i].setBackground(pBg);
 
-               // 2. Fetch Data Directly (No String Parsing, No ModelObject casting)
+                // 2. Fetch Data Directly (No String Parsing, No ModelObject casting)
                 // We use the same logic as StatusWindow to get authoritative numbers.
                 try {
-net.sf.rails.game.Player targetPlayer = players.getPlayerByPosition(i);
+                    net.sf.rails.game.Player targetPlayer = players.getPlayerByPosition(i);
                     if (p != null) {
-                        // getCertificateCount returns float (for 1835 partials), cast to int for display
+                        // getCertificateCount returns float (for 1835 partials), cast to int for
+                        // display
                         int held = (int) p.getPortfolioModel().getCertificateCount();
-                        
+
                         // Access GameManager via the UI Manager to get the dynamic limit
                         int limit = gameUIManager.getGameManager().getPlayerCertificateLimit(p);
-                        
+
                         playerCertCount[i].update(held, limit);
                     }
                 } catch (Exception e) {
                     // Fallback to safe defaults to prevent visual glitch
                     playerCertCount[i].update(0, 1);
                 }
-
 
             }
         }
@@ -2990,7 +2986,6 @@ net.sf.rails.game.Player targetPlayer = players.getPlayerByPosition(i);
         repaint();
     }
 
-
     /**
      * A Custom Flat Progress Bar for Certificate Limits.
      * Visualizes "Held vs Limit" with color coding and text overlay.
@@ -3021,7 +3016,8 @@ net.sf.rails.game.Player targetPlayer = players.getPlayerByPosition(i);
 
             // 1. Calculate Fill Percentage
             float ratio = (float) held / (float) Math.max(limit, 1);
-            if (ratio > 1.0f) ratio = 1.0f;
+            if (ratio > 1.0f)
+                ratio = 1.0f;
             int fillWidth = (int) (w * ratio);
 
             // 2. Determine Color (Green = Safe, Red = Full/Over)
@@ -3040,15 +3036,16 @@ net.sf.rails.game.Player targetPlayer = players.getPlayerByPosition(i);
             g.setColor(Color.BLACK);
             // Anti-aliasing for text
             if (g instanceof Graphics2D) {
-                ((Graphics2D) g).setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
+                ((Graphics2D) g).setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING,
+                        RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
             }
-            
+
             FontMetrics fm = g.getFontMetrics();
             int tx = (w - fm.stringWidth(text)) / 2;
             int ty = (h - fm.getAscent()) / 2 + fm.getAscent();
-            
+
             g.drawString(text, tx, ty);
-            
+
             // 5. Border: Red border if full
             if (held >= limit) {
                 g.setColor(Color.RED);
@@ -3360,7 +3357,7 @@ net.sf.rails.game.Player targetPlayer = players.getPlayerByPosition(i);
             // We'll let the loop below handle visible ones.
         }
 
-      // --- START FIX ---
+        // --- START FIX ---
         // Group trains by name (Type) to consolidate display
         java.util.Map<String, java.util.List<net.sf.rails.game.Train>> groups = new java.util.LinkedHashMap<>();
         for (net.sf.rails.game.Train t : pool.getTrainList()) {
@@ -3373,7 +3370,8 @@ net.sf.rails.game.Player targetPlayer = players.getPlayerByPosition(i);
         // 3. Populate
         int slotIndex = 0;
         for (java.util.Map.Entry<String, java.util.List<net.sf.rails.game.Train>> entry : groups.entrySet()) {
-            if (slotIndex >= MAX_POOL_SLOTS) break;
+            if (slotIndex >= MAX_POOL_SLOTS)
+                break;
 
             String cleanName = entry.getKey();
             java.util.List<net.sf.rails.game.Train> group = entry.getValue();
@@ -3450,7 +3448,7 @@ net.sf.rails.game.Player targetPlayer = players.getPlayerByPosition(i);
         if (clickable) {
             newTrainButton.setVisible(true);
             newTrainButton.setEnabled(true);
-newTrainButton.setBackground(BG_CARD_PASSIVE); // Beige
+            newTrainButton.setBackground(BG_CARD_PASSIVE); // Beige
             newTrainButton.setBorder(BorderFactory.createLineBorder(BORDER_COL_BUY, 3)); // Thick Green Border
 
             if (action != null) {
@@ -3655,7 +3653,7 @@ newTrainButton.setBackground(BG_CARD_PASSIVE); // Beige
             } else {
                 f.setBorder(BorderFactory.createMatteBorder(0, 0, 1, 1, Color.GRAY));
             }
-// Apply Uniform Header Color
+            // Apply Uniform Header Color
             f.setBackground(BG_HEADER);
             f.setOpaque(true);
 
@@ -4189,15 +4187,15 @@ newTrainButton.setBackground(BG_CARD_PASSIVE); // Beige
         f.setBackground(Color.WHITE);
         f.setOpaque(true);
         addField(f, compNameCol, playerCertCountYOffset, 1, 1, 0, true);
-       
+
         // Initialize the new Gauge Components
         playerCertCount = new CertLimitGauge[np];
-        
+
         for (int i = 0; i < np; i++) {
             playerCertCount[i] = new CertLimitGauge();
             playerCertCount[i].setBorder(BORDER_THIN);
             playerCertCount[i].setPreferredSize(DIM_PLAYER);
-            
+
             gbc.weightx = 1.0;
             addField(playerCertCount[i], certPerPlayerXOffset + i, playerCertCountYOffset, 1, 1, 0, true);
             gbc.weightx = 0.0;
@@ -4273,8 +4271,8 @@ newTrainButton.setBackground(BG_CARD_PASSIVE); // Beige
         poolTrainsPanel = new JPanel(new FlowLayout(FlowLayout.CENTER, 3, 0));
         // Add Padding (EmptyBorder) inside the Line Border (B_BOT_L)
         poolTrainsPanel.setBorder(BorderFactory.createCompoundBorder(
-            B_BOT_L, 
-            BorderFactory.createEmptyBorder(5, 0, 0, 0) // 5px Top Padding
+                B_BOT_L,
+                BorderFactory.createEmptyBorder(5, 0, 0, 0) // 5px Top Padding
         ));
 
         poolTrainsPanel.setBackground(BG_TRAINS);
@@ -4306,11 +4304,10 @@ newTrainButton.setBackground(BG_CARD_PASSIVE); // Beige
         // Refactor to match Future/Pool structure exactly: FlowLayout -> Slot Panel ->
         // Button + Label
         newTrainsPanel = new JPanel(new FlowLayout(FlowLayout.CENTER, 3, 0));
-newTrainsPanel.setBorder(BorderFactory.createCompoundBorder(
-            B_BOT_M, 
-            BorderFactory.createEmptyBorder(5, 0, 0, 0)
-        ));
-                newTrainsPanel.setBackground(BG_TRAINS);
+        newTrainsPanel.setBorder(BorderFactory.createCompoundBorder(
+                B_BOT_M,
+                BorderFactory.createEmptyBorder(5, 0, 0, 0)));
+        newTrainsPanel.setBackground(BG_TRAINS);
         newTrainsPanel.setOpaque(true);
 
         newTrainButton = createTrainButton();
@@ -4334,11 +4331,10 @@ newTrainsPanel.setBorder(BorderFactory.createCompoundBorder(
         addField(newTrainsPanel, colCurr, trainY_Data, 1, 1, 0, true);
 
         futureTrainsPanel = new JPanel(new FlowLayout(FlowLayout.CENTER, 3, 0));
-futureTrainsPanel.setBorder(BorderFactory.createCompoundBorder(
-            B_BOT_R, 
-            BorderFactory.createEmptyBorder(5, 0, 0, 0)
-        ));
-                futureTrainsPanel.setBackground(BG_TRAINS);
+        futureTrainsPanel.setBorder(BorderFactory.createCompoundBorder(
+                B_BOT_R,
+                BorderFactory.createEmptyBorder(5, 0, 0, 0)));
+        futureTrainsPanel.setBackground(BG_TRAINS);
         futureTrainsPanel.setOpaque(true);
 
         futureTrainButtons = new RailCard[MAX_FUTURE_SLOTS];
@@ -4595,10 +4591,13 @@ futureTrainsPanel.setBorder(BorderFactory.createCompoundBorder(
             // 1. Identify Target Company (Public OR Private)
             net.sf.rails.game.Company target = null;
 
-            if (pa instanceof StartPrussian) {
-                target = ((StartPrussian) pa).getCompanyToFold();
-            } else if (pa instanceof ExchangeForPrussianShare) {
-                target = ((ExchangeForPrussianShare) pa).getCompanyToExchange();
+            // --- START REFACTOR: Generic Interface Check ---
+            // Replaces explicit checks for StartPrussian / ExchangeForPrussianShare
+            if (pa instanceof GuiTargetedAction) {
+                net.sf.rails.game.state.Owner actor = ((GuiTargetedAction) pa).getActor();
+                if (actor instanceof net.sf.rails.game.Company) {
+                    target = (net.sf.rails.game.Company) actor;
+                }
             }
 
             // 2. INTERCEPT DISCARD ACTIONS (Map to Train Cards in Status Window)
@@ -4667,6 +4666,35 @@ futureTrainsPanel.setBorder(BorderFactory.createCompoundBorder(
                 }
 
                 if (companyIndex >= 0 && companyIndex < nc && playerIndex >= 0 && playerIndex < np) {
+                   
+                    // Logging to debug why MS (or others) are appearing Cyan/Highlighted
+                    if (target instanceof net.sf.rails.game.PublicCompany && "MS".equals(((net.sf.rails.game.PublicCompany) target).getId())) {
+                       log.warn("!!! INVESTIGATION START: Action targeting MS !!!");
+                        log.warn("Action Class: {}", pa.getClass().getName());
+                        log.warn("Action toString: {}", pa.toString());
+
+                        // Dump all fields of the Action object using Reflection
+                        Class<?> clazz = pa.getClass();
+                        while (clazz != null) {
+                            for (java.lang.reflect.Field f : clazz.getDeclaredFields()) {
+                                f.setAccessible(true);
+                                try {
+                                    Object val = f.get(pa);
+                                    String valStr = (val != null) ? val.toString() : "null";
+                                    // If the field is a Company, print its ID specifically
+                                    if (val instanceof net.sf.rails.game.Company) {
+                                        valStr += " (ID: " + ((net.sf.rails.game.Company) val).getId() + ")";
+                                    }
+                                    log.warn("Field [{}]: {} = {}", clazz.getSimpleName(), f.getName(), valStr);
+                                } catch (Exception e) {
+                                    log.warn("Field [{}]: {} - Error reading: {}", clazz.getSimpleName(), f.getName(), e.getMessage());
+                                }
+                            }
+                            clazz = clazz.getSuperclass(); // Move up to parent class (PossibleAction, etc.)
+                        }
+                        log.warn("!!! INVESTIGATION END !!!");
+                    }
+                   
                     setPlayerCertButton(companyIndex, playerIndex, true, pa);
                     net.sf.rails.ui.swing.elements.RailCard card = getRailCardFor(companyIndex, playerIndex);
                     if (card != null) {
@@ -4694,10 +4722,8 @@ futureTrainsPanel.setBorder(BorderFactory.createCompoundBorder(
                         for (java.awt.Component comp : playerPrivatesPanel[i].getComponents()) {
                             if (comp instanceof net.sf.rails.ui.swing.elements.RailCard) {
                                 net.sf.rails.ui.swing.elements.RailCard card = (net.sf.rails.ui.swing.elements.RailCard) comp;
-                                if (card.getCompany() == target) {
-                                    card.setPossibleAction(pa);
-                                    card.setState(RailCard.State.HIGHLIGHTED);
-                                    card.repaint();
+                                // Inject generic check
+                                if (checkAndHighlight(card, pa)) {
                                     found = true;
                                 }
                             }
@@ -4714,10 +4740,9 @@ futureTrainsPanel.setBorder(BorderFactory.createCompoundBorder(
                         for (java.awt.Component comp : compPrivatesPanel[i].getComponents()) {
                             if (comp instanceof net.sf.rails.ui.swing.elements.RailCard) {
                                 net.sf.rails.ui.swing.elements.RailCard card = (net.sf.rails.ui.swing.elements.RailCard) comp;
-                                if (card.getCompany() == target) {
-                                    card.setPossibleAction(pa);
-                                    card.setState(RailCard.State.HIGHLIGHTED);
-                                    card.repaint();
+                                if (checkAndHighlight(card, pa)) {
+                                    // No 'found = true' break needed here if we want to highlight all matches,
+                                    // but usually one action targets one card.
                                 }
                             }
                         }
@@ -4727,6 +4752,41 @@ futureTrainsPanel.setBorder(BorderFactory.createCompoundBorder(
         }
     }
 
+    // --- START FIX ---
+    /**
+     * Generic helper to highlight a RailCard if it matches a GuiTargetedAction.
+     * Returns TRUE if a match was found, so the loop knows to stop searching if
+     * needed.
+     */
+    private boolean checkAndHighlight(net.sf.rails.ui.swing.elements.RailCard card, PossibleAction action) {
+        // Safety check
+        if (card == null || action == null)
+            return false;
 
-    
+        if (action instanceof GuiTargetedAction) {
+            GuiTargetedAction gta = (GuiTargetedAction) action;
+            Object target = gta.getTarget();
+            String targetId = null;
+
+            // SAFELY EXTRACT ID based on object type
+            if (target instanceof net.sf.rails.game.Company) {
+                targetId = ((net.sf.rails.game.Company) target).getId();
+            } else if (target instanceof net.sf.rails.game.Train) {
+                targetId = ((net.sf.rails.game.Train) target).getName();
+            } else if (target instanceof net.sf.rails.game.StartItem) {
+                targetId = ((net.sf.rails.game.StartItem) target).getId();
+            }
+
+            // Perform the match
+            if (targetId != null && card.getUniqueId() != null && card.getUniqueId().equals(targetId)) {
+                card.setPossibleAction(action);
+                card.setState(net.sf.rails.ui.swing.elements.RailCard.State.HIGHLIGHTED);
+                card.setBackground(gta.getHighlightColor());
+                card.repaint();
+                return true; // Match found!
+            }
+        }
+        return false; // No match
+    }
+
 }

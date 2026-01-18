@@ -197,6 +197,7 @@ public abstract class HexMap implements MouseListener, MouseMotionListener {
             bufferDirtyRegions.add(r);
             super.repaint(r);
         }
+        
 
         @Override
         public final void paintComponent(Graphics g) {

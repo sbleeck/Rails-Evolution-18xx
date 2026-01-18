@@ -30,6 +30,7 @@ import java.lang.reflect.Field;
 import net.sf.rails.game.model.PortfolioModel;
 import com.google.common.collect.Iterables;
 import rails.game.action.SetDividend;
+import rails.game.specific._1835.LayBadenHomeToken;
 
 public class OperatingRound_1835 extends OperatingRound {
     private static final Logger log = LoggerFactory.getLogger(OperatingRound_1835.class);
@@ -277,13 +278,13 @@ public class OperatingRound_1835 extends OperatingRound {
             company.getPortfolioModel().rustObsoleteTrains();
         }
 
+// We removed the block that triggered 'needPrussianFormationCall' just because
+        // currentPhase starts with "5". Triggers should only be event-based.
         if (currentPhase.getId().startsWith("5")) {
             boolean excess = checkForExcessTrains();
             if (excess) {
                 setStep(GameDef.OrStep.DISCARD_TRAINS);
-                needPrussianFormationCall.set(true);
-                pfrTriggeredThisOR.set(true);
-                return;
+                  return;
             }
         }
 
@@ -332,18 +333,18 @@ public class OperatingRound_1835 extends OperatingRound {
                 needPrussianFormationCall.set(true);
             }
         }
-
-        boolean phase5Forced = "5".equals(currentPhase.getId()) && !prIsComplete;
-
+        // We remove 'phase5Forced' from the trigger logic.
+        // PFR is only triggered by specific train buys or New Round logic (handled by GameManager).
         boolean alreadyOffered = ((GameManager_1835) gameManager).hasPrussianFormationBeenOffered();
 
-        if (alreadyOffered && !phase5Forced && !isForcedByTrain) {
+        if (alreadyOffered && !isForcedByTrain) {
             pfrTriggered = false;
         }
 
         boolean currentPfrTriggeredVal = pfrTriggeredThisOR.value();
 
-        if ((pfrTriggered || phase5Forced) && !currentPfrTriggeredVal) {
+        // Only trigger if a relevant train was bought AND we haven't triggered yet this turn
+        if (pfrTriggered && !currentPfrTriggeredVal) {
             pfrTriggeredThisOR.set(true);
             needPrussianFormationCall.set(true);
         }
@@ -389,6 +390,9 @@ public class OperatingRound_1835 extends OperatingRound {
 
     @Override
     public boolean layTile(LayTile action) {
+
+
+        
         // SAFETY NET: Force cleanup of closed private properties immediately before
         // processing.
         forceCleanupGhosts();
@@ -410,26 +414,46 @@ public class OperatingRound_1835 extends OperatingRound {
         // Execute the parent action
         boolean result = super.layTile(action);
 
+
         // --- PfB/PF State Restoration Logic ---
-        // (Handles the specific complexity of PfB/PF multi-step interactions)
-        boolean isPfB = false;
+        // Identify if this specific action utilized the PfB or PF special property.
         SpecialProperty actionSp = action.getSpecialProperty();
-        if (result && actionSp != null &&
-                actionSp.getOriginalCompany() != null &&
-                ("PfB".equals(actionSp.getOriginalCompany().getId())
-                        || "PF".equals(actionSp.getOriginalCompany().getId()))) {
-            isPfB = true;
+        boolean isSpecialPfBLay = false;
+        if (result && actionSp != null && actionSp.getOriginalCompany() != null) {
+            String ownerId = actionSp.getOriginalCompany().getId();
+            if ("PfB".equals(ownerId) || "PF".equals(ownerId)) {
+                isSpecialPfBLay = true;
+            }
         }
 
-        if (result && isPfB) {
+        
+
+        // Only revert the "Normal" lay status if we just used an "Extra" lay property.
+        // We MUST NOT clear the map if this was a normal lay (isSpecialPfBLay == false),
+        // or the engine will lose the ability to UNDO the tile placement.
+        if (result && isSpecialPfBLay) {
             normalTileLaidThisTurn.set(wasNormalLaid);
-            tileLaysPerColour.clear();
-            tileLaysPerColour.initFromMap(laysSnapshot);
+// Re-sync counts. We must explicitly remove keys added by super.layTile 
+            // that were not in the snapshot (e.g. the color of the special tile just laid).
+            // We avoid clear() to preserve State metadata identity if possible, though clear() is safer.
+            // Here we perform a differential sync.
+            Set<String> currentKeys = new HashSet<>(tileLaysPerColour.viewKeySet());
+            for (String key : currentKeys) {
+                if (!laysSnapshot.containsKey(key)) {
+                    tileLaysPerColour.remove(key);
+                }
+            }
+            
+            // Restore original values
+            for (Map.Entry<String, Integer> entry : laysSnapshot.entrySet()) {
+                tileLaysPerColour.put(entry.getKey(), entry.getValue());
+            }
             if (getStep() != stepBefore && !action.getChosenHex().getId().equals("L6")) {
                 setStep(stepBefore);
             }
         }
 
+        
         if (result) {
             SpecialProperty sp = action.getSpecialProperty();
             // 1. OBB Extra Tile Limit Check
@@ -466,7 +490,7 @@ public class OperatingRound_1835 extends OperatingRound {
             }
         }
 
-        // --- START FIX: WATERTIGHT SEQUENCE ENFORCEMENT ---
+        // : WATERTIGHT SEQUENCE ENFORCEMENT ---
         // Goal: Support "Normal Tile -> Special Tile" sequence ROBUSTLY.
         // Logic: If the engine auto-advanced the step, but we still have a usable
         // special property,
@@ -509,7 +533,6 @@ public class OperatingRound_1835 extends OperatingRound {
                 setStep(GameDef.OrStep.LAY_TRACK);
             }
         }
-        // --- END FIX ---
 
         return result;
     }
@@ -617,7 +640,7 @@ public class OperatingRound_1835 extends OperatingRound {
                 playerManager.setCurrentPlayer(originalCompany.getPresident());
                 interruptedCompany.set(null);
 
-                // CRITICAL FIX: Restoration of Step for Original Company
+                // : Restoration of Step for Original Company
                 // The original company (likely BY) was interrupted during Tile Laying.
                 // We must return the game state to LAY_TRACK so they can finish their turn.
                 setStep(GameDef.OrStep.LAY_TRACK);
@@ -718,7 +741,7 @@ public class OperatingRound_1835 extends OperatingRound {
     public boolean setPossibleActions() {
         if (awaitingBadenHomeToken.value()) {
             possibleActions.clear();
-            // CRITICAL FIX: Reset the doneAllowed flag.
+            // : Reset the doneAllowed flag.
             // Since we do not call super.setPossibleActions(), this flag retains its
             // 'true' state from the previous player's (BY) LAY_TRACK step.
             // This prevents the generation of a 'SKIP' action which causes an infinite
@@ -728,19 +751,24 @@ public class OperatingRound_1835 extends OperatingRound {
             PublicCompany ba = companyManager.getPublicCompany("BA");
             MapHex l6 = getRoot().getMapManager().getHex("L6");
 
+            // for (Stop stop : l6.getStops()) {
+            //     LayBaseToken action = new LayBaseToken(getRoot(), l6);
+            //     action.setCompany(ba);
+            //     action.setChosenStation(stop.getRelatedStationNumber());
+            //     action.setType(LayBaseToken.HOME_CITY);
+
+            //     Station station = l6.getStation(stop.getRelatedStationNumber());
+            //     String label = String.format("Place Baden Home Station (%s)",
+            //             l6.getConnectionString(station));
+            //     action.setButtonLabel(label);
+
+            //     possibleActions.add(action);
+            // }
+
             for (Stop stop : l6.getStops()) {
-                LayBaseToken action = new LayBaseToken(getRoot(), l6);
-                action.setCompany(ba);
-                action.setChosenStation(stop.getRelatedStationNumber());
-                action.setType(LayBaseToken.HOME_CITY);
-
-                Station station = l6.getStation(stop.getRelatedStationNumber());
-                String label = String.format("Place Baden Home Station (%s)",
-                        l6.getConnectionString(station));
-                action.setButtonLabel(label);
-
-                possibleActions.add(action);
+                possibleActions.add(new LayBadenHomeToken(l6, ba, stop));
             }
+            
             // DO NOT PRUNE HERE - BADEN needs these specific actions
             return true;
         }
@@ -922,6 +950,15 @@ public class OperatingRound_1835 extends OperatingRound {
 
         if (action instanceof BuyTrain) {
             newPhaseChecks();
+
+// Guard: If buyTrain() already switched us to PFR, do not trigger again.
+            // This prevents the "Double PFR Start" seen in the logs.
+            if (gameManager.getCurrentRound() instanceof PrussianFormationRound) {
+                return result;
+            }
+
+
+
             if (needPrussianFormationCall.value()) {
                 needPrussianFormationCall.set(false);
                 if (!PrussianFormationRound.prussianIsComplete(gameManager)) {
@@ -939,7 +976,6 @@ public class OperatingRound_1835 extends OperatingRound {
         // 1. Get the standard distribution from the engine
         Map<MoneyOwner, Integer> sharesPerRecipient = super.countSharesPerRecipient();
 
-        // --- START FIX ---
         // CRITICAL CHECK: The Income Denial Rule (4.6) applies ONLY to the Prussian (PR) dividend.
         // If any other company (e.g., BY, SX) is operating, we MUST ignore the denial map entirely.
         if (!operatingCompany.value().getId().equals(GameDef_1835.PR_ID)) {
@@ -1011,7 +1047,6 @@ public class OperatingRound_1835 extends OperatingRound {
                 sharesPerRecipient.put(prussian, currentPrShares + totalRedirectedShares);
             }
         }
-        // --- END FIX ---
 
         return sharesPerRecipient;
     }
@@ -1061,10 +1096,12 @@ public class OperatingRound_1835 extends OperatingRound {
 
             if (isFirst4 || isFirst4Plus4) {
 
-                GameManager_1835 gm = (GameManager_1835) gameManager;
                 PublicCompany pr = companyManager.getPublicCompany(GameDef_1835.PR_ID);
 
-                if (!pr.hasStarted()) {
+// Prevent recursive trigger if we have already switched rounds
+                if (!(gameManager.getCurrentRound() instanceof PrussianFormationRound)) {
+                    GameManager_1835 gm = (GameManager_1835) gameManager;
+                    
                     PublicCompany m2 = companyManager.getPublicCompany(GameDef_1835.M2_ID);
                     Player m2Pres = (m2 != null) ? m2.getPresident() : null;
 
@@ -1078,7 +1115,7 @@ public class OperatingRound_1835 extends OperatingRound {
             }
         }
 
-        // 4. Suppress Immediate Discard if PFR Triggered (The New Fix)
+        // 4. Suppress Immediate Discard if PFR Triggered )
         // If the PFR started (via manual trigger above OR super.buyTrain phase triggers),
         // we must prevent the 'DISCARD_TRAINS' step from sticking to this suspended Operating Round.
         if (gameManager.getCurrentRound() instanceof PrussianFormationRound) {
@@ -1159,6 +1196,9 @@ public class OperatingRound_1835 extends OperatingRound {
         }
         return false;
     }
+
+    
+    
 
     
 }

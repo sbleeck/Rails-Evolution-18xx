@@ -219,6 +219,12 @@ public class StockRound_1835 extends StockRound {
         if (pr != null && pr.hasStarted()&& !pr.isClosed()) {
             for (PublicCompany minor : companyManager.getAllPublicCompanies()) {
                 String id = minor.getId();
+                // Exclude Majors (like MS) that might match the "M.." ID pattern.
+                // Only companies without a stock price (Minors) can exchange.
+                if (minor.hasStockPrice()) {
+                    continue;
+                }
+                
                 // Check eligible Minors/pre-majors: M1-M6, HB, BB
                 if (id.startsWith("M") && id.length() == 2 || id.equals("HB") || id.equals("BB")) {
                     if (currentPlayer.getPortfolioModel().getShare(minor) > 0) {
