@@ -407,7 +407,8 @@ public class GameManager extends RailsManager implements Configurable, Owner {
      * Prevents "farming" time by undoing/redoing the start of a turn.
      */
     public void grantTimeBonus(Player player, String roundId, int amount) {
-        if (isReloading()) return; // Block bonuses during reload
+        if (isReloading())
+            return; // Block bonuses during reload
 
         if (player == null || amount <= 0)
             return;
@@ -511,7 +512,6 @@ public class GameManager extends RailsManager implements Configurable, Owner {
         this.timeMgmtShareRoundIncrement = seconds;
     }
 
-
     public void setTimeMgmtOperatorName(String name) {
         this.timeMgmtOperatorName.set(name);
         // BACKUP: Save to global config
@@ -541,17 +541,19 @@ public class GameManager extends RailsManager implements Configurable, Owner {
     /**
      * DYNAMIC PHASE BONUS
      * Returns the time bonus based on the CURRENT Game Phase.
-     * This implements the "Green Wall" logic where the Green phase grants more time.
+     * This implements the "Green Wall" logic where the Green phase grants more
+     * time.
      */
-public int getOrTimeBonus() {
+    public int getOrTimeBonus() {
         Phase phase = getRoot().getPhaseManager().getCurrentPhase();
-        
+
         // Fallback if phase is null
-        if (phase == null) return getTimeMgmtYellowIncrement();
+        if (phase == null)
+            return getTimeMgmtYellowIncrement();
 
         // Use toText() instead of getName()
         String phaseName = phase.toText().toLowerCase();
-        
+
         // Logic for 1835 Phases
         // Phase 1 is usually Yellow. Phase 2 starts Green. Phase 3+ is Brown.
         if (phaseName.contains("2") || phaseName.contains("green")) {
@@ -559,11 +561,10 @@ public int getOrTimeBonus() {
         } else if (phaseName.contains("3") || phaseName.contains("brown") || phaseName.contains("gray")) {
             return getTimeMgmtBrownIncrement();
         }
-        
+
         // Default to Yellow (Early Game)
         return getTimeMgmtYellowIncrement();
     }
-
 
     public int getTimeMgmtStartingSeconds() {
         return this.timeMgmtStartingSeconds;
@@ -572,7 +573,6 @@ public int getOrTimeBonus() {
     public int getTimeMgmtShareRoundIncrement() {
         return this.timeMgmtShareRoundIncrement;
     }
-
 
     public double getTimeMgmtOperatorMultiplier() {
         Double val = this.timeMgmtOperatorMultiplier.value();
@@ -589,7 +589,6 @@ public int getOrTimeBonus() {
         }
         return 1.5;
     }
-
 
     public int getCurrentActionCount() {
         return absoluteActionCounter;
@@ -676,40 +675,44 @@ public int getOrTimeBonus() {
      * Use this to identify which component is stealing focus during Stock Rounds.
      */
     private void installFocusSpy() {
-        KeyboardFocusManager.getCurrentKeyboardFocusManager().addPropertyChangeListener("focusOwner", 
-            new PropertyChangeListener() {
-                @Override
-                public void propertyChange(PropertyChangeEvent evt) {
-                    Component oldC = (Component) evt.getOldValue();
-                    Component newC = (Component) evt.getNewValue();
-                    
-                    String oldName = (oldC != null) ? oldC.getClass().getSimpleName() + "[" + oldC.getName() + "]" : "null";
-                    String newName = (newC != null) ? newC.getClass().getSimpleName() + "[" + newC.getName() + "]" : "null";
+        KeyboardFocusManager.getCurrentKeyboardFocusManager().addPropertyChangeListener("focusOwner",
+                new PropertyChangeListener() {
+                    @Override
+                    public void propertyChange(PropertyChangeEvent evt) {
+                        Component oldC = (Component) evt.getOldValue();
+                        Component newC = (Component) evt.getNewValue();
 
-                    // log.info("FOCUS SPY [Component]: LOST={} | GAINED={}", oldName, newName);
-                    
-                    // Optional: Print stack trace if the focus shift looks suspicious (e.g. to a map component)
-                    // if (newName.contains("MapPanel") || newName.contains("ORPanel")) {
-                    //    Thread.dumpStack(); 
-                    // }
-                }
-            }
-        );
+                        String oldName = (oldC != null) ? oldC.getClass().getSimpleName() + "[" + oldC.getName() + "]"
+                                : "null";
+                        String newName = (newC != null) ? newC.getClass().getSimpleName() + "[" + newC.getName() + "]"
+                                : "null";
 
-        KeyboardFocusManager.getCurrentKeyboardFocusManager().addPropertyChangeListener("activeWindow", 
-            new PropertyChangeListener() {
-                @Override
-                public void propertyChange(PropertyChangeEvent evt) {
-                    Window oldW = (Window) evt.getOldValue();
-                    Window newW = (Window) evt.getNewValue();
+                        // log.info("FOCUS SPY [Component]: LOST={} | GAINED={}", oldName, newName);
 
-                    String oldName = (oldW != null) ? oldW.getClass().getSimpleName() + "[" + oldW.getName() + "]" : "null";
-                    String newName = (newW != null) ? newW.getClass().getSimpleName() + "[" + newW.getName() + "]" : "null";
-                    
-                    // log.info("FOCUS SPY [Window]: DEACTIVATED={} | ACTIVATED={}", oldName, newName);
-                }
-            }
-        );
+                        // Optional: Print stack trace if the focus shift looks suspicious (e.g. to a
+                        // map component)
+                        // if (newName.contains("MapPanel") || newName.contains("ORPanel")) {
+                        // Thread.dumpStack();
+                        // }
+                    }
+                });
+
+        KeyboardFocusManager.getCurrentKeyboardFocusManager().addPropertyChangeListener("activeWindow",
+                new PropertyChangeListener() {
+                    @Override
+                    public void propertyChange(PropertyChangeEvent evt) {
+                        Window oldW = (Window) evt.getOldValue();
+                        Window newW = (Window) evt.getNewValue();
+
+                        String oldName = (oldW != null) ? oldW.getClass().getSimpleName() + "[" + oldW.getName() + "]"
+                                : "null";
+                        String newName = (newW != null) ? newW.getClass().getSimpleName() + "[" + newW.getName() + "]"
+                                : "null";
+
+                        // log.info("FOCUS SPY [Window]: DEACTIVATED={} | ACTIVATED={}", oldName,
+                        // newName);
+                    }
+                });
     }
 
     public void configureFromXML(Tag tag) throws ConfigurationException {
@@ -1071,15 +1074,13 @@ public int getOrTimeBonus() {
         }
     }
 
-public void setRound(RoundFacade round) {
+    public void setRound(RoundFacade round) {
         // --- START FIX ---
         String oldRound = (currentRound.value() != null) ? currentRound.value().getId() : "null";
         String newRound = (round != null) ? round.getId() : "null";
-        
 
         currentRound.set(round);
     }
-
 
     public void setInterruptedRound(RoundFacade interruptedRound) {
         this.interruptedRound.set(interruptedRound);
@@ -1297,7 +1298,7 @@ public void setRound(RoundFacade round) {
 
     // FIXME: We need an ID!
     public <T extends RoundFacade> T createRound(Class<T> roundClass, String id) {
- 
+
         T round = null;
         try {
             round = Configure.create(roundClass, GameManager.class, this, id);
@@ -1401,7 +1402,6 @@ public void setRound(RoundFacade round) {
         createRound(treasuryShareRoundClass, id).start(getInterruptedRound());
     }
 
-
     /**
      * EMERGENCY DEBUG TOOL: Forces the Operating Round to jump to the next company.
      * Use this if the game hangs on a closed company (Zombie Company).
@@ -1412,18 +1412,17 @@ public void setRound(RoundFacade round) {
             return;
         }
 
-
         try {
             OperatingRound or = (OperatingRound) current;
-            
+
             // 1. Access the internal list of operating companies
             // We use the getter provided in OperatingRound to avoid reflection if possible,
             // otherwise we assume 'operatingCompanies' is accessible or use reflection.
             List<PublicCompany> companies = or.getOperatingCompanies();
             PublicCompany stuckComp = or.getOperatingCompany();
-            
+
             if (companies == null || companies.isEmpty()) {
-                 return;
+                return;
             }
 
             // 2. Find current index
@@ -1433,7 +1432,7 @@ public void setRound(RoundFacade round) {
             int nextIndex = currentIndex;
             int attempts = 0;
             PublicCompany nextComp = null;
-            
+
             while (attempts < companies.size()) {
                 nextIndex = (nextIndex + 1) % companies.size();
                 PublicCompany candidate = companies.get(nextIndex);
@@ -1445,18 +1444,22 @@ public void setRound(RoundFacade round) {
             }
 
             if (nextComp != null) {
-                
+
                 // 4. Force state update using Reflection to bypass 'private' access if needed,
                 // or just call the protected method if we were in the same package (we aren't).
-                // Since we are in GameManager, we might need Reflection to set 'operatingCompany'
-                // if there isn't a public setter. OperatingRound has 'setOperatingCompany' but it is protected.
-                
-                java.lang.reflect.Method setMethod = OperatingRound.class.getDeclaredMethod("setOperatingCompany", PublicCompany.class);
+                // Since we are in GameManager, we might need Reflection to set
+                // 'operatingCompany'
+                // if there isn't a public setter. OperatingRound has 'setOperatingCompany' but
+                // it is protected.
+
+                java.lang.reflect.Method setMethod = OperatingRound.class.getDeclaredMethod("setOperatingCompany",
+                        PublicCompany.class);
                 setMethod.setAccessible(true);
                 setMethod.invoke(or, nextComp);
-                
+
                 // 5. Reset Step
-                java.lang.reflect.Method setStepMethod = OperatingRound.class.getDeclaredMethod("setStep", GameDef.OrStep.class);
+                java.lang.reflect.Method setStepMethod = OperatingRound.class.getDeclaredMethod("setStep",
+                        GameDef.OrStep.class);
                 setStepMethod.setAccessible(true);
                 setStepMethod.invoke(or, GameDef.OrStep.INITIAL);
 
@@ -1474,7 +1477,7 @@ public void setRound(RoundFacade round) {
         }
     }
 
-        /**
+    /**
      * Central processing method for game actions.
      * 
      * @param action The action to process.
@@ -1485,12 +1488,11 @@ public void setRound(RoundFacade round) {
         // EMERGENCY OVERRIDE: Check for "FORCE_SKIP" signal
         // This allows recovering a stuck game state where a company loops infinitely.
         if (action != null && action.toString().contains("FORCE_SKIP")) {
-             forceSkipStuckCompany();
-             return true;
+            forceSkipStuckCompany();
+            return true;
         }
 
         getRoot().getReportManager().getDisplayBuffer().clear();
-
 
         // Capture the active entity (Player or Company) BEFORE processing the action.
         // We will compare this with the "After" state to detect if the turn has ended.
@@ -1524,6 +1526,7 @@ public void setRound(RoundFacade round) {
         boolean startGameAction = false;
 
         logActionTaken(action); // Your existing logging
+        logAction(action);
         boolean isBuyTrainAction = action instanceof BuyTrain;
 
         boolean result = false; // Initialize result to false
@@ -1540,14 +1543,15 @@ public void setRound(RoundFacade round) {
             String actionPlayerName = action.getPlayerName();
             String currentPlayerName = getCurrentPlayer().getId();
 
-            // Fix for "AI" player name bug: Relax validation for whitespace, case, and AI-flagged actions
+            // Fix for "AI" player name bug: Relax validation for whitespace, case, and
+            // AI-flagged actions
             boolean nameMatch = actionPlayerName.equals(currentPlayerName);
 
             if (!nameMatch) {
                 // 1. Try relaxed check (trim + ignore case)
                 if (actionPlayerName.trim().equalsIgnoreCase(currentPlayerName.trim())) {
                     nameMatch = true;
-                } 
+                }
                 // 2. Trust explicit AI actions even if name format differs (e.g. "AI " vs "AI")
                 else if (action.isAIAction()) {
                     nameMatch = true;
@@ -1558,7 +1562,7 @@ public void setRound(RoundFacade round) {
                 DisplayBuffer.add(this, LocalText.getText("WrongPlayer", actionPlayerName, currentPlayerName));
                 return false; // Return early, DO NOT count
             }
-            
+
             if (!possibleActions.validate(action)) {
                 DisplayBuffer.add(this, LocalText.getText("ActionNotAllowed", action.toString()));
                 return false; // Return early, DO NOT count
@@ -1579,7 +1583,7 @@ public void setRound(RoundFacade round) {
                     } else if (getCurrentRound() != null) {
                         result = getCurrentRound().process(action);
                     } else {
-          
+
                         result = false;
                     }
                 }
@@ -1587,7 +1591,6 @@ public void setRound(RoundFacade round) {
                 // Increment counter ONLY on successful processing of non-GameAction types
                 if (result && !(action instanceof GameAction)) {
                     this.absoluteActionCounter++;
-                    
 
                     if (action.hasActed()) { // Consider if action.hasActed() check is still needed here
                         executedActions.add(action);
@@ -1633,20 +1636,20 @@ public void setRound(RoundFacade round) {
             if (result && !(action instanceof GameAction) && !(startGameAction)) {
                 changeStack.close(action);
 
-                // FORCE UI UPDATE: Manually trigger the Observer update() method.
-                // We pass 'null' as the Observable because GameManager does not extend Observable.
-                if (gameUIManager != null && gameUIManager.getStatusWindow() != null) {
-                    SwingUtilities.invokeLater(() -> {
-                        Object status = gameUIManager.getStatusWindow().getGameStatus();
-                        // Explicitly check against java.util.Observer
-                        if (status instanceof java.util.Observer) {
-                            // Explicitly cast to java.util.Observer and pass NULL as the source
-                            ((java.util.Observer) status).update(null, "ForceUpdate");
-                        }
-                    });
-                }
+                // // FORCE UI UPDATE: Manually trigger the Observer update() method.
+                // // We pass 'null' as the Observable because GameManager does not extend
+                // // Observable.
+                // if (gameUIManager != null && gameUIManager.getStatusWindow() != null) {
+                //     SwingUtilities.invokeLater(() -> {
+                //         Object status = gameUIManager.getStatusWindow().getGameStatus();
+                //         // Explicitly check against java.util.Observer
+                //         if (status instanceof java.util.Observer) {
+                //             // Explicitly cast to java.util.Observer and pass NULL as the source
+                //             ((java.util.Observer) status).update(null, "ForceUpdate");
+                //         }
+                //     });
+                // }
 
-                
                 // Autosave logic: Only save if the Round changed OR the Active Actor changed.
                 // This indicates a "Full Move" (e.g. Player passed priority, or Company
                 // finished operating).
@@ -1678,11 +1681,27 @@ public void setRound(RoundFacade round) {
                         String filename = String.format("logs/state/state_%05d.json", this.absoluteActionCounter);
                         JsonStateSerializer.serialize(this, filename);
                     } catch (IOException e) {
-                      
+
                     }
                 }
             }
 
+            // FORCE UI UPDATE: Moved outside the block above to ensure it runs for
+            // GameActions (UNDO/REDO) as well.
+            if (result && !startGameAction) {
+                if (gameUIManager != null && gameUIManager.getStatusWindow() != null) {
+                    SwingUtilities.invokeLater(() -> {
+                        try {
+                            Object status = gameUIManager.getStatusWindow().getGameStatus();
+                            if (status instanceof java.util.Observer) {
+                                ((java.util.Observer) status).update(null, "ForceUpdate");
+                            }
+                        } catch (Exception e) {
+                            log.warn("UI ForceUpdate failed", e);
+                        }
+                    });
+                }
+            }
 
             // Add correction actions
             if (!isGameOver()) // Check again in case auto-pass ended the game
@@ -1701,79 +1720,15 @@ public void setRound(RoundFacade round) {
                 possibleActions.add(new GameAction(getRoot(), GameAction.Mode.REDO));
             }
 
-            
-
-
-
         } // End if (!isGameOver()) block
 
         return result;
     }
 
-
     protected void logActionTaken(PossibleAction action) {
         if (action instanceof NullAction
                 && ((NullAction) action).getMode() == NullAction.Mode.START_GAME) {
         } else {
-            // Generate a concise summary for common actions
-            String summary;
-            if (action instanceof LayTile) {
-                LayTile lt = (LayTile) action;
-                String tileId = (lt.getLaidTile() != null) ? lt.getLaidTile().getId() : "null";
-                String hexId = (lt.getChosenHex() != null) ? lt.getChosenHex().getId() : "null";
-                summary = String.format("Lays tile %s on %s", tileId, hexId);
-            } else if (action instanceof BuyCertificate) {
-                BuyCertificate bc = (BuyCertificate) action;
-                summary = String.format("Buys %d%% %s for %s", bc.getSharePerCertificate(), bc.getCompany().getId(),
-                        bc.getPrice());
-            } else if (action instanceof BuyTrain) {
-                BuyTrain bt = (BuyTrain) action;
-                String trainName = bt.getTrain() != null ? bt.getTrain().getName().split("_")[0] : "?";
-                summary = String.format("Buys %s train for %d", trainName, bt.getPricePaid());
-            } else if (action instanceof BuyStartItem) {
-                String item = action.toString().contains("startItem=")
-                        ? action.toString().split("startItem=")[1].split(",")[0]
-                        : "Start Item";
-                summary = "Buys " + item;
-
-                // Add SetDividend formatting ---
-            } else if (action instanceof SetDividend) {
-                SetDividend sd = (SetDividend) action;
-                String type = "Unknown";
-
-                // Map integer constants to readable strings
-                if (sd.getRevenueAllocation() == SetDividend.PAYOUT)
-                    type = "Payout";
-                else if (sd.getRevenueAllocation() == SetDividend.WITHHOLD)
-                    type = "Withhold";
-                else if (sd.getRevenueAllocation() == SetDividend.SPLIT)
-                    type = "Split";
-
-                summary = String.format("Revenue %d (%s)", sd.getActualRevenue(), type);
-
-            } else if (action instanceof NullAction) {
-                summary = ((NullAction) action).getMode().toString();
-            } else {
-                summary = action.toString();
-            }
-
-            if (getCurrentRound() instanceof OperatingRound) {
-                OperatingRound thisOR = (OperatingRound) getCurrentRound();
-                String actor;
-                if (action instanceof PossibleORAction) {
-                    PossibleORAction orAction = (PossibleORAction) action;
-                    // Safety check for null company ---
-                    if (orAction.getCompany() != null) {
-                        actor = orAction.getCompanyName() + "(" + orAction.getPlayerName() + ")";
-                    } else {
-                        actor = orAction.getPlayerName();
-                    }
-                } else {
-                    actor = action.getPlayerName();
-                }
-            } else {
-                
-            }
             actionCount.add(1);
         }
     }
@@ -1840,14 +1795,13 @@ public void setRound(RoundFacade round) {
 
             case UNDO:
             case FORCED_UNDO:
-// 1. BLIND THE UI (Pre-Undo)
+                // 1. BLIND THE UI (Pre-Undo)
                 if (gameUIManager != null && getCurrentPlayer() != null) {
                     gameUIManager.resetTimeHistory(getCurrentPlayer().getIndex());
                 }
 
                 // 2. CAPTURE STATE BEFORE UNDO
                 Player playerBefore = getCurrentPlayer();
-
 
                 // 3. EXECUTE UNDO (Restores state, including Victim's time)
                 if (index == -1) {
@@ -1871,12 +1825,14 @@ public void setRound(RoundFacade round) {
                     int penaltyAmount = 0;
                     String penaltyType = "";
 
-                   Player penaltyTarget = null;
+                    Player penaltyTarget = null;
 
                     // LOGIC:
-                    // If playerBefore == playerAfter: I am undoing my own recent move. (Self-Correction)
-                    // If playerBefore != playerAfter: I undid back into the previous player's turn. (Disruption)
-                    
+                    // If playerBefore == playerAfter: I am undoing my own recent move.
+                    // (Self-Correction)
+                    // If playerBefore != playerAfter: I undid back into the previous player's turn.
+                    // (Disruption)
+
                     if (playerBefore != null && playerAfter != null) {
                         if (playerBefore.equals(playerAfter)) {
                             // Minor Penalty for fixing your own math
@@ -1897,7 +1853,6 @@ public void setRound(RoundFacade round) {
 
                         // A. Apply Penalty to the restored time
                         penaltyTarget.getTimeBankModel().add(-penaltyAmount);
-                 
 
                         // B. FORCE RED FLASH (Uses the final time AFTER penalty)
                         triggerUITimeFlash(penaltyTarget, -penaltyAmount);
@@ -1905,7 +1860,6 @@ public void setRound(RoundFacade round) {
                 }
                 result = true;
                 break;
-
 
             case REDO:
                 if (index == -1) {
@@ -1993,7 +1947,7 @@ public void setRound(RoundFacade round) {
             // Save the exact clock times to a sidecar file
             saveTimeData(file);
             // Save UI Window Positions & Scale
-// Save UI Window Positions & Scale, passing the Game Name
+            // Save UI Window Positions & Scale, passing the Game Name
             if (gameUIManager != null) {
                 gameUIManager.saveWindowSettings(getGameName());
             }
@@ -2054,7 +2008,7 @@ public void setRound(RoundFacade round) {
                         File toMove = fileList[i];
                         File destFile = new File(archiveDir + File.separator + toMove.getName());
                         if (!toMove.renameTo(destFile)) {
-                      
+
                         }
                     }
                 }
@@ -2088,7 +2042,6 @@ public void setRound(RoundFacade round) {
             player.getTimePenaltyModel().set(0);
         }
 
-
         /*
          * gameLoader actions get compared to the executed actions of the current game
          */
@@ -2099,7 +2052,6 @@ public void setRound(RoundFacade round) {
         // This is the fix for the save/load crash [cite: 570-572].
         // We must clean up all *active round references* in the GameManager
         // to clear 'transient' fields of stale data *before* we replay any actions.
-
 
         // Clean up the current round
         RoundFacade loadedRound = getCurrentRound();
@@ -2130,7 +2082,6 @@ public void setRound(RoundFacade round) {
         // Check size
         if (savedActions.size() < executedActions.size()) {
 
-
             DisplayBuffer.add(this, LocalText.getText("LOAD_FAILED_MESSAGE",
                     "loaded file has less actions than current game"));
             this.actionsBeingReloaded = null; // Cleanup
@@ -2158,6 +2109,7 @@ public void setRound(RoundFacade round) {
                         this.actionsBeingReloaded = null; // <-- CLEANUP
                         return false;
                     }
+                    logAction(savedAction, this.reloadActionIndex + 1);
                 } else {
                     if (this.reloadActionIndex == executedActionsCount) { // <-- USE MEMBER
                     }
@@ -2186,20 +2138,17 @@ public void setRound(RoundFacade round) {
         // FIXME (Rails2.0): CommentItems have to be replaced
         // ReportBuffer.setCommentItems(gameLoader.getComments());
 
-
         // 1. Restore the exact times from the sidecar file (if it exists)
         loadTimeData(new File(filepath));
-// Reload Window Positions & Scale, passing the Game Name
+        // Reload Window Positions & Scale, passing the Game Name
         if (gameUIManager != null) {
             gameUIManager.loadWindowSettings(getGameName());
         }
 
-        
         // 2. Force Pause so players can orient themselves before the clock ticks
         if (isTimeManagementEnabled()) {
             setGamePaused(true);
         }
-
 
         return true;
     }
@@ -2304,7 +2253,6 @@ public void setRound(RoundFacade round) {
         RoundFacade roundToResume = getInterruptedRound();
         setInterruptedRound(null);
         setRound(roundToResume);
-      
 
         guiHints.setCurrentRoundType(roundToResume.getClass());
 
@@ -2403,7 +2351,7 @@ public void setRound(RoundFacade round) {
 
         ReportBuffer.add(this, warningMsg);
 
-// Show warning dialog if UI is active AND we are not reloading
+        // Show warning dialog if UI is active AND we are not reloading
         if (!isReloading() && !java.awt.GraphicsEnvironment.isHeadless()) {
             javax.swing.JOptionPane.showMessageDialog(null,
                     warningMsg,
@@ -2523,17 +2471,15 @@ public void setRound(RoundFacade round) {
         DisplayBuffer.add(this, msg);
         addToNextPlayerMessages(msg, true);
 
-        // Use invokeLater to prevent blocking the game loop, which causes duplicate moves (race condition)
+        // Use invokeLater to prevent blocking the game loop, which causes duplicate
+        // moves (race condition)
         if (!isReloading() && !java.awt.GraphicsEnvironment.isHeadless()) {
-             final String finalMsg = msg;
-             javax.swing.SwingUtilities.invokeLater(() -> 
-                 javax.swing.JOptionPane.showMessageDialog(null,
-                     finalMsg,
-                     "Bank Broken!",
-                     javax.swing.JOptionPane.WARNING_MESSAGE)
-             );
+            final String finalMsg = msg;
+            javax.swing.SwingUtilities.invokeLater(() -> javax.swing.JOptionPane.showMessageDialog(null,
+                    finalMsg,
+                    "Bank Broken!",
+                    javax.swing.JOptionPane.WARNING_MESSAGE));
         }
-        
 
     }
 
@@ -2870,7 +2816,7 @@ public void setRound(RoundFacade round) {
     }
 
     public void setGuiParameter(GuiDef.Parm key, boolean value) {
- 
+
         guiParameters.put(key, value);
     }
 
@@ -3263,12 +3209,12 @@ public void setRound(RoundFacade round) {
         return null;
     }
 
-    public boolean processOnReload(PossibleAction action) {
+public boolean processOnReload(PossibleAction action) {
         getRoot().getReportManager().getDisplayBuffer().clear();
-// 1. Capture the round BEFORE processing the action
         RoundFacade roundBefore = getCurrentRound();
         
-        // We capture the state *before* the action is processed.
+      
+
         if (this.logOutputDirectory != null) {
             try {
                 String filename = String.format("state_%05d.json", getActionCountModel().value());
@@ -3278,38 +3224,33 @@ public void setRound(RoundFacade round) {
             }
         }
 
-        // Log possible actions (normally this is outcommented)
-        for (PossibleAction a : possibleActions.getList()) {
-        }
 
         logActionTaken(action);
+        logAction(action);
         try {
-            // Allow but negate spurious NullAction (usually Skip)
             if (action instanceof NullAction
                     && !possibleActions.contains(NullAction.class)) {
                 return true;
             }
 
-            // New in Rails2.0: Check if the action is allowed
             if (!possibleActions.validate(action)) {
                 DisplayBuffer.add(this, LocalText.getText("ActionNotAllowed",
                         action.toString()));
 
-                        StringBuilder sb = new StringBuilder();
+                StringBuilder sb = new StringBuilder();
                 sb.append("!!! RELOAD VALIDATION FAILURE ANALYSIS !!!\n");
                 sb.append("Failed Action: ").append(action).append("\n");
-                sb.append("Current Round: ").append(getCurrentRound() != null ? getCurrentRound().toString() : "null").append("\n");
-                
-                // Removed non-existent isBroken(). Just show cash.
+                sb.append("Current Round: ").append(getCurrentRound() != null ? getCurrentRound().toString() : "null")
+                        .append("\n");
+
                 sb.append("Bank Cash: ").append(getRoot().getBank().getPurse().value()).append("\n");
-                
+
                 sb.append("Game Over Pending: ").append(gameOverPending.value()).append("\n");
                 sb.append("Is Game Over: ").append(isGameOver()).append("\n");
-                
-                // Use getList() for size/empty checks
+
                 int actionCount = (possibleActions.getList() != null) ? possibleActions.getList().size() : 0;
                 sb.append("--- Available Possible Actions (" + actionCount + ") ---\n");
-                
+
                 if (actionCount == 0) {
                     sb.append("  (NONE)\n");
                 } else {
@@ -3322,7 +3263,6 @@ public void setRound(RoundFacade round) {
 
             }
 
-            // FOR BACKWARDS COMPATIBILITY
             boolean doProcess = true;
             if (skipNextDone) {
                 if (action instanceof NullAction
@@ -3338,30 +3278,18 @@ public void setRound(RoundFacade round) {
 
             ChangeStack changeStack = getRoot().getStateManager().getChangeStack();
 
-            // This is the critical state-advancing call
             if (doProcess && !processCorrectionActions(action) && !getCurrentRound().process(action)) {
+                
+            
                 String msg = "Player " + action.getPlayerName() + "'s action \""
                         + action + "\"\n  in " + getCurrentRound().getRoundName()
                         + " is considered invalid by the game engine";
                 log.error(msg);
                 DisplayBuffer.add(this, msg);
-                // DO NOT return false.
                 log.warn("GAMEMANAGER [BruteForce]: Engine failed to process action. IGNORING and continuing replay.",
                         action);
             }
-            // Detect if the round object has changed (e.g. PFR -> Operating Round).
-            // If it has, we MUST tell the new round to clear any stale cache (like "current player")
-            // so it can correctly identify the next actor (Rainer instead of Christian).
-            RoundFacade roundAfter = getCurrentRound();
-            if (roundAfter != null && roundAfter != roundBefore) {
-                 if (roundAfter instanceof OperatingRound) {
-                     ((OperatingRound) roundAfter).resetTransientStateOnLoad();
-                 } else if (roundAfter instanceof StockRound) {
-                     ((StockRound) roundAfter).resetTransientStateOnLoad();
-                 }
-            }
 
-            // This code will now be reached even if validation/process fails
             executedActions.add(action);
             updatePayoutTracker(action);
 
@@ -3373,15 +3301,13 @@ public void setRound(RoundFacade round) {
                 setCorrectionActions();
 
         } catch (Exception e) {
-            // This handles a hard crash
             log.error("GAMEMANAGER [BruteForce]: CRASH during replay. IGNORING and continuing. Error: {} -> {}",
                     e.getClass().getSimpleName(), e.getMessage());
         }
 
-        return true; // Always return true to allow GameLoader to continue
+        return true;
 
     }
-
     public LinkedHashMap<String, Map<String, Integer>> getInstantaneousPayoutHistory() {
         return instantaneousPayoutHistory.value();
     }
@@ -3547,13 +3473,110 @@ public void setRound(RoundFacade round) {
             passedPlayers.clear();
     }
 
+     /**
+     * Calculate the worth of a public company certificate for player
+     * net-worth/bankruptcy,
+     * used to override the market price (e.g., for 1835 Minors before flotation).
+     * Default behavior is to return -1, indicating no override; the market price
+     * should be used.
+     */
+    public int getPublicCompanyWorth(PublicCompany company) {
+        return -1; // Default: No override, use market price
+    }
+
+    /**
+     * Called from the UI to launch the Worth History Chart.
+     * 
+     * @param parentFrame The main UI frame (e.g., StatusWindow) required as the
+     *                    dialog parent.
+     */
+    public void displayWorthChart(Object parentFrame) {
+        // We use reflection/dynamic class loading here to avoid making GameManager
+        // dependent on specific UI classes (like WorthChartWindow) at compile time.
+        try {
+            Class<?> chartClass = Class.forName("net.sf.rails.ui.swing.charts.WorthChartWindow");
+            // Use JFrame.class for reflection method lookup to handle the generic parent
+            // frame
+            java.lang.reflect.Method showMethod = chartClass.getMethod("showChart", JFrame.class, GameManager.class);
+
+            // Cast the parentFrame object to a generic JFrame
+            JFrame frame = (JFrame) parentFrame;
+
+            // Call the static showChart method
+            showMethod.invoke(null, frame, this);
+
+        } catch (Exception e) {
+        }
+    }
+
+    private void saveTimeData(File saveFile) {
+        if (!isTimeManagementEnabled())
+            return;
+
+        File timeFile = new File(saveFile.getAbsolutePath() + ".time");
+        try (PrintWriter writer = new PrintWriter(timeFile)) {
+            for (Player p : getRoot().getPlayerManager().getPlayers()) {
+                // Format: PlayerName=Seconds
+                writer.println(p.getName() + "=" + p.getTimeBankModel().value());
+            }
+        } catch (IOException e) {
+        }
+    }
+
+    private void loadTimeData(File saveFile) {
+        if (!isTimeManagementEnabled())
+            return;
+
+        File timeFile = new File(saveFile.getAbsolutePath() + ".time");
+        if (!timeFile.exists()) {
+            return;
+        }
+
+        try (java.io.BufferedReader reader = new java.io.BufferedReader(new java.io.FileReader(timeFile))) {
+            String line;
+            while ((line = reader.readLine()) != null) {
+                String[] parts = line.split("=");
+                if (parts.length == 2) {
+                    String pName = parts[0];
+                    int seconds = Integer.parseInt(parts[1]);
+
+                    for (Player p : getRoot().getPlayerManager().getPlayers()) {
+                        if (p.getName().equals(pName)) {
+                            p.getTimeBankModel().set(seconds);
+                            break;
+                        }
+                    }
+                }
+            }
+        } catch (Exception e) {
+        }
+    }
+
+
     /**
      * Called by process() to record human-readable history.
      * Includes robust error handling to prevent game freezes.
      */
+
+private transient PossibleAction lastLoggedAction = null;
+    private transient int lastLoggedMoveNumber = -1;
+    
     public void logAction(PossibleAction action) {
+        logAction(action, actionCount.value());
+    }
+
+    public void logAction(PossibleAction action, int moveNumber) {
         if (action == null)
             return;
+
+        // Strict De-duplication:
+        // If we are asked to log the EXACT same action object for the EXACT same move number,
+        // we ignore it. This suppresses the double/triple logs caused by UI/Engine overlaps.
+        if (action == lastLoggedAction && moveNumber == lastLoggedMoveNumber) {
+            return;
+        }
+        lastLoggedAction = action;
+        lastLoggedMoveNumber = moveNumber;
 
         try {
             // --- 0. SETUP VARIABLES ---
@@ -3648,7 +3671,7 @@ public void setRound(RoundFacade round) {
                         if (!passedPlayers.contains(actorName)) {
                             passedPlayers.add(actorName);
                         }
-                    }
+                    } 
                 }
                 // Note: If they Buy *after* selling, the Buy block above will
                 // trigger on the next action and clear this entry. Correct.
@@ -3744,24 +3767,30 @@ public void setRound(RoundFacade round) {
                     if (!passedPlayers.contains(actorName)) {
                         passedPlayers.add(actorName);
                     }
+                } else if (na.getMode() == NullAction.Mode.DONE) {
+                    entry = "finished turn";
                 } else {
                     return;
                 }
             } else {
+
                 entry = actionString;
             }
-
-            // Direct Logging: One line per action, with AI tag
+            // Unified Console Output: Single source for Move #, Actor, and Action details
             if (Util.hasValue(entry)) {
                 StringBuilder sb = new StringBuilder();
-                // Match the prefix style: "[Company (Player)] Action"
-                sb.append("Move: [").append(currentLogPrefix).append("] ").append(entry);
-                
-                if (action.isAIAction()) {
-                    sb.append(" [AI]");
+                // Use the provided moveNumber to allow replay overrides
+                sb.append("Move #").append(moveNumber).append(" ");
+                sb.append("[").append(currentLogPrefix).append("] : ");
+                sb.append(entry);
+                sb.append(action.isAIAction() ? " [AI]" : " [Human]");
+                if (isReloading()) {
+                    sb.append(" [loaded]");
                 }
                 log.info(sb.toString());
             }
+
+        
             
 
             // --- 4. SMART APPEND LOGIC ---
@@ -3802,84 +3831,4 @@ public void setRound(RoundFacade round) {
             log.error("Error generating history log", e);
         }
     }
-
-    /**
-     * Calculate the worth of a public company certificate for player
-     * net-worth/bankruptcy,
-     * used to override the market price (e.g., for 1835 Minors before flotation).
-     * Default behavior is to return -1, indicating no override; the market price
-     * should be used.
-     */
-    public int getPublicCompanyWorth(PublicCompany company) {
-        return -1; // Default: No override, use market price
-    }
-
-    /**
-     * Called from the UI to launch the Worth History Chart.
-     * 
-     * @param parentFrame The main UI frame (e.g., StatusWindow) required as the
-     *                    dialog parent.
-     */
-    public void displayWorthChart(Object parentFrame) {
-        // We use reflection/dynamic class loading here to avoid making GameManager
-        // dependent on specific UI classes (like WorthChartWindow) at compile time.
-        try {
-            Class<?> chartClass = Class.forName("net.sf.rails.ui.swing.charts.WorthChartWindow");
-            // Use JFrame.class for reflection method lookup to handle the generic parent
-            // frame
-            java.lang.reflect.Method showMethod = chartClass.getMethod("showChart", JFrame.class, GameManager.class);
-
-            // Cast the parentFrame object to a generic JFrame
-            JFrame frame = (JFrame) parentFrame;
-
-            // Call the static showChart method
-            showMethod.invoke(null, frame, this);
-
-        } catch (Exception e) {
-        }
-    }
-
-    private void saveTimeData(File saveFile) {
-        if (!isTimeManagementEnabled()) return;
-        
-        File timeFile = new File(saveFile.getAbsolutePath() + ".time");
-        try (PrintWriter writer = new PrintWriter(timeFile)) {
-            for (Player p : getRoot().getPlayerManager().getPlayers()) {
-                // Format: PlayerName=Seconds
-                writer.println(p.getName() + "=" + p.getTimeBankModel().value());
-            }
-        } catch (IOException e) {
-        }
-    }
-
-    private void loadTimeData(File saveFile) {
-        if (!isTimeManagementEnabled()) return;
-
-        File timeFile = new File(saveFile.getAbsolutePath() + ".time");
-        if (!timeFile.exists()) {
-            return;
-        }
-
-        try (java.io.BufferedReader reader = new java.io.BufferedReader(new java.io.FileReader(timeFile))) {
-            String line;
-            while ((line = reader.readLine()) != null) {
-                String[] parts = line.split("=");
-                if (parts.length == 2) {
-                    String pName = parts[0];
-                    int seconds = Integer.parseInt(parts[1]);
-                    
-for (Player p : getRoot().getPlayerManager().getPlayers()) {
-                         if (p.getName().equals(pName)) {
-                             p.getTimeBankModel().set(seconds);
-                             break; 
-                         }
-                    }
-                }
-            }
-        } catch (Exception e) {
-        }
-    }
-
-
 }
-

@@ -182,6 +182,22 @@ public class PrussianFormationRound extends Round implements I_MapRenderableRoun
     }
 
     public void start() {
+
+        // CRITICAL: Initialize this BEFORE checking for completion/abort.
+        // If we abort, finishRound() needs this object to know where to return.
+        this.interruptedRound = gameManager.getInterruptedRound();
+        
+        log.info("--- PFR STARTING ---");
+        PublicCompany pr = companyManager.getPublicCompany(GameDef_1835.PR_ID);
+        boolean prStarted = (pr != null && pr.hasStarted());
+        log.info("PR Started Status: {}", prStarted);
+        
+        if (prussianIsComplete(gameManager)) {
+            log.warn("PFR Start Aborted: prussianIsComplete() returned TRUE immediately.");
+            finishRound();
+            return;
+        }
+
         this.interruptedRound = gameManager.getInterruptedRound();
 
         // 1. Determine Force Status BEFORE checking the 'Already Offered' flag.
@@ -204,10 +220,21 @@ public class PrussianFormationRound extends Round implements I_MapRenderableRoun
 
         forcedStart = isOrTrigger || forcedMerge || isPhase4Plus4Forced;
 
+        // If we are forced to merge (Phase 5), we must ensure we are in the MERGE step
+        // to process the automatic closure of minors, even if the PFR object has
+        // stale state (e.g., DISCARD_TRAINS) from a previous run.
+        if (forcedMerge && !prussianIsComplete(gameManager)) {
+            if (getPrussianStep() != Step.MERGE) {
+                log.info("PFR Force-Start: Resetting stale step {} to MERGE for Phase 5 cleanup.", getPrussianStep());
+                setPrussianStep(Step.MERGE);
+            }
+        }
+        
         // 2. LOOP GUARD: Check if PFR was already offered.
-// We skip if it has been offered, UNLESS it is a forced merge (Phase 5) which repeats.
-        // We remove !forcedStart because checking "Offered" is sufficient to handle the "Once per OR" rule.
-        if (!forcedMerge && gameManager instanceof GameManager_1835
+        // We skip if it has been offered, UNLESS it is a forced start (Phase 5 OR 4+4).
+        // FIX: Check !forcedStart instead of !forcedMerge to ensure 4+4 triggers are
+        // respected.
+        if (!forcedStart && gameManager instanceof GameManager_1835
                 && ((GameManager_1835) gameManager).hasPrussianFormationBeenOffered()) {
 
             if (interruptedRound != null) {
@@ -717,6 +744,7 @@ public class PrussianFormationRound extends Round implements I_MapRenderableRoun
             return false;
         }
         possibleActions.clear();
+        log.info("PFR setPossibleActions: Checking for actions...");
 
         log.info("TRACE_PFR_GEN: Generating actions for Step: {}. Acting Company: {}",
                 getPrussianStep(), (m2 != null ? m2.getId() : "null"));
@@ -1160,6 +1188,11 @@ public class PrussianFormationRound extends Round implements I_MapRenderableRoun
             setCurrentPlayer(nextPlayer);
 
             mergeTurnCount.add(1); // Track turns for end condition
+            // Stop immediately if we have processed all players (including this auto-skip)
+            if (mergeTurnCount.value() >= maxPlayers) {
+                finishMergeStep();
+                return;
+            }
             count++;
         }
 

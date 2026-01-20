@@ -280,19 +280,11 @@ public class OperatingRound extends Round implements Observer {
         finishRound();
     }
 
-    /*
-     * =======================================
-     * 2. CENTRAL PROCESSING FUNCTIONS
-     * 2.1. PROCESS USER ACTION
-     * =======================================
-     */
 
     @Override
     public boolean process(PossibleAction action) {
 
-// JIT Correction: Ensure the Operating Company matches the Saved Action.
-        // This fixes cases where the "Safe Placeholder" (set in resetTransientStateOnLoad)
-        // doesn't match the actual historical move.
+        // JIT Correction: Ensure the Operating Company matches the Saved Action.
         if (gameManager.isReloading()) {
             
             PublicCompany actionCompany = null;
@@ -301,30 +293,25 @@ public class OperatingRound extends Round implements Observer {
             } else if (action instanceof RelayTokenAction) {
                 actionCompany = ((RelayTokenAction) action).getCompany();
             }
-
-            // If we have a company from the action, and it differs from the current state (or state is null)
-            if (actionCompany != null && actionCompany != operatingCompany.value()) {
+            
+            // --- FIX: EXPLICITLY EXCLUDE DiscardTrain ---
+            // The subclass (OperatingRound_1835) must handle the swap for discards 
+            // to preserve the return-to-origin logic.
+            if (actionCompany != null 
+                    && actionCompany != operatingCompany.value() 
+                    && !(action instanceof DiscardTrain)) {
                 
-
-
-                // 1. Force the correct company
                 this.operatingCompany.set(actionCompany);
-
-                // 2. Re-run initialization for this specific company
                 setStep(GameDef.OrStep.INITIAL);
                 try {
                     initTurn();
                 } catch (Exception e) {
-                    // Suppress initialization logs/errors during JIT swap
                 }
                 nextStep();
             }
         }
         
-// SAFETY NET: Zombie Company Detection
-        // If the operating company is closed (e.g., merged M1) and we are not explicitly
-        // handling a discard action (which might be the cause of the closure), 
-        // we must not allow it to operate.
+        // SAFETY NET: Zombie Company Detection
         if (operatingCompany.value() != null && operatingCompany.value().isClosed()) {
             if (!(action instanceof DiscardTrain)) {
                 log.warn("OperatingRound: Detected closed company {} attempting to act. Forcing finishTurn().", 
@@ -337,22 +324,18 @@ public class OperatingRound extends Round implements Observer {
         boolean result = false;
         doneAllowed.set(false);
 
-        
         /*--- Common OR checks ---*/
         /* Check operating company */
         if (!(action instanceof DiscardTrain) && !action.isCorrection()) {
             PublicCompany company = null;
 
-            // Get the company based on the action type
             if (action instanceof PossibleORAction) {
                 company = ((PossibleORAction) action).getCompany();
             } else if (action instanceof RelayTokenAction) {
                 company = ((RelayTokenAction) action).getCompany();
             }
 
-            // Now, perform the check if we successfully got a company
             if (company != null && company != operatingCompany.value()) {
-               // Safe check: Handle case where operatingCompany.value() is null to prevent crash
                 String currentId = (operatingCompany.value() != null) ? operatingCompany.value().getId() : "NULL";
                 
                 DisplayBuffer.add(this, LocalText.getText("WrongCompany",
@@ -364,13 +347,10 @@ public class OperatingRound extends Round implements Observer {
         selectedAction = action;
 
         if (selectedAction instanceof LayTile) {
-            // We must check for the subclass *first*
             if (selectedAction instanceof LayTileAndHomeTokenAction) {
                 result = processLayTileAndHomeToken((LayTileAndHomeTokenAction) selectedAction);
             } else {
-
                 LayTile layTileAction = (LayTile) selectedAction;
-
                 if (layTileAction.getType() == LayTile.CORRECTION) {
                     result = layTileCorrection(layTileAction);
                 } else {
@@ -382,67 +362,35 @@ public class OperatingRound extends Round implements Observer {
             result = layBaseToken((LayBaseToken) selectedAction);
         } else if (selectedAction instanceof LayBonusToken) {
             result = layBonusToken((LayBonusToken) selectedAction);
-
         } else if (selectedAction instanceof BuyBonusToken) {
-
             result = buyBonusToken((BuyBonusToken) selectedAction);
-
         } else if (selectedAction instanceof OperatingCost) {
-
             result = executeOperatingCost((OperatingCost) selectedAction);
-
         } else if (selectedAction instanceof SetDividend) {
-
             result = setRevenueAndDividend((SetDividend) selectedAction);
-
         } else if (selectedAction instanceof BuyTrain) {
-
             result = buyTrain((BuyTrain) selectedAction);
-
         } else if (selectedAction instanceof DiscardTrain) {
             result = discardTrain((DiscardTrain) selectedAction);
         } else if (selectedAction instanceof BuyPrivate) {
-
             result = buyPrivate((BuyPrivate) selectedAction);
-
         } else if (selectedAction instanceof ReachDestinations) {
-
             result = reachDestinations((ReachDestinations) selectedAction);
-
         } else if (selectedAction instanceof GrowCompany) {
-
             result = growCompany((GrowCompany) action);
-
         } else if (selectedAction instanceof TakeLoans) {
-
             result = takeLoans((TakeLoans) selectedAction);
-
         } else if (selectedAction instanceof RepayLoans) {
-
             result = repayLoans((RepayLoans) selectedAction);
-
-            /*
-             * } else if (selectedAction instanceof ExchangeTokens) {
-             *
-             * result = exchangeTokens((ExchangeTokens) selectedAction, false); // 2nd //
-             * parameter: // unlinked // moveset
-             */
         } else if (selectedAction instanceof ClosePrivate) {
-
             result = executeClosePrivate((ClosePrivate) selectedAction);
-
         } else if (selectedAction instanceof UseSpecialProperty
                 && ((UseSpecialProperty) selectedAction).getSpecialProperty() instanceof SpecialRight) {
-
             result = buyRight((UseSpecialProperty) selectedAction);
-
         } else if (selectedAction instanceof UseSpecialProperty
                 && ((UseSpecialProperty) selectedAction).getSpecialProperty() instanceof ExchangeForShare) {
-
             useSpecialProperty((UseSpecialProperty) selectedAction);
-
         } else if (selectedAction instanceof NullAction) {
-
             NullAction nullAction = (NullAction) action;
             switch (nullAction.getMode()) {
                 case DONE:
@@ -456,13 +404,9 @@ public class OperatingRound extends Round implements Observer {
                 default:
                     break;
             }
-
         } else if (processGameSpecificAction(action)) {
-
             result = true;
-
         } else {
-
             DisplayBuffer.add(
                     this,
                     LocalText.getText("UnexpectedAction",
@@ -472,7 +416,6 @@ public class OperatingRound extends Round implements Observer {
 
         return result;
     }
-
     public boolean useSpecialProperty(UseSpecialProperty action) {
 
         SpecialProperty sp = action.getSpecialProperty();

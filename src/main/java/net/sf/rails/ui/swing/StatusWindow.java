@@ -122,6 +122,8 @@ public class StatusWindow extends JFrame implements ActionListener, ActionPerfor
     protected RoundFacade currentRound;
     protected PossibleActions possibleActions;
     protected PossibleAction immediateAction = null;
+    protected MoveMonitor moveMonitor = null;
+    protected ActionRunner actionRunner = null; // --- ADDED FIELD ---
     protected JPanel pane = new JPanel(new BorderLayout());
     private JMenuBar menuBar;
     private JMenu fileMenu, optMenu, moveMenu, moderatorMenu, specialMenu, correctionMenu, developerMenu;
@@ -151,11 +153,25 @@ public class StatusWindow extends JFrame implements ActionListener, ActionPerfor
     protected ActionButton undoButton;
     protected ActionButton redoButton;
 
+    // DESIGN LANGUAGE CONSTANTS
 
     // DESIGN LANGUAGE CONSTANTS
-    private static final Color SYS_BLUE = new Color(30, 144, 255); // DodgerBlue
-    private static final Color SYS_CYAN = Color.CYAN; // Action Required
-    private static final Color FG_WHITE = Color.WHITE;
+    // Primary Borders (Strong Indication)
+    private static final Color SYS_BLUE  = new Color(30, 144, 255); // DodgerBlue - Generic Interaction / Pass
+    private static final Color SYS_CYAN  = Color.CYAN;              // Cyan - Special Action / Force / Scrap
+    private static final Color SYS_RED   = new Color(255, 69, 0);   // OrangeRed - Selling / Destructive
+    private static final Color SYS_GREEN = new Color(34, 139, 34);  // ForestGreen - Buying / Acquisition
+    private static final Color FG_WHITE  = Color.WHITE;
+
+    // Backgrounds (Pale Context Hints)
+    private static final Color BG_BLUE   = new Color(225, 240, 255); // Pale Blue
+    private static final Color BG_RED    = new Color(255, 235, 235); // Pale Red
+    private static final Color BG_GREEN  = new Color(230, 255, 230); // Pale Green
+    private static final Color BG_BEIGE  = new Color(245, 245, 220); // Beige - Special / Scrap
+
+
+
+  
     private String lastCompanySignature = null;
 
     // Helper to enforce Design Language on buttons
@@ -171,7 +187,8 @@ public class StatusWindow extends JFrame implements ActionListener, ActionPerfor
 
     // New Helper for "Passive/Yield" buttons (Grey + Black Text)
     private void stylePassiveButton(ActionButton btn) {
-        if (btn == null) return;
+        if (btn == null)
+            return;
         btn.setBackground(Color.LIGHT_GRAY);
         btn.setForeground(Color.BLACK); // Black text for readability on Grey
         btn.setOpaque(true);
@@ -448,7 +465,6 @@ public class StatusWindow extends JFrame implements ActionListener, ActionPerfor
         // --- 6. SPECIAL MENU (Dynamic) ---
         // Initialize specialMenu before using it!
         specialMenu = new JMenu(LocalText.getText("SPECIAL"));
-        specialMenu.setBackground(Color.YELLOW);
         menuBar.add(specialMenu);
 
         // --- 7. INFO MENU ---
@@ -499,6 +515,19 @@ public class StatusWindow extends JFrame implements ActionListener, ActionPerfor
             developerMenu.setName("Developer");
             menuBar.add(developerMenu);
 
+
+            ActionMenuItem actionRunnerItem = new ActionMenuItem("Force Actions!");
+            actionRunnerItem.setName("Force Actions!");
+            actionRunnerItem.setActionCommand("SHOW_ACTION_RUNNER");
+            actionRunnerItem.addActionListener(this);
+            developerMenu.add(actionRunnerItem);
+
+            ActionMenuItem monitorItem = new ActionMenuItem("Move Monitor");
+            monitorItem.setName("Move Monitor");
+            monitorItem.setActionCommand("SHOW_MOVE_MONITOR");
+            monitorItem.addActionListener(this);
+            developerMenu.add(monitorItem);
+
             ActionMenuItem saveLogsItem = new ActionMenuItem("Save Logs");
             saveLogsItem.setName("Save Logs");
             saveLogsItem.setActionCommand("Save Logs");
@@ -547,8 +576,10 @@ public class StatusWindow extends JFrame implements ActionListener, ActionPerfor
         // which must always be up-to-date.
         undoItem.setEnabled(false);
         redoItem.setEnabled(false);
-        if (undoButton != null) undoButton.setEnabled(false);
-        if (redoButton != null) redoButton.setEnabled(false);
+        if (undoButton != null)
+            undoButton.setEnabled(false);
+        if (redoButton != null)
+            redoButton.setEnabled(false);
         // SAVE, RELOAD, AUTOSAVELOAD are always enabled
     }
 
@@ -860,6 +891,11 @@ public class StatusWindow extends JFrame implements ActionListener, ActionPerfor
         } else if (command.equals(FONT_DECREASE_CMD)) {
             gameUIManager.adjustGlobalFontScale(-0.1);
             updateFonts(Math.max(8f, currentBaseFontSize - 1f));
+        } else if (command.equals("SHOW_MOVE_MONITOR")) {
+            showMoveMonitor();
+            } else if (command.equals("SHOW_ACTION_RUNNER")) { // --- START FIX ---
+            showActionRunner();
+
 
         } else if (command.equals(REM_TILES_CMD) || command.equals(ORPanel.REM_TILES_CMD)) {
 
@@ -1093,12 +1129,13 @@ public class StatusWindow extends JFrame implements ActionListener, ActionPerfor
         gameStatusPane = new JScrollPane(gameStatus); //
 
         // --- BUTTONS (SOUTH) ---
-// --- BUTTONS (SOUTH) ---
+        // --- BUTTONS (SOUTH) ---
         // 1. Single Row Grid (1 Row, 5 Cols) -> HGap=12 for "tiny bit more space"
-        buttonPanel = new JPanel(new GridLayout(1, 5, 12, 0)); 
+        buttonPanel = new JPanel(new GridLayout(1, 5, 12, 0));
 
         // 2. Define Buttons
-        // We use RailsIcon.PASS as a placeholder for the constructor, then strip it for Text-Only mode.
+        // We use RailsIcon.PASS as a placeholder for the constructor, then strip it for
+        // Text-Only mode.
 
         // PAUSE
         pauseButton = new ActionButton(RailsIcon.PAUSE);
@@ -1109,33 +1146,33 @@ public class StatusWindow extends JFrame implements ActionListener, ActionPerfor
         pauseButton.addActionListener(this);
 
         // UNDO
-        undoButton = new ActionButton(RailsIcon.PASS); 
+        undoButton = new ActionButton(RailsIcon.PASS);
         undoButton.setText("Undo");
         undoButton.setIcon(null);
         undoButton.setActionCommand(UNDO_CMD);
         undoButton.addActionListener(this);
-        undoButton.setEnabled(false); 
+        undoButton.setEnabled(false);
 
-        // REDO 
+        // REDO
         redoButton = new ActionButton(RailsIcon.PASS);
         redoButton.setText("Redo");
         redoButton.setIcon(null);
         redoButton.setActionCommand(REDO_CMD);
         redoButton.addActionListener(this);
-        redoButton.setEnabled(false); 
+        redoButton.setEnabled(false);
 
         // AI
-        aiButton = new ActionButton(RailsIcon.AI_MOVE); 
+        aiButton = new ActionButton(RailsIcon.AI_MOVE);
         aiButton.setText("AI");
-        aiButton.setIcon(null); 
+        aiButton.setIcon(null);
         aiButton.setActionCommand(AI_MOVE_CMD);
         aiButton.setToolTipText("Let AI make the next Operating Round move");
         aiButton.addActionListener(this);
 
         // PASS
-        passButton = new ActionButton(RailsIcon.PASS); 
+        passButton = new ActionButton(RailsIcon.PASS);
         passButton.setText("Pass");
-        passButton.setIcon(null); 
+        passButton.setIcon(null);
         passButton.setMnemonic(KeyEvent.VK_P);
         passButton.setActionCommand(DONE_CMD);
         passButton.addActionListener(this);
@@ -1341,7 +1378,7 @@ public class StatusWindow extends JFrame implements ActionListener, ActionPerfor
 
         if (gameUIManager.isTimerPaused()) {
             timeText = "PAUSED";
-            color = Color.RED;
+            color = SYS_RED;
         } else {
             Player p = gameUIManager.getCurrentPlayer();
             if (p != null) {
@@ -1353,7 +1390,7 @@ public class StatusWindow extends JFrame implements ActionListener, ActionPerfor
                         absVal / 60,
                         absVal % 60);
                 if (val < 0)
-                    color = Color.RED;
+                    color = SYS_RED;
             } else {
                 net.sf.rails.game.GameManager gm = gameUIManager.getGameManager();
                 gm.incrementTotalGameTime();
@@ -1379,6 +1416,14 @@ public class StatusWindow extends JFrame implements ActionListener, ActionPerfor
     @Override
     public void updateStatus(boolean myTurn) {
 
+        if (moveMonitor != null && moveMonitor.isVisible()) {
+            moveMonitor.refresh();
+        }
+
+        if (actionRunner != null && actionRunner.isVisible()) {
+            actionRunner.refresh();
+        }
+
         try {
             // 1. Debug: Log Entry and Player States
             Player uiPlayer = gameUIManager.getCurrentPlayer();
@@ -1386,13 +1431,12 @@ public class StatusWindow extends JFrame implements ActionListener, ActionPerfor
             if (gameUIManager.getGameManager() != null) {
                 enginePlayer = gameUIManager.getGameManager().getCurrentPlayer();
             }
-         
+
             // 2. Refresh Actions from Engine
             if (gameUIManager.getGameManager() != null) {
                 this.possibleActions = gameUIManager.getGameManager().getPossibleActions();
                 this.currentRound = gameUIManager.getGameManager().getCurrentRound();
 
-              
             }
 
             // 3. Delegate to Subclass (Polymorphism)
@@ -1539,7 +1583,6 @@ public class StatusWindow extends JFrame implements ActionListener, ActionPerfor
                 gameStatus.initTurn(effectivePlayerIndex, true);
             }
 
-
             Player currentPlayer = effectivePlayer;
             String activityText = (currentPlayer != null) ? "Thinking: " + currentPlayer.getName() : "Thinking...";
 
@@ -1596,9 +1639,9 @@ public class StatusWindow extends JFrame implements ActionListener, ActionPerfor
             }
 
             // 1. Do NOT disable immediately. This causes the "Switch Off" flicker.
-            // passButton.setEnabled(false); 
+            // passButton.setEnabled(false);
             // autopassButton.setEnabled(false);
-            
+
             boolean passFound = false;
 
             List<NullAction> inactiveItems = possibleActions.getType(NullAction.class);
@@ -1634,11 +1677,11 @@ public class StatusWindow extends JFrame implements ActionListener, ActionPerfor
                             passButton.setActionCommand(DONE_CMD);
                             passButton.setMnemonic(KeyEvent.VK_D);
                             passButton.setPossibleAction(na);
-                            
+
                             passFound = true;
                             passButton.setEnabled(true);
                             passButton.setVisible(true);
-                            
+
                             passButton.setText("Done");
                             styleStatusButton(passButton, SYS_BLUE); // Standard: Blue
 
@@ -1657,7 +1700,7 @@ public class StatusWindow extends JFrame implements ActionListener, ActionPerfor
             if (!passFound) {
                 passButton.setEnabled(false);
             }
-            
+
             gameStatus.setBackground(UIManager.getColor("Panel.background"));
             gameStatus.setOpaque(false);
             gameStatus.repaint();
@@ -2004,10 +2047,10 @@ public class StatusWindow extends JFrame implements ActionListener, ActionPerfor
         net.sf.rails.ui.swing.elements.RailCard card = findRailCardRecursive(gameStatus, company);
 
         if (card != null) {
-   
-         // Visual: Color Code based on Action
+
+            // Visual: Color Code based on Action
             applyActionColor(card, action);
-            
+
             // Functional: Attach Action
             card.setPossibleAction(action);
             // Listen
@@ -2197,24 +2240,29 @@ public class StatusWindow extends JFrame implements ActionListener, ActionPerfor
         return false;
     }
 
-    /**
-     * Applies the correct visual style (Green/Red/Blue) to a RailCard based on the action.
-     */
+
     private void applyActionColor(net.sf.rails.ui.swing.elements.RailCard card, PossibleAction action) {
-        if (card == null) return;
-        
-        // Default Highlight (System Blue - Generic)
-        Color borderColor = new Color(30, 144, 255); // DodgerBlue
-        Color bgColor = new Color(225, 240, 255);    // Pale Blue
+        if (card == null)
+            return;
+
+        // Default Highlight (Generic Selection)
+        Color borderColor = SYS_BLUE;
+        Color bgColor     = BG_BLUE;
 
         if (action instanceof SellShares) {
             // SELLING -> RED (Destructive)
-            borderColor = new Color(255, 69, 0); // OrangeRed
-            bgColor = new Color(255, 235, 235);  // Pale Red
+            borderColor = SYS_RED;
+            bgColor     = BG_RED;
+
+        } else if (action instanceof DiscardTrain) {
+            // SCRAPPING -> CYAN + BEIGE (Special / Mandatory Action)
+            borderColor = SYS_CYAN; 
+            bgColor     = BG_BEIGE; 
+            
         } else if (action instanceof BuyCertificate || action instanceof BuyTrain || action instanceof BuyPrivate) {
             // BUYING -> GREEN (Acquisition)
-            borderColor = new Color(34, 139, 34); // ForestGreen
-            bgColor = new Color(230, 255, 230);   // Pale Green
+            borderColor = SYS_GREEN;
+            bgColor     = BG_GREEN;
         }
 
         // Apply State & Colors
@@ -2223,6 +2271,146 @@ public class StatusWindow extends JFrame implements ActionListener, ActionPerfor
         card.setOpaque(true);
         card.setBackground(bgColor);
         card.repaint();
+    }
+
+
+    private void showMoveMonitor() {
+        if (moveMonitor == null) {
+            moveMonitor = new MoveMonitor(gameUIManager);
+        }
+        moveMonitor.setVisible(true);
+        moveMonitor.refresh();
+    }
+
+    private class MoveMonitor extends JFrame {
+        private JTextArea area;
+        private GameUIManager gui;
+
+        public MoveMonitor(GameUIManager gui) {
+            super("Engine Move Monitor");
+            this.gui = gui;
+
+            // Make Sticky (Always on top)
+            setAlwaysOnTop(true);
+            setLayout(new BorderLayout());
+
+            area = new JTextArea();
+            area.setEditable(false);
+            area.setFont(new Font("Monospaced", Font.BOLD, 13));
+            area.setBackground(new Color(30, 30, 30)); // Dark background
+            area.setForeground(new Color(0, 255, 0)); // Matrix Green
+
+            add(new JScrollPane(area), BorderLayout.CENTER);
+            setSize(600, 500);
+        }
+
+        public void refresh() {
+            GameManager gm = gui.getGameManager();
+            if (gm == null)
+                return;
+
+            StringBuilder sb = new StringBuilder();
+            int move = gm.getActionCountModel().value();
+            Player p = gm.getCurrentPlayer();
+            RoundFacade r = gm.getCurrentRound();
+
+            sb.append("==================================================\n");
+            sb.append(String.format(" MOVE: #%-5d | PLAYER: %s\n", move, (p != null ? p.getName() : "None")));
+            sb.append(String.format(" ROUND: %-13s\n", (r != null ? r.getId() : "None")));
+
+            if (r instanceof OperatingRound) {
+                PublicCompany c = ((OperatingRound) r).getOperatingCompany();
+                sb.append(String.format(" COMPANY: %s\n", (c != null ? c.getId() : "None")));
+            }
+            sb.append("==================================================\n\n");
+            sb.append(String.format(" %-22s | %s\n", "ACTION TYPE", "DETAILS"));
+            sb.append(" -----------------------+--------------------------\n");
+
+            List<PossibleAction> actions = gm.getPossibleActions().getList();
+            if (actions != null) {
+                for (PossibleAction pa : actions) {
+                    // Filter out correction and internal game actions
+                    if (pa instanceof GameAction || pa instanceof CorrectionModeAction || pa.isCorrection()) {
+                        continue;
+                    }
+                    sb.append(String.format(" %-22s | %s\n", pa.getClass().getSimpleName(), pa.toString()));
+                }
+            }
+            area.setText(sb.toString());
+            area.setCaretPosition(0);
+        }
+    }
+
+    private void showActionRunner() {
+        if (actionRunner == null) {
+            actionRunner = new ActionRunner();
+        }
+        actionRunner.setVisible(true);
+        actionRunner.refresh();
+    }
+
+    private class ActionRunner extends JFrame {
+        private static final long serialVersionUID = 1L;
+        private JPanel buttonPanel;
+
+        public ActionRunner() {
+            super("Action Runner (Debug Force)");
+            
+            // Layout: Scrollable Vertical List
+            setLayout(new BorderLayout());
+            buttonPanel = new JPanel();
+            buttonPanel.setLayout(new BoxLayout(buttonPanel, BoxLayout.Y_AXIS));
+            
+            JScrollPane scrollPane = new JScrollPane(buttonPanel);
+            scrollPane.getVerticalScrollBar().setUnitIncrement(16); // Faster scrolling
+            add(scrollPane, BorderLayout.CENTER);
+            
+            setSize(400, 600);
+            setDefaultCloseOperation(JFrame.HIDE_ON_CLOSE);
+        }
+
+        public void refresh() {
+            buttonPanel.removeAll();
+            
+            // Safety Check
+            if (possibleActions == null || possibleActions.getList() == null) {
+                buttonPanel.revalidate();
+                buttonPanel.repaint();
+                return;
+            }
+
+            for (final PossibleAction pa : possibleActions.getList()) {
+
+                if (pa instanceof GameAction || pa instanceof rails.game.correct.CorrectionAction || pa.isCorrection()) {
+                    continue;
+                }
+
+
+                // Create a button for every single action
+                JButton btn = new JButton(pa.toString());
+                btn.setAlignmentX(Component.LEFT_ALIGNMENT);
+                btn.setMaximumSize(new Dimension(Short.MAX_VALUE, 30)); // Full width
+                
+                // Color Code "NullActions" (Pass/Done) vs Real Moves
+                if (pa instanceof NullAction) {
+                    btn.setForeground(SYS_BLUE);
+                }
+
+                btn.addActionListener(new ActionListener() {
+                    @Override
+                    public void actionPerformed(ActionEvent e) {
+                        // FORCE THE MOVE
+                        log.info("ActionRunner: Forcing action -> {}", pa);
+                        gameUIManager.processAction(pa);
+                    }
+                });
+                
+                buttonPanel.add(btn);
+            }
+            
+            buttonPanel.revalidate();
+            buttonPanel.repaint();
+        }
     }
 
 

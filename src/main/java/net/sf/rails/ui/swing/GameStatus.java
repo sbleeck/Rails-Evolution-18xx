@@ -935,13 +935,6 @@ public class GameStatus extends GridPanel implements ActionListener {
 
         lastPlayerTimes[playerIndex] = newTime; // Update stored time
 
-        // If time changed by more than 1 second (and isn't the init step), trigger
-        // flash
-        if (Math.abs(diff) > 1) {
-            updatePlayerTimeWithFlash(playerIndex, newTime, diff);
-            return;
-        }
-
         // 1. Pure Text Update (No Flashing)
         SwingUtilities.invokeLater(() -> {
             timerField.setText(String.valueOf(newTime));
@@ -1017,41 +1010,7 @@ public class GameStatus extends GridPanel implements ActionListener {
      *                      Positive = Green Flash, Negative = Red Flash.
      */
     public void updatePlayerTimeWithFlash(final int playerIndex, final int newTime, final int amountChanged) {
-        if (playerTimer == null || playerIndex < 0 || playerIndex >= playerTimer.length) {
-            return;
-        }
-        final Field timerField = playerTimer[playerIndex];
-        if (timerField == null)
-            return;
-
-        //
-        SwingUtilities.invokeLater(() -> {
-            // 1. Update Text
-            timerField.setText(String.valueOf(newTime));
-
-            // 2. Determine Flash Color (Green for Gain, Red for Loss)
-            Color flashColor = (amountChanged > 0) ? Color.GREEN : Color.RED;
-
-            // 3. Apply Flash
-            timerField.setOpaque(true);
-            timerField.setBackground(flashColor);
-
-            // 4. Calculate Revert Color
-            // If this player is the current actor, revert to Yellow (BG_OPERATING), else
-            // White.
-            // BG_OPERATING is typically (255, 255, 200).
-            final Color normalColor = (playerIndex == this.actorIndex) ? new Color(255, 255, 200) : Color.WHITE;
-
-            // 5. Reset after 500ms
-            javax.swing.Timer resetTimer = new javax.swing.Timer(500, e -> {
-                timerField.setBackground(normalColor);
-                repaint();
-            });
-            resetTimer.setRepeats(false);
-            resetTimer.start();
-
-            repaint();
-        });
+        updatePlayerTime(playerIndex, newTime);
     }
 
     @Override
@@ -1368,15 +1327,10 @@ public class GameStatus extends GridPanel implements ActionListener {
             return;
         }
 
-        // Unified Rendering: ALWAYS use the Button Panel, NEVER the text Field.
-        // This ensures Company trains look identical to Pool/IPO trains (RailCards).
-
-        // 1. Hide the old static text field
         if (compTrains[i] != null) {
             compTrains[i].setVisible(false);
         }
 
-        // 2. Show the button panel (if the row is visible)
         if (compTrainsButtonPanel == null || compTrainsButtonPanel.length <= i || compTrainsButtonPanel[i] == null)
             return;
 
@@ -1385,8 +1339,15 @@ public class GameStatus extends GridPanel implements ActionListener {
         compTrainsButtonPanel[i].setVisible(visible);
 
         PublicCompany c = companies[i];
-        // 1. Hide train slots completely if the company hasn't started (floated) yet
-        if (!c.hasFloated()) {
+
+        // --- Robust Train List Retrieval ---
+        java.util.List<net.sf.rails.game.Train> trainList = new java.util.ArrayList<>();
+        if (c.getPortfolioModel() != null && c.getPortfolioModel().getTrainList() != null) {
+            trainList.addAll(c.getPortfolioModel().getTrainList());
+        }
+
+        // Allow display if (Not Floated AND Has Trains) - Critical for Prussia
+        if (!c.hasFloated() && trainList.isEmpty()) {
             if (compSubTrainButtons[i] != null) {
                 for (RailCard cf : compSubTrainButtons[i]) {
                     if (cf != null)
@@ -1395,8 +1356,7 @@ public class GameStatus extends GridPanel implements ActionListener {
             }
             return;
         }
-        java.util.List<net.sf.rails.game.Train> trainList = new java.util.ArrayList<>(
-                c.getPortfolioModel().getTrainList());
+
         java.util.List<BuyTrain> buyActions = clickable ? possibleActions.getType(BuyTrain.class) : null;
         int limit = c.getCurrentTrainLimit();
 
@@ -1406,7 +1366,7 @@ public class GameStatus extends GridPanel implements ActionListener {
             if (cf == null)
                 continue;
 
-            cf.reset(); // Clear previous state (label, train, actions)
+            cf.reset();
 
             if (t < trainList.size()) {
                 // EXISTING TRAIN
@@ -1414,8 +1374,12 @@ public class GameStatus extends GridPanel implements ActionListener {
 
                 // Use RailCard logic to set content
                 cf.setTrain(train);
-                String cleanName = train.getName().replaceAll("_\\d+$", "");
+                // FIX: Explicitly set Component Name as safety for ID matching
+                cf.setName(train.getName());
 
+                String cleanName = train.getName().replaceAll("_\\d+$", "");
+                // This call previously deleted the train data in RailCard. With the fix, it is
+                // safe.
                 cf.setCustomLabel(getAbbreviatedTrainName(cleanName));
 
                 boolean canBuy = false;
@@ -1429,30 +1393,24 @@ public class GameStatus extends GridPanel implements ActionListener {
                     }
                 }
 
-                // Apply Styles manually: Use Beige + Green Border instead of solid Green
                 if (canBuy) {
-                    // OLD: cf.setBackground(BG_BUY_ACTIVE);
-                    cf.setBackground(BG_CARD_PASSIVE); // Beige
-                    cf.setBorder(BorderFactory.createLineBorder(BORDER_COL_BUY, 3)); // Thick Green Border
-
+                    cf.setBackground(BG_CARD_PASSIVE);
+                    cf.setBorder(BorderFactory.createLineBorder(BORDER_COL_BUY, 3));
                     cf.setToolTipText("Click to Buy " + train.getName());
                     cf.setEnabled(true);
                 } else {
                     cf.setBackground(BG_CARD_PASSIVE);
-                    // Compound border to match the 2px thickness of the active button
                     cf.setBorder(BorderFactory.createCompoundBorder(
                             BorderFactory.createLineBorder(Color.BLACK, 1),
                             BorderFactory.createEmptyBorder(1, 1, 1, 1)));
                     cf.setToolTipText(null);
                     cf.setEnabled(true);
                 }
-
                 cf.setVisible(true);
 
             } else if (t < limit) {
                 // EMPTY SLOT (Passive)
-                cf.setCustomLabel(""); // Render empty space
-                // Placeholder Style: Weaker color + Dotted Line
+                cf.setCustomLabel("");
                 cf.setBackground(BG_PLACEHOLDER);
                 cf.setBorder(BORDER_DASHED);
                 cf.setVisible(true);
@@ -1557,11 +1515,16 @@ public class GameStatus extends GridPanel implements ActionListener {
 
             boolean isOperating = (c == operatingComp);
 
-            currentSignature.add(c.getId() + ":" + isActive);
+            // This ensures that transitioning from OR (Operating=True) to SR
+            // (Operating=False)
+            // is detected as a state change, triggering the required UI rebuild.
+            currentSignature.add(c.getId() + ":" + isActive + ":" + isOperating);
         }
 
         // 4. Compare and Recreate
-        if (!currentSignature.equals(previousDashboardSignature)) {
+        // Self-Healing: If component count is 0, the previous render failed/crashed.
+        // Force recreation even if signature matches to recover from "Grey Screen".
+        if (!currentSignature.equals(previousDashboardSignature) || this.getComponentCount() == 0) {
             previousDashboardSignature = currentSignature;
             recreate();
         } else {
@@ -1726,8 +1689,17 @@ public class GameStatus extends GridPanel implements ActionListener {
     }
 
     protected void setIPOCertButton(int i, boolean clickable, Object o) {
-        if (i < 0 || i >= shareRowVisibilityObservers.length || shareRowVisibilityObservers[i] == null)
-            return;
+        // Capture locally to ensure atomic null-check and prevent race conditions/array
+        // shifting
+        // during reload or high-speed undo/redo.
+        RowVisibility observer = null;
+        if (shareRowVisibilityObservers != null && i >= 0 && i < shareRowVisibilityObservers.length) {
+            observer = shareRowVisibilityObservers[i];
+        }
+
+        if (observer == null) {
+            return; // Fail safe if the company row was not initialized (e.g. Closed)
+        }
 
         // Redirect logic to the new ipoShareCards
         if (ipoShareCards == null || ipoShareCards[i] == null)
@@ -1741,7 +1713,7 @@ public class GameStatus extends GridPanel implements ActionListener {
         ipoShareCards[i].setShareStackTooltip(ipo.getCertificates(companies[i]));
 
         // Base Visibility Check
-        boolean visible = shareRowVisibilityObservers[i].lastValue();
+        boolean visible = observer.lastValue();
         if (!visible) {
             ipoShareCards[i].setVisible(false);
             return;
@@ -1796,7 +1768,12 @@ public class GameStatus extends GridPanel implements ActionListener {
     // COMPLETELY REPLACE the setPoolCertButton methods:
 
     protected void setPoolCertButton(int i, boolean clickable, Object o) {
-        if (i < 0 || i >= shareRowVisibilityObservers.length || shareRowVisibilityObservers[i] == null)
+        RowVisibility observer = null;
+        if (shareRowVisibilityObservers != null && i >= 0 && i < shareRowVisibilityObservers.length) {
+            observer = shareRowVisibilityObservers[i];
+        }
+
+        if (observer == null)
             return;
 
         if (poolShareCards == null || poolShareCards[i] == null)
@@ -1808,8 +1785,8 @@ public class GameStatus extends GridPanel implements ActionListener {
 
         // Set Tooltip with Stack Details
         poolShareCards[i].setShareStackTooltip(pool.getCertificates(companies[i]));
+        boolean visible = observer.lastValue(); // Use local var
 
-        boolean visible = shareRowVisibilityObservers[i].lastValue();
         if (!visible) {
             poolShareCards[i].setVisible(false);
             return;
@@ -2398,6 +2375,12 @@ public class GameStatus extends GridPanel implements ActionListener {
         for (cIdx = 0; cIdx < nc; cIdx++) {
             PublicCompany c = companies[cIdx];
             int i = c.getPublicNumber(); // CORRECT INDEX for arrays
+
+            // CRITICAL: Skip closed companies. They have no UI rows (skipped in
+            // initCompanyRows),
+            // so accessing arrays like compNameCaption[i] will throw NullPointerException.
+            if (c.isClosed())
+                continue;
 
             // FORCE RESET TRAINS: Ensure we are in "Display Mode" (HTML) at the start of
             // every update.
@@ -4588,6 +4571,7 @@ public class GameStatus extends GridPanel implements ActionListener {
         }
 
         for (rails.game.action.PossibleAction pa : possibleActions.getList()) {
+
             // 1. Identify Target Company (Public OR Private)
             net.sf.rails.game.Company target = null;
 
@@ -4666,35 +4650,45 @@ public class GameStatus extends GridPanel implements ActionListener {
                 }
 
                 if (companyIndex >= 0 && companyIndex < nc && playerIndex >= 0 && playerIndex < np) {
-                   
-                    // Logging to debug why MS (or others) are appearing Cyan/Highlighted
-                    if (target instanceof net.sf.rails.game.PublicCompany && "MS".equals(((net.sf.rails.game.PublicCompany) target).getId())) {
-                       log.warn("!!! INVESTIGATION START: Action targeting MS !!!");
-                        log.warn("Action Class: {}", pa.getClass().getName());
-                        log.warn("Action toString: {}", pa.toString());
+                    if (pa instanceof rails.game.action.DiscardTrain) {
+                        rails.game.action.DiscardTrain dt = (rails.game.action.DiscardTrain) pa;
+                        net.sf.rails.game.PublicCompany company = (net.sf.rails.game.PublicCompany) dt.getCompany();
+                        net.sf.rails.game.Train targetTrain = dt.getDiscardedTrain();
 
-                        // Dump all fields of the Action object using Reflection
-                        Class<?> clazz = pa.getClass();
-                        while (clazz != null) {
-                            for (java.lang.reflect.Field f : clazz.getDeclaredFields()) {
-                                f.setAccessible(true);
-                                try {
-                                    Object val = f.get(pa);
-                                    String valStr = (val != null) ? val.toString() : "null";
-                                    // If the field is a Company, print its ID specifically
-                                    if (val instanceof net.sf.rails.game.Company) {
-                                        valStr += " (ID: " + ((net.sf.rails.game.Company) val).getId() + ")";
+                        String cId = (company != null) ? company.getId() : "null";
+                        String tName = (targetTrain != null) ? targetTrain.getName() : "null";
+
+                        if (company != null && targetTrain != null) {
+                            int cIdx = company.getPublicNumber();
+
+                            // Verify index and ensure buttons exist
+                            if (cIdx >= 0 && cIdx < nc && compSubTrainButtons[cIdx] != null) {
+                                int slot = 0;
+                                for (net.sf.rails.ui.swing.elements.RailCard card : compSubTrainButtons[cIdx]) {
+
+                                    // Match by unique train name
+                                    if (card != null && card.getUniqueId() != null
+                                            && card.getUniqueId().equals(targetTrain.getName())) {
+
+                                        card.setPossibleAction(pa);
+                                        card.setState(net.sf.rails.ui.swing.elements.RailCard.State.HIGHLIGHTED);
+                                        card.setBackground(java.awt.Color.CYAN);
+                                        card.setBorder(
+                                                javax.swing.BorderFactory.createLineBorder(java.awt.Color.CYAN, 3));
+                                        card.setToolTipText("Click to Discard " + targetTrain.getName());
+                                        card.setEnabled(true);
+                                        card.setVisible(true);
+                                        card.repaint();
                                     }
-                                    log.warn("Field [{}]: {} = {}", clazz.getSimpleName(), f.getName(), valStr);
-                                } catch (Exception e) {
-                                    log.warn("Field [{}]: {} - Error reading: {}", clazz.getSimpleName(), f.getName(), e.getMessage());
                                 }
+                            } else {
                             }
-                            clazz = clazz.getSuperclass(); // Move up to parent class (PossibleAction, etc.)
                         }
-                        log.warn("!!! INVESTIGATION END !!!");
+                        // Important: Skip the rest of the loop for this action so it doesn't match
+                        // generic handlers
+                        continue;
                     }
-                   
+
                     setPlayerCertButton(companyIndex, playerIndex, true, pa);
                     net.sf.rails.ui.swing.elements.RailCard card = getRailCardFor(companyIndex, playerIndex);
                     if (card != null) {

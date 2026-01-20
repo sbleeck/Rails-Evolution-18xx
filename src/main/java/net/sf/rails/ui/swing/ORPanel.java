@@ -1833,6 +1833,46 @@ private void styleRevenueButton(ActionButton btn, boolean isSelected) {
         }
     }
 
+private void addDiscardTrainButton(DiscardTrain action) {
+        ActionButton btn = new ActionButton(RailsIcon.OK);
+        btn.setIcon(null);
+
+        // Extract Train Name safely
+        String trainName = "Train";
+        if (action.getDiscardedTrain() != null) {
+            trainName = action.getDiscardedTrain().getType().getName();
+        } else {
+            // Fallback parsing if object is missing
+            trainName = action.getButtonLabel().replace("Discard ", "");
+        }
+
+        // Card-like formatting: "Discard" small on top, Train Name large below
+        btn.setText("<html><center><br><font size='5'><b>" + trainName + "</b></font></center></html>");
+
+        // Train Card Styling (Beige Background)
+        btn.setBackground(new Color(255, 255, 240)); 
+        btn.setForeground(Color.BLACK);
+        btn.setOpaque(true);
+        btn.setFont(new Font("SansSerif", Font.PLAIN, 12));
+
+        // FAT CYAN BORDER (3 pixels)
+        btn.setBorder(BorderFactory.createCompoundBorder(
+                BorderFactory.createLineBorder(Color.CYAN, 3),
+                BorderFactory.createEmptyBorder(2, 5, 2, 5) // Internal padding
+        ));
+
+        btn.setPossibleAction(action);
+        btn.setActionCommand("SpecialAction");
+        btn.addActionListener(this);
+        
+        btn.setAlignmentX(Component.CENTER_ALIGNMENT);
+        btn.setMaximumSize(new Dimension(SIDEBAR_WIDTH - 20, 50)); // Taller for card look
+
+        specialPanel.add(btn);
+        specialPanel.add(Box.createVerticalStrut(8));
+    }
+
+
     private boolean isActionListEmpty(ActionButton btn) {
         return btn.getPossibleActions() == null || btn.getPossibleActions().isEmpty();
     }
@@ -1848,7 +1888,29 @@ private void styleRevenueButton(ActionButton btn, boolean isSelected) {
 
     public void updateDynamicActions(List<PossibleAction> actions) {
 
-       
+       try {
+        if (orUIManager != null && orUIManager.getGameUIManager() != null) {
+            net.sf.rails.game.round.RoundFacade currentRound = 
+                orUIManager.getGameUIManager().getCurrentRound();
+            
+            String roundName = currentRound.getClass().getSimpleName();
+            int hash = System.identityHashCode(this);
+            
+            // CHECK: Are we processing OR Logic while in a Stock Round?
+            if (roundName.contains("StockRound")) {
+                log.error("CRITICAL INTERFERENCE: Zombie ORPanel [{}] is waking up during StockRound!", hash);
+                log.error("Stack Trace Trigger:", new Exception("Zombie Trace"));
+                
+                // OPTIONAL: Force kill the zombie to see if it fixes the bug immediately
+                // this.setVisible(false);
+                // return; 
+            } else {
+                log.info("ORPanel [{}] updating in round: {}", hash, roundName);
+            }
+        }
+    } catch (Exception e) {
+        log.error("Logging check failed", e);
+    }
 
         try {
             // 1. Clean Setup
@@ -1914,11 +1976,7 @@ private void styleRevenueButton(ActionButton btn, boolean isSelected) {
                 updateSidebarData();
                 if (sidebarPanel != null)
                     sidebarPanel.repaint();
-                SwingUtilities.invokeLater(() -> {
-                    if (!(orUIManager.getGameUIManager().getCurrentRound() instanceof StartRound)) {
-                        this.requestFocusInWindow();
-                    }
-                });
+    
                 return;
             }
 
@@ -1985,6 +2043,11 @@ private void styleRevenueButton(ActionButton btn, boolean isSelected) {
                     for (PossibleAction spa : specialActions) {
                         ActionButton b = null;
 
+                        if (spa instanceof DiscardTrain) {
+                            addDiscardTrainButton((DiscardTrain) spa);
+                            continue; // Skip standard generation for this action
+                        }
+
                         if (spa instanceof GuiTargetedAction) {
                             // 1. Targeted Action (Start / Exchange) -> GREY / NON-DESCRIPT
                             GuiTargetedAction gta = (GuiTargetedAction) spa;
@@ -2022,6 +2085,20 @@ private void styleRevenueButton(ActionButton btn, boolean isSelected) {
                             styleButton(b, SYS_BLUE, label);
                             b.setEnabled(true);
                         }
+                        else if (spa instanceof LayBaseToken) {
+                        // 3. LayBaseToken (e.g. Baden Home Choice)
+                        // These are special "Home City" token lays that act as a decision.
+                        // We use the label provided by the Operating Round.
+                        String label = spa.getButtonLabel();
+                        if (label == null || label.isEmpty()) label = "Place Token";
+
+                        b = createSidebarButton(label, "SpecialAction");
+                        b.setPossibleAction(spa);
+
+                        // FORCE BLUE ACTIVE STYLE to indicate this is the required action
+                        styleButton(b, SYS_BLUE, label);
+                        b.setEnabled(true);
+                    }
 
                         if (b != null) {
                             b.setEnabled(true);

@@ -64,7 +64,7 @@ public class TimeOptionsDialog extends JDialog implements ActionListener {
     private static final int ST_BRN = 40;
 
     private static final int MINOR_PENALTY_PRESET = 0; 
-    private static final int MAJOR_PENALTY_PRESET = 30; 
+    private static final int MAJOR_PENALTY_PRESET = 0; 
     private static final double MODERATOR_BONUS = 1.1;
 
     public TimeOptionsDialog(Dialog owner, GameManager gm) {

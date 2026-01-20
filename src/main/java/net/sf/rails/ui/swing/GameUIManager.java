@@ -143,6 +143,9 @@ public class GameUIManager implements DialogOwner {
     private boolean isTimerPaused = false;
     private double currentFontScale = 1.0;
 
+    private boolean isHistoryNavigation = false;
+
+
     // Player order
     // protected PlayerOrderView playerOrderView;
     /**
@@ -340,14 +343,12 @@ public class GameUIManager implements DialogOwner {
         String savedScale = null;
         if (windowSettings != null) {
             savedScale = windowSettings.getProperty("font.ui.scale");
-            log.info("GameUIManager: Loaded saved font scale from WindowSettings: '{}'", savedScale);
         } else {
             log.warn("GameUIManager: WindowSettings is null during initFontSettings!");
         }
 
         if (!Util.hasValue(savedScale)) {
             savedScale = Config.get("font.ui.scale");
-            log.info("GameUIManager: Fallback to Config for font scale: '{}'", savedScale);
         }
 
         if (Util.hasValue(savedScale)) {
@@ -557,16 +558,26 @@ public class GameUIManager implements DialogOwner {
             Thread.dumpStack(); // Trace who triggered this update
         }
 
-        previousRoundType = currentRoundType;
-        previousRoundName = currentRoundName;
-        previousRound = currentRound;
-
         currentRound = railsRoot.getGameManager().getCurrentRound();
         currentRoundName = currentRound.toString();
-
         currentRoundType = currentRound.getClass();
 
-        /* Process actual round type changes */
+// Derive previous types from the stored 'previousRound' state
+        // This ensures that if the previous update crashed, we still see the OLD round here.
+        if (previousRound != null) {
+            previousRoundType = previousRound.getClass();
+            previousRoundName = previousRound.toString();
+        } else {
+            previousRoundType = null;
+            previousRoundName = "";
+        }
+
+
+
+
+
+        // 2. Handle specific Transition Events (Start/Operating Round inits)
+        // These are expensive or state-resetting, so we keep them gated by the transition check.
         if (previousRoundType != currentRoundType) {
             if (previousRoundType != null) {
                 setCurrentDialog(null, null);
@@ -578,15 +589,17 @@ public class GameUIManager implements DialogOwner {
                         startRoundWindow.close();
                         startRoundWindow = null;
                     }
-                } else if (OperatingRound.class.isAssignableFrom(previousRoundType)) {
-                    orUIManager.finish();
-                }
+                } 
+                // Note: OperatingRound cleanup is now handled unconditionally above.
             }
         }
 
         if (currentRound != previousRound) {
             // Start the new round UI processing
             if (StartRound.class.isAssignableFrom(currentRoundType)) {
+
+                
+
                 startRound = (StartRound) currentRound;
                 if (startRoundWindow == null) {
                     String startRoundWindowClassName = getClassName(GuiDef.ClassName.START_ROUND_WINDOW);
@@ -601,8 +614,13 @@ public class GameUIManager implements DialogOwner {
                     }
                 }
 
+                // Revert aggressive "Force Visibility" logic here. 
+            // We trust the Transactional Update (at the end) to handle retries.
             } else if (StockRound.class.isAssignableFrom(currentRoundType)) {
-                statusWindow.getGameStatus().initGameSpecificActions();
+                 statusWindow.getGameStatus().initGameSpecificActions();
+                 // Ensure OR Panel is cleaned up if we arrived here via Undo
+                 if (orUIManager != null) orUIManager.finish();
+
 
             } else if (OperatingRound.class.isAssignableFrom(currentRoundType)) {
                 orUIManager.initOR((OperatingRound) currentRound);
@@ -724,25 +742,33 @@ public class GameUIManager implements DialogOwner {
                 log.error("Recovered from StatusWindow crash during updateUI. Proceeding to ORUIManager.", e);
             }
         }
-if (orUIManager != null) {
-            
-            // TRAFFIC CONTROL ---
-            boolean isPFR = (currentRound != null && currentRound.getClass().getSimpleName().equals("PrussianFormationRound"));
+        if (orUIManager != null) {
 
-            // 1. If we are NOT in PFR, we must UNLOCK the ORPanel so standard updates (M3) can pass.
+            // TRAFFIC CONTROL ---
+            boolean isPFR = (currentRound != null
+                    && currentRound.getClass().getSimpleName().equals("PrussianFormationRound"));
+
+            // 1. If we are NOT in PFR, we must UNLOCK the ORPanel so standard updates (M3)
+            // can pass.
             if (!isPFR) {
                 ORPanel.releaseSpecialMode(this);
             }
 
-            // 2. Standard Update (Will be ignored by ORPanel if PFR is active, Accepted if Released)
-            orUIManager.updateStatus(myTurn);
+            // 3. Crash Protection for Side Panel:
+            // If ORPanel/ORUIManager crashes (e.g., due to stale state during Undo),
+            // we catch it so the rest of the UI (GameStatus) keeps updating.
+            try {
+                orUIManager.updateStatus(myTurn);
+            } catch (Exception e) {
+                log.error("Recovered from ORUIManager crash. Side panel may be stale, but Game should proceed.", e);
+            }
 
             // 3. If we ARE in PFR, force the special UI
             if (isPFR) {
                 List<PossibleAction> actions = getGameManager().getPossibleActions().getList();
                 ORPanel.forceUpdateForManager(this, actions);
             }
-      }
+        }
 
         if (StartRoundWindow.class.isAssignableFrom(activeWindow.getClass())) {
             startRoundWindow.setSRPlayerTurn();
@@ -768,6 +794,15 @@ if (orUIManager != null) {
                     startRoundWindow.requestFocus();
                 }
             });
+        }
+
+        // Transactional Commit: Only update the "Previous" state AFTER everything successfully ran.
+        // If an exception occurred above (e.g. in orUIManager.finish()), these lines are skipped.
+        // The next call to updateUI() will see (previous != current) and RETRY the transition/cleanup.
+        previousRound = currentRound;
+        if (previousRound != null) {
+             previousRoundType = previousRound.getClass();
+             previousRoundName = previousRound.toString();
         }
 
     }
@@ -1888,6 +1923,7 @@ if (orUIManager != null) {
     }
 
     public void performAIMove() {
+
         RoundFacade currentRound = getCurrentRound();
 
         // CRITICAL FIX: Zwinge die Engine, die Aktionen zu setzen, bevor wir
@@ -2121,9 +2157,16 @@ if (orUIManager != null) {
         boolean result;
         lastAction = action;
 
-        // Safety Check for Game Actions (Undo/Redo) ---
-if (action instanceof GameAction) {
 
+        // Detect Undo/Redo
+        if (action instanceof GameAction) {
+            GameAction.Mode mode = ((GameAction) action).getMode();
+            if (mode == GameAction.Mode.UNDO || mode == GameAction.Mode.REDO || mode == GameAction.Mode.FORCED_UNDO) {
+                isHistoryNavigation = true;
+            } else {
+                isHistoryNavigation = false;
+            }
+            
             result = previousResult = processOnServer(action);
             if (result) {
                 updateUI();
@@ -2134,6 +2177,22 @@ if (action instanceof GameAction) {
             return result;
         }
         
+        // Reset flag for normal moves
+        isHistoryNavigation = false;
+
+
+        // Safety Check for Game Actions (Undo/Redo) ---
+        if (action instanceof GameAction) {
+
+            result = previousResult = processOnServer(action);
+            if (result) {
+                updateUI();
+                if (statusWindow != null) {
+                    statusWindow.setGameActions();
+                }
+            }
+            return result;
+        }
 
         // Intercept Train Correction Actions and route to Manager
         if (action instanceof TrainCorrectionAction) {

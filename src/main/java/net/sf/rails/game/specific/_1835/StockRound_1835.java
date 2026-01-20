@@ -210,32 +210,7 @@ public class StockRound_1835 extends StockRound {
             possibleActions.add(new AdjustSharePrice(lastSoldCompany, EnumSet.of(AdjustSharePrice.Direction.DOWN)));
         }
 
-        // PFR rules allow exchange in subsequent Stock Rounds until the Minor is gone.
-        // We generate the action if the player holds an eligible Minor and PR has
-        // started.
-        PublicCompany pr = companyManager.getPublicCompany("PR");
-
-        // FIX: Relaxed condition check: if PR exists and is not closed.
-        if (pr != null && pr.hasStarted()&& !pr.isClosed()) {
-            for (PublicCompany minor : companyManager.getAllPublicCompanies()) {
-                String id = minor.getId();
-                // Exclude Majors (like MS) that might match the "M.." ID pattern.
-                // Only companies without a stock price (Minors) can exchange.
-                if (minor.hasStockPrice()) {
-                    continue;
-                }
-                
-                // Check eligible Minors/pre-majors: M1-M6, HB, BB
-                if (id.startsWith("M") && id.length() == 2 || id.equals("HB") || id.equals("BB")) {
-                    if (currentPlayer.getPortfolioModel().getShare(minor) > 0) {
-                        // Only offer exchange if the minor hasn't already been closed/removed
-                        if (!minor.isClosed()) {
-                            possibleActions.add(new ExchangeForPrussianShare(minor));
-                        }
-                    }
-                }
-            }
-        }
+        
     }
 
     protected boolean processGameSpecificAction(PossibleAction action) {

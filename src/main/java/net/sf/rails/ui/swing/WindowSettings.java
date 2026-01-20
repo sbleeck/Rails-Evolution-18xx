@@ -62,10 +62,10 @@ public class WindowSettings {
     public void load () {
         FileReader file;
         try {
-            log.info("WindowSettings: Attempting to load settings from '{}'", filepath);
+            // log.info("WindowSettings: Attempting to load settings from '{}'", filepath);
             file = new FileReader (filepath);
         } catch (FileNotFoundException e1) {
-            log.warn("WindowSettings: User settings file not found at '{}'. Attempting default.", filepath);
+            // log.warn("WindowSettings: User settings file not found at '{}'. Attempting default.", filepath);
             try {
                 file = new FileReader (defaultpath);
             } catch (FileNotFoundException e2) {

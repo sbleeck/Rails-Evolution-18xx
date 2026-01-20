@@ -131,9 +131,7 @@ public class ORUIManager implements DialogOwner {
         }
 
         if (orPanel != null) {
-            orPanel.disableButtons();
-            orPanel.updateDynamicActions(new ArrayList<>());
-            orPanel.redisplay();
+            orPanel.finish();
         }
 
         if (!(gameUIManager.getCurrentRound() instanceof ShareSellingRound)) {
@@ -1063,27 +1061,33 @@ public class ORUIManager implements DialogOwner {
         return this.localStep;
     }
 
-    public void setMapRelatedActions(PossibleActions actions) {
+public void setMapRelatedActions(PossibleActions actions) {
         this.networkAdapter = NetworkAdapter.create(gameUIManager.getRoot());
         currentValidTileLays.clear();
         currentValidTokenLays.clear();
 
-// We must capture the selected hex and explicitly clear its 'upgrade' (preview) 
-        // state. Without this, the GUIHex retains the visual of the tile even after 
-        // the Engine undoes the move.
-        GUIHex selectedHex = map.getSelectedHex();
-
-        if (hexUpgrades.hasElements()) {
-            if (selectedHex != null) {
-                selectedHex.setUpgrade(null); // <--- THE CRITICAL FIX
-                selectedHex.setState(GUIHex.State.NORMAL);
-                map.setSelectedHex(null);
+        // AGGRESSIVE CLEANUP: Iterate ALL hexes to clear "Ghost" previews.
+        // During Undo, map.getSelectedHex() is often null, so the specific hex 
+        // that holds the visual artifact is missed by the standard cleanup.
+        if (map != null) {
+            for (GUIHex hex : map.getHexes()) {
+                // Clear any pending visual upgrade (the ghost tile)
+                if (hex.getUpgrade() != null) {
+                    hex.setUpgrade(null);
+                }
+                // Reset state to ensure no "Green/Red" highlights linger from a future turn
+                if (hex.getState() != GUIHex.State.NORMAL) {
+                    hex.setState(GUIHex.State.NORMAL);
+                }
             }
-            for (GUIHex h : hexUpgrades.getHexes())
-                h.setState(GUIHex.State.NORMAL);
-            hexUpgrades.clear();
+            // Clear global selection
+            map.setSelectedHex(null);
         }
-        
+       
+        // Ensure the collection is cleared so we can rebuild it fresh below
+        if (hexUpgrades != null) {
+            hexUpgrades.clear();
+        }     
 
         List<LayTile> tiles = actions.getType(LayTile.class);
         List<LayToken> tokens = actions.getType(LayToken.class);

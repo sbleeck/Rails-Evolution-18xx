@@ -105,10 +105,6 @@ private static final Border BORDER_HIGHLIGHT = BorderFactory.createLineBorder(CO
      * Assigns an action to this card, making it clickable (Blue Highlight mode).
      */
 public void setPossibleAction(PossibleAction action) {
-        if (action != null) {
-            System.out.println("[RailCard] setPossibleAction: " + action.getClass().getSimpleName() 
-                + " on card " + getFirstAvailableLabel());
-        }
         this.clearPossibleActions();
         if (action != null) {
             this.addPossibleAction(action);
@@ -196,15 +192,8 @@ public void setPossibleAction(PossibleAction action) {
     }
 
     public void setCustomLabel(String label) {
-        // DO NOT call reset() here!
-        // reset() calls setToolTipText(null), which wipes the tooltip we just set in
-        // GameStatus.
-
-        // Manually clear content lists instead to ensure the label displays correctly
-        this.certificates.clear();
-        this.trains.clear();
-        this.privates.clear();
-
+// FIX: Do not clear internal lists (trains/certificates)!
+        // We need them to remain populated so getUniqueId() works for action matching.
         this.customLabel = label;
         updateView();
     }
@@ -361,7 +350,6 @@ public void setState(State state) {
     }
 
 
-    // ... (lines of unchanged context code) ...
     /**
      * Robust Identification: Checks if this card holds the specific certificate object.
      * Use this instead of comparing string IDs or labels.
@@ -388,24 +376,6 @@ public void setState(State state) {
                 }
             }
 
-            // // --- DEBUG LOGGING ---
-            // // Only log if we are looking for "M2" (the problem cert) to avoid spamming the log for every card
-            // if (target.getId().equals("M2") || held.getId().equals("M2")) {
-            //     System.out.println(String.format(">> [RailCard CHECK] CardLabel='%s'", getFirstAvailableLabel()));
-            //     System.out.println(String.format("   TARGET: ID=%s | Share=%d%% | Class=%s | Hash=%s",
-            //             target.getId(),
-            //             (target instanceof PublicCertificate ? ((PublicCertificate)target).getShare() : 0),
-            //             target.getClass().getSimpleName(),
-            //             System.identityHashCode(target)));
-                
-            //     System.out.println(String.format("   HELD:   ID=%s | Share=%d%% | Class=%s | Hash=%s",
-            //             held.getId(),
-            //             (held instanceof PublicCertificate ? ((PublicCertificate)held).getShare() : 0),
-            //             held.getClass().getSimpleName(),
-            //             System.identityHashCode(held)));
-                
-            //     System.out.println(String.format("   >> MATCH: %s", matchFound));
-            // }
 
             if (matchFound) return true;
         }
@@ -595,36 +565,34 @@ public void setState(State state) {
         setToolTipText(info);
     }
 
-    /**
-     * Returns the unique identifier of the primary object displayed on this card.
-     * Used by the UI to match Actions to Cards.
-     */
+
     public String getUniqueId() {
-        // 1. If explicitly linked to a Company (e.g. in the Map or Legend)
         if (associatedCompany != null) {
             return associatedCompany.getId();
         }
-        
-        // 2. If holding Certificates (Shares) -> Return the Company ID
         if (!certificates.isEmpty()) {
-            Certificate cert = certificates.get(0);
-            if (cert instanceof PublicCertificate) {
-                return ((PublicCertificate) cert).getCompany().getId();
-            } else if (cert instanceof PrivateCompany) {
-                return ((PrivateCompany) cert).getId();
+            net.sf.rails.game.financial.Certificate cert = certificates.get(0);
+            if (cert instanceof net.sf.rails.game.financial.PublicCertificate) {
+                return ((net.sf.rails.game.financial.PublicCertificate) cert).getCompany().getId();
+            } else if (cert instanceof net.sf.rails.game.PrivateCompany) {
+                return ((net.sf.rails.game.PrivateCompany) cert).getId();
             }
             return cert.getId();
         }
-
-        // 3. If holding Privates (Directly)
         if (!privates.isEmpty()) {
             return privates.get(0).getId();
         }
-
-        // 4. If holding Trains
         if (!trains.isEmpty()) {
             return trains.get(0).getName();
         }
+        
+        // --- START FIX ---
+        // Safety Fallback: Use Swing Name if manually set (e.g. by GameStatus)
+        String name = getName();
+        if (name != null && !name.isEmpty()) {
+            return name;
+        }
+        // --- END FIX ---
 
         return null;
     }
