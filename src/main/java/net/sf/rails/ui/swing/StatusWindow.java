@@ -48,9 +48,9 @@ import net.sf.rails.util.GameLoader;
 import rails.game.action.*;
 import rails.game.correct.CorrectionModeAction;
 import rails.game.correct.CorrectionType;
-import rails.game.correct.TrainCorrectionAction;
-import net.sf.rails.ui.swing.elements.ActionButton; // Ensure this is imported
-import net.sf.rails.ui.swing.elements.RailsIcon; // Ensure this is imported
+// import rails.game.correct.TrainCorrectionAction;
+// import net.sf.rails.ui.swing.elements.ActionButton; // Ensure this is imported
+// import net.sf.rails.ui.swing.elements.RailsIcon; // Ensure this is imported
 
 import java.io.InputStream;
 import java.util.Properties;
@@ -157,22 +157,19 @@ public class StatusWindow extends JFrame implements ActionListener, ActionPerfor
 
     // DESIGN LANGUAGE CONSTANTS
     // Primary Borders (Strong Indication)
-    private static final Color SYS_BLUE  = new Color(30, 144, 255); // DodgerBlue - Generic Interaction / Pass
-    private static final Color SYS_CYAN  = Color.CYAN;              // Cyan - Special Action / Force / Scrap
-    private static final Color SYS_RED   = new Color(255, 69, 0);   // OrangeRed - Selling / Destructive
-    private static final Color SYS_GREEN = new Color(34, 139, 34);  // ForestGreen - Buying / Acquisition
-    private static final Color FG_WHITE  = Color.WHITE;
+    private static final Color SYS_BLUE = new Color(30, 144, 255); // DodgerBlue - Generic Interaction / Pass
+    private static final Color SYS_CYAN = Color.CYAN; // Cyan - Special Action / Force / Scrap
+    private static final Color SYS_RED = new Color(255, 69, 0); // OrangeRed - Selling / Destructive
+    private static final Color SYS_GREEN = new Color(34, 139, 34); // ForestGreen - Buying / Acquisition
+    private static final Color FG_WHITE = Color.WHITE;
 
     // Backgrounds (Pale Context Hints)
-    private static final Color BG_BLUE   = new Color(225, 240, 255); // Pale Blue
-    private static final Color BG_RED    = new Color(255, 235, 235); // Pale Red
-    private static final Color BG_GREEN  = new Color(230, 255, 230); // Pale Green
-    private static final Color BG_BEIGE  = new Color(245, 245, 220); // Beige - Special / Scrap
+    private static final Color BG_BLUE = new Color(225, 240, 255); // Pale Blue
+    private static final Color BG_RED = new Color(255, 235, 235); // Pale Red
+    private static final Color BG_GREEN = new Color(230, 255, 230); // Pale Green
+    private static final Color BG_BEIGE = new Color(245, 245, 220); // Beige - Special / Scrap
 
-
-
-  
-    private String lastCompanySignature = null;
+    // private String lastCompanySignature = null;
 
     // Helper to enforce Design Language on buttons
     private void styleStatusButton(ActionButton btn, Color bg) {
@@ -181,75 +178,77 @@ public class StatusWindow extends JFrame implements ActionListener, ActionPerfor
         btn.setBackground(bg);
         btn.setForeground(FG_WHITE);
         btn.setOpaque(true);
-        btn.setFont(new Font("SansSerif", Font.BOLD, 12));
+        btn.setFont(new Font("SansSerif", Font.BOLD, (int) currentBaseFontSize));
         btn.setBorder(BorderFactory.createRaisedBevelBorder()); // Match ORPanel 3D look
     }
 
-    // New Helper for "Passive/Yield" buttons (Grey + Black Text)
-    private void stylePassiveButton(ActionButton btn) {
-        if (btn == null)
-            return;
-        btn.setBackground(Color.LIGHT_GRAY);
-        btn.setForeground(Color.BLACK); // Black text for readability on Grey
-        btn.setOpaque(true);
-        btn.setFont(new Font("SansSerif", Font.BOLD, 12));
-        btn.setBorder(BorderFactory.createRaisedBevelBorder());
-    }
+    // // New Helper for "Passive/Yield" buttons (Grey + Black Text)
+    // private void stylePassiveButton(ActionButton btn) {
+    // if (btn == null)
+    // return;
+    // btn.setBackground(Color.LIGHT_GRAY);
+    // btn.setForeground(Color.BLACK); // Black text for readability on Grey
+    // btn.setOpaque(true);
+    // btn.setFont(new Font("SansSerif", Font.BOLD, 12));
+    // btn.setBorder(BorderFactory.createRaisedBevelBorder());
+    // }
 
-    // Helper to reset button to passive state
-    private void resetStatusButton(ActionButton btn) {
-        if (btn == null)
-            return;
-        btn.setBackground(UIManager.getColor("Button.background"));
-        btn.setForeground(Color.BLACK);
-        btn.setFont(new Font("SansSerif", Font.PLAIN, 12));
-        btn.setBorder(UIManager.getBorder("Button.border"));
-    }
+    // // Helper to reset button to passive state
+    // private void resetStatusButton(ActionButton btn) {
+    // if (btn == null)
+    // return;
+    // btn.setBackground(UIManager.getColor("Button.background"));
+    // btn.setForeground(Color.BLACK);
+    // btn.setFont(new Font("SansSerif", Font.PLAIN, 12));
+    // btn.setBorder(UIManager.getBorder("Button.border"));
+    // }
 
-    private void checkStructureChange() {
-        if (gameUIManager == null || gameUIManager.getGameManager() == null)
-            return;
+    // private void checkStructureChange() {
+    // if (gameUIManager == null || gameUIManager.getGameManager() == null)
+    // return;
 
-        // 1. Build a "Signature" of the current public companies
-        // Access CompanyManager via getRoot()
-        String currentSignature = "";
-        try {
-            List<PublicCompany> comps = gameUIManager.getGameManager()
-                    .getRoot() // <--- ADDED THIS
-                    .getCompanyManager()
-                    .getAllPublicCompanies();
+    // // 1. Build a "Signature" of the current public companies
+    // // Access CompanyManager via getRoot()
+    // String currentSignature = "";
+    // try {
+    // List<PublicCompany> comps = gameUIManager.getGameManager()
+    // .getRoot() // <--- ADDED THIS
+    // .getCompanyManager()
+    // .getAllPublicCompanies();
 
-            currentSignature = comps.stream()
-                    .filter(c -> !c.isClosed())
-                    .map(c -> c.getId())
-                    .collect(Collectors.joining(","));
-        } catch (Exception e) {
-            // Safety fallback if Root or CompanyManager isn't ready
-            return;
-        }
+    // currentSignature = comps.stream()
+    // .filter(c -> !c.isClosed())
+    // .map(c -> c.getId())
+    // .collect(Collectors.joining(","));
+    // } catch (Exception e) {
+    // // Safety fallback if Root or CompanyManager isn't ready
+    // return;
+    // }
 
-        // 2. Initialize on first run (Startup)
-        // We assume 'init()' has already set up the grid correctly for the start state.
-        if (lastCompanySignature == null) {
-            lastCompanySignature = currentSignature;
-            return;
-        }
+    // // 2. Initialize on first run (Startup)
+    // // We assume 'init()' has already set up the grid correctly for the start
+    // state.
+    // if (lastCompanySignature == null) {
+    // lastCompanySignature = currentSignature;
+    // return;
+    // }
 
-        // 3. Compare and Recreate if needed
-        if (!currentSignature.equals(lastCompanySignature)) {
-            log.info("StatusWindow: Structure change detected ({} -> {}). Recreating Dashboard.",
-                    lastCompanySignature, currentSignature);
-            gameStatus.recreate();
-            lastCompanySignature = currentSignature;
-        } else {
-            // 4. Standard Refresh
-            gameStatus.refreshDashboard();
-        }
-    }
+    // // 3. Compare and Recreate if needed
+    // if (!currentSignature.equals(lastCompanySignature)) {
+    // log.info("StatusWindow: Structure change detected ({} -> {}). Recreating
+    // Dashboard.",
+    // lastCompanySignature, currentSignature);
+    // gameStatus.recreate();
+    // lastCompanySignature = currentSignature;
+    // } else {
+    // // 4. Standard Refresh
+    // gameStatus.refreshDashboard();
+    // }
+    // }
 
     private static final Logger log = LoggerFactory.getLogger(StatusWindow.class);
 
-    private JMenu infoMenu;
+    // private JMenu infoMenu;
     private JMenu companiesMenu;
     private JMenu trainsMenu;
     private JMenu phasesMenu;
@@ -514,7 +513,6 @@ public class StatusWindow extends JFrame implements ActionListener, ActionPerfor
             developerMenu = new JMenu("Developer");
             developerMenu.setName("Developer");
             menuBar.add(developerMenu);
-
 
             ActionMenuItem actionRunnerItem = new ActionMenuItem("Force Actions!");
             actionRunnerItem.setName("Force Actions!");
@@ -893,9 +891,8 @@ public class StatusWindow extends JFrame implements ActionListener, ActionPerfor
             updateFonts(Math.max(8f, currentBaseFontSize - 1f));
         } else if (command.equals("SHOW_MOVE_MONITOR")) {
             showMoveMonitor();
-            } else if (command.equals("SHOW_ACTION_RUNNER")) { // --- START FIX ---
+        } else if (command.equals("SHOW_ACTION_RUNNER")) { // --- START FIX ---
             showActionRunner();
-
 
         } else if (command.equals(REM_TILES_CMD) || command.equals(ORPanel.REM_TILES_CMD)) {
 
@@ -1129,9 +1126,8 @@ public class StatusWindow extends JFrame implements ActionListener, ActionPerfor
         gameStatusPane = new JScrollPane(gameStatus); //
 
         // --- BUTTONS (SOUTH) ---
-        // --- BUTTONS (SOUTH) ---
         // 1. Single Row Grid (1 Row, 5 Cols) -> HGap=12 for "tiny bit more space"
-        buttonPanel = new JPanel(new GridLayout(1, 5, 12, 0));
+        buttonPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 12, 0));
 
         // 2. Define Buttons
         // We use RailsIcon.PASS as a placeholder for the constructor, then strip it for
@@ -1207,11 +1203,11 @@ public class StatusWindow extends JFrame implements ActionListener, ActionPerfor
         undoButton.setPreferredSize(btnDim);
         redoButton.setPreferredSize(btnDim);
         aiButton.setPreferredSize(btnDim);
-        passButton.setPreferredSize(btnDim);
+        passButton.setPreferredSize(new Dimension(113, 45)); // 1.41x wider
 
         setSize(600, 300);
 
-        buttonPanel.setBorder(BorderFactory.createEtchedBorder());
+        buttonPanel.setBorder(null);
         buttonPanel.setOpaque(false);
 
         String loadedBuildTime = "Dev Build";
@@ -1259,12 +1255,13 @@ public class StatusWindow extends JFrame implements ActionListener, ActionPerfor
         pane.add(gameStatusPane, BorderLayout.CENTER); // Table in Center
 
         // Bottom Container
-        JPanel southContainer = new JPanel(new BorderLayout(10, 0));
+        JPanel southContainer = new JPanel(new BorderLayout(100, 0));
         southContainer.setBorder(BorderFactory.createEtchedBorder());
         southContainer.add(buttonPanel, BorderLayout.WEST);
 
         dynamicButtonPanel = new JPanel();
         dynamicButtonPanel.setLayout(new FlowLayout(FlowLayout.LEFT));
+        dynamicButtonPanel.setBorder(BorderFactory.createEmptyBorder(0, 300, 0, 0));
         dynamicButtonPanel.setOpaque(false);
         southContainer.add(dynamicButtonPanel, BorderLayout.CENTER);
         southContainer.add(gameTimeLabel, BorderLayout.EAST);
@@ -1701,6 +1698,145 @@ public class StatusWindow extends JFrame implements ActionListener, ActionPerfor
                 passButton.setEnabled(false);
             }
 
+            // "Default Move" Logic: Map the main "Done/Pass" button to the most logical
+            // next step
+            // Labels: "Pay out" (Rev), "Skip" (Tile/Token/Train), "Finished" (OR End),
+            // "Done" (SR)
+
+            boolean defaultActionHandled = false;
+
+            // 1. Analyze Phase Context
+            boolean hasLayTile = false;
+            boolean hasLayToken = false;
+            boolean hasBuyTrain = false;
+
+            if (possibleActions != null && possibleActions.getList() != null) {
+                for (PossibleAction pa : possibleActions.getList()) {
+                    if (pa instanceof LayTile)
+                        hasLayTile = true;
+                    else if (pa instanceof LayToken)
+                        hasLayToken = true;
+                    else if (pa instanceof BuyTrain)
+                        hasBuyTrain = true;
+                }
+            }
+
+            // ... (lines of unchanged context code) ...
+            // 2. REVENUE PHASE ("Pay out" / "Split" / "Withhold")
+            List<SetDividend> revenueActions = possibleActions.getType(SetDividend.class);
+            if (revenueActions != null && !revenueActions.isEmpty()) {
+                SetDividend sourceAction = revenueActions.get(0);
+                SetDividend bestOption = null;
+
+                // Priority: PAYOUT -> SPLIT -> WITHHOLD -> ANY
+                if (sourceAction.isAllocationAllowed(SetDividend.PAYOUT)) {
+                    bestOption = (SetDividend) sourceAction.clone();
+                    bestOption.setRevenueAllocation(SetDividend.PAYOUT);
+                } else if (sourceAction.isAllocationAllowed(SetDividend.SPLIT)) {
+                    bestOption = (SetDividend) sourceAction.clone();
+                    bestOption.setRevenueAllocation(SetDividend.SPLIT);
+                } else if (sourceAction.isAllocationAllowed(SetDividend.WITHHOLD)) {
+                    bestOption = (SetDividend) sourceAction.clone();
+                    bestOption.setRevenueAllocation(SetDividend.WITHHOLD);
+                } else {
+                    int[] allowed = sourceAction.getAllowedRevenueAllocations();
+                    if (allowed != null && allowed.length > 0) {
+                        bestOption = (SetDividend) sourceAction.clone();
+                        bestOption.setRevenueAllocation(allowed[0]);
+                    }
+                }
+
+                if (bestOption != null) {
+                    passButton.setEnabled(true);
+                    passButton.setVisible(true);
+                    passButton.setRailsIcon(null);
+                    passButton.setActionCommand(DONE_CMD);
+                    passButton.setPossibleAction(bestOption);
+
+                    // Critical: Set Text AFTER setPossibleAction
+                    int alloc = bestOption.getRevenueAllocation();
+
+                    if (alloc == SetDividend.PAYOUT) {
+                        passButton.setText("Pay out");
+                    } else if (alloc == SetDividend.SPLIT) {
+                        passButton.setText("Split");
+                    } else {
+                        passButton.setText("Withhold");
+                    }
+
+                    // Unified Blue Color (as requested)
+                    styleStatusButton(passButton, SYS_BLUE);
+                    defaultActionHandled = true;
+                }
+            }
+
+            // 3. OTHER PHASES ("Pass" / "Done" / "Skip" / "Finished")
+            if (!defaultActionHandled) {
+                List<NullAction> nullActions = possibleActions.getType(NullAction.class);
+                if (nullActions != null && !nullActions.isEmpty()) {
+                    NullAction bestNull = null;
+
+                    boolean isStock = (currentRound instanceof net.sf.rails.game.financial.StockRound);
+                    boolean isStepPhase = (hasLayTile || hasLayToken); // Phases where we typically "Skip" steps
+
+                    for (NullAction na : nullActions) {
+                        if (na.getMode() == NullAction.Mode.PASS || na.getMode() == NullAction.Mode.DONE) {
+                            if (bestNull == null) {
+                                bestNull = na;
+                            } else {
+                                if (isStock) {
+                                    // Stock Round: Prefer PASS
+                                    if (na.getMode() == NullAction.Mode.PASS)
+                                        bestNull = na;
+                                } else if (isStepPhase) {
+                                    // OR Step (Build/Token): Prefer PASS (Skip Step)
+                                    if (na.getMode() == NullAction.Mode.PASS)
+                                        bestNull = na;
+                                } else {
+                                    // OR Final (Train/End): Prefer DONE (End Turn)
+                                    if (na.getMode() == NullAction.Mode.DONE)
+                                        bestNull = na;
+                                }
+                            }
+                        }
+                    }
+
+                    if (bestNull != null) {
+                        passButton.setEnabled(true);
+                        passButton.setVisible(true);
+                        passButton.setRailsIcon(null);
+                        passButton.setActionCommand(passButton.getActionCommand());
+                        passButton.setPossibleAction(bestNull);
+
+                        String label = "Done"; // Default fallback
+
+                        if (currentRound instanceof net.sf.rails.game.financial.StockRound) {
+                            // Stock Round: Explicitly map PASS to "Pass"
+                            if (bestNull.getMode() == NullAction.Mode.PASS) {
+                                label = "Pass";
+                            } else {
+                                label = "Done";
+                            }
+                        } else {
+                            if (hasLayTile) {
+                                label = "Skip Build";
+                            } else if (hasLayToken) {
+                                label = "Skip Token";
+                            } else if (hasBuyTrain) {
+                                label = "Skip Buy"; // User Request: Always "Skip Buy" if purchase is possible
+                            } else {
+                                label = "End Turn";
+                            }
+                        }
+
+                        passButton.setText(label);
+                        styleStatusButton(passButton, SYS_BLUE);
+                        defaultActionHandled = true;
+                    }
+                }
+            }
+            // ... (rest of the method) ...
+
             gameStatus.setBackground(UIManager.getColor("Panel.background"));
             gameStatus.setOpaque(false);
             gameStatus.repaint();
@@ -1709,28 +1845,7 @@ public class StatusWindow extends JFrame implements ActionListener, ActionPerfor
                 endOfGame();
 
             gameUIManager.packAndApplySizing(this);
-            // Use invokeLater to reclaim focus after potential 'focus stealing' by ORWindow
-            // updates.
-            // This ensures our request runs AFTER other windows have finished their layout
-            // churn.
-            SwingUtilities.invokeLater(() -> {
-                // Focus Management:
-                // We yield focus if we are in a Start Round (Auction) OR an Operating Round
-                // (Map).
-                // We only aggressively grab focus during Stock Rounds or related phases.
 
-                boolean startIsActive = gameUIManager.isStartRoundActive();
-                boolean orIsActive = (currentRound instanceof OperatingRound);
-
-                // Only grab focus if NEITHER the Start Round NOR the OR is active.
-                if (!startIsActive && !orIsActive) {
-                    toFront();
-                    if (myTurn) {
-                        requestFocusInWindow();
-                    }
-                }
-
-            });
         } catch (Exception e) {
             log.error("CRITICAL ERROR in StatusWindow.updateStatus", e);
         }
@@ -2240,29 +2355,28 @@ public class StatusWindow extends JFrame implements ActionListener, ActionPerfor
         return false;
     }
 
-
     private void applyActionColor(net.sf.rails.ui.swing.elements.RailCard card, PossibleAction action) {
         if (card == null)
             return;
 
         // Default Highlight (Generic Selection)
         Color borderColor = SYS_BLUE;
-        Color bgColor     = BG_BLUE;
+        Color bgColor = BG_BLUE;
 
         if (action instanceof SellShares) {
             // SELLING -> RED (Destructive)
             borderColor = SYS_RED;
-            bgColor     = BG_RED;
+            bgColor = BG_RED;
 
         } else if (action instanceof DiscardTrain) {
             // SCRAPPING -> CYAN + BEIGE (Special / Mandatory Action)
-            borderColor = SYS_CYAN; 
-            bgColor     = BG_BEIGE; 
-            
+            borderColor = SYS_CYAN;
+            bgColor = BG_BEIGE;
+
         } else if (action instanceof BuyCertificate || action instanceof BuyTrain || action instanceof BuyPrivate) {
             // BUYING -> GREEN (Acquisition)
             borderColor = SYS_GREEN;
-            bgColor     = BG_GREEN;
+            bgColor = BG_GREEN;
         }
 
         // Apply State & Colors
@@ -2272,7 +2386,6 @@ public class StatusWindow extends JFrame implements ActionListener, ActionPerfor
         card.setBackground(bgColor);
         card.repaint();
     }
-
 
     private void showMoveMonitor() {
         if (moveMonitor == null) {
@@ -2355,23 +2468,23 @@ public class StatusWindow extends JFrame implements ActionListener, ActionPerfor
 
         public ActionRunner() {
             super("Action Runner (Debug Force)");
-            
+
             // Layout: Scrollable Vertical List
             setLayout(new BorderLayout());
             buttonPanel = new JPanel();
             buttonPanel.setLayout(new BoxLayout(buttonPanel, BoxLayout.Y_AXIS));
-            
+
             JScrollPane scrollPane = new JScrollPane(buttonPanel);
             scrollPane.getVerticalScrollBar().setUnitIncrement(16); // Faster scrolling
             add(scrollPane, BorderLayout.CENTER);
-            
+
             setSize(400, 600);
             setDefaultCloseOperation(JFrame.HIDE_ON_CLOSE);
         }
 
         public void refresh() {
             buttonPanel.removeAll();
-            
+
             // Safety Check
             if (possibleActions == null || possibleActions.getList() == null) {
                 buttonPanel.revalidate();
@@ -2381,16 +2494,16 @@ public class StatusWindow extends JFrame implements ActionListener, ActionPerfor
 
             for (final PossibleAction pa : possibleActions.getList()) {
 
-                if (pa instanceof GameAction || pa instanceof rails.game.correct.CorrectionAction || pa.isCorrection()) {
+                if (pa instanceof GameAction || pa instanceof rails.game.correct.CorrectionAction
+                        || pa.isCorrection()) {
                     continue;
                 }
-
 
                 // Create a button for every single action
                 JButton btn = new JButton(pa.toString());
                 btn.setAlignmentX(Component.LEFT_ALIGNMENT);
                 btn.setMaximumSize(new Dimension(Short.MAX_VALUE, 30)); // Full width
-                
+
                 // Color Code "NullActions" (Pass/Done) vs Real Moves
                 if (pa instanceof NullAction) {
                     btn.setForeground(SYS_BLUE);
@@ -2404,14 +2517,13 @@ public class StatusWindow extends JFrame implements ActionListener, ActionPerfor
                         gameUIManager.processAction(pa);
                     }
                 });
-                
+
                 buttonPanel.add(btn);
             }
-            
+
             buttonPanel.revalidate();
             buttonPanel.repaint();
         }
     }
-
 
 }

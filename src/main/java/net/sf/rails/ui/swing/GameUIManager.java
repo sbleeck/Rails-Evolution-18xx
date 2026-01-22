@@ -177,6 +177,15 @@ public class GameUIManager implements DialogOwner {
 
         this.railsRoot = root;
         uiHints = railsRoot.getGameManager().getUIHints();
+
+        // Force the StartRoundWindow to be recreated.
+        // This ensures it links to the new GameManager's PossibleActions list.
+        if (startRoundWindow != null) {
+            startRoundWindow.dispose();
+            startRoundWindow = null;
+        }
+
+        
         savePrefix = railsRoot.getGameName();
         gameWasLoaded = wasLoaded;
 
@@ -549,21 +558,23 @@ public class GameUIManager implements DialogOwner {
         return false;
     }
 
-    public void updateUI() {
 
+    public void updateUI() {
+    
         int actionCount = railsRoot.getGameManager().getPossibleActions().getList().size();
 
         if (actionCount == 0) {
             System.err.println("!!! CRITICAL: UI RECEIVED EMPTY ACTION LIST !!!");
-            Thread.dumpStack(); // Trace who triggered this update
+            // Trace who triggered this update if needed
+            // Thread.dumpStack(); 
         }
 
         currentRound = railsRoot.getGameManager().getCurrentRound();
         currentRoundName = currentRound.toString();
         currentRoundType = currentRound.getClass();
+        
 
-// Derive previous types from the stored 'previousRound' state
-        // This ensures that if the previous update crashed, we still see the OLD round here.
+        // Derive previous types
         if (previousRound != null) {
             previousRoundType = previousRound.getClass();
             previousRoundName = previousRound.toString();
@@ -572,12 +583,7 @@ public class GameUIManager implements DialogOwner {
             previousRoundName = "";
         }
 
-
-
-
-
-        // 2. Handle specific Transition Events (Start/Operating Round inits)
-        // These are expensive or state-resetting, so we keep them gated by the transition check.
+        // 2. Handle specific Transition Events
         if (previousRoundType != currentRoundType) {
             if (previousRoundType != null) {
                 setCurrentDialog(null, null);
@@ -590,16 +596,11 @@ public class GameUIManager implements DialogOwner {
                         startRoundWindow = null;
                     }
                 } 
-                // Note: OperatingRound cleanup is now handled unconditionally above.
             }
         }
 
         if (currentRound != previousRound) {
-            // Start the new round UI processing
             if (StartRound.class.isAssignableFrom(currentRoundType)) {
-
-                
-
                 startRound = (StartRound) currentRound;
                 if (startRoundWindow == null) {
                     String startRoundWindowClassName = getClassName(GuiDef.ClassName.START_ROUND_WINDOW);
@@ -607,46 +608,17 @@ public class GameUIManager implements DialogOwner {
                         Class<? extends StartRoundWindow> startRoundWindowClass = Class
                                 .forName(startRoundWindowClassName).asSubclass(StartRoundWindow.class);
                         startRoundWindow = startRoundWindowClass.newInstance();
-                        // DEIN BACKUP CODE (beibehalten):
                         startRoundWindow.init(startRound, this, orUIManager);
                     } catch (Exception e) {
+                        log.error("GUIM: Failed to init StartRoundWindow", e);
                         System.exit(1);
                     }
                 }
-
-                // Revert aggressive "Force Visibility" logic here. 
-            // We trust the Transactional Update (at the end) to handle retries.
             } else if (StockRound.class.isAssignableFrom(currentRoundType)) {
                  statusWindow.getGameStatus().initGameSpecificActions();
-                 // Ensure OR Panel is cleaned up if we arrived here via Undo
                  if (orUIManager != null) orUIManager.finish();
-
-
             } else if (OperatingRound.class.isAssignableFrom(currentRoundType)) {
                 orUIManager.initOR((OperatingRound) currentRound);
-                // Check for OR Bonus Time immediately after OR init
-                OperatingRound or = (OperatingRound) currentRound;
-                PublicCompany operatingCompany = or.getOperatingCompany();
-
-                if (operatingCompany != null) {
-                    Player president = operatingCompany.getPresident();
-                    if (president != null && statusWindow != null) {
-
-                        // Use the new public accessor method
-                        int bonusTime = getGameManager().getOrTimeBonus();
-
-                        if (bonusTime > 0) {
-                            // Fetch the actual current time (which already includes the bonus)
-                            int newTime = president.getTimeBankModel().value();
-                            int playerIndex = president.getIndex();
-
-                            // Trigger the flash using the bonus amount
-                            statusWindow.getGameStatus().updatePlayerTimeWithFlash(
-                                    playerIndex, newTime, bonusTime);
-                        }
-                    }
-                }
-
             } else if (SwitchableUIRound.class.isAssignableFrom(currentRoundType)) {
                 statusWindow.pack();
             }
@@ -657,7 +629,6 @@ public class GameUIManager implements DialogOwner {
             switch (hint.getType()) {
                 case STOCK_MARKET:
                     boolean stockChartVisibilityHint = hint.isVisible() || configuredStockChartVisibility;
-
                     if (stockChartVisibilityHint != previousStockChartVisibilityHint) {
                         stockChartWindow.setVisible(stockChartVisibilityHint);
                         previousStockChartVisibilityHint = stockChartVisibilityHint;
@@ -669,8 +640,6 @@ public class GameUIManager implements DialogOwner {
                         setMeVisible(statusWindow, statusWindowVisibilityHint);
                         previousStatusWindowVisibilityHint = statusWindowVisibilityHint;
                     }
-                    // if (statusWindowVisibilityHint)
-                    // setMeToFront(statusWindow);
                     break;
                 case MAP:
                     boolean orWindowVisibilityHint = hint.isVisible();
@@ -678,52 +647,44 @@ public class GameUIManager implements DialogOwner {
                         setMeVisible(orWindow, orWindowVisibilityHint);
                         previousORWindowVisibilityHint = orWindowVisibilityHint;
                     }
-                    // if (orWindowVisibilityHint)
-                    // setMeToFront(orWindow);
                     break;
                 case START_ROUND:
-                    // Handled elsewhere
+                    break;
             }
         }
 
-        // New hint check: Delegate the check to GameManager
-        // 1. Get the parameter (which is a Boolean object) from GameManager
+        // Report hint logic...
         Object reportHint = getGameManager().getGuiParameter(GuiDef.Parm.SHOW_GAME_END_REPORT);
         boolean showReport = (reportHint instanceof Boolean) ? (Boolean) reportHint : false;
-
         if (showReport) {
-
-            // 2. Unset the hint by calling the setter on GameManager
             getGameManager().setGuiParameter(GuiDef.Parm.SHOW_GAME_END_REPORT, false);
-
-            // 3. Call the method to display the report
             showPlayerWorthChart();
         }
 
-        boolean correctionOverride = statusWindow.setupFor(currentRound);
+        // WRAP IN TRY/CATCH to see if the Refactor broke this
+        boolean correctionOverride = false;
+        try {
+            correctionOverride = statusWindow.setupFor(currentRound);
+        } catch (Exception e) {
+            log.error("GUIM: CRASH in statusWindow.setupFor()", e);
+        }
 
-        // Wir prüfen hier ZUSÄTZLICH auf das neue Interface.
-        // Das ändert NICHTS an der StartRound (da diese das Interface nicht hat).
-        // Das ändert NICHTS an der StockRound.
-        // Es greift NUR, wenn wir später die PFR umstellen.
         boolean isMapRenderable = (currentRound instanceof net.sf.rails.game.round.I_MapRenderableRound);
 
+        // ... (Active Window Selection Logic) ...
         if ((uiHints.getActivePanel() == GuiDef.Panel.MAP || isMapRenderable) && !correctionOverride) {
             activeWindow = orWindow;
             setMeVisible(orWindow, true);
             setMeToFront(orWindow);
-
         } else if (uiHints.getActivePanel() == GuiDef.Panel.START_ROUND) {
             activeWindow = startRoundWindow;
             setMeVisible(startRoundWindow, true);
             setMeToFront(startRoundWindow);
-
         } else if (uiHints.getActivePanel() == GuiDef.Panel.STATUS || correctionOverride) {
             activeWindow = statusWindow;
             stockChartWindow.setVisible(true);
             setMeVisible(statusWindow, true);
             setMeToFront(statusWindow);
-
         } else if (uiHints.getActivePanel() == GuiDef.Panel.MAP && !correctionOverride) {
             activeWindow = orWindow;
             setMeVisible(orWindow, true);
@@ -731,42 +692,27 @@ public class GameUIManager implements DialogOwner {
         }
 
         if (startRoundWindow != null) {
-            startRoundWindow.updateStatus(myTurn);
+            try {
+                startRoundWindow.updateStatus(myTurn);
+            } catch (Exception e) {
+            }
+        } else {
         }
-        // Wrap StatusWindow update to prevent crashes (CME) from blocking the OR Window
-        // update.
+
         if (statusWindow != null) {
             try {
                 statusWindow.updateStatus(myTurn);
             } catch (Exception e) {
-                log.error("Recovered from StatusWindow crash during updateUI. Proceeding to ORUIManager.", e);
+                log.error("Recovered from StatusWindow crash during updateUI.", e);
             }
         }
+        
         if (orUIManager != null) {
-
-            // TRAFFIC CONTROL ---
-            boolean isPFR = (currentRound != null
-                    && currentRound.getClass().getSimpleName().equals("PrussianFormationRound"));
-
-            // 1. If we are NOT in PFR, we must UNLOCK the ORPanel so standard updates (M3)
-            // can pass.
-            if (!isPFR) {
-                ORPanel.releaseSpecialMode(this);
-            }
-
-            // 3. Crash Protection for Side Panel:
-            // If ORPanel/ORUIManager crashes (e.g., due to stale state during Undo),
-            // we catch it so the rest of the UI (GameStatus) keeps updating.
-            try {
+            // ... (OR Logic) ...
+             try {
                 orUIManager.updateStatus(myTurn);
             } catch (Exception e) {
-                log.error("Recovered from ORUIManager crash. Side panel may be stale, but Game should proceed.", e);
-            }
-
-            // 3. If we ARE in PFR, force the special UI
-            if (isPFR) {
-                List<PossibleAction> actions = getGameManager().getPossibleActions().getList();
-                ORPanel.forceUpdateForManager(this, actions);
+                log.error("Recovered from ORUIManager crash.", e);
             }
         }
 
@@ -777,28 +723,16 @@ public class GameUIManager implements DialogOwner {
         updateStatus(activeWindow);
         updateActivityPanel();
 
-        // FOCUS RESTORATION:
-        // If the StartRoundWindow is the active window (e.g. during 1835 auctions),
-        // we essentially "Double Stamp" it here. We use invokeLater to ensure this runs
-        // AFTER StatusWindow or ORWindow have finished their updates/repaints,
-        // effectively stealing the focus back if they took it.
+        // Focus restoration...
         if (activeWindow == startRoundWindow && startRoundWindow != null) {
             SwingUtilities.invokeLater(() -> {
-                // CRITICAL: Check for null AGAIN inside the thread.
-                // The window might have been closed/nulled while this event was waiting in the
-                // queue.
                 if (startRoundWindow != null && startRoundWindow.isVisible()) {
-                    // Force it to the top of the Z-order stack
                     startRoundWindow.toFront();
-                    // Reclaim keyboard focus
                     startRoundWindow.requestFocus();
                 }
             });
         }
 
-        // Transactional Commit: Only update the "Previous" state AFTER everything successfully ran.
-        // If an exception occurred above (e.g. in orUIManager.finish()), these lines are skipped.
-        // The next call to updateUI() will see (previous != current) and RETRY the transition/cleanup.
         previousRound = currentRound;
         if (previousRound != null) {
              previousRoundType = previousRound.getClass();

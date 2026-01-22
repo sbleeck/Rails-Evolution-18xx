@@ -308,15 +308,15 @@ public class ORWindow extends DockingFrame implements ActionPerformer {
         // --- 1. GENERAL/DEFAULT ACTIONS ---
 
        
-        // Return (Enter): Done and Accept/Confirm
-        String CONFIRM_KEY = "confirmAction";
+// Return (Enter): Done and Accept/Confirm
+
+String CONFIRM_KEY = "confirmAction";
         inputMap.put(KeyStroke.getKeyStroke(KeyEvent.VK_ENTER, 0), CONFIRM_KEY);
         actionMap.put(CONFIRM_KEY, new AbstractAction() {
             public void actionPerformed(ActionEvent e) {
-                if (orPanel.currentDefaultButton != null && orPanel.currentDefaultButton.isEnabled()) {
-                    orPanel.currentDefaultButton.doClick();
-                } else {
-                    orUIManager.confirmUpgrade();
+                // Delegate completely to ORPanel's centralized handler
+                if (orPanel != null) {
+                    orPanel.handleEnterPress();
                 }
             }
         });

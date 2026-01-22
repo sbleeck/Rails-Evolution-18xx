@@ -1477,16 +1477,11 @@ public class GameManager extends RailsManager implements Configurable, Owner {
         }
     }
 
-    /**
-     * Central processing method for game actions.
-     * 
-     * @param action The action to process.
-     * @return True if the action was successful, false otherwise.
-     */
+
     public boolean process(PossibleAction action) {
 
+
         // EMERGENCY OVERRIDE: Check for "FORCE_SKIP" signal
-        // This allows recovering a stuck game state where a company loops infinitely.
         if (action != null && action.toString().contains("FORCE_SKIP")) {
             forceSkipStuckCompany();
             return true;
@@ -1494,30 +1489,90 @@ public class GameManager extends RailsManager implements Configurable, Owner {
 
         getRoot().getReportManager().getDisplayBuffer().clear();
 
+        // -----------------------------------------------------------
+        // 1. CRITICAL INTERCEPT: Navigation Actions (Undo/Redo)
+        // -----------------------------------------------------------
+        // This MUST happen before 'logActionTaken' or 'logAction'.
+        // If we let it pass, the engine treats Undo as "Move #267", 
+        // increments the counter, and creates the "Death Spiral".
+        
+        if (action instanceof GameAction) {
+            GameAction ga = (GameAction) action;
+            GameAction.Mode mode = ga.getMode();
+            
+            if (mode == GameAction.Mode.UNDO || 
+                mode == GameAction.Mode.FORCED_UNDO || 
+                mode == GameAction.Mode.REDO) {
+                
+
+                // Clear hints to ensure clean UI rebuild
+                guiHints.clearVisibilityHints();
+                
+                // Execute the undo/redo logic directly
+                // This reloads the old state without incrementing the "Move Counter"
+                boolean success = processGameActions(ga);
+                
+                // We must update the list of possible moves for the new state immediately.
+                // Otherwise, the UI will have stale buttons (e.g., missing Redo).
+                if (success) {
+                    possibleActions.clear();
+                    
+                    // Allow action generation check
+                    boolean allowActionGeneration = !isGameOver() || (getCurrentRound() instanceof EndOfGameRound);
+                    
+                    if (allowActionGeneration) {
+                        if (getCurrentRound() != null) {
+                             getCurrentRound().setPossibleActions();
+                        }
+                        
+                        ChangeStack changeStack = getRoot().getStateManager().getChangeStack();
+                        if (changeStack.isUndoPossible()) { 
+                            possibleActions.add(new GameAction(getRoot(), GameAction.Mode.FORCED_UNDO));
+                        }
+                        if (changeStack.isRedoPossible()) {
+                            possibleActions.add(new GameAction(getRoot(), GameAction.Mode.REDO));
+                        }
+                    }
+                }
+
+                
+                // Force a UI refresh cycle immediately after the state change
+                if (success && gameUIManager != null && gameUIManager.getStatusWindow() != null) {
+                    SwingUtilities.invokeLater(() -> {
+                        try {
+                            Object status = gameUIManager.getStatusWindow().getGameStatus();
+                            if (status instanceof java.util.Observer) {
+                                ((java.util.Observer) status).update(null, "ForceUpdate");
+                            }
+                        } catch (Exception e) {
+                            log.warn("UI ForceUpdate failed after Undo", e);
+                        }
+                    });
+                }
+
+                // RETURN IMMEDIATELY. Do not fall through to logActionTaken().
+                return success;
+            }
+        }
+        // -----------------------------------------------------------
+
+
         // Capture the active entity (Player or Company) BEFORE processing the action.
-        // We will compare this with the "After" state to detect if the turn has ended.
         RoundFacade roundBefore = getCurrentRound();
         Object actorBefore = getCurrentPlayer();
 
-        // If we are in an Operating Round, the "Actor" is the Company, not the Player.
         if (roundBefore instanceof OperatingRound) {
-            // We access the operatingCompany state directly, similar to logActionTaken
-            // logic
             actorBefore = ((OperatingRound) roundBefore).operatingCompany.value();
         }
 
-        // If the batch logger tool has set an output directory,
-        // save a snapshot of the current state *before* processing the action.
+        // Snapshot logging (for AI/Replay debugging)
         if (this.logOutputDirectory != null) {
             try {
-                // Use the existing actionCount state to number the files
                 String filename = String.format("state_%05d.json", actionCount.value());
                 File outputFile = new File(this.logOutputDirectory, filename);
-
-                // Use the EXISTING, WORKING serialize method.
                 net.sf.rails.game.ai.snapshot.JsonStateSerializer.serialize(this, outputFile.getAbsolutePath());
             } catch (Exception e) {
-                // Don't stop the replay, just log the capture error.
+                // Ignore snapshot errors
             }
         }
 
@@ -1525,97 +1580,93 @@ public class GameManager extends RailsManager implements Configurable, Owner {
         ChangeStack changeStack = getRoot().getStateManager().getChangeStack();
         boolean startGameAction = false;
 
-        logActionTaken(action); // Your existing logging
-        logAction(action);
+        // -----------------------------------------------------------
+        // 2. STANDARD LOGGING (Only for real moves)
+        // -----------------------------------------------------------
+        // Since we returned early for Undo/Redo, code reaching here is a REAL move.
+        
+        logActionTaken(action); // Increments the official move counter (Move #265 -> #266)
+        logAction(action);      // Logs "Move #266: Laid Tile..."
+        
         boolean isBuyTrainAction = action instanceof BuyTrain;
+        boolean result = false; 
 
-        boolean result = false; // Initialize result to false
+        // -----------------------------------------------------------
+        // 3. STANDARD PROCESSING
+        // -----------------------------------------------------------
 
         if (action instanceof NullAction && ((NullAction) action).getMode() == NullAction.Mode.START_GAME) {
             startGameAction = true;
-            result = true; // START_GAME action is considered successful for flow control
-            // Do not increment counter for START_GAME meta-action
+            result = true; 
 
         } else if (action != null) {
-            action.setActed(); // Seems fine here
+            action.setActed(); 
 
-            // Validation checks (Keep these)
+            // Validation checks
             String actionPlayerName = action.getPlayerName();
             String currentPlayerName = getCurrentPlayer().getId();
 
-            // Fix for "AI" player name bug: Relax validation for whitespace, case, and
-            // AI-flagged actions
             boolean nameMatch = actionPlayerName.equals(currentPlayerName);
 
             if (!nameMatch) {
-                // 1. Try relaxed check (trim + ignore case)
                 if (actionPlayerName.trim().equalsIgnoreCase(currentPlayerName.trim())) {
                     nameMatch = true;
-                }
-                // 2. Trust explicit AI actions even if name format differs (e.g. "AI " vs "AI")
-                else if (action.isAIAction()) {
+                } else if (action.isAIAction()) {
                     nameMatch = true;
                 }
             }
 
             if (!nameMatch) {
                 DisplayBuffer.add(this, LocalText.getText("WrongPlayer", actionPlayerName, currentPlayerName));
-                return false; // Return early, DO NOT count
+                return false; 
             }
 
             if (!possibleActions.validate(action)) {
                 DisplayBuffer.add(this, LocalText.getText("ActionNotAllowed", action.toString()));
-                return false; // Return early, DO NOT count
+                return false; 
             }
 
-            // Process the action within try-catch
+            // Process the action
             try {
                 if (action instanceof GameAction) {
+                    // This handles Save/Load/Export (Undo/Redo handled above)
                     GameAction gameAction = (GameAction) action;
-                    result = processGameActions(gameAction); // Assume this handles Undo/Redo counting if necessary
-                    // Typically Undo/Redo might not increment the main counter, depends on rules.
-                    // If they SHOULD count, increment here:
-                    // if (result) { this.absoluteActionCounter++; }
+                    result = processGameActions(gameAction); 
                 } else {
+                    // Logic/Correction Actions
                     boolean correctionHandled = processCorrectionActions(action);
                     if (correctionHandled) {
                         result = true;
                     } else if (getCurrentRound() != null) {
                         result = getCurrentRound().process(action);
                     } else {
-
                         result = false;
                     }
                 }
 
-                // Increment counter ONLY on successful processing of non-GameAction types
+                // Increment absolute counter (legacy field)
                 if (result && !(action instanceof GameAction)) {
                     this.absoluteActionCounter++;
 
-                    if (action.hasActed()) { // Consider if action.hasActed() check is still needed here
+                    if (action.hasActed()) { 
                         executedActions.add(action);
                     }
                     updatePayoutTracker(action);
-                    // Hook the new logging logic here, immediately after a successful,
-                    // non-GameAction execution
+                    
+                    // Re-log strictly for history consistency if needed
                     logAction(action);
 
-                } else if (!result) { // Log failure if not already handled by exceptions
-
-                }
+                } 
             } catch (Exception e) {
-                result = false; // Ensure result is false on exception
-                // Do NOT increment counter on exception
+                result = false; 
             }
 
-        } else { // Handle null action case
-            result = true; // Assuming null action means success/continue flow
-            // Do NOT increment counter for null action
+        } else { 
+            result = true; 
         }
 
-        // BuyTrain post-logging (Keep this)
+        // BuyTrain logging cleanup
         if (isBuyTrainAction) {
-
             BuyTrain buyTrainAction = (BuyTrain) action;
             if (buyTrainAction.getCompany() instanceof PublicCompany) {
                 PublicCompany company = (PublicCompany) buyTrainAction.getCompany();
@@ -1624,35 +1675,17 @@ public class GameManager extends RailsManager implements Configurable, Owner {
 
         possibleActions.clear();
 
-        // Allow action generation if game is active OR if we are in the End Round (to
-        // allow Undo)
+        // 4. POST-PROCESSING (Autosave, ChangeStack)
         boolean allowActionGeneration = !isGameOver() || (getCurrentRound() instanceof EndOfGameRound);
 
-        if (allowActionGeneration) { // Check game over state OR EndOfGameRound
+        if (allowActionGeneration) { 
 
             getCurrentRound().setPossibleActions();
-            // Close change stack *after* successful processing, *before* auto-pass or
-            // adding Undo/Redo
+            
             if (result && !(action instanceof GameAction) && !(startGameAction)) {
                 changeStack.close(action);
 
-                // // FORCE UI UPDATE: Manually trigger the Observer update() method.
-                // // We pass 'null' as the Observable because GameManager does not extend
-                // // Observable.
-                // if (gameUIManager != null && gameUIManager.getStatusWindow() != null) {
-                //     SwingUtilities.invokeLater(() -> {
-                //         Object status = gameUIManager.getStatusWindow().getGameStatus();
-                //         // Explicitly check against java.util.Observer
-                //         if (status instanceof java.util.Observer) {
-                //             // Explicitly cast to java.util.Observer and pass NULL as the source
-                //             ((java.util.Observer) status).update(null, "ForceUpdate");
-                //         }
-                //     });
-                // }
-
-                // Autosave logic: Only save if the Round changed OR the Active Actor changed.
-                // This indicates a "Full Move" (e.g. Player passed priority, or Company
-                // finished operating).
+                // Autosave logic
                 RoundFacade roundAfter = getCurrentRound();
                 Object actorAfter = getCurrentPlayer();
 
@@ -1661,7 +1694,6 @@ public class GameManager extends RailsManager implements Configurable, Owner {
                 }
 
                 boolean roundChanged = (roundBefore != roundAfter);
-                // Check for actor change (null-safe)
                 boolean actorChanged = (actorBefore == null && actorAfter != null) ||
                         (actorBefore != null && !actorBefore.equals(actorAfter));
 
@@ -1669,25 +1701,17 @@ public class GameManager extends RailsManager implements Configurable, Owner {
                     recoverySave();
                 }
 
-                // We use a config flag to turn this on/off
                 if (Config.getBoolean("ai.save.state.on.move", false)) {
-                    // Ensure the logs/state directory exists
                     File stateDir = new File("logs/state");
-                    if (!stateDir.exists()) {
-                        stateDir.mkdirs();
-                    }
-
+                    if (!stateDir.exists()) stateDir.mkdirs();
                     try {
                         String filename = String.format("logs/state/state_%05d.json", this.absoluteActionCounter);
                         JsonStateSerializer.serialize(this, filename);
-                    } catch (IOException e) {
-
-                    }
+                    } catch (IOException e) {}
                 }
             }
 
-            // FORCE UI UPDATE: Moved outside the block above to ensure it runs for
-            // GameActions (UNDO/REDO) as well.
+            // FORCE UI UPDATE
             if (result && !startGameAction) {
                 if (gameUIManager != null && gameUIManager.getStatusWindow() != null) {
                     SwingUtilities.invokeLater(() -> {
@@ -1703,27 +1727,21 @@ public class GameManager extends RailsManager implements Configurable, Owner {
                 }
             }
 
-            // Add correction actions
-            if (!isGameOver()) // Check again in case auto-pass ended the game
+            if (!isGameOver()) 
                 setCorrectionActions();
 
-            boolean undoPossible = changeStack.isUndoPossible(getCurrentPlayer());
-
-            // Add Undo/Redo actions
-            // if (changeStack.isUndoPossible(getCurrentPlayer())) {
-            // possibleActions.add(new GameAction(getRoot(), GameAction.Mode.UNDO));
-            // }
-            if (changeStack.isUndoPossible()) { // Forced Undo? Check if logic is distinct
+            if (changeStack.isUndoPossible()) { 
                 possibleActions.add(new GameAction(getRoot(), GameAction.Mode.FORCED_UNDO));
             }
             if (changeStack.isRedoPossible()) {
                 possibleActions.add(new GameAction(getRoot(), GameAction.Mode.REDO));
             }
 
-        } // End if (!isGameOver()) block
+        } 
 
         return result;
     }
+// --- END FIX ---
 
     protected void logActionTaken(PossibleAction action) {
         if (action instanceof NullAction
@@ -2643,8 +2661,6 @@ public class GameManager extends RailsManager implements Configurable, Owner {
         if (action == null)
             return;
 
-        // DEBUG: Log the class of every action processed to catch the exact Revenue
-        // action type
 
         if (action instanceof SetDividend) {
             SetDividend sd = (SetDividend) action;

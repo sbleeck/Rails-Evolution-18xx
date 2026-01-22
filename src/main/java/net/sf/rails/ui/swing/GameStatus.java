@@ -25,6 +25,9 @@ import net.sf.rails.util.Util;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.awt.geom.Ellipse2D;
+import java.awt.geom.Line2D;
+
 // Ensure this is imported
 import rails.game.action.*;
 import rails.game.correct.CashCorrectionAction;
@@ -208,6 +211,7 @@ public class GameStatus extends GridPanel implements ActionListener {
 
     // Variable to persist the user's zoom/font setting across component recreations
     private Font stickyFont = null;
+    private RoundCounterPanel roundCounterPanel;
 
     @Override
     public void setFont(Font f) {
@@ -218,46 +222,145 @@ public class GameStatus extends GridPanel implements ActionListener {
         }
     }
 
+    // --- START FIX ---
     /**
-     * * Scans the parent StatusWindow to find the "Thinking" label and the Main
-     * Timer label.
+     * Scans the parent StatusWindow to find the "Pause" button (which lives in the
+     * footer).
+     * Injects the RoundCounter into that same button panel.
      */
     private void hijackParentComponents() {
+        // Stop if already injected
+        if (roundCounterPanel != null && roundCounterPanel.getParent() != null)
+            return;
         if (parent == null)
             return;
 
-        // Traverse component tree
+        // 1. Find the "Pause" button using Breadth-First Search
+        // We look for the button to identify the correct panel in the footer.
         java.util.Queue<Component> queue = new java.util.LinkedList<>();
         queue.add(parent);
 
+        Component pauseBtn = null;
+
         while (!queue.isEmpty()) {
-            Component comp = queue.poll();
-
-            if (comp instanceof javax.swing.JLabel) {
-                javax.swing.JLabel lbl = (javax.swing.JLabel) comp;
-                String text = lbl.getText();
-                Color fg = lbl.getForeground();
-
-                // 1. Identify "Thinking" Label (Usually Red)
-                if (parentStatusLabel == null
-                        && (Color.RED.equals(fg) || (text != null && text.startsWith("Thinking")))) {
-                    parentStatusLabel = lbl;
-                }
-
-                // 2. Identify Timer Label (Usually Top Right, Black, contains :)
-                // We check if it looks like a time string and is NOT the status label
-                if (parentTimerLabel == null && lbl != parentStatusLabel && text != null
-                        && text.matches(".*\\d\\d:\\d\\d.*")) {
-                    parentTimerLabel = lbl;
+            Component c = queue.poll();
+            if (c instanceof javax.swing.AbstractButton) {
+                String txt = ((javax.swing.AbstractButton) c).getText();
+                // Robust check for "Pause", ignoring case or stray spaces
+                if (txt != null && txt.trim().equalsIgnoreCase("Pause")) {
+                    pauseBtn = c;
+                    break;
                 }
             }
-
-            if (comp instanceof Container) {
-                for (Component child : ((Container) comp).getComponents()) {
+            if (c instanceof Container) {
+                for (Component child : ((Container) c).getComponents())
                     queue.add(child);
-                }
             }
         }
+
+        if (pauseBtn == null)
+            return;
+
+        // 2. Identify Structure
+        Container buttonPanel = pauseBtn.getParent(); // The panel holding [Pause][Undo]...
+
+        // 2b. UNIFORM STYLING: Force all footer buttons to look like standard buttons
+        // This fixes the "dissimilar blue rectangles" issue.
+        for (Component comp : buttonPanel.getComponents()) {
+            if (comp instanceof javax.swing.AbstractButton) {
+                javax.swing.AbstractButton btn = (javax.swing.AbstractButton) comp;
+
+                // A. Strip HTML (Standardize text appearance)
+                String cleanText = btn.getText().replaceAll("\\<.*?\\>", "");
+                btn.setText(cleanText);
+
+                // B. Apply Standard "Button" Look (Gray + 3D Border)
+                btn.setContentAreaFilled(true);
+                btn.setOpaque(true);
+                btn.setBackground(new Color(238, 238, 238)); // Standard Light Gray
+                btn.setForeground(Color.BLACK); // Always Black Text
+
+                // C. Add Depth (Raised Bevel = "Clickable" look)
+                btn.setBorder(BorderFactory.createCompoundBorder(
+                        BorderFactory.createRaisedBevelBorder(),
+                        BorderFactory.createEmptyBorder(3, 12, 3, 12) // Padding
+                ));
+
+                // D. Uniform Font
+                btn.setFont(new Font("SansSerif", Font.BOLD, 12));
+
+                // E. Fix Focus Painting (Removes ugly dotted lines)
+                btn.setFocusPainted(false);
+            }
+        }
+        Container footer = buttonPanel.getParent(); // The strip at the bottom of the window
+
+        if (footer == null)
+            return;
+
+        // Prevent recursive injection if run multiple times
+        if (roundCounterPanel.getParent() == footer || roundCounterPanel.getParent() == buttonPanel)
+            return;
+
+        // 3. The Wrapper Strategy
+        // We cannot add directly to 'buttonPanel' because it likely uses GridLayout.
+        // Adding a component there would resize all buttons.
+        // Instead, we replace 'buttonPanel' in the footer with a 'wrapper' that holds
+        // both.
+
+        // A. Capture original constraints/index to put the wrapper back in the exact
+        // same spot
+        LayoutManager lm = footer.getLayout();
+        Object constraints = null;
+        if (lm instanceof BorderLayout)
+            constraints = ((BorderLayout) lm).getConstraints(buttonPanel);
+        else if (lm instanceof GridBagLayout)
+            constraints = ((GridBagLayout) lm).getConstraints(buttonPanel);
+
+        int idx = -1;
+        Component[] children = footer.getComponents();
+        for (int i = 0; i < children.length; i++) {
+            if (children[i] == buttonPanel) {
+                idx = i;
+                break;
+            }
+        }
+
+        // B. Remove original button panel
+        footer.remove(buttonPanel);
+
+        // C. Create Wrapper (GridBagLayout for maximum control)
+        JPanel wrapper = new JPanel(new GridBagLayout());
+        wrapper.setOpaque(false);
+
+        GridBagConstraints gbc = new GridBagConstraints();
+
+        // Slot 0: The Original Buttons
+        gbc.gridx = 0;
+        gbc.gridy = 0;
+        gbc.weightx = 0.0; // Do not force stretch, let it be natural size
+        gbc.fill = GridBagConstraints.VERTICAL;
+        gbc.anchor = GridBagConstraints.WEST;
+        wrapper.add(buttonPanel, gbc);
+
+        // Slot 1: The Round Counter (To the RIGHT of buttons)
+        gbc.gridx = 1;
+        gbc.insets = new Insets(0, 15, 0, 0); // 15px Gap
+        gbc.fill = GridBagConstraints.NONE;
+        wrapper.add(roundCounterPanel, gbc);
+
+        // D. Re-inject Wrapper into Footer
+        if (constraints != null) {
+            footer.add(wrapper, constraints);
+        } else {
+            if (idx > -1)
+                footer.add(wrapper, idx);
+            else
+                footer.add(wrapper);
+        }
+
+        footer.revalidate();
+        footer.repaint();
     }
 
     protected ClickField newTrainsButton;
@@ -556,6 +659,9 @@ public class GameStatus extends GridPanel implements ActionListener {
             // Pull the current, potentially already-bonused time from the model
             lastPlayerTimes[i] = players.getPlayerByPosition(i).getTimeBankModel().value();
         }
+
+        // Initialize the visualization panel
+        roundCounterPanel = new RoundCounterPanel();
 
         initFields();
         javax.swing.SwingUtilities.invokeLater(this::hijackParentComponents);
@@ -1429,6 +1535,11 @@ public class GameStatus extends GridPanel implements ActionListener {
             return;
         }
 
+        // Retry injection if it failed during startup (e.g. if timer text wasn't ready)
+        if (roundCounterPanel != null && roundCounterPanel.getParent() == null) {
+            hijackParentComponents();
+        }
+
         if (gameUIManager == null || gameUIManager.getGameManager() == null)
             return;
 
@@ -2152,6 +2263,15 @@ public class GameStatus extends GridPanel implements ActionListener {
         // Limit display to 4 to prevent grid explosion
         int displayCount = Math.min(availableCount, 4);
 
+        // Switch to GridBagLayout for true vertical centering
+        panel.setLayout(new GridBagLayout());
+        GridBagConstraints gbc = new GridBagConstraints();
+        gbc.gridx = 0;
+        gbc.gridy = 0;
+        gbc.anchor = GridBagConstraints.CENTER;
+        // Add small horizontal gap between tokens
+        gbc.insets = new Insets(0, 1, 0, 1);
+
         for (int k = 0; k < displayCount; k++) {
             // Create a smart label that listens for Font changes (e.g. Zoom)
             // and regenerates the icon with the correct size on the fly.
@@ -2170,17 +2290,14 @@ public class GameStatus extends GridPanel implements ActionListener {
             };
 
             // Force initial setup using the panel's current font
-            // (StatusWindow.updateFonts will trigger setFont() again later with the scaled
-            // font)
             iconLabel.setFont(panel.getFont());
 
             String tooltip = "<html><b>" + company.getId() + "</b> Token Available</html>";
             iconLabel.setToolTipText(tooltip);
 
-            panel.add(iconLabel);
-            // --- END FIX ---
+            panel.add(iconLabel, gbc);
+            gbc.gridx++; // Move to next slot
         }
-
         panel.revalidate();
         panel.repaint();
     }
@@ -2753,24 +2870,30 @@ public class GameStatus extends GridPanel implements ActionListener {
             boolean passed = (actorIndex != -1) && log != null
                     && java.util.Arrays.asList(log.split(", ")).contains(p.getName());
 
-            Color headerBg = passed ? BG_PASSED : pBg;
+            // CHANGED: Do NOT change background color for passing. Use standard spotlight
+            // color.
+            Color headerBg = pBg;
 
             if (upperPlayerCaption[i] != null) {
                 upperPlayerCaption[i].setBackground(headerBg);
                 upperPlayerCaption[i].setOpaque(true);
-
-                // REMOVED: The distracting thick border.
-                // We now use BORDER_DEFAULT for everyone. The Background Color (White vs Grey)
-                // is the indicator.
                 upperPlayerCaption[i].setBorder(BORDER_DEFAULT);
 
-                // Keep text color logic if you want (Black vs Dark Gray) or unify it
+                // Update the Pass Dot
+                if (upperPlayerCaption[i] instanceof PassIndicatorCaption) {
+                    // STRICT CLEARED LOGIC:
+                    // If actorIndex is -1 (Round End/Transition), force clear (false).
+                    // Otherwise, respect the 'passed' flag.
+                    boolean showPass = (actorIndex != -1) && passed;
+                    ((PassIndicatorCaption) upperPlayerCaption[i]).setPassed(showPass);
+                }
+
+                // Keep text color logic
                 if (isSpotlight) {
                     upperPlayerCaption[i].setForeground(Color.BLACK);
                 } else {
                     upperPlayerCaption[i].setForeground(Color.DARK_GRAY);
                 }
-
             }
 
             if (playerCash[i] != null) {
@@ -2903,6 +3026,11 @@ public class GameStatus extends GridPanel implements ActionListener {
             }
         }
 
+        // Update the visual round counter
+        if (roundCounterPanel != null) {
+            roundCounterPanel.updateState();
+        }
+
         // Force Update Parent Timer immediately
         if (parentTimerLabel != null && actorIndex >= 0 && actorIndex < np) {
             Player p = players.getPlayerByPosition(actorIndex);
@@ -2997,27 +3125,14 @@ public class GameStatus extends GridPanel implements ActionListener {
             int w = getWidth();
             int h = getHeight();
 
-            // 1. Calculate Fill Percentage
-            float ratio = (float) held / (float) Math.max(limit, 1);
-            if (ratio > 1.0f)
-                ratio = 1.0f;
-            int fillWidth = (int) (w * ratio);
-
-            // 2. Determine Color (Green = Safe, Red = Full/Over)
-            Color barColor;
+            // 1. Text Color Logic: Red if full, otherwise Black
             if (held >= limit) {
-                barColor = new Color(255, 180, 180); // Pastel Red (Full)
+                g.setColor(Color.RED);
             } else {
-                barColor = new Color(180, 255, 180); // Pastel Green (Safe)
+                g.setColor(Color.BLACK);
             }
 
-            // 3. Draw The Bar
-            g.setColor(barColor);
-            g.fillRect(0, 0, fillWidth, h);
-
-            // 4. Draw The Text (Centered)
-            g.setColor(Color.BLACK);
-            // Anti-aliasing for text
+            // 2. Draw The Text (Centered)
             if (g instanceof Graphics2D) {
                 ((Graphics2D) g).setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING,
                         RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
@@ -3028,12 +3143,6 @@ public class GameStatus extends GridPanel implements ActionListener {
             int ty = (h - fm.getAscent()) / 2 + fm.getAscent();
 
             g.drawString(text, tx, ty);
-
-            // 5. Border: Red border if full
-            if (held >= limit) {
-                g.setColor(Color.RED);
-                g.drawRect(0, 0, w - 1, h - 1);
-            }
         }
     }
 
@@ -3629,7 +3738,7 @@ public class GameStatus extends GridPanel implements ActionListener {
 
     protected void initHeaders() {
         for (int i = 0; i < np; i++) {
-            f = upperPlayerCaption[i] = new Caption(players.getPlayerByPosition(i).getName());
+            f = upperPlayerCaption[i] = new PassIndicatorCaption(players.getPlayerByPosition(i).getName());
 
             if (i == np - 1) {
                 f.setBorder(BorderFactory.createMatteBorder(0, 0, 1, 4, Color.BLACK));
@@ -4119,7 +4228,7 @@ public class GameStatus extends GridPanel implements ActionListener {
 
             // Add the panel to the grid (Visible = true)
             addField(compTrainsButtonPanel[i], compTrainsXOffset, y, 1, 1, 0, visible);
-
+            compTokens[i] = new JPanel(new GridBagLayout());
             compTokens[i] = new JPanel(new FlowLayout(FlowLayout.CENTER, 2, 0));
             compTokens[i].setOpaque(true);
             compTokens[i].setBackground(isOperating ? BG_OPERATING : (!isActive ? BG_INACTIVE : BG_MAUVE));
@@ -4609,11 +4718,11 @@ public class GameStatus extends GridPanel implements ActionListener {
                             // Attach Action
                             card.setPossibleAction(pa);
 
-                            // Visual Cue: CYAN for attention (consistent with PFR exchange)
                             card.setBackground(java.awt.Color.CYAN);
+                            card.setBorder(BorderFactory.createLineBorder(Color.BLUE, 3));
 
-                            // Ensure it looks active
-                            card.setBorder(BorderFactory.createLineBorder(Color.BLACK, 2));
+                            // Standardize Border: Thick Blue (3px) to match Shares
+                            card.setBorder(BorderFactory.createLineBorder(Color.BLUE, 3));
                             card.setToolTipText("Click to Discard " + targetTrain.getName());
 
                             card.setEnabled(true);
@@ -4672,9 +4781,13 @@ public class GameStatus extends GridPanel implements ActionListener {
 
                                         card.setPossibleAction(pa);
                                         card.setState(net.sf.rails.ui.swing.elements.RailCard.State.HIGHLIGHTED);
+
+                                        // Uniform Styling: Force Cyan Background and Thick Blue Border
+                                        // (Ignoring gta.getHighlightColor() to ensure consistency across all special
+                                        // actions)
                                         card.setBackground(java.awt.Color.CYAN);
-                                        card.setBorder(
-                                                javax.swing.BorderFactory.createLineBorder(java.awt.Color.CYAN, 3));
+                                        card.setBorder(BorderFactory.createLineBorder(Color.BLUE, 3));
+
                                         card.setToolTipText("Click to Discard " + targetTrain.getName());
                                         card.setEnabled(true);
                                         card.setVisible(true);
@@ -4693,6 +4806,9 @@ public class GameStatus extends GridPanel implements ActionListener {
                     net.sf.rails.ui.swing.elements.RailCard card = getRailCardFor(companyIndex, playerIndex);
                     if (card != null) {
                         card.setState(RailCard.State.HIGHLIGHTED);
+                        // Explicitly override default highlighting to ensure match with Privates/Trains
+                        card.setBackground(java.awt.Color.CYAN);
+                        card.setBorder(BorderFactory.createLineBorder(Color.BLUE, 3));
                     }
                 }
             }
@@ -4775,12 +4891,290 @@ public class GameStatus extends GridPanel implements ActionListener {
             if (targetId != null && card.getUniqueId() != null && card.getUniqueId().equals(targetId)) {
                 card.setPossibleAction(action);
                 card.setState(net.sf.rails.ui.swing.elements.RailCard.State.HIGHLIGHTED);
-                card.setBackground(gta.getHighlightColor());
+
+                // FORCE UNIFORMITY: Privates
+                // Exact same styling as Shares and Trains
+                card.setBackground(java.awt.Color.CYAN);
+                card.setBorder(BorderFactory.createLineBorder(Color.BLUE, 3));
+
                 card.repaint();
                 return true; // Match found!
             }
         }
         return false; // No match
+    }
+
+    // --- START FIX ---
+    /**
+     * Visualization Component for Round Tracking (Route Style).
+     * Displays a linear track: [OR 1] -- [OR 2] -- [OR 3] -- [SR]
+     * ANIMATED: The train smoothly travels between stations.
+     */
+    private class RoundCounterPanel extends JPanel {
+        private static final int WIDTH = 240;
+        private static final int HEIGHT = 45;
+
+        // Game State
+        private int phaseMaxOrs = 1;
+        private int currentOrNum = 1;
+        private boolean isStockRound = true;
+
+        // Animation State
+        private double currentTrainX = -1; // Current visual position (-1 = not set)
+        private double targetTrainX = -1; // Destination position
+        private javax.swing.Timer animTimer;
+
+        public RoundCounterPanel() {
+            setPreferredSize(new Dimension(WIDTH, HEIGHT));
+            setMinimumSize(new Dimension(WIDTH, HEIGHT));
+            setMaximumSize(new Dimension(WIDTH, HEIGHT));
+            setOpaque(false);
+
+            // Animation Timer: Runs at ~60 FPS (16ms delay)
+            animTimer = new javax.swing.Timer(16, e -> stepAnimation());
+        }
+
+        /**
+         * Physics Step: Moves the train towards the target.
+         */
+        private void stepAnimation() {
+            double distance = targetTrainX - currentTrainX;
+
+            // Snap if close enough (0.5 pixel)
+            if (Math.abs(distance) < 0.5) {
+                currentTrainX = targetTrainX;
+                animTimer.stop();
+            } else {
+                // Ease-Out Logic: Move 5% of the remaining distance per frame
+                // This creates a smooth deceleration effect.
+                double step = distance * 0.05;
+
+                // Enforce minimum speed so it doesn't stall at the end (Linear finish)
+                // 0.8 pixels per frame ensures it completes in ~1 second total
+                if (Math.abs(step) < 0.8)
+                    step = Math.signum(distance) * 0.8;
+
+                currentTrainX += step;
+            }
+            repaint(); // Redraw frame
+        }
+
+        public void updateState() {
+            if (gameUIManager == null || gameUIManager.getRoot() == null)
+                return;
+
+            try {
+                // 1. Get Phase Limits
+                net.sf.rails.game.PhaseManager pm = gameUIManager.getRoot().getPhaseManager();
+                if (pm != null && pm.getCurrentPhase() != null) {
+                    phaseMaxOrs = pm.getCurrentPhase().getNumberOfOperatingRounds();
+                }
+
+                // 2. Determine Current Round & Index
+                net.sf.rails.game.round.RoundFacade round = gameUIManager.getGameManager().getCurrentRound();
+
+                if (round instanceof net.sf.rails.game.financial.StockRound) {
+                    isStockRound = true;
+                    currentOrNum = 0;
+                } else if (round instanceof net.sf.rails.game.OperatingRound) {
+                    isStockRound = false;
+                    String orId = gameUIManager.getGameManager().getORId();
+                    currentOrNum = 1;
+                    if (orId != null && orId.contains(".")) {
+                        try {
+                            String suffix = orId.substring(orId.lastIndexOf('.') + 1);
+                            currentOrNum = Integer.parseInt(suffix);
+                        } catch (NumberFormatException e) {
+                            currentOrNum = 1;
+                        }
+                    }
+                } else {
+                    isStockRound = true;
+                }
+
+                // 3. Calculate Target Position (Pixels)
+                int startX = 25;
+                int gap = 55;
+
+                int activeIndex;
+                if (isStockRound) {
+                    activeIndex = 3; // SR is always at the end
+                } else {
+                    activeIndex = currentOrNum - 1; // OR 1 -> Index 0
+                    if (activeIndex < 0)
+                        activeIndex = 0;
+                    if (activeIndex > 2)
+                        activeIndex = 2;
+                }
+
+                double newTarget = startX + (activeIndex * gap);
+
+                // 4. Trigger Animation
+                if (currentTrainX < 0) {
+                    // First Load: Snap instantly (no animation on startup)
+                    currentTrainX = newTarget;
+                    targetTrainX = newTarget;
+                } else if (Math.abs(newTarget - targetTrainX) > 0.1) {
+                    // Destination Changed: Set target and start engine
+                    targetTrainX = newTarget;
+                    if (!animTimer.isRunning()) {
+                        animTimer.start();
+                    }
+                }
+
+            } catch (Exception e) {
+                // Fail safe
+            }
+            repaint();
+        }
+
+        @Override
+        protected void paintComponent(Graphics g) {
+            super.paintComponent(g);
+            Graphics2D g2 = (Graphics2D) g;
+            g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+
+            int startX = 25;
+            int gap = 55;
+            int trackY = HEIGHT - 12;
+
+            // Capsule Dimensions
+            int capW = 34;
+            int capH = 18;
+            int capArc = 10;
+
+            // --- 1. DRAW TRACK ---
+            g2.setStroke(new BasicStroke(3));
+            for (int i = 0; i < 3; i++) { // 3 segments for 4 nodes
+                int x1 = startX + (i * gap);
+                int x2 = startX + ((i + 1) * gap);
+
+                boolean isFutureDisabled = ((i + 1) < 3 && (i + 1) >= phaseMaxOrs);
+
+                if (isFutureDisabled) {
+                    g2.setColor(Color.LIGHT_GRAY);
+                    g2.setStroke(new BasicStroke(2, BasicStroke.CAP_BUTT, BasicStroke.JOIN_BEVEL, 0,
+                            new float[] { 4, 4 }, 0));
+                } else {
+                    g2.setColor(Color.GRAY);
+                    g2.setStroke(new BasicStroke(3));
+                }
+                g2.draw(new Line2D.Float(x1, trackY, x2, trackY));
+            }
+
+            // --- 2. DRAW STATIONS ---
+            g2.setStroke(new BasicStroke(1.5f));
+            for (int i = 0; i < 4; i++) {
+                int cx = startX + (i * gap);
+
+                String label = (i == 3) ? "SR" : "OR" + (i + 1);
+                boolean isDisabled = (i < 3 && i >= phaseMaxOrs);
+
+                java.awt.geom.RoundRectangle2D capsule = new java.awt.geom.RoundRectangle2D.Float(
+                        cx - (capW / 2), trackY - (capH / 2), capW, capH, capArc, capArc);
+
+                if (isDisabled) {
+                    g2.setColor(new Color(245, 245, 245));
+                    g2.fill(capsule);
+                    g2.setColor(Color.LIGHT_GRAY);
+                    g2.setStroke(
+                            new BasicStroke(1, BasicStroke.CAP_BUTT, BasicStroke.JOIN_BEVEL, 0, new float[] { 2 }, 0));
+                    g2.draw(capsule);
+                    g2.setColor(Color.LIGHT_GRAY);
+                } else {
+                    g2.setColor(Color.WHITE);
+                    g2.fill(capsule);
+                    g2.setColor(Color.BLACK);
+                    g2.setStroke(new BasicStroke(1.5f));
+                    g2.draw(capsule);
+                    g2.setColor(Color.BLACK);
+                }
+
+                g2.setFont(new Font("SansSerif", Font.BOLD, 10));
+                FontMetrics fm = g2.getFontMetrics();
+                int tx = cx - (fm.stringWidth(label) / 2);
+                int ty = trackY + (fm.getAscent() / 2) - 2;
+                g2.drawString(label, tx, ty);
+            }
+
+            // --- 3. DRAW ANIMATED TRAIN ---
+            // Use currentTrainX calculated by Timer
+            int drawX = (int) currentTrainX;
+            int trainY = trackY - 10;
+
+            // Safety: if drawX is still -1 (render before updateState), assume start
+            if (drawX < 0)
+                drawX = startX;
+
+            drawTrain(g2, drawX, trainY);
+        }
+
+        private void drawTrain(Graphics2D g2, int x, int y) {
+            int w = 32;
+            int h = 20;
+            int left = x - (w / 2);
+            int bottom = y;
+
+            Color locoColor = new Color(40, 40, 40);
+            Color accentColor = new Color(200, 50, 50);
+
+            // Wheels
+            g2.setColor(Color.BLACK);
+            int wheelSize = 8;
+            for (int i = 0; i < 3; i++) {
+                g2.fillOval(left + 2 + (i * 9), bottom - wheelSize + 2, wheelSize, wheelSize);
+            }
+
+            // Chassis
+            java.awt.geom.GeneralPath body = new java.awt.geom.GeneralPath();
+            body.moveTo(left, bottom - 4);
+            body.lineTo(left + w, bottom - 4);
+            body.lineTo(left + w, bottom - 12);
+            body.lineTo(left + 8, bottom - 12);
+            body.lineTo(left + 8, bottom - 18);
+            body.lineTo(left, bottom - 18);
+            body.closePath();
+
+            g2.setColor(locoColor);
+            g2.fill(body);
+
+            // Cab Window
+            g2.setColor(Color.WHITE);
+            g2.fillRect(left + 2, bottom - 16, 4, 4);
+
+            // Funnel
+            g2.setColor(locoColor);
+            g2.fillRect(left + 22, bottom - 16, 4, 6);
+            g2.fillRect(left + 21, bottom - 18, 6, 2);
+
+            // Cowcatcher
+            g2.setColor(accentColor);
+            java.awt.geom.GeneralPath cow = new java.awt.geom.GeneralPath();
+            cow.moveTo(left + w, bottom - 4);
+            cow.lineTo(left + w + 4, bottom);
+            cow.lineTo(left + w, bottom);
+            cow.closePath();
+            g2.fill(cow);
+
+            // Roof Accent
+            g2.fillRect(left - 1, bottom - 19, 10, 2);
+        }
+    }
+    // --- END FIX ---
+
+    /**
+     * Custom Caption to render a Green "Pass" Dot behind the Priority Train icon.
+     */
+    private static class PassIndicatorCaption extends Caption {
+        private boolean passed = false;
+
+        public PassIndicatorCaption(String text) {
+            super(text);
+        }
+
+        public void setPassed(boolean passed) {
+        }
+
     }
 
 }

@@ -188,12 +188,7 @@ public class ORUIManager implements DialogOwner {
         // Force repaint to clear any "Ghost" pixels from the previous state
         if (mapPanel != null)
             mapPanel.repaint();
-        if (currentRound instanceof OperatingRound) {
-            if (orWindow != null && orWindow.isVisible()) {
-                orWindow.toFront();
-                orWindow.requestFocus();
-            }
-        }
+      
 
         // Extract Undo/Redo
         GameAction undoAction = null;
@@ -380,7 +375,6 @@ public class ORUIManager implements DialogOwner {
             orPanel.setupConfirm();
             orPanel.updateDynamicActions(possibleActions.getList());
             updateHexBuildNumbers(true);
-            orWindow.requestFocus();
         } else if (orStep == GameDef.OrStep.LAY_TOKEN) {
             boolean hasButtonActions = false;
             List<LayToken> tokenActions = possibleActions.getType(LayToken.class);
@@ -403,7 +397,6 @@ public class ORUIManager implements DialogOwner {
                 orPanel.initTokenLayingStep();
                 orPanel.updateDynamicActions(possibleActions.getList());
             } else {
-                orWindow.requestFocus();
                 orPanel.initTokenLayingStep();
                 orPanel.setupConfirm();
                 orPanel.updateDynamicActions(possibleActions.getList());
@@ -537,11 +530,7 @@ public class ORUIManager implements DialogOwner {
             log.error("Error processing action command: " + command, e);
         }
 
-        if (currentRound instanceof OperatingRound) {
-            if (this.getORWindow() != null && this.getORWindow().isVisible()) {
-                this.getORWindow().requestFocus();
-            }
-        }
+      
     }
 
     // --- RESTORED PLUMBING METHODS ---
@@ -607,8 +596,7 @@ public class ORUIManager implements DialogOwner {
                     upgradePanel.nextUpgrade();
                 else
                     upgradePanel.nextSelection();
-                if (orWindow != null && orPanel != null)
-                    orPanel.requestFocusInWindow();
+                
                 return true;
             }
             return false;
@@ -619,8 +607,7 @@ public class ORUIManager implements DialogOwner {
                 if (selectedHex != null)
                     map.selectHex(null);
                 setLocalStep(LocalSteps.SELECT_HEX);
-                if (orWindow != null && orPanel != null)
-                    orPanel.requestFocusInWindow();
+                
                 return true;
             }
             return false;
@@ -638,8 +625,7 @@ public class ORUIManager implements DialogOwner {
                         upgradePanel.setSelect(clickedHex);
                     if (orPanel != null)
                         orPanel.enableConfirm(true);
-                    if (orWindow != null && orPanel != null)
-                        orPanel.requestFocusInWindow();
+                   
                     return true;
                 default:
                     return false;
@@ -650,15 +636,13 @@ public class ORUIManager implements DialogOwner {
             case SELECT_UPGRADE:
                 map.selectHex(null);
                 setLocalStep(LocalSteps.SELECT_HEX);
-                if (orWindow != null && orPanel != null)
-                    orPanel.requestFocusInWindow();
+                
                 return false;
             default:
                 return false;
         }
     }
 
-// ... (beginning of method) ...
     public void updateHexBuildNumbers(boolean show) {
         if (map == null || orPanel == null)
             return;

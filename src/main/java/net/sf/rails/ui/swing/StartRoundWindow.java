@@ -29,7 +29,8 @@ import com.google.common.collect.Iterables;
 
 /**
  * This displays the Auction Window.
- * Refactored to remove separate Info column/button and integrate details into RailCard tooltips.
+ * Refactored to remove separate Info column/button and integrate details into
+ * RailCard tooltips.
  */
 public class StartRoundWindow extends JFrame implements ActionListener, KeyListener, ActionPerformer, DialogOwner {
 
@@ -45,7 +46,6 @@ public class StartRoundWindow extends JFrame implements ActionListener, KeyListe
     private static final int WIDE_BOTTOM = 8;
 
     private ActionButton undoButton;
-    private ActionButton aiButton;
 
     protected static final String[] itemStatusTextKeys = new String[] { "Status_Unavailable", "Status_Biddable",
             "Status_Buyable",
@@ -73,11 +73,11 @@ public class StartRoundWindow extends JFrame implements ActionListener, KeyListe
     private Field[] minBid;
     private int[] minBidXOffset;
     private int minBidYOffset;
-    
+
     // Separator Fields
-    private JComponent[] verticalSeparators; 
+    private JComponent[] verticalSeparators;
     private int[] separatorXOffset;
-    
+
     private Field[][] bidPerPlayer;
     private int[] bidPerPlayerXOffset;
     private int bidPerPlayerYOffset;
@@ -89,7 +89,7 @@ public class StartRoundWindow extends JFrame implements ActionListener, KeyListe
     private int playerFreeCashYOffset;
 
     // REMOVED: Info column arrays (info, infoXOffset, infoYOffset)
-    
+
     private Field[] itemStatus; // Remains invisible, only used for status tooltip
 
     private int[] playerCaptionXOffset;
@@ -127,9 +127,10 @@ public class StartRoundWindow extends JFrame implements ActionListener, KeyListe
     protected PossibleActions possibleActions;
     protected PossibleAction immediateAction;
 
-    // We don't use the ItemGroup for the click buttons anymore to avoid "sticky" selection
+    // We don't use the ItemGroup for the click buttons anymore to avoid "sticky"
+    // selection
     private final ButtonGroup itemGroup = new ButtonGroup();
-    private ClickField dummyButton; 
+    private ClickField dummyButton;
 
     private StartRound.Bidding includeBidding;
     private boolean includeBuying;
@@ -137,7 +138,6 @@ public class StartRoundWindow extends JFrame implements ActionListener, KeyListe
 
     private ORUIManager orUIManager;
     private int selectedItemIndex = -1;
-
 
     private void initCells() {
         int lastX = -1;
@@ -149,7 +149,7 @@ public class StartRoundWindow extends JFrame implements ActionListener, KeyListe
 
         basePrice = new Field[ni];
         minBid = new Field[ni];
-        
+
         verticalSeparators = new JComponent[numberOfColumns];
         separatorXOffset = new int[numberOfColumns];
 
@@ -168,9 +168,9 @@ public class StartRoundWindow extends JFrame implements ActionListener, KeyListe
             minBidXOffset = new int[numberOfColumns];
         bidPerPlayerXOffset = new int[numberOfColumns];
         playerCaptionXOffset = new int[numberOfColumns];
-        
+
         // REMOVED: infoXOffset array allocation
-        
+
         if (includeBidding != StartRound.Bidding.NO)
             playerBidsXOffset = new int[numberOfColumns];
         playerFreeCashXOffset = new int[numberOfColumns];
@@ -191,18 +191,18 @@ public class StartRoundWindow extends JFrame implements ActionListener, KeyListe
                 if (col == 0)
                     minBidYOffset = lastY;
             }
-            
-            separatorXOffset[col] = ++lastX; 
-            
+
+            separatorXOffset[col] = ++lastX;
+
             bidPerPlayerXOffset[col] = playerCaptionXOffset[col] = ++lastX;
             if (col == 0)
                 bidPerPlayerYOffset = lastY;
 
             // REMOVED: Info column logic
             // infoXOffset[col] = bidPerPlayerXOffset[col] + np;
-            
+
             lastX += np; // Skip over the player columns
-            
+
             if (col == 0) {
                 // infoYOffset = lastY; // Removed
                 columnWidth = lastX + 1;
@@ -240,13 +240,13 @@ public class StartRoundWindow extends JFrame implements ActionListener, KeyListe
                 addField(new Caption(LocalText.getText("MINIMUM_BID")),
                         minBidXOffset[col], 0, 1, 2, WIDE_BOTTOM + WIDE_RIGHT);
             }
-            
+
             // Vertical Separator
             JSeparator sep = new JSeparator(SwingConstants.VERTICAL);
             sep.setForeground(Color.GRAY);
-            int totalHeight = lastY + 2; 
+            int totalHeight = lastY + 2;
             addField(sep, separatorXOffset[col], 0, 1, totalHeight, 0);
-            
+
             addField(new Caption(LocalText.getText("PLAYERS")),
                     playerCaptionXOffset[col], 0, np, 1, 0);
             for (int i = 0; i < np; i++) {
@@ -272,8 +272,9 @@ public class StartRoundWindow extends JFrame implements ActionListener, KeyListe
 
             // 1. Enable Clicks
             cards[i].addActionListener(this);
+            log.error("Added ActionListener to RailCard for StartItem index {}", si.getIndex());
 
-            // Apply scaling 
+            // Apply scaling
             cards[i].setScale(1.3);
 
             // Layout
@@ -338,12 +339,12 @@ public class StartRoundWindow extends JFrame implements ActionListener, KeyListe
         }
 
         int cashLabelX = (showBasePrices) ? basePriceXOffset[0] : itemNameXOffset[0];
-        
+
         addField(new Caption(
                 LocalText.getText(includeBidding != StartRound.Bidding.NO ? "FREE" : "CASH")),
                 cashLabelX, playerFreeCashYOffset, 1, 1,
                 WIDE_RIGHT + (firstBelowTable ? WIDE_TOP : 0));
-                
+
         for (int i = 0; i < np; i++) {
             playerFree[i] = new Field(includeBidding != StartRound.Bidding.NO
                     ? round.getFreeCashModel(players.getPlayerByPosition(i))
@@ -381,8 +382,6 @@ public class StartRoundWindow extends JFrame implements ActionListener, KeyListe
         }
     }
 
-
-
     @Override
     public boolean processImmediateAction() {
         if (immediateAction != null) {
@@ -401,8 +400,6 @@ public class StartRoundWindow extends JFrame implements ActionListener, KeyListe
         }
         return true;
     }
-
-  
 
     protected boolean requestStartPrice(BuyStartItem activeItem) {
         if (activeItem.hasSharePriceToSet()) {
@@ -510,7 +507,6 @@ public class StartRoundWindow extends JFrame implements ActionListener, KeyListe
         }
     }
 
-
     @Override
     public void keyPressed(KeyEvent e) {
     }
@@ -577,7 +573,7 @@ public class StartRoundWindow extends JFrame implements ActionListener, KeyListe
 
     public void init(StartRound round, GameUIManager parent, ORUIManager orUIManager) {
         this.round = round;
-        this.orUIManager = orUIManager; 
+        this.orUIManager = orUIManager;
         startPacket = round.getStartPacket();
         multipleColumns = startPacket.isMultipleColumns();
         if (multipleColumns) {
@@ -640,12 +636,6 @@ public class StartRoundWindow extends JFrame implements ActionListener, KeyListe
         undoButton.setEnabled(false);
         buttonPanel.add(undoButton);
 
-        // Initialize AI Button
-        aiButton = new ActionButton(RailsIcon.AI_MOVE);
-        aiButton.setToolTipText("AI Move (A)");
-        aiButton.addActionListener(this);
-        aiButton.setEnabled(false);
-        buttonPanel.add(aiButton);
 
         buttonPanel.setOpaque(true);
 
@@ -709,9 +699,10 @@ public class StartRoundWindow extends JFrame implements ActionListener, KeyListe
 
     @Override
     public void updateStatus(boolean myTurn) {
+        // --- START FIX ---
+        log.info("SRW: updateStatus STARTED. MyTurn={}", myTurn);
 
-
-        // Reset all cards to their default state based on game status
+        // 1. Reset all cards to their default state based on game status
         for (int i = 0; i < round.getNumberOfStartItems(); i++) {
             StartItem si = round.getStartItem(i);
             int status = si.getStatus();
@@ -719,19 +710,12 @@ public class StartRoundWindow extends JFrame implements ActionListener, KeyListe
             // Clear previous actions
             cards[i].clearPossibleActions();
 
-            // Set base visual state
             if (status == StartItem.SOLD) {
                 cards[i].setState(RailCard.State.DISABLED);
-                
-                // Set tooltip for sold/unavailable items
                 String tooltipKey = itemStatusTextKeys[status];
                 cards[i].setToolTipText(LocalText.getText(tooltipKey));
             } else {
                 cards[i].setState(RailCard.State.PASSIVE);
-                
-                // RESTORE RICH TOOLTIP IF AVAILABLE
-                // Because reset/setState might clear it (depending on implementation), 
-                // we re-apply the company details tooltip to ensure it persists.
                 Certificate cert = si.getPrimary();
                 Company comp = null;
                 if (cert instanceof PublicCertificate) {
@@ -745,7 +729,6 @@ public class StartRoundWindow extends JFrame implements ActionListener, KeyListe
             }
         }
 
-
         dummyButton.setSelected(true);
 
         if (includeBuying) buyButton.setEnabled(false);
@@ -757,21 +740,21 @@ public class StartRoundWindow extends JFrame implements ActionListener, KeyListe
         
         // Disable new buttons initially
         if (undoButton != null) undoButton.setEnabled(false);
-        if (aiButton != null) aiButton.setEnabled(false);
+        
+        // AI Button logic removed as requested
 
         RoundFacade currentRound = gameUIManager.getCurrentRound();
         if (!(currentRound instanceof StartRound)) {
+            log.info("SRW: updateStatus ABORT - Not StartRound.");
             return;
         }
 
-        if (!myTurn) return;
+        if (!myTurn) {
+            log.info("SRW: updateStatus ABORT - Not My Turn.");
+            return;
+        }
 
         List<StartItemAction> actions = possibleActions.getType(StartItemAction.class);
-
-        // --- ENABLE AI BUTTON ---
-        if (aiButton != null) {
-            aiButton.setEnabled(true);
-        }
 
         // --- ENABLE UNDO BUTTON ---
         GameAction undoAction = null;
@@ -787,9 +770,14 @@ public class StartRoundWindow extends JFrame implements ActionListener, KeyListe
             undoButton.setPossibleAction(undoAction);
         }
 
-        if (actions == null || actions.isEmpty()) {
+        if (actions == null) {
+            log.warn("SRW: actions list is NULL");
+        } else if (actions.isEmpty()) {
+            log.warn("SRW: actions list is EMPTY");
             close();
             return;
+        } else {
+            log.info("SRW: Found {} StartItemActions to distribute.", actions.size());
         }
 
         setSRPlayerTurn();
@@ -799,21 +787,26 @@ public class StartRoundWindow extends JFrame implements ActionListener, KeyListe
         boolean selected = false;
         BuyStartItem buyAction;
 
+        // 2. Distribute Actions Loop
         for (StartItemAction action : actions) {
             int j = action.getItemIndex();
             int i = crossIndex[j];
             StartItem item = action.getStartItem();
 
+            // LOGGING ASSIGNMENT
+            log.info("SRW: Assigning Action {} to Card Index {}", action, i);
+            cards[i].setPossibleAction(action);
+            
+            // Verify immediate assignment
+            if (cards[i].getPossibleActions().isEmpty()) {
+                 log.error("SRW: IMMEDIATE CHECK FAILED. Card {} has empty actions after setPossibleAction!", i);
+            }
+
             if (action instanceof BuyStartItem) {
                 buyAction = (BuyStartItem) action;
-                // Assign the action so actionPerformed detects it.
-                cards[i].setPossibleAction(action);
                 
-                // Restore the visual selection state if this index is selected
                 if (i == selectedItemIndex) {
                     cards[i].setState(RailCard.State.SELECTED);
-                    
-                    // Also ensure the Buy button is enabled if this is the selected item
                     if (buyButton != null && includeBuying) {
                         buyButton.setEnabled(true);
                         buyButton.setPossibleAction(action);
@@ -822,8 +815,6 @@ public class StartRoundWindow extends JFrame implements ActionListener, KeyListe
                     cards[i].setState(RailCard.State.ACTIONABLE);
                 }
 
-
-                // Border Logic via RailCard State
                 selected = buyAction.isSelected();
                 if (selected) {
                     cards[i].setState(RailCard.State.SELECTED);
@@ -832,7 +823,6 @@ public class StartRoundWindow extends JFrame implements ActionListener, KeyListe
                 if (includeBidding == StartRound.Bidding.ON_ITEMS && showBasePrices)
                     minBid[i].setText("");
                 buyAllowed = true;
-
 
             } else if (action instanceof BidStartItem) {
                 BidStartItem bidAction = (BidStartItem) action;
@@ -844,8 +834,6 @@ public class StartRoundWindow extends JFrame implements ActionListener, KeyListe
                     spinnerModel.setMinimum(mb);
                     spinnerModel.setStepSize(bidAction.getBidIncrement());
                     spinnerModel.setValue(mb);
-                } else {
-                    cards[i].setPossibleAction(action);
                 }
                 
                 if (selected) {
@@ -853,17 +841,22 @@ public class StartRoundWindow extends JFrame implements ActionListener, KeyListe
                 } else {
                     cards[i].setState(RailCard.State.ACTIONABLE);
                 }
-
                 
                 bidAllowed = selected;
                 if (includeBidding == StartRound.Bidding.ON_ITEMS) {
-                    // Update Min Bid text
                     minBid[i].setText(Bank.format(item, item.getMinimumBid()));
                 }
-
             }
         }
+        
+        // Final State Check Logging
+        for (int k = 0; k < cards.length; k++) {
+if (cards[k] != null && cards[k].getPossibleActions() != null && !cards[k].getPossibleActions().isEmpty()) {
+                     log.info("SRW: FINAL CHECK - Card {} has {} actions. State: {}", k, cards[k].getPossibleActions().size(), cards[k].getState());
+             }
+        }
 
+        // 3. Pass Button Logic
         boolean passAllowed = false;
         List<NullAction> inactiveItems = possibleActions.getType(NullAction.class);
         if (inactiveItems != null && !inactiveItems.isEmpty()) {
@@ -881,8 +874,12 @@ public class StartRoundWindow extends JFrame implements ActionListener, KeyListe
         }
         passButton.setEnabled(passAllowed);
 
-        pack(); 
+        // Replaced pack() with validate/repaint to preserve user-resized window dimensions
+        revalidate();
+        repaint(); 
         requestFocus();
+        log.info("SRW: updateStatus COMPLETED.");
+        // --- END FIX ---
     }
 
 
@@ -890,82 +887,56 @@ public class StartRoundWindow extends JFrame implements ActionListener, KeyListe
     public void actionPerformed(ActionEvent actor) {
         JComponent source = (JComponent) actor.getSource();
 
-        // --- Handle AI Button ---
-        if (source == aiButton) {
-            gameUIManager.performAIMove();
-            return;
+        // --- START FIX ---
+        log.info("SRW: actionPerformed fired by Source Class: {}", source.getClass().getName());
+
+      
+
+        // Identify RailCard Clicks
+        int clickedIndex = -1;
+        for (int k = 0; k < cards.length; k++) {
+            if (source == cards[k] || SwingUtilities.isDescendingFrom(source, cards[k])) {
+                clickedIndex = k;
+                log.info("SRW: Source identified as descending from RailCard index {}", k);
+                break;
+            }
         }
 
-        // --- Handle Undo Button ---
-        if (source == undoButton) {
-            // Undo logic is handled by the framework via the action
-        }
-
-        if (source instanceof ClickField) {
-            gbc = gb.getConstraints(source);
-
-            // Safety Check: Ignore clicks if the card has no assigned actions (e.g. Passive/Sold)
-            java.util.List<PossibleAction> actions = ((ClickField) source).getPossibleActions();
+        if (clickedIndex != -1) {
+            RailCard card = cards[clickedIndex];
+            java.util.List<PossibleAction> actions = card.getPossibleActions();
+            
             if (actions == null || actions.isEmpty()) {
+                // Log the state to help debug why actions might be missing
+                log.warn("SRW: RailCard index {} clicked, but has NO actions assigned. State: {}", clickedIndex, card.getState());
                 return;
             }
             
             StartItemAction currentActiveItem = (StartItemAction) actions.get(0);
-            
+            log.info("SRW: Processing RailCard action: {}", currentActiveItem);
             SoundManager.notifyOfClickFieldSelection(currentActiveItem);
 
             if (currentActiveItem instanceof BuyStartItem) {
-                // --- Two-step Processing (Select -> Buy) ---
                 BuyStartItem bsi = (BuyStartItem) currentActiveItem;
 
-                // 1. Identify which item was clicked
-                int clickedIndex = -1;
-                for (int k = 0; k < cards.length; k++) {
-                    if (source == cards[k]) {
-                        clickedIndex = k;
-                        break;
-                    }
-                }
-
-                // 2. Check if this item is ALREADY selected (Confirmation Click)
-                if (clickedIndex != -1 && clickedIndex == selectedItemIndex) {
-                    
-                    // Handle Majors that need a start price
+                if (clickedIndex == selectedItemIndex) {
                     if (bsi.hasSharePriceToSet()) {
-                        if (requestStartPrice(bsi)) return; 
+                        if (requestStartPrice(bsi)) return;
                     }
-                    
-                    // Execute Buy
                     process(bsi);
-                    selectedItemIndex = -1; // Reset after processing
-                    return;
-
+                    selectedItemIndex = -1;
                 } else {
-                    // 3. First Click: Selection Logic
                     selectedItemIndex = clickedIndex;
-
-                    // Visual Feedback: Highlight the selected item, reset others
                     for (int k = 0; k < cards.length; k++) {
-                        // Safety check: ensure card exists and is conceptually 'active' (enabled)
-                        if (cards[k] != null && cards[k].isEnabled()) { 
-                            if (k == selectedItemIndex) {
-                                cards[k].setState(RailCard.State.SELECTED);
-                            } else {
-                                cards[k].setState(RailCard.State.ACTIONABLE);
-                            }
+                        if (cards[k] != null && cards[k].isEnabled()) {
+                            cards[k].setState(k == selectedItemIndex ? RailCard.State.SELECTED : RailCard.State.ACTIONABLE);
                         }
                     }
-                    
-                    // Enable the main "Buy" button and link it to this action
-                    if (buyButton != null) {
+                    if (buyButton != null && includeBuying) {
                         buyButton.setEnabled(true);
                         buyButton.setPossibleAction(bsi);
                     }
-                    
-                    // Do NOT process yet. Wait for second click or Buy button.
-                    return;
                 }
-                
             } else if (currentActiveItem instanceof BidStartItem) {
                 BidStartItem bidAction = (BidStartItem) currentActiveItem;
                 if (includeBuying) buyButton.setEnabled(false);
@@ -987,14 +958,24 @@ public class StartRoundWindow extends JFrame implements ActionListener, KeyListe
                     spinnerModel.setStepSize(bidAction.getBidIncrement());
                     spinnerModel.setValue(minBid);
                 }
+                
+                for (int k = 0; k < cards.length; k++) {
+                    if (cards[k] != null && cards[k].isEnabled()) {
+                        cards[k].setState(k == clickedIndex ? RailCard.State.SELECTED : RailCard.State.ACTIONABLE);
+                    }
+                }
             }
-        } else if (source instanceof ActionButton) {
-            List<PossibleAction> actions = ((ActionButton) source).getPossibleActions();
+            return;
+        }
+
+        if (source instanceof ActionButton) {
+            java.util.List<PossibleAction> actions = ((ActionButton) source).getPossibleActions();
             if (actions == null || actions.isEmpty()) {
+                log.warn("SRW: ActionButton clicked but actions list is empty.");
                 return;
             }
-            
             PossibleAction activeItem = actions.get(0);
+            log.info("SRW: ActionButton Action: {}", activeItem);
 
             if (source == buyButton) {
                 if (activeItem instanceof BuyStartItem && ((BuyStartItem) activeItem).hasSharePriceToSet()) {
@@ -1014,7 +995,7 @@ public class StartRoundWindow extends JFrame implements ActionListener, KeyListe
                 process(activeItem);
             }
         }
+        // --- END FIX ---
     }
 
-    
 }

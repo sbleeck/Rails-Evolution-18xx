@@ -168,6 +168,10 @@ public void setPossibleAction(PossibleAction action) {
         updateView();
     }
 
+    public State getState() {
+        return currentState;
+    }
+
     /**
      * Scales the entire card: Width, Height, and Font.
      * 
@@ -238,12 +242,35 @@ public void setPossibleAction(PossibleAction action) {
 
         } else {
             GridBagConstraints gbc = new GridBagConstraints();
-            gbc.fill = GridBagConstraints.BOTH;
-            gbc.insets = new Insets(0, 0, 0, 0);
-            gbc.gridy = 0;
-            gbc.weighty = 1.0;
+           
+            int totalItems = certificates.size() + trains.size() + privates.size();
+            boolean centerSingleItem = (totalItems == 1 && scaleFactor > 1.0);
 
-            int x = 0;
+            gbc.gridy = 0;
+            gbc.fill = GridBagConstraints.BOTH;
+            gbc.weighty = 1.0;
+            
+            if (centerSingleItem) {
+                // 1. Left Spacer (Weight 1.0)
+                gbc.gridx = 0;
+                gbc.weightx = 1.2;
+                contentPanel.add(javax.swing.Box.createGlue(), gbc);
+
+                // 2. Prepare Constraints for the Item (Weight 2.0)
+                // Width Logic: The double items have a 5px gap (insets.right=5).
+                // To match their width exactly, we must shrink this single item by 5px too.
+                // We split the 5px (2px left, 3px right) to keep it visually centered.
+                gbc.weightx = 2.0;
+                gbc.insets = new Insets(0, 2, 0, 3); 
+
+            } else {
+                // Standard behavior: Fill evenly with 5px gap
+                gbc.weightx = 1.0;
+                gbc.insets = new Insets(0, 0, 0, 5);
+            }
+
+
+            int x = centerSingleItem ? 1 : 0; // Start at 1 if centering
 
             for (Certificate cert : certificates) {
                 String label = cert.getId();
@@ -263,27 +290,47 @@ public void setPossibleAction(PossibleAction action) {
 
                 JLabel lbl = createStyledLabel(label, bg, itemFg, false);
                 lbl.setBorder(new LineBorder(Color.GRAY, 1));
+                // Center text in the wider label
+                lbl.setHorizontalAlignment(SwingConstants.CENTER);
+                
                 gbc.gridx = x++;
                 contentPanel.add(lbl, gbc);
             }
 
             for (Train train : trains) {
                 JLabel lbl = createStyledLabel(train.getName(), null, fgColor, false);
+               lbl.setHorizontalAlignment(SwingConstants.CENTER);
                 gbc.gridx = x++;
                 contentPanel.add(lbl, gbc);
             }
 
             for (PrivateCompany priv : privates) {
                 JLabel lbl = createStyledLabel(priv.getId(), null, fgColor, false);
+               lbl.setHorizontalAlignment(SwingConstants.CENTER);
                 gbc.gridx = x++;
                 contentPanel.add(lbl, gbc);
             }
+
+            // --- START FIX ---
+            if (centerSingleItem) {
+                // 3. Add Right Spacer (Weight 1.0)
+                gbc.gridx = x; 
+                gbc.weightx = 1.2;
+                contentPanel.add(javax.swing.Box.createGlue(), gbc);
+            }
+
         }
         contentPanel.revalidate();
         contentPanel.repaint();
         this.revalidate();
         this.repaint();
     }
+
+    @Override
+public java.util.List<rails.game.action.PossibleAction> getPossibleActions() {
+    java.util.List<rails.game.action.PossibleAction> actions = super.getPossibleActions();
+    return (actions == null) ? java.util.Collections.emptyList() : actions;
+}
 
     private JLabel createStyledLabel(String text, Color bg, Color fg, boolean isCentered) {
         JLabel l = new JLabel(text);
@@ -397,83 +444,56 @@ public void setState(State state) {
         }
     }
 
-    // --- START FIX ---
-    /**
-     * STATIC CALCULATOR: The single source of truth for card dimensions.
-     * Calculated dynamically from the font to avoid fixed sizes.
-     */
-    public static Dimension calculateBaseSize(Font f, boolean compactMode, double scaleFactor) {
-        // 1. Safety Default
+public static Dimension calculateBaseSize(Font f, boolean compactMode, double scaleFactor) {
         if (f == null)
             f = new Font("SansSerif", Font.BOLD, 12);
 
-        // 2. Use Toolkit Metrics (No Display Peer required)
         FontMetrics fm = java.awt.Toolkit.getDefaultToolkit().getFontMetrics(f);
-
-        // 3. HEIGHT: 1.3 times the Font Height (No fixed floor)
         int fontHeight = (fm != null) ? fm.getHeight() : 14;
         int height = (int) (fontHeight * HEIGHT_FACTOR * scaleFactor);
 
-        // 4. WIDTH: Context-Aware
-        int width;
-        if (compactMode) {
-            // TRAINS / PRIVATES: 5 spaces long
-            // We use '0' as a standard proxy for "space" in UI terms to avoid thin gaps
-            int charW = (fm != null) ? fm.charWidth('0') : 8;
-            width = (int) (charW * WIDTH_CHARS_COMPACT * scaleFactor);
-        } else {
-            // SHARES: "Owner" or "100%P" + Gap
-            int w1 = (fm != null) ? fm.stringWidth("Owner") : 40;
-            int w2 = (fm != null) ? fm.stringWidth("100%P") : 40;
-            int maxW = Math.max(w1, w2);
-
-            width = (int) ((maxW + WIDTH_GAP_SHARES) * scaleFactor);
-        }
+        // 1. Set Standard Width to "WWWW" (Narrower for GameStatus)
+        String referenceString = "WWWW"; 
+        int charW = (fm != null) ? fm.stringWidth(referenceString) : 40;
+        
+        int width = (int) ((charW + WIDTH_GAP_SHARES) * scaleFactor);
 
         return new Dimension(width, height);
     }
 
     @Override
     public Dimension getPreferredSize() {
-        // 1. Get Base Size via static helper
         Dimension base = calculateBaseSize(getFont(), compactMode, scaleFactor);
 
-        // 2. Instance-Specific Expansion (e.g. Multi-Share cards)
         if (scaleFactor == 1.0) {
+            // Normal behavior (GameStatus, ORPanel)
             int items = Math.max(1, certificates.size() + trains.size() + privates.size());
-            if (items > 1)
-                base.width *= items;
+            if (items > 1) base.width *= items;
         } else {
-            // Complex scaling logic for "Start Round" if needed
-            Font f = getFont();
-            if (f != null) {
-                FontMetrics fm = getFontMetrics(f);
-                int totalW = 0;
-                int gap = 10;
-                for (Certificate cert : certificates) {
-                    String label = cert.getId();
-                    if (cert instanceof PublicCertificate)
-                        label = ((PublicCertificate) cert).getParent().getId();
-                    else if (cert instanceof PrivateCompany)
-                        label = ((PrivateCompany) cert).getId();
-                    if (label != null && fm != null) {
-                        label = label.replaceAll("\\<.*?\\>", "");
-                        totalW += fm.stringWidth(label) + gap;
-                    }
-                }
-                if (fm != null) {
-                    for (Train t : trains)
-                        totalW += fm.stringWidth(t.getName()) + gap;
-                    for (PrivateCompany p : privates)
-                        totalW += fm.stringWidth(p.getId()) + gap;
-                }
-                if (totalW > 0)
-                    return new Dimension(Math.max(40, totalW + gap), base.height);
-            }
+            // Start Round Window Mode (Scaled > 1.0)
+            // FORCE IDENTICAL WIDTH: Always calculate width as if there are 2 items.
+            // This ensures single-item cards (M1) are identical width to double-item cards (LD|SX).
+            int fixedItems = 2; 
+            int totalW = base.width * fixedItems;
+            
+            // Add gap spacing
+            totalW += (fixedItems - 1) * 5;
+            
+            return new Dimension(totalW, base.height);
         }
         return base;
     }
-    // --- END FIX ---
+
+    /**
+     * CRITICAL FIX: The "squashed" look happens because GridBagLayout 
+     * shrinks components to their Minimum Size when space is tight.
+     * By default, Minimum Size is often (0,0). 
+     * We must override this to match Preferred Size to prevent squashing.
+     */
+    @Override
+    public Dimension getMinimumSize() {
+        return getPreferredSize();
+    }
 
     private Color getCertColor(Certificate cert) {
         if (cert instanceof PublicCertificate) {

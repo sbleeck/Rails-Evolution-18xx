@@ -3955,13 +3955,7 @@ public class OperatingRound extends Round implements Observer {
         }
         label.append(")");
 
-        // 4. Flags (Special Property / Emergency)
-        if (stb != null) {
-            label.append(" [P]"); // Private/Property discount
-        }
-        if (emergency) {
-            label.append(" [E!]"); // Emergency buy
-        }
+      
 
         return label.toString();
     }

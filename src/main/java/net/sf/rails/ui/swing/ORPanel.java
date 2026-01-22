@@ -86,6 +86,7 @@ public class ORPanel extends GridPanel
     private static final Color BG_READOUT = Color.WHITE;
     private static final Font FONT_READOUT = new Font("SansSerif", Font.BOLD, 18);
     private static final Font FONT_HEADER = new Font("SansSerif", Font.BOLD, 12);
+private static final int PANEL_ACTION_GAP = 8;
 
     private static final int BTN_HEIGHT = 28;
     private static final Font BTN_FONT = new Font("SansSerif", Font.PLAIN, 11);
@@ -166,6 +167,41 @@ public class ORPanel extends GridPanel
 
     private static final List<ORPanel> activeInstances = new ArrayList<>();
 
+
+
+    /**
+     * Centralized UI Theme for the Operating Round Sidebar.
+     * Organizes colors by logical "Zones": Infrastructure, Capital, and Control.
+     */
+    public static class UITheme {
+        // ZONE: Infrastructure (Map Actions)
+        public static final Color TRACK_DARK     = new Color(139, 69, 19);   // Ochre
+        public static final Color TRACK_LIGHT    = new Color(255, 245, 235);
+        public static final Color TOKEN_DARK     = new Color(34, 139, 34);   // Forest
+        public static final Color TOKEN_LIGHT    = new Color(210, 255, 210);
+
+        // ZONE: Capital (Treasury Actions)
+        public static final Color REVENUE_DARK   = new Color(0, 60, 140);    // Royal Blue
+        public static final Color REVENUE_LIGHT  = new Color(210, 230, 255);
+        public static final Color TRAIN_DARK     = new Color(204, 102, 0);   // Industrial Orange
+        public static final Color TRAIN_LIGHT    = new Color(255, 235, 205);
+
+        // ZONE: Control (Navigation & State)
+        public static final Color ACTION_SKIP    = new Color(30, 144, 255);  // DodgerBlue
+        public static final Color ACTION_DONE    = new Color(180, 0, 0);      // Warning Red
+        public static final Color ACTION_DISCARD = new Color(220, 20, 60);   // Crimson
+        
+        // General UI Components
+        public static final Color BG_SIDEBAR     = new Color(235, 230, 255); // Standard Mauve
+        public static final Color BG_SPECIAL     = new Color(255, 220, 220); // Light Red
+        public static final Color BG_CARD        = new Color(255, 255, 240); // Beige
+        public static final Color READOUT_BG     = Color.WHITE;
+        public static final Color READOUT_FG     = Color.BLACK;
+    }
+
+
+
+
     // --- CONSTRUCTOR ---
     public ORPanel(ORWindow parent, ORUIManager orUIManager) {
         super();
@@ -234,7 +270,6 @@ public class ORPanel extends GridPanel
         }
 
         // D. Focus
-        SwingUtilities.invokeLater(this::requestFocusInWindow);
         if (sidebarPanel != null) {
             sidebarPanel.revalidate();
             sidebarPanel.repaint();
@@ -453,17 +488,16 @@ public class ORPanel extends GridPanel
             lblCash.getParent().setVisible(visible);
     }
 
-    private void colorizeActivePhase(Color unused) {
+   private void colorizeActivePhase(Color unused) {
         resetPhasePanel(phase1Panel, btnTileConfirm);
         resetPhasePanel(phase2Panel, btnTokenConfirm);
         resetPhasePanel(phase3Panel, btnRevPayout);
 
-        // Always enforce text and "White Box" style for Revenue buttons.
-        // We strictly apply styleRevenueButton(..., false) here to ensure they 
-        // look like "buttons" (bordered, white bg) even when disabled or inactive.
+// --- START FIX ---
+        // Always enforce the "White Box" style for Revenue buttons for consistency
         if (btnRevPayout != null) {
             btnRevPayout.setText("Pay");
-            styleRevenueButton(btnRevPayout, false); 
+            styleRevenueButton(btnRevPayout, false);
         }
         if (btnRevWithhold != null) {
             btnRevWithhold.setText("Hold");
@@ -473,38 +507,33 @@ public class ORPanel extends GridPanel
             btnRevSplit.setText("Split");
             styleRevenueButton(btnRevSplit, false);
         }
-        
+
         resetPhasePanel(phase4Panel, btnTrainSkip);
         resetPhasePanel(null, btnDone);
 
+     // Phase 1: Infrastructure - Track (Matches Ochre/Brown Palette)
         if (activePhase == 1) {
-            applyPhaseStyle(phase1Panel, null, PH_TILE_DARK, PH_TILE_LIGHT, "Confirm Track");
-            // Force Blue "Skip" by default. enableConfirm(true) will override to Brown
-            // "Confirm" if a hex is selected.
+            applyPhaseStyle(phase1Panel, null, UITheme.TRACK_DARK, UITheme.TRAIN_LIGHT, "Confirm Track");
             if (btnTileConfirm != null) {
                 btnTileConfirm.setEnabled(true);
-                styleButton(btnTileConfirm, SYS_BLUE, "Skip");
+                // logic preserved: Defaults to Blue Skip, enableConfirm() will override to Brown Confirm
+                styleButton(btnTileConfirm, UITheme.ACTION_SKIP, "Skip");
             }
 
+        // Phase 2: Infrastructure - Token (Matches Forest Green Palette)
         } else if (activePhase == 2) {
-            applyPhaseStyle(phase2Panel, null, PH_TOKEN_DARK, PH_TOKEN_LIGHT, "Confirm Token");
-            // Force Blue "Skip" by default for Token phase as well.
+            applyPhaseStyle(phase2Panel, null, UITheme.TOKEN_DARK, UITheme.TRAIN_LIGHT, "Confirm Token");
             if (btnTokenConfirm != null) {
                 btnTokenConfirm.setEnabled(true);
-                styleButton(btnTokenConfirm, SYS_BLUE, "Skip");
+                styleButton(btnTokenConfirm, UITheme.ACTION_SKIP, "Skip");
             }
+
+        // Phase 3: Capital - Revenue (Matches Royal Blue palette)
         } else if (activePhase == 3) {
-            applyPhaseStyle(phase3Panel, null, PH_REV_DARK, PH_REV_LIGHT, "Revenue");
+            applyPhaseStyle(phase3Panel, null, UITheme.REVENUE_DARK, UITheme.TRAIN_LIGHT, "Revenue");
 
-          
-// Force strict labels
-            if (btnRevPayout != null) btnRevPayout.setText("Pay");
-            if (btnRevWithhold != null) btnRevWithhold.setText("Hold");
-            if (btnRevSplit != null) btnRevSplit.setText("Split");
-
-            // Intelligent Highlighting: Check which button is ACTUALLY enabled
+            // Preserved complex logic: Identify which button is ACTUALLY enabled and highlight it
             ActionButton primaryBtn = null;
-
             if (btnRevPayout != null && btnRevPayout.isEnabled()) {
                 primaryBtn = btnRevPayout;
             } else if (btnRevSplit != null && btnRevSplit.isEnabled()) {
@@ -513,7 +542,7 @@ public class ORPanel extends GridPanel
                 primaryBtn = btnRevWithhold;
             }
 
-            // Apply Robust Styling to ALL buttons
+            // Apply highlighting to the primary option while keeping others in the standard theme
             if (primaryBtn == btnRevSplit) {
                 styleRevenueButton(btnRevSplit, true);
                 styleRevenueButton(btnRevPayout, false);
@@ -523,29 +552,35 @@ public class ORPanel extends GridPanel
                 styleRevenueButton(btnRevPayout, false);
                 styleRevenueButton(btnRevSplit, false);
             } else {
-                // Default to Pay (Payout)
                 boolean payEnabled = (btnRevPayout != null && btnRevPayout.isEnabled());
                 styleRevenueButton(btnRevPayout, payEnabled);
                 styleRevenueButton(btnRevSplit, false);
                 styleRevenueButton(btnRevWithhold, false);
             }
-            
+
+        // Phase 4: Capital - Trains (Matches Industrial Orange Palette)
         } else if (activePhase == 4) {
-            Color trainOrange = getTrainHighlightColor();
+
+            applyPhaseStyle(phase4Panel, null, UITheme.TRAIN_DARK, UITheme.TRAIN_LIGHT, "Done");
+            styleButton(btnTrainSkip, UITheme.ACTION_SKIP, "Done");
             boolean canBuy = (trainButtonsPanel != null && trainButtonsPanel.getComponentCount() > 0);
             String label = canBuy ? "Skip Buy" : "Done Buying";
-            applyPhaseStyle(phase4Panel, null, trainOrange, PH_TRAIN_LIGHT, label);
-            styleButton(btnTrainSkip, SYS_BLUE, label);
-        } else if (activePhase == 5) {
-            styleButton(btnDone, new Color(180, 0, 0), "END TURN");
+            applyPhaseStyle(phase4Panel, null, UITheme.TRAIN_DARK, UITheme.TRAIN_LIGHT, label);
+            styleButton(btnTrainSkip, UITheme.ACTION_SKIP, label);
+
+        // Phase 5: Control - Conclusion (Uses Warning Red)
+       } else if (activePhase == 5) {
+            // ACTIVATE: Enable and colorize for the final step
+            btnDone.setEnabled(true);
+            styleButton(btnDone, UITheme.ACTION_SKIP, "END TURN");
             btnDone.setForeground(Color.WHITE);
             btnDone.setFont(new Font("SansSerif", Font.BOLD, 16));
-            if (btnDone != null) {
-                btnDone.setEnabled(true);
-            }
         } else {
-            styleButton(btnDone, SYS_BLUE, "Done");
-            btnDone.setForeground(Color.WHITE);
+            // PERSISTENT WAIT: Keep as 'END TURN' but disabled and grey
+            btnDone.setEnabled(false);
+            styleButton(btnDone, UIManager.getColor("Button.background"), "END TURN");
+            btnDone.setForeground(Color.GRAY);
+            btnDone.setFont(new Font("SansSerif", Font.BOLD, 14));
         }
     }
 
@@ -566,22 +601,24 @@ public class ORPanel extends GridPanel
         btn.setBorder(BorderFactory.createRaisedBevelBorder());
     }
 
-    private void resetButtonStyle(ActionButton btn) {
+ private void resetButtonStyle(ActionButton btn) {
         if (btn == null)
             return;
+        
+        // 1. Set the Standard Grey Background
         btn.setBackground(UIManager.getColor("Button.background"));
-        btn.setForeground(Color.BLACK);
-        btn.setFont(new Font("SansSerif", Font.PLAIN, 11));
-        btn.setBorder(UIManager.getBorder("Button.border"));
+        btn.setForeground(Color.GRAY); // Text is Grey to indicate inactivity
+        btn.setFont(new Font("SansSerif", Font.PLAIN, 11)); // Keep font smaller/plain for inactive
+
+        // 2. ENFORCE SHAPE CONSISTENCY
+        // Instead of reverting to UIManager.getBorder("Button.border"), we use the same 3D bevel.
+        btn.setBorder(BorderFactory.createRaisedBevelBorder());
+        
+        // 3. Ensure Opacity is true so the grey background paints correctly within the border
+        btn.setOpaque(true);
+        btn.setContentAreaFilled(true);
     }
 
-    private void styleSecondaryButton(ActionButton btn, Color bgLight) {
-        if (btn == null || !btn.isEnabled())
-            return;
-        btn.setBackground(Color.WHITE);
-        btn.setForeground(Color.BLACK);
-        btn.setBorder(BorderFactory.createLineBorder(Color.GRAY));
-    }
 
     private void applyPhaseStyle(JPanel p, ActionButton mainBtn, Color dark, Color light, String btnLabel) {
         if (p == null)
@@ -611,21 +648,22 @@ public class ORPanel extends GridPanel
             p.setOpaque(false);
             p.setBackground(BG_NORMAL);
 
-// Grey out the border title
+            // Grey out the border title
             if (p.getBorder() instanceof TitledBorder) {
                 ((TitledBorder) p.getBorder()).setTitleColor(Color.GRAY);
                 ((TitledBorder) p.getBorder()).setBorder(BorderFactory.createLineBorder(Color.GRAY));
             }
 
-
-            // Grey out labels inside
+// Grey out labels inside
             for (Component c : p.getComponents()) {
                 if (c instanceof JLabel) {
                     c.setForeground(Color.GRAY);
+                } else if (c instanceof JPanel) {
+                    ((JPanel) c).setOpaque(false);
                 }
-                // c.setEnabled(false); // <--- DELETE: Do not clobber state set by Engine
             }
             p.repaint();
+            
         }
         if (mainBtn != null) {
             resetButtonStyle(mainBtn);
@@ -820,7 +858,10 @@ public class ORPanel extends GridPanel
         // Reduce Height: Set a strict maximum height for Phase 1 (Header + Button +
         // Padding)
         btnTileConfirm = createSidebarButton("Skip", CONFIRM_CMD);
+        // Add breathing space above and below the button
+        phase1Panel.add(Box.createVerticalStrut(PANEL_ACTION_GAP));
         phase1Panel.add(btnTileConfirm);
+        phase1Panel.add(Box.createVerticalStrut(PANEL_ACTION_GAP));
 
         miscActionPanel = new JPanel();
         miscActionPanel.setLayout(new BoxLayout(miscActionPanel, BoxLayout.Y_AXIS));
@@ -838,7 +879,11 @@ public class ORPanel extends GridPanel
         phase2Panel.add(tokenDisplay);
 
         btnTokenConfirm = createSidebarButton("Skip", CONFIRM_CMD);
+        // Add breathing space between content and button, and at bottom
+        phase2Panel.add(Box.createVerticalStrut(PANEL_ACTION_GAP));
         phase2Panel.add(btnTokenConfirm);
+        phase2Panel.add(Box.createVerticalStrut(PANEL_ACTION_GAP));
+
         sidebarPanel.add(phase2Panel);
         sidebarPanel.add(Box.createVerticalStrut(2));
 
@@ -851,7 +896,7 @@ public class ORPanel extends GridPanel
 
         phase3Panel.add(lblRevenue);
 
-// Use GridLayout to force exactly equal 1/3 widths for the 3 buttons
+        // Use GridLayout to force exactly equal 1/3 widths for the 3 buttons
         JPanel revBtnRow = new JPanel(new GridLayout(1, 3, 5, 0)); // 1 row, 3 cols, 5px gap
         revBtnRow.setOpaque(false);
         revBtnRow.setMaximumSize(new Dimension(Integer.MAX_VALUE, 28)); // slight height increase
@@ -871,9 +916,10 @@ public class ORPanel extends GridPanel
         revBtnRow.add(btnRevWithhold);
         revBtnRow.add(btnRevSplit);
 
-
-        phase3Panel.add(Box.createVerticalStrut(4));
+        // Increase spacing around the revenue button row
+        phase3Panel.add(Box.createVerticalStrut(PANEL_ACTION_GAP));
         phase3Panel.add(revBtnRow);
+        phase3Panel.add(Box.createVerticalStrut(PANEL_ACTION_GAP));
         sidebarPanel.add(phase3Panel);
         sidebarPanel.add(Box.createVerticalStrut(2));
 
@@ -904,9 +950,15 @@ public class ORPanel extends GridPanel
         footerPanel = new JPanel(new FlowLayout(FlowLayout.CENTER, 0, 0));
         footerPanel.setOpaque(false);
 
-        btnDone = createSidebarButton("Done", DONE_CMD);
+        // Apply the same breathing space to the Footer via EmptyBorder
+        footerPanel.setBorder(BorderFactory.createEmptyBorder(PANEL_ACTION_GAP, 0, PANEL_ACTION_GAP, 0));
+        
+      // Rename to "END TURN" and set initial state to Disabled/Grey
+        btnDone = createSidebarButton("END TURN", DONE_CMD);
         btnDone.setFont(new Font("SansSerif", Font.BOLD, 14));
         btnDone.setPreferredSize(new Dimension(SIDEBAR_WIDTH - 10, 40));
+        btnDone.setEnabled(false);
+        resetButtonStyle(btnDone); // Forces grey/standard look
 
         footerPanel.add(btnDone);
         sidebarPanel.add(footerPanel);
@@ -984,18 +1036,20 @@ public class ORPanel extends GridPanel
         return b;
     }
 
-private void styleRevenueButton(ActionButton btn, boolean isSelected) {
-        if (btn == null) return;
-        
-        // 1. Force BasicUI to prevent LookAndFeel (e.g. Mac Aqua) from overriding disabled styles
+    private void styleRevenueButton(ActionButton btn, boolean isSelected) {
+        if (btn == null)
+            return;
+
+        // 1. Force BasicUI to prevent LookAndFeel (e.g. Mac Aqua) from overriding
+        // disabled styles
         btn.setUI(new javax.swing.plaf.basic.BasicButtonUI());
-        
+
         // 2. Enforce strict opacity and painting
         btn.setOpaque(true);
         btn.setContentAreaFilled(true);
         btn.setBorderPainted(true);
         btn.setFocusPainted(false);
-        
+
         // 3. Uniform Border and Font
         btn.setBorder(BorderFactory.createRaisedBevelBorder());
         btn.setFont(new Font("SansSerif", Font.BOLD, 12));
@@ -1008,7 +1062,7 @@ private void styleRevenueButton(ActionButton btn, boolean isSelected) {
             // Force White background even if Disabled
             btn.setBackground(Color.WHITE);
             // Optional: Ensure text remains visible/black if disabled
-            btn.setForeground(Color.BLACK); 
+            btn.setForeground(Color.BLACK);
         }
     }
 
@@ -1082,7 +1136,6 @@ private void styleRevenueButton(ActionButton btn, boolean isSelected) {
             styleButton(targetBtn, SYS_BLUE, "Skip");
         }
         updateDefaultButton();
-        SwingUtilities.invokeLater(this::requestFocusInWindow);
     }
 
     private void updateDefaultButton() {
@@ -1290,9 +1343,12 @@ private void styleRevenueButton(ActionButton btn, boolean isSelected) {
         SetDividend clone = (SetDividend) sd.clone();
         clone.setRevenueAllocation(allocation);
         btn.setPossibleAction(clone);
-        if (btn == btnRevPayout) btn.setText("Pay");
-        else if (btn == btnRevWithhold) btn.setText("Hold");
-        else if (btn == btnRevSplit) btn.setText("Split");
+        if (btn == btnRevPayout)
+            btn.setText("Pay");
+        else if (btn == btnRevWithhold)
+            btn.setText("Hold");
+        else if (btn == btnRevSplit)
+            btn.setText("Split");
     }
 
     private void setupButton(ActionButton btn, PossibleAction pa) {
@@ -1515,34 +1571,41 @@ private void styleRevenueButton(ActionButton btn, boolean isSelected) {
             return;
         }
 
-        // ... (Phase Color Logic remains the same) ...
-        Color phaseColor = PH_DONE_BG;
-        String instruction = "Done?";
-        if (activePhase == 1) {
-            phaseColor = PH_TILE_DARK;
-            instruction = "BUILD TRACK";
-        } else if (activePhase == 2) {
-            phaseColor = PH_TOKEN_DARK;
-            instruction = "PLACE TOKEN";
-        } else if (activePhase == 3) {
-            phaseColor = PH_REV_DARK;
-            instruction = "REVENUE";
-        } else if (activePhase == 4) {
-            phaseColor = getTrainHighlightColor();
-            instruction = "BUY TRAIN";
-        } else if (activePhase == 5) {
-            phaseColor = new Color(180, 0, 0);
-            instruction = "FINALIZE";
-        } else if (discardMode) {
-            phaseColor = new Color(220, 20, 60);
-            instruction = "DISCARD";
+      Color phaseColor = UITheme.READOUT_BG;
+        String instruction = "Wait...";
+
+        switch(activePhase) {
+            case 1: 
+                phaseColor = UITheme.TRACK_DARK; 
+                instruction = "BUILD TRACK"; 
+                break;
+            case 2: 
+                phaseColor = UITheme.TOKEN_DARK; 
+                instruction = "PLACE TOKEN"; 
+                break;
+            case 3: 
+                phaseColor = UITheme.REVENUE_DARK; 
+                instruction = "REVENUE"; 
+                break;
+            case 4: 
+                phaseColor = UITheme.TRAIN_DARK; 
+                instruction = "BUY TRAIN"; 
+                break;
+            case 5: 
+                phaseColor = UITheme.ACTION_DONE; 
+                instruction = "FINALIZE"; 
+                break;
+            default:
+                if (discardMode) {
+                    phaseColor = UITheme.ACTION_DISCARD;
+                    instruction = "DISCARD";
+                }
         }
+
 
         if (lblCompanyInfo != null) {
             String playerInfo = (orComp.getPresident() != null) ? orComp.getPresident().getName() : "";
-
-            // TOP LABEL: Company Info
-            // We only use HTML for text styling now, NOT for layout/background
+// TOP LABEL: Company Info
             String topText = "<html><center>" +
                     "<font face='SansSerif' size='6'><b>" + orComp.getId() + "</b></font><br>" +
                     "<font face='SansSerif' size='5'>" + playerInfo + "</font>" +
@@ -1551,18 +1614,25 @@ private void styleRevenueButton(ActionButton btn, boolean isSelected) {
             lblCompanyInfo.setText(topText);
             lblCompanyInfo.setBackground(orComp.getBgColour());
             lblCompanyInfo.setForeground(orComp.getFgColour());
-            lblCompanyInfo.setBorder(BorderFactory.createMatteBorder(1, 1, 0, 1, Color.DARK_GRAY)); // Top/Side borders
+            
+            // Standard top/side border, open bottom to merge with instruction
+            lblCompanyInfo.setBorder(BorderFactory.createMatteBorder(1, 1, 0, 1, Color.DARK_GRAY));
             lblCompanyInfo.setVisible(true);
 
             // BOTTOM LABEL: Instruction
+            // Reverted to match Company Logo colors (Unified Header)
             String bottomText = "<html><center><font face='SansSerif' size='4'><b>" + instruction
                     + "</b></font></center></html>";
 
             lblPhaseInstruction.setText(bottomText);
-            lblPhaseInstruction.setBackground(phaseColor);
-            lblPhaseInstruction.setForeground(Color.WHITE); // Always white for contrast on phase colors
-            lblPhaseInstruction.setBorder(BorderFactory.createMatteBorder(0, 1, 1, 1, Color.DARK_GRAY)); // Bottom/Side
-                                                                                                         // borders
+            
+            // Set colors to match the Company ID above
+            lblPhaseInstruction.setBackground(orComp.getBgColour());
+            lblPhaseInstruction.setForeground(orComp.getFgColour()); 
+            
+            // Remove the 5px gap. Set top inset to 0.
+            // Border: 0px Top, 1px Left, 1px Bottom, 1px Right
+            lblPhaseInstruction.setBorder(BorderFactory.createMatteBorder(0, 1, 1, 1, Color.DARK_GRAY));
             lblPhaseInstruction.setVisible(true);
         }
 
@@ -1617,58 +1687,53 @@ private void styleRevenueButton(ActionButton btn, boolean isSelected) {
                 }
             }
         });
+    }
 
-        inputMap.put(KeyStroke.getKeyStroke(KeyEvent.VK_ENTER, 0), "defaultAction");
-        actionMap.put("defaultAction", new AbstractAction() {
-            public void actionPerformed(ActionEvent e) {
+/**
+     * Centralized handler for the Enter Key.
+     * Called by ORWindow's global hotkey listener.
+     * This robustly checks for Enabled buttons directly, removing dependency on potentially stale activePhase logic.
+     */
+    public void handleEnterPress() {
+        // 1. REVENUE (Phase 3) - Prioritize Payout/Split/Hold
+        // We do NOT check activePhase here. If the buttons are enabled, they are the valid action.
+        if (tryClick(btnRevPayout)) return;
+        if (tryClick(btnRevSplit)) return;
+        if (tryClick(btnRevWithhold)) return;
 
-                // PHASE 3: REVENUE (Payout/Split)
-                if (activePhase == 3) {
-                    if (btnRevPayout != null && btnRevPayout.isEnabled()) {
-                        btnRevPayout.doClick();
-                        return;
-                    }
-                    if (btnRevSplit != null && btnRevSplit.isEnabled()) {
-                        btnRevSplit.doClick();
-                        return;
-                    }
-                    if (btnRevWithhold != null && btnRevWithhold.isEnabled()) {
-                        btnRevWithhold.doClick();
-                        return;
-                    }
-                }
+        // 2. TOKEN (Phase 2)
+        // Checks if the token confirmation/skip button is available
+        if (tryClick(btnTokenConfirm)) return;
 
-                // PHASE 1: TILE (Confirm/Skip)
-                if (activePhase == 1 && btnTileConfirm != null && btnTileConfirm.isEnabled()) {
-                    btnTileConfirm.doClick();
-                    return;
-                }
+        // 3. TILE (Phase 1)
+        // Checks if the tile confirmation/skip button is available
+        if (tryClick(btnTileConfirm)) return;
 
-                // PHASE 2: TOKEN (Confirm/Skip)
-                if (activePhase == 2 && btnTokenConfirm != null && btnTokenConfirm.isEnabled()) {
-                    btnTokenConfirm.doClick();
-                    return;
-                }
+        // 4. TRAIN (Phase 4)
+        if (tryClick(btnTrainSkip)) return;
 
-                // PHASE 4: TRAIN (Skip Buy)
-                if (activePhase == 4 && btnTrainSkip != null && btnTrainSkip.isEnabled()) {
-                    btnTrainSkip.doClick();
-                    return;
-                }
+        // 5. DONE / END TURN (Phase 5 or Generic)
+        if (tryClick(btnDone)) return;
 
-                // PHASE 5 OR FALLBACK: DONE
-                if (btnDone != null && btnDone.isEnabled()) {
-                    btnDone.doClick();
-                    return;
-                }
+        // 6. SWING DEFAULT (Fallback)
+        if (tryClick(currentDefaultButton)) return;
 
-                // Final safety: check the Swing default button
-                if (currentDefaultButton != null && currentDefaultButton.isEnabled()) {
-                    currentDefaultButton.doClick();
-                } else {
-                }
-            }
-        });
+        // 7. MAP FALLBACK (Crucial for Phase 1 Upgrades)
+        // If no button matched, try to confirm a selected map action (Tile/Token).
+        if (orUIManager != null) {
+            orUIManager.confirmUpgrade();
+        }
+    }
+    
+    /**
+     * Helper to safely click a button if it exists, is enabled, and is visible.
+     */
+    private boolean tryClick(ActionButton btn) {
+        if (btn != null && btn.isEnabled() && btn.isVisible()) {
+            btn.doClick();
+            return true;
+        }
+        return false;
     }
 
     private void checkAndEnable(ActionButton btn, String name) {
@@ -1681,7 +1746,6 @@ private void styleRevenueButton(ActionButton btn, boolean isSelected) {
     public void actionPerformed(ActionEvent e) {
         String command = e.getActionCommand();
         JComponent source = (JComponent) e.getSource();
-
 
         if (command.equals(REM_TILES_CMD)) {
             new RemainingTilesWindow(orWindow);
@@ -1697,7 +1761,6 @@ private void styleRevenueButton(ActionButton btn, boolean isSelected) {
                 for (Component c : trainButtonsPanel.getComponents())
                     c.setEnabled(false);
             }
-            SwingUtilities.invokeLater(this::requestFocusInWindow);
         } else if (command.equals(CONFIRM_CMD)) {
             if (orUIManager != null) {
                 boolean hasSelection = (orUIManager.getMap().getSelectedHex() != null);
@@ -1731,7 +1794,7 @@ private void styleRevenueButton(ActionButton btn, boolean isSelected) {
                     GameManager gm = orUIManager.getGameUIManager().getGameManager();
                     if (gm != null && gm.getPossibleActions() != null) {
                         List<PossibleAction> nextActions = gm.getPossibleActions().getList();
-   
+
                         updateDynamicActions(nextActions);
                     }
                 });
@@ -1810,22 +1873,36 @@ private void styleRevenueButton(ActionButton btn, boolean isSelected) {
                     }
                 }
             }
+// --- STRICT FINAL BUTTON CONTROL ---
+        // This block runs LAST to override any engine attempts to enable the button early.
+        
+        if (btnDone != null) {
+            // Always force the label
+            btnDone.setText("END TURN");
 
-            // Force enable btnDone if we are in Phase 5 OR if a valid Done action was
-            // found.
-            // This overrides any previous disabling by resetPhasePanel/resetSidebarState.
-            if ((activePhase == 5 || doneActionFound) && btnDone != null) {
+            if (activePhase == 5) {
+                // PHASE 5: ACTIVE & BLUE
                 btnDone.setEnabled(true);
-                if (activePhase == 5) {
-                    styleButton(btnDone, new Color(180, 0, 0), "END TURN");
-                } else if (btnDone.getBackground() == PH_DONE_BG) {
-                    styleButton(btnDone, SYS_BLUE, "Done");
-                }
+                styleButton(btnDone, UITheme.ACTION_SKIP, "END TURN"); // Blue
+                btnDone.setForeground(Color.WHITE);
+                btnDone.setFont(new Font("SansSerif", Font.BOLD, 16)); // Large/Bold
+            } else {
+                // PHASE 1-4: DISABLED & GREY
+                // We strictly disable it, even if the engine suggested otherwise
+                btnDone.setEnabled(false);
+                
+                // Revert to standard "Button.background" (Grey)
+                btnDone.setBackground(UIManager.getColor("Button.background"));
+                btnDone.setForeground(Color.GRAY);
+                btnDone.setBorder(UIManager.getBorder("Button.border"));
+                btnDone.setOpaque(true);
+                btnDone.setFont(new Font("SansSerif", Font.BOLD, 14)); // Standard size
             }
+        }
+        
 
             SwingUtilities.invokeLater(() -> {
                 updateDefaultButton();
-                this.requestFocusInWindow();
             });
 
         } catch (Exception e) {
@@ -1833,7 +1910,7 @@ private void styleRevenueButton(ActionButton btn, boolean isSelected) {
         }
     }
 
-private void addDiscardTrainButton(DiscardTrain action) {
+    private void addDiscardTrainButton(DiscardTrain action) {
         ActionButton btn = new ActionButton(RailsIcon.OK);
         btn.setIcon(null);
 
@@ -1850,7 +1927,7 @@ private void addDiscardTrainButton(DiscardTrain action) {
         btn.setText("<html><center><br><font size='5'><b>" + trainName + "</b></font></center></html>");
 
         // Train Card Styling (Beige Background)
-        btn.setBackground(new Color(255, 255, 240)); 
+        btn.setBackground(new Color(255, 255, 240));
         btn.setForeground(Color.BLACK);
         btn.setOpaque(true);
         btn.setFont(new Font("SansSerif", Font.PLAIN, 12));
@@ -1864,14 +1941,13 @@ private void addDiscardTrainButton(DiscardTrain action) {
         btn.setPossibleAction(action);
         btn.setActionCommand("SpecialAction");
         btn.addActionListener(this);
-        
+
         btn.setAlignmentX(Component.CENTER_ALIGNMENT);
         btn.setMaximumSize(new Dimension(SIDEBAR_WIDTH - 20, 50)); // Taller for card look
 
         specialPanel.add(btn);
         specialPanel.add(Box.createVerticalStrut(8));
     }
-
 
     private boolean isActionListEmpty(ActionButton btn) {
         return btn.getPossibleActions() == null || btn.getPossibleActions().isEmpty();
@@ -1888,29 +1964,37 @@ private void addDiscardTrainButton(DiscardTrain action) {
 
     public void updateDynamicActions(List<PossibleAction> actions) {
 
-       try {
-        if (orUIManager != null && orUIManager.getGameUIManager() != null) {
-            net.sf.rails.game.round.RoundFacade currentRound = 
-                orUIManager.getGameUIManager().getCurrentRound();
-            
-            String roundName = currentRound.getClass().getSimpleName();
-            int hash = System.identityHashCode(this);
-            
-            // CHECK: Are we processing OR Logic while in a Stock Round?
-            if (roundName.contains("StockRound")) {
-                log.error("CRITICAL INTERFERENCE: Zombie ORPanel [{}] is waking up during StockRound!", hash);
-                log.error("Stack Trace Trigger:", new Exception("Zombie Trace"));
-                
-                // OPTIONAL: Force kill the zombie to see if it fixes the bug immediately
-                // this.setVisible(false);
-                // return; 
-            } else {
-                log.info("ORPanel [{}] updating in round: {}", hash, roundName);
-            }
+        if (actions == null || actions.isEmpty()) {
+            updateSidebarData(); // Update passive labels (Cash, Trains)
+            if (sidebarPanel != null)
+                sidebarPanel.repaint();
+
+            // RETURN IMMEDIATELY.
+            // Do not request focus. Do not generate actions. Just sit there.
+            return;
         }
-    } catch (Exception e) {
-        log.error("Logging check failed", e);
-    }
+
+        try {
+            if (orUIManager != null && orUIManager.getGameUIManager() != null) {
+                net.sf.rails.game.round.RoundFacade currentRound = orUIManager.getGameUIManager().getCurrentRound();
+
+                String roundName = currentRound.getClass().getSimpleName();
+                int hash = System.identityHashCode(this);
+
+                // CHECK: Are we processing OR Logic while in a Stock Round?
+                if (roundName.contains("StockRound")) {
+                    log.error("CRITICAL INTERFERENCE: Zombie ORPanel [{}] is waking up during StockRound!", hash);
+                    log.error("Stack Trace Trigger:", new Exception("Zombie Trace"));
+
+                    // OPTIONAL: Force kill the zombie to see if it fixes the bug immediately
+                    // this.setVisible(false);
+                    // return;
+                } else {
+                }
+            }
+        } catch (Exception e) {
+            log.error("Logging check failed", e);
+        }
 
         try {
             // 1. Clean Setup
@@ -1976,7 +2060,7 @@ private void addDiscardTrainButton(DiscardTrain action) {
                 updateSidebarData();
                 if (sidebarPanel != null)
                     sidebarPanel.repaint();
-    
+
                 return;
             }
 
@@ -2076,29 +2160,28 @@ private void addDiscardTrainButton(DiscardTrain action) {
                             // NullActions
                             String label = (na.getMode() == NullAction.Mode.PASS) ? "Decline" : "Done";
 
-// Use "SpecialAction" instead of DONE_CMD to bypass "End Turn" validation
+                            // Use "SpecialAction" instead of DONE_CMD to bypass "End Turn" validation
                             b = createSidebarButton(label, "SpecialAction");
                             b.setPossibleAction(spa);
-
 
                             // FORCE BLUE ACTIVE STYLE
                             styleButton(b, SYS_BLUE, label);
                             b.setEnabled(true);
+                        } else if (spa instanceof LayBaseToken) {
+                            // 3. LayBaseToken (e.g. Baden Home Choice)
+                            // These are special "Home City" token lays that act as a decision.
+                            // We use the label provided by the Operating Round.
+                            String label = spa.getButtonLabel();
+                            if (label == null || label.isEmpty())
+                                label = "Place Token";
+
+                            b = createSidebarButton(label, "SpecialAction");
+                            b.setPossibleAction(spa);
+
+                            // FORCE BLUE ACTIVE STYLE to indicate this is the required action
+                            styleButton(b, SYS_BLUE, label);
+                            b.setEnabled(true);
                         }
-                        else if (spa instanceof LayBaseToken) {
-                        // 3. LayBaseToken (e.g. Baden Home Choice)
-                        // These are special "Home City" token lays that act as a decision.
-                        // We use the label provided by the Operating Round.
-                        String label = spa.getButtonLabel();
-                        if (label == null || label.isEmpty()) label = "Place Token";
-
-                        b = createSidebarButton(label, "SpecialAction");
-                        b.setPossibleAction(spa);
-
-                        // FORCE BLUE ACTIVE STYLE to indicate this is the required action
-                        styleButton(b, SYS_BLUE, label);
-                        b.setEnabled(true);
-                    }
 
                         if (b != null) {
                             b.setEnabled(true);
@@ -2117,7 +2200,6 @@ private void addDiscardTrainButton(DiscardTrain action) {
                     specialPanel.repaint();
                 }
 
-                SwingUtilities.invokeLater(this::requestFocusInWindow);
                 return;
             }
 
@@ -2191,9 +2273,9 @@ private void addDiscardTrainButton(DiscardTrain action) {
                     // log.info("--- DEBUG REVENUE ACTION ---");
                     // log.info("Action: {}", sd.toString());
                     // log.info("Allocations Allowed -> PAYOUT: {}, WITHHOLD: {}, SPLIT: {}",
-                    //         sd.isAllocationAllowed(SetDividend.PAYOUT),
-                    //         sd.isAllocationAllowed(SetDividend.WITHHOLD),
-                    //         sd.isAllocationAllowed(SetDividend.SPLIT));
+                    // sd.isAllocationAllowed(SetDividend.PAYOUT),
+                    // sd.isAllocationAllowed(SetDividend.WITHHOLD),
+                    // sd.isAllocationAllowed(SetDividend.SPLIT));
 
                     if (sd.isAllocationAllowed(SetDividend.PAYOUT)) {
                         enableRevenueBtn(btnRevPayout, sd, SetDividend.PAYOUT);
@@ -2224,19 +2306,7 @@ private void addDiscardTrainButton(DiscardTrain action) {
             // --- 7. FINALIZE UI STATE ---
             updateSidebarData();
 
-            // Force-Enable "Done" button if we are in Phase 5.
-            if ((activePhase == 5 || hasDoneAction) && btnDone != null) {
-                btnDone.setEnabled(true);
-                if (activePhase == 5) {
-                    styleButton(btnDone, new Color(180, 0, 0), "END TURN");
-                    btnDone.setForeground(Color.WHITE);
-                    btnDone.setFont(new Font("SansSerif", Font.BOLD, 16));
-                } else if (btnDone.getBackground() == PH_DONE_BG) {
-                    // Fallback for standard Done in non-final phases
-                    styleButton(btnDone, SYS_BLUE, "Done");
-                }
-            }
-
+           
             // Send train actions to Status Window
             if (orUIManager != null && orUIManager.getGameUIManager() != null) {
                 StatusWindow sw = orUIManager.getGameUIManager().getStatusWindow();
@@ -2267,14 +2337,6 @@ private void addDiscardTrainButton(DiscardTrain action) {
 
             if (sidebarPanel != null)
                 sidebarPanel.repaint();
-
-            SwingUtilities.invokeLater(() -> {
-                updateDefaultButton();
-                // updateActionTooltips(actions);
-                // logFormattedActions(actions);
-                this.requestFocusInWindow();
-            });
-
 
         } catch (Exception e) {
         }

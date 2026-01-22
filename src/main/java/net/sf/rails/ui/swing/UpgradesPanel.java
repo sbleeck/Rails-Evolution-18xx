@@ -124,7 +124,8 @@ public class UpgradesPanel extends JPanel {
 
         this.miniDock = new RemainingTilesWindow.MiniDock(orUIManager);
         
-        Dimension dockSize = new Dimension(240, panelHeight - 4); 
+        // --- SIZING FIX: Double Wide (480px) ---
+        Dimension dockSize = new Dimension(480, panelHeight - 4); 
         miniDock.setPreferredSize(dockSize);
         miniDock.setMaximumSize(dockSize);
         miniDock.setMinimumSize(dockSize);

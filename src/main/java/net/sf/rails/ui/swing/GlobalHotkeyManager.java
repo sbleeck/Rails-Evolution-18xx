@@ -12,9 +12,13 @@ import net.sf.rails.game.StartRound;
 import net.sf.rails.game.round.RoundFacade;
 import net.sf.rails.game.financial.StockRound;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 public class GlobalHotkeyManager implements KeyEventDispatcher {
 
     private final GameUIManager gameUIManager;
+private static final Logger log = LoggerFactory.getLogger(GlobalHotkeyManager.class);
 
     public GlobalHotkeyManager(GameUIManager gameUIManager) {
         this.gameUIManager = gameUIManager;
@@ -100,21 +104,11 @@ public class GlobalHotkeyManager implements KeyEventDispatcher {
                 ORPanel panel = orWindow.getORPanel();
                 if (panel != null) {
                     
-                    // Phase 1 (Tile) & Phase 2 (Token):
-                    // Since we removed specific "Skip" buttons in favor of the Smart Button,
-                    // we trigger the underlying Skip logic via the Manager.
-                    if (panel.activePhase == 1 || panel.activePhase == 2) {
-                        if (orWindow.getORUIManager() != null) {
-                            orWindow.getORUIManager().skipUpgrade(); 
-                            return;
-                        }
-                    }
+                // Delegate completely to ORPanel's centralized handler logic.
+                    // This ensures the "Payout/Split/Hold" priority checks in ORPanel are respected.
+                    panel.handleEnterPress(); 
+                    return;
 
-                    // Phase 4 (Trains): "Skip" means "Done Buying" or "Skip Train"
-                    if (panel.activePhase == 4 && clickIfEnabled(panel.btnTrainSkip)) return;
-                    
-                    // Fallback: Done
-                    if (clickIfEnabled(panel.btnDone)) return;
                 }
             }
         }
@@ -135,6 +129,7 @@ public class GlobalHotkeyManager implements KeyEventDispatcher {
     }
 
    private void triggerEnter() {
+//    log.info("GlobalHotkeyManager: ENTER pressed. Checking context...");
         RoundFacade round = gameUIManager.getCurrentRound();
 
         // --- CASE 1: OPERATING ROUND ---
@@ -145,23 +140,27 @@ public class GlobalHotkeyManager implements KeyEventDispatcher {
                 ORPanel panel = orWindow.getORPanel();
                 
                 if (panel != null) {
-                    // 1. Try the calculated "Default Button" (Confirm, Done, etc.)
-                    if (clickIfEnabled(panel.currentDefaultButton)) return;
-                    
-                    // 2. Fallback to Map Confirm (if button logic failed but map has selection)
-                    if (orWindow.getORUIManager() != null) {
-                        orWindow.getORUIManager().confirmUpgrade();
-                    }
+                    // log.info("GlobalHotkeyManager: Delegating ENTER to ORPanel.handleEnterPress()");
+                    // 1. Delegate completely to ORPanel's centralized handler logic.
+                    panel.handleEnterPress(); 
+                    return; 
+                } else {
+                    // log.warn("GlobalHotkeyManager: ORPanel is NULL");
                 }
+            } else {
+                // log.info("GlobalHotkeyManager: ORWindow not visible or null");
             }
         }
         // CASE 2: STOCK ROUND
-        // Map Enter to the Status Window "Pass" / "Done"
         else if (round instanceof StockRound) {
+            // log.info("GlobalHotkeyManager: StockRound detected. Clicking Pass button.");
             if (gameUIManager.getStatusWindow() != null) {
                 clickIfEnabled(gameUIManager.getStatusWindow().passButton);
             }
+        } else {
+            // log.info("GlobalHotkeyManager: Round type ignored: {}", (round != null ? round.getClass().getSimpleName() : "null"));
         }
+
     }
 
     private boolean clickIfEnabled(AbstractButton btn) {
