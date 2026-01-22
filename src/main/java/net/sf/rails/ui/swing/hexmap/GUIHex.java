@@ -111,9 +111,9 @@ public class GUIHex implements Observer {
 
         NORMAL(1.0, Color.black),
         // Phase 1: Build Track (Construction Brown)
-        SELECTABLE(0.9, new Color(139, 69, 19)),
+        SELECTABLE(0.9, Color.RED),
         // Phase 2: Lay Token (Forest Green - Matching OR Panel)
-        TOKEN_SELECTABLE(0.9, new Color(34, 139, 34)),
+        TOKEN_SELECTABLE(0.8,Color.RED),
         // Selected Hex (Construction Brown)
         SELECTED(0.8, new Color(139, 69, 19)),
         INVALIDS(0.9, Color.pink);
