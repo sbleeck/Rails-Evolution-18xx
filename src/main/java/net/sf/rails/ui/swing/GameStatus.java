@@ -1,57 +1,42 @@
 package net.sf.rails.ui.swing;
 
 import com.google.common.collect.Lists;
-import net.sf.rails.common.GameOption;
 import net.sf.rails.common.GuiDef;
 import net.sf.rails.common.LocalText;
 import net.sf.rails.game.Player;
 import net.sf.rails.game.PublicCompany;
 import net.sf.rails.game.financial.Bank;
-import net.sf.rails.game.financial.PublicCertificate;
 import net.sf.rails.game.financial.StockRound;
 import net.sf.rails.game.model.PortfolioModel;
-import net.sf.rails.game.state.IntegerState;
 import net.sf.rails.game.state.MoneyOwner;
 import net.sf.rails.sound.SoundManager;
-import net.sf.rails.ui.swing.elements.ActionButton;
 import net.sf.rails.ui.swing.elements.Caption;
 import net.sf.rails.ui.swing.elements.ClickField;
 import net.sf.rails.ui.swing.elements.Field;
 import net.sf.rails.ui.swing.elements.RadioButtonDialog;
-import net.sf.rails.ui.swing.elements.TimeField;
-import net.sf.rails.ui.swing.elements.TokenIcon;
 import net.sf.rails.ui.swing.hexmap.HexHighlightMouseListener;
 import net.sf.rails.util.Util;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import java.awt.geom.Ellipse2D;
 import java.awt.geom.Line2D;
-
-// Ensure this is imported
 import rails.game.action.*;
 import rails.game.correct.CashCorrectionAction;
-import rails.game.correct.CorrectionType;
 import rails.game.correct.TrainCorrectionAction;
-
 import javax.swing.*;
 import java.awt.*;
 import java.awt.event.ActionEvent;
-import java.awt.event.ActionListener;
-import java.awt.event.MouseListener;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import net.sf.rails.ui.swing.elements.RailCard;
-
 import java.util.Map;
 
 /**
  * This class is incorporated into StatusWindow and displays the bulk of
  * rails.game status information.
  */
-public class GameStatus extends GridPanel implements ActionListener {
+public class GameStatus extends GridPanel {
 
     // Width Definitions
     // STRUCTURAL CONSTANTS FOR "SLOT" SYSTEM
@@ -59,20 +44,10 @@ public class GameStatus extends GridPanel implements ActionListener {
     // private final Dimension DIM_ARROW = new Dimension(20, 20); // 1. Visible
     // Arrow
     private final Dimension DIM_STD = new Dimension(52, 20); // 5. Fix clipping (was 45, now 52)
-    private final Dimension DIM_MINOR = new Dimension(52, 20); // Sync with STD
-    private final Dimension DIM_DOT = new Dimension(8, 20);
-    private final Dimension DIM_PRICE = new Dimension(28, 20);
-
-    // Combined Slot Sizes (Card + Indicator)
-    private final Dimension DIM_PLAYER_SLOT = new Dimension(60, 20); // Was 60, 25
-    private final Dimension DIM_POOL_SLOT = new Dimension(60, 20); // Was 75, 25
-
-    // 4. Identical Market Columns
-    private final Dimension DIM_MARKET = new Dimension(85, 20); // Shared width for Pool & IPO
+ 
 
     // Width Definitions
     private final Dimension DIM_PLAYER = new Dimension(60, 20);
-    private final Dimension DIM_MERGED = new Dimension(68, 20); // Sync with MARKET
     private final Dimension DIM_TOKENS = new Dimension(55, 20);
 
     // Flexible height for privates (Point 4b) - Width 85, Height 0 (auto)
@@ -89,23 +64,13 @@ public class GameStatus extends GridPanel implements ActionListener {
 
     // 2. APPLY TO CONSTANTS
     private final Color BG_INACTIVE = BG_UNIFIED_GREY; // Fixes Inactive Rows
-
     private final Color BG_POOL = new Color(230, 240, 255);
-    private final Color BG_IPO = new Color(255, 235, 235); // Distinct Reddish/Pink (Point 13)
-
     private final Color BG_MAUVE = new Color(235, 230, 255); // Standard Company Data Background
     private final Color BG_OPERATING = Color.WHITE;
-
-    // Promoted from initTurn to avoid shadowing/reallocation
-    private final Color BG_PASSED = new Color(150, 255, 150);
-    private final Color BG_CERT_OK = new Color(200, 255, 200);
-    private final Color BG_CERT_LIMIT = new Color(255, 200, 200);
 
     // Spotlight System Constants
     private static final Color BG_SPOTLIGHT_ACTIVE = Color.WHITE;
     private static final Color BG_SPOTLIGHT_INACTIVE = BG_UNIFIED_GREY;
-    private static final javax.swing.border.Border BORDER_SPOTLIGHT = BorderFactory.createMatteBorder(0, 0, 3, 0,
-            new Color(255, 215, 0)); // Gold Underline
     private static final javax.swing.border.Border BORDER_DEFAULT = BorderFactory.createMatteBorder(0, 0, 1, 1,
             Color.GRAY);
 
@@ -124,8 +89,6 @@ public class GameStatus extends GridPanel implements ActionListener {
 
     // 2. Larger Train Cards
     private static final Dimension DIM_TRAIN_BTN = new Dimension(32, 18);
-    // 3. Compact Future Trains (Narrower to prevent column blowout)
-    private static final Dimension DIM_FUTURE_BTN = new Dimension(28, 18);
 
     private static final long serialVersionUID = 1L;
 
@@ -207,7 +170,6 @@ public class GameStatus extends GridPanel implements ActionListener {
     protected javax.swing.Timer uiRefreshTimer;
     private javax.swing.JLabel parentTimerLabel = null;
     private javax.swing.JLabel parentStatusLabel = null;
-    private String lastThinkingText = "";
 
     // Variable to persist the user's zoom/font setting across component recreations
     private Font stickyFont = null;
@@ -222,7 +184,6 @@ public class GameStatus extends GridPanel implements ActionListener {
         }
     }
 
-    // --- START FIX ---
     /**
      * Scans the parent StatusWindow to find the "Pause" button (which lives in the
      * footer).
@@ -1126,9 +1087,14 @@ public class GameStatus extends GridPanel implements ActionListener {
         PossibleAction chosenAction = null;
         StockRound.manualSwapChoice = null;
 
-        if (source instanceof ClickField) {
+       if (source instanceof ClickField || source instanceof RailCard) {
             gbc = gb.getConstraints(source);
-            actions = ((ClickField) source).getPossibleActions();
+            
+            if (source instanceof ClickField) {
+                actions = ((ClickField) source).getPossibleActions();
+            } else {
+                actions = ((RailCard) source).getPossibleActions();
+            }
 
             // SAFETY CHECK: Actions might be null if the button was initialized but no
             // action added
@@ -1327,6 +1293,16 @@ public class GameStatus extends GridPanel implements ActionListener {
             } else if (actions.get(0).getClass().getSimpleName().equals("StartPrussian")) {
                 // Explicitly handle StartPrussian to ensure it triggers
                 chosenAction = actions.get(0);
+                // } else if
+                // (actions.get(0).getClass().getSimpleName().equals("ExchangeCoalAction")) {
+                // // Explicitly handle ExchangeCoalAction (1837)
+                // chosenAction = actions.get(0);
+
+                // Replaces the hardcoded "ExchangeCoalAction" check.
+                // Any action implementing GuiTargetedAction will now work automatically.
+            } else if (actions.get(0) instanceof GuiTargetedAction) {
+                chosenAction = actions.get(0);
+
             } else if (actions.get(0) instanceof LayTile) {
                 // Prevent incomplete LayTile actions (from Private Cards) from being sent to
                 // GameManager
@@ -2113,6 +2089,17 @@ public class GameStatus extends GridPanel implements ActionListener {
                     // NEW: Explicitly catch BuyPrivate actions
                     target = ((BuyPrivate) pa).getPrivateCompany();
                 }
+                else if (pa instanceof GuiTargetedAction && !(pa instanceof DiscardTrain)) {
+                    try {
+                        // Catch generic Targeted Actions (e.g. Exchange) targeting a Private
+                        Object t = ((GuiTargetedAction) pa).getTarget();
+                        if (t instanceof net.sf.rails.game.PrivateCompany) {
+                            target = (net.sf.rails.game.PrivateCompany) t;
+                        }
+                    } catch (Exception e) {
+                        // Fail silently so we don't break the rest of the UI (e.g. Discard Trains)
+                    }
+                }
 
                 // If found, link back to the Private Company ID
                 if (target != null) {
@@ -2179,6 +2166,10 @@ public class GameStatus extends GridPanel implements ActionListener {
                     // The card will check its internal logic and paint itself Cyan
                     // (COL_HIGHLIGHT_BG).
                     card.setState(RailCard.State.HIGHLIGHTED);
+
+                    // Force the standard "Special Action" visual style (Cyan + Blue Border)
+                    card.setBackground(java.awt.Color.CYAN);
+                    card.setBorder(BorderFactory.createLineBorder(Color.BLUE, 3));
 
                     if (action instanceof BuyPrivate) {
                         card.setToolTipText("Click to Buy " + pc.getId());
@@ -2458,6 +2449,20 @@ public class GameStatus extends GridPanel implements ActionListener {
     }
 
     public void initTurn(int actorIndex, boolean myTurn) {
+
+
+
+// We use the existing gameUIManager field directly.
+        // We removed the 'getRoot()' fallback that was causing compilation errors.
+        if (gameUIManager != null && gameUIManager.getGameManager() != null) {
+            this.possibleActions = gameUIManager.getGameManager().getPossibleActions();
+        }
+
+        if (!myTurn) {
+            actorIndex = -1;
+        }
+        
+
         int cIdx, pIdx;
 
         // 1. RESET HIGHLIGHTS: If not my turn, or between rounds, clear the actor
@@ -2509,10 +2514,6 @@ public class GameStatus extends GridPanel implements ActionListener {
             boolean isOperating = (opCompId != null) && c.getId().equals(opCompId);
 
             boolean isMinor = !c.hasStockPrice();
-            // // Update Arrow Logic dynamically
-            // if (compArrowCaption != null && compArrowCaption[i] != null) {
-            // compArrowCaption[i].setText(isOperating ? "▶" : "");
-            // }
 
             boolean hasOwner = c.getPresidentsShare() != null && c.getPresidentsShare().getOwner() instanceof Player;
             // Check if shares are available in the IPO
@@ -3041,6 +3042,10 @@ public class GameStatus extends GridPanel implements ActionListener {
             }
         }
 
+        updateFixedIncome();
+        updatePlayerPrivates();
+        updateTrainCosts();
+
         // 3. ENABLE BUTTONS
         if ((pIdx = this.actorIndex) >= -1 && myTurn) {
 
@@ -3088,13 +3093,17 @@ public class GameStatus extends GridPanel implements ActionListener {
                 for (NullAction na : nullActions)
                     (parent).setPassButton(na);
             }
+            // This connects the 'BuyTrain' actions from the engine to the UI buttons.
+            setTrainBuyingActions(possibleActions.getList());
         }
 
-        updateFixedIncome();
-        updatePlayerPrivates();
-        updateTrainCosts();
-        initGameSpecificActions();
-        repaint();
+
+        try {
+            initGameSpecificActions();
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+                repaint();
     }
 
     /**
@@ -3449,7 +3458,6 @@ public class GameStatus extends GridPanel implements ActionListener {
             // We'll let the loop below handle visible ones.
         }
 
-        // --- START FIX ---
         // Group trains by name (Type) to consolidate display
         java.util.Map<String, java.util.List<net.sf.rails.game.Train>> groups = new java.util.LinkedHashMap<>();
         for (net.sf.rails.game.Train t : pool.getTrainList()) {
@@ -4057,26 +4065,6 @@ public class GameStatus extends GridPanel implements ActionListener {
 
                 addField(treasuryPanels[i], certInTreasuryXOffset, y, 1, 1, 0, visible);
 
-                // Note: We keep the old certInTreasuryButton for logic, but we don't add it to
-                // the GUI anymore
-                // or we reuse it just for action mapping if needed.
-                // However, setTreasuryCertButton below will handle the logic using the new
-                // Card.
-                // --- END FIX ---
-                // --- DELETE ---
-                /*
-                 * f = certInTreasury[i] = new Field(c.getPortfolioModel().getShareModel(c));
-                 * f.setBackground(isOperating ? BG_OPERATING : (isMinor || !isActive ?
-                 * BG_INACTIVE : BG_POOL));
-                 * f.setOpaque(true);
-                 * f.setBorder(getBorder.apply(true, false));
-                 * f.setPreferredSize(DIM_STD);
-                 * addField(f, certInTreasuryXOffset, y, 1, 1, 0, visible);
-                 * f = certInTreasuryButton[i] = new ClickField(certInTreasury[i].getText(),
-                 * BUY_FROM_POOL_CMD, "", this,
-                 * buySellGroup);
-                 * addField(f, certInTreasuryXOffset, y, 1, 1, 0, false);
-                 */
             }
 
             // DETAILS (Cash, Rev, Trains, Tokens)
@@ -4673,196 +4661,8 @@ public class GameStatus extends GridPanel implements ActionListener {
         return null;
     }
 
-    // ... (lines of unchanged context code) ...
-    protected void initGameSpecificActions() {
-        if (possibleActions == null || players == null) {
-            return;
-        }
 
-        for (rails.game.action.PossibleAction pa : possibleActions.getList()) {
 
-            // 1. Identify Target Company (Public OR Private)
-            net.sf.rails.game.Company target = null;
-
-            // --- START REFACTOR: Generic Interface Check ---
-            // Replaces explicit checks for StartPrussian / ExchangeForPrussianShare
-            if (pa instanceof GuiTargetedAction) {
-                net.sf.rails.game.state.Owner actor = ((GuiTargetedAction) pa).getActor();
-                if (actor instanceof net.sf.rails.game.Company) {
-                    target = (net.sf.rails.game.Company) actor;
-                }
-            }
-
-            // 2. INTERCEPT DISCARD ACTIONS (Map to Train Cards in Status Window)
-            else if (pa instanceof DiscardTrain) {
-                DiscardTrain dt = (DiscardTrain) pa;
-                net.sf.rails.game.PublicCompany company = (net.sf.rails.game.PublicCompany) dt.getCompany();
-                net.sf.rails.game.Train targetTrain = dt.getDiscardedTrain();
-
-                int companyIndex = company.getPublicNumber();
-
-                // Locate the Train Button Panel for this company
-                if (companyIndex >= 0 && companyIndex < nc && compSubTrainButtons[companyIndex] != null) {
-
-                    // We must find which button slot holds the specific train.
-                    // The buttons are populated in the same order as the company's train list.
-                    java.util.List<net.sf.rails.game.Train> trainList = new java.util.ArrayList<>(
-                            company.getPortfolioModel().getTrainList());
-                    int trainIdx = trainList.indexOf(targetTrain);
-
-                    // If valid index found, activate that specific card
-                    if (trainIdx >= 0 && trainIdx < compSubTrainButtons[companyIndex].length) {
-                        net.sf.rails.ui.swing.elements.RailCard card = compSubTrainButtons[companyIndex][trainIdx];
-
-                        if (card != null) {
-                            // Attach Action
-                            card.setPossibleAction(pa);
-
-                            card.setBackground(java.awt.Color.CYAN);
-                            card.setBorder(BorderFactory.createLineBorder(Color.BLUE, 3));
-
-                            // Standardize Border: Thick Blue (3px) to match Shares
-                            card.setBorder(BorderFactory.createLineBorder(Color.BLUE, 3));
-                            card.setToolTipText("Click to Discard " + targetTrain.getName());
-
-                            card.setEnabled(true);
-                            card.setVisible(true);
-                            card.repaint();
-                        }
-                    }
-                }
-                // Continue loop to process other actions
-                continue;
-            }
-
-            if (target == null)
-                continue;
-
-            // --- CASE A: PUBLIC COMPANY (Grid Logic) ---
-            if (target instanceof net.sf.rails.game.PublicCompany) {
-                int companyIndex = ((net.sf.rails.game.PublicCompany) target).getPublicNumber();
-
-                // Determine Player Column from Action
-                int playerIndex = -1;
-                String actorName = pa.getPlayerName();
-                if (actorName != null) {
-                    for (int k = 0; k < players.getNumberOfPlayers(); k++) {
-                        if (players.getPlayerByPosition(k).getName().equals(actorName)) {
-                            playerIndex = k;
-                            break;
-                        }
-                    }
-                }
-                // Fallback to President
-                if (playerIndex == -1 && ((net.sf.rails.game.PublicCompany) target).getPresident() != null) {
-                    playerIndex = ((net.sf.rails.game.PublicCompany) target).getPresident().getIndex();
-                }
-
-                if (companyIndex >= 0 && companyIndex < nc && playerIndex >= 0 && playerIndex < np) {
-                    if (pa instanceof rails.game.action.DiscardTrain) {
-                        rails.game.action.DiscardTrain dt = (rails.game.action.DiscardTrain) pa;
-                        net.sf.rails.game.PublicCompany company = (net.sf.rails.game.PublicCompany) dt.getCompany();
-                        net.sf.rails.game.Train targetTrain = dt.getDiscardedTrain();
-
-                        String cId = (company != null) ? company.getId() : "null";
-                        String tName = (targetTrain != null) ? targetTrain.getName() : "null";
-
-                        if (company != null && targetTrain != null) {
-                            int cIdx = company.getPublicNumber();
-
-                            // Verify index and ensure buttons exist
-                            if (cIdx >= 0 && cIdx < nc && compSubTrainButtons[cIdx] != null) {
-                                int slot = 0;
-                                for (net.sf.rails.ui.swing.elements.RailCard card : compSubTrainButtons[cIdx]) {
-
-                                    // Match by unique train name
-                                    if (card != null && card.getUniqueId() != null
-                                            && card.getUniqueId().equals(targetTrain.getName())) {
-
-                                        card.setPossibleAction(pa);
-                                        card.setState(net.sf.rails.ui.swing.elements.RailCard.State.HIGHLIGHTED);
-
-                                        // Uniform Styling: Force Cyan Background and Thick Blue Border
-                                        // (Ignoring gta.getHighlightColor() to ensure consistency across all special
-                                        // actions)
-                                        card.setBackground(java.awt.Color.CYAN);
-                                        card.setBorder(BorderFactory.createLineBorder(Color.BLUE, 3));
-
-                                        card.setToolTipText("Click to Discard " + targetTrain.getName());
-                                        card.setEnabled(true);
-                                        card.setVisible(true);
-                                        card.repaint();
-                                    }
-                                }
-                            } else {
-                            }
-                        }
-                        // Important: Skip the rest of the loop for this action so it doesn't match
-                        // generic handlers
-                        continue;
-                    }
-
-                    setPlayerCertButton(companyIndex, playerIndex, true, pa);
-                    net.sf.rails.ui.swing.elements.RailCard card = getRailCardFor(companyIndex, playerIndex);
-                    if (card != null) {
-                        card.setState(RailCard.State.HIGHLIGHTED);
-                        // Explicitly override default highlighting to ensure match with Privates/Trains
-                        card.setBackground(java.awt.Color.CYAN);
-                        card.setBorder(BorderFactory.createLineBorder(Color.BLUE, 3));
-                    }
-                }
-            }
-            // --- CASE B: PRIVATE COMPANY (Search All Panels) ---
-            else if (target instanceof net.sf.rails.game.PrivateCompany) {
-                // Debug Logging specifically for BB
-                boolean isBB = "BB".equals(target.getId());
-                if (isBB) {
-                    System.out.println("DEBUG-BB: Searching for BB. PlayerPanels="
-                            + (playerPrivatesPanel == null ? "null" : playerPrivatesPanel.length));
-                }
-
-                boolean found = false;
-
-                // 1. Search PLAYER Panels
-                if (playerPrivatesPanel != null) {
-                    for (int i = 0; i < playerPrivatesPanel.length; i++) {
-                        if (playerPrivatesPanel[i] == null)
-                            continue;
-
-                        for (java.awt.Component comp : playerPrivatesPanel[i].getComponents()) {
-                            if (comp instanceof net.sf.rails.ui.swing.elements.RailCard) {
-                                net.sf.rails.ui.swing.elements.RailCard card = (net.sf.rails.ui.swing.elements.RailCard) comp;
-                                // Inject generic check
-                                if (checkAndHighlight(card, pa)) {
-                                    found = true;
-                                }
-                            }
-                        }
-                    }
-                }
-
-                // 2. Search COMPANY Panels (e.g. if a company owns the private)
-                if (!found && compPrivatesPanel != null) {
-                    for (int i = 0; i < compPrivatesPanel.length; i++) {
-                        if (compPrivatesPanel[i] == null)
-                            continue;
-
-                        for (java.awt.Component comp : compPrivatesPanel[i].getComponents()) {
-                            if (comp instanceof net.sf.rails.ui.swing.elements.RailCard) {
-                                net.sf.rails.ui.swing.elements.RailCard card = (net.sf.rails.ui.swing.elements.RailCard) comp;
-                                if (checkAndHighlight(card, pa)) {
-                                    // No 'found = true' break needed here if we want to highlight all matches,
-                                    // but usually one action targets one card.
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    // --- START FIX ---
     /**
      * Generic helper to highlight a RailCard if it matches a GuiTargetedAction.
      * Returns TRUE if a match was found, so the loop knows to stop searching if
@@ -4904,7 +4704,6 @@ public class GameStatus extends GridPanel implements ActionListener {
         return false; // No match
     }
 
-    // --- START FIX ---
     /**
      * Visualization Component for Round Tracking (Route Style).
      * Displays a linear track: [OR 1] -- [OR 2] -- [OR 3] -- [SR]
@@ -5160,13 +4959,11 @@ public class GameStatus extends GridPanel implements ActionListener {
             g2.fillRect(left - 1, bottom - 19, 10, 2);
         }
     }
-    // --- END FIX ---
 
     /**
      * Custom Caption to render a Green "Pass" Dot behind the Priority Train icon.
      */
     private static class PassIndicatorCaption extends Caption {
-        private boolean passed = false;
 
         public PassIndicatorCaption(String text) {
             super(text);
@@ -5176,5 +4973,89 @@ public class GameStatus extends GridPanel implements ActionListener {
         }
 
     }
+
+
+// ... (lines of unchanged context code) ...
+    protected void initGameSpecificActions() {
+        // 1. Safety Checks
+        if (possibleActions == null) return;
+        if (players == null) return;
+
+        java.util.List<rails.game.action.PossibleAction> list = possibleActions.getList();
+        if (list == null || list.isEmpty()) return;
+
+        for (rails.game.action.PossibleAction pa : list) {
+            
+            // --- TYPE A: GuiTargetedAction (ExchangeCoal, StartPrussian, etc.) ---
+            if (pa instanceof GuiTargetedAction) {
+                
+                net.sf.rails.game.state.Owner actor = ((GuiTargetedAction) pa).getActor();
+                
+                if (actor instanceof net.sf.rails.game.PublicCompany) {
+                    net.sf.rails.game.PublicCompany targetComp = (net.sf.rails.game.PublicCompany) actor;
+                    int companyIndex = targetComp.getPublicNumber();
+                    
+                    // Resolve President
+                    if (targetComp.getPresident() != null) {
+                        int playerIndex = targetComp.getPresident().getIndex();
+
+                        // Apply Highlight
+                        if (companyIndex >= 0 && companyIndex < nc && playerIndex >= 0 && playerIndex < players.getNumberOfPlayers()) {
+                            
+                            // 1. Activate Button (This adds the action and enables the card)
+                            setPlayerCertButton(companyIndex, playerIndex, true, pa);
+                            
+                            // 2. Visual Highlight
+                            net.sf.rails.ui.swing.elements.RailCard card = getRailCardFor(companyIndex, playerIndex);
+                            if (card != null) {
+                                card.setBackground(java.awt.Color.CYAN);
+                                card.setBorder(BorderFactory.createLineBorder(Color.BLUE, 3));
+                                // REMOVED: card.setPossibleAction(pa); 
+                                // Reason: setPlayerCertButton already adds the action. 
+                                // Setting it again here can reset listeners or cause conflicts.
+                                card.repaint();
+                            }
+                        }
+                    }
+                }
+            } 
+            
+            // --- TYPE B: Discard Train ---
+            if (pa instanceof DiscardTrain) {
+                DiscardTrain dt = (DiscardTrain) pa;
+                net.sf.rails.game.PublicCompany company = (net.sf.rails.game.PublicCompany) dt.getCompany();
+                net.sf.rails.game.Train targetTrain = dt.getDiscardedTrain();
+
+                int companyIndex = company.getPublicNumber();
+
+                if (companyIndex >= 0 && companyIndex < nc && compSubTrainButtons[companyIndex] != null) {
+                    java.util.List<net.sf.rails.game.Train> trainList = new java.util.ArrayList<>(
+                            company.getPortfolioModel().getTrainList());
+                    int trainIdx = trainList.indexOf(targetTrain);
+
+                    if (trainIdx >= 0 && trainIdx < compSubTrainButtons[companyIndex].length) {
+                        net.sf.rails.ui.swing.elements.RailCard card = compSubTrainButtons[companyIndex][trainIdx];
+                        if (card != null) {
+                            card.setPossibleAction(pa);
+                            card.setBorder(BorderFactory.createLineBorder(Color.BLUE, 3));
+                            card.setToolTipText("Click to Discard " + targetTrain.getName());
+                            card.setEnabled(true);
+                            card.setVisible(true);
+                            card.repaint();
+                        }
+                    }
+                }
+            }
+        }
+    }
+// ... (rest of the method) ...
+
+
+
+
+
+
+
+
 
 }

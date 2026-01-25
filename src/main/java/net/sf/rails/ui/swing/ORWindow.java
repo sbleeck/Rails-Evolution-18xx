@@ -106,11 +106,14 @@ public class ORWindow extends DockingFrame implements ActionPerformer {
           // The ORPanel object itself is now just a component holder.
             // We pull its contents (Sidebar and Upgrades) directly into the main window.
 
-            // --- START FIX ---
             // 1. Sidebar Wrapper (WEST): Holds ONLY the Action Buttons (ORPanel sidebar)
             // We strip the upgrade panel out so the sidebar gets full height.
+            
             JPanel sidebarWrapper = new JPanel(new BorderLayout());
-            sidebarWrapper.setPreferredSize(new Dimension(180, 0)); // Match ORPanel width
+
+            // VERIFICATION LOG: Confirm the width is actually 300 (ORPanel.SIDEBAR_WIDTH)
+            
+sidebarWrapper.setPreferredSize(new Dimension(ORPanel.SIDEBAR_WIDTH, 0));
             sidebarWrapper.add(orPanel.getSidebarPanel(), BorderLayout.CENTER);
 
             // 2. Map Wrapper (CENTER): Vertically stacks Map (Center) and Tiles (South)
@@ -427,7 +430,6 @@ String CONFIRM_KEY = "confirmAction";
                 }
             }
         });
-        // --- END FIX ---
         
    
      }

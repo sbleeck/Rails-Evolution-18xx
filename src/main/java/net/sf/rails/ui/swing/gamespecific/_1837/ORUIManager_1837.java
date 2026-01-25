@@ -87,7 +87,6 @@ public class ORUIManager_1837 extends ORUIManager {
 
     @Override
     public void updateStatus(boolean myTurn) {
-        log.info("1837_DEBUG: ORUIManager_1837.updateStatus entered. myTurn=" + myTurn);
 
         // 1. Run standard parent logic (updates map, panels, etc.)
         super.updateStatus(myTurn);
@@ -102,26 +101,21 @@ public class ORUIManager_1837 extends ORUIManager {
                     PublicCompany company = ((OperatingRound) round).getOperatingCompany();
                     
                     if (company != null && "S5".equalsIgnoreCase(company.getId())) {
-                        log.info("1837_DEBUG: Manual check for S5 in updateStatus.");
                         
                         PossibleActions actions = gameUIManager.getGameManager().getPossibleActions();
                         if (actions != null && actions.contains(SetHomeHexLocation.class)) {
-                            log.info("1837_DEBUG: SetHomeHexLocation found in possible actions.");
                             
                             // Check if we are already displaying this dialog to avoid duplicates
                             PossibleAction currentAction = getCurrentDialogAction();
                             if (currentAction == null || !(currentAction instanceof SetHomeHexLocation)) {
-                                log.info("1837_DEBUG: Dialog not active. Triggering requestHomeHex.");
                                 SetHomeHexLocation action = actions.getType(SetHomeHexLocation.class).get(0);
                                 requestHomeHex(action);
                             } else {
-                                log.info("1837_DEBUG: Dialog already active. Skipping trigger.");
                             }
                         }
                     }
                 }
             } catch (Exception e) {
-                log.error("1837_DEBUG: Error in manual S5 check", e);
             }
         }
     }
@@ -161,16 +155,13 @@ public class ORUIManager_1837 extends ORUIManager {
 
                                                 // DEBUG LOGGING
         if (orComp.getId().equalsIgnoreCase("S5")) {
-             log.info("1837_DEBUG: Checking S5 actions. Step=" + orStep);
              if (possibleActions != null && possibleActions.contains(SetHomeHexLocation.class)) {
-                 log.info("1837_DEBUG: SetHomeHexLocation FOUND in possible actions.");
              }
         }
 
         if (orComp.getId().equalsIgnoreCase("S5")
               && possibleActions.contains(SetHomeHexLocation.class)) {
             
-            log.info("1837_DEBUG: Triggering requestHomeHex for S5.");
             SetHomeHexLocation action = possibleActions.getType(SetHomeHexLocation.class).get(0);
             requestHomeHex(action);
 
@@ -179,20 +170,13 @@ public class ORUIManager_1837 extends ORUIManager {
     }
     private boolean requestHomeHex(SetHomeHexLocation action) {
 
-       log.info("1837_DEBUG: Entering requestHomeHex.");
-
-        if (orWindow == null) log.error("1837_DEBUG: orWindow is NULL! Dialog parent is missing.");
-        if (hexes == null) log.error("1837_DEBUG: Hexes array is NULL!");
-
         RadioButtonDialog dialog = new RadioButtonDialog(
                 COMPANY_START_HEX_DIALOG, this, orWindow,
                 LocalText.getText("PleaseSelect"),
                 LocalText.getText("StartingHomeHexS5", action.getPlayerName(), action.getCompanyName()),
                 hexes, 0);
         
-        log.info("1837_DEBUG: Dialog created: " + dialog.toString());
         setCurrentDialog (dialog, action);
-        log.info("1837_DEBUG: setCurrentDialog called.");
         return true;
 
     }
@@ -200,9 +184,7 @@ public class ORUIManager_1837 extends ORUIManager {
     @Override
     public void dialogActionPerformed() {
 
-        log.info("1837_DEBUG: dialogActionPerformed. Action=" + 
-            (getCurrentDialogAction() != null ? getCurrentDialogAction().getClass().getSimpleName() : "null"));
-
+  
         if (getCurrentDialogAction() instanceof SetHomeHexLocation) {
             handleStartHex();
         } else {
@@ -211,23 +193,18 @@ public class ORUIManager_1837 extends ORUIManager {
     }
 
 private void handleStartHex() {
-// --- START FIX ---
-        log.info("1837_DEBUG: handleStartHex entered.");
         RadioButtonDialog dialog = (RadioButtonDialog) getCurrentDialog();
         SetHomeHexLocation action =
                 (SetHomeHexLocation) getCurrentDialogAction();
 
         if (dialog == null) {
-            log.error("1837_DEBUG: Dialog is null in handleStartHex!");
             return;
         }
 
         int index = dialog.getSelectedOption();
-        log.info("1837_DEBUG: Selected index=" + index);
 
         if (index >= 0) {
             String hexName = hexes[index];
-            log.info("1837_DEBUG: Selected hex name=" + hexName);
             
             action.setHomeHex(hexName);
 
@@ -236,17 +213,13 @@ private void handleStartHex() {
             net.sf.rails.game.MapHex mapHex = gameUIManager.getRoot().getMapManager().getHex(hexName);
             
             if (mapHex != null) {
-                log.info("1837_DEBUG: Verified hex exists in MapManager: " + mapHex.getId());
                 // action.setSelectedHomeHex(mapHex); // REMOVED: Method does not exist
             } else {
-                log.error("1837_DEBUG: Failed to map string '" + hexName + "' to a MapHex object!");
             }
 
             gameUIManager.processAction(action);
         } else {
-            log.warn("1837_DEBUG: Invalid selection index.");
         }
-// --- END FIX ---
     }
 
 }

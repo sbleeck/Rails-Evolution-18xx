@@ -2399,7 +2399,6 @@ public class GameUIManager implements DialogOwner {
                         null,
                         certs.toArray(),
                         certs.get(0));
-        // --- END FIX ---
 
         if (selectedCert == null)
             return;
@@ -2629,10 +2628,28 @@ public class GameUIManager implements DialogOwner {
         if (window == null)
             return;
         Rectangle r = windowSettings.getBounds(window);
-        // WindowSettings returns -1,-1,-1,-1 if not found
+// If window settings are valid, verify they are visible on the current screen.
         if (r.width > 0 && r.height > 0) {
-            window.setBounds(r);
+            boolean visible = false;
+            // Check if the top-left corner is within any available screen device
+            GraphicsEnvironment ge = GraphicsEnvironment.getLocalGraphicsEnvironment();
+            for (GraphicsDevice gd : ge.getScreenDevices()) {
+                if (gd.getDefaultConfiguration().getBounds().contains(r.getLocation())) {
+                    visible = true;
+                    break;
+                }
+            }
+
+            if (visible) {
+                window.setBounds(r);
+            } else {
+                // If off-screen, center it on the default screen instead
+                window.setSize(r.getSize());
+                window.setLocationRelativeTo(null);
+                log.info("Window restored to center (was off-screen): {}", window.getName());
+            }
         }
+        
     }
 
 }

@@ -122,7 +122,6 @@ public class StatusWindow_1856 extends StatusWindow {
             escrowX = col++;
             loansX = col++;
 
-            // --- START FIX: Use literals for headers to avoid missing text error ---
             Caption hEscrow = new Caption("Escrow");
             hEscrow.setBorder(BorderFactory.createMatteBorder(0, 0, 1, 1, Color.GRAY));
             addField(hEscrow, escrowX, 1, 1, 1, 0, true);
@@ -130,7 +129,6 @@ public class StatusWindow_1856 extends StatusWindow {
             Caption hLoans = new Caption("Loans");
             hLoans.setBorder(BorderFactory.createMatteBorder(0, 0, 1, 1, Color.GRAY));
             addField(hLoans, loansX, 1, 1, 1, 0, true);
-            // --- END FIX ---
 
             compEscrow = new Field[nc];
             compLoans = new Field[nc];
@@ -158,8 +156,6 @@ public class StatusWindow_1856 extends StatusWindow {
             // Run standard update first
             super.initTurn(actorIndex, myTurn);
 
-            // --- START FIX: Use INFO logging to confirm this runs ---
-            // log.info("GameStatus_1856: initTurn called.");
 
             // Identify Operating Company for highlighting
             PublicCompany operatingComp = null;

@@ -37,7 +37,6 @@ public class StatusWindow_1835 extends StatusWindow {
         prussian = gameUIManager.getRoot().getCompanyManager().getPublicCompany(GameDef_1835.PR_ID);
     }
 
-    // --- START FIX ---
     @Override
     public void updateStatus(boolean myTurn) {
         RoundFacade currentRound = gameUIManager.getCurrentRound();
@@ -54,7 +53,6 @@ public class StatusWindow_1835 extends StatusWindow {
         // 2. Run the standard update (which will call our updateGameSpecificHighlights hook)
         super.updateStatus(myTurn);
     }
-    // --- END FIX ---
 
     @Override
     protected void updateGameSpecificHighlights() {

@@ -13,6 +13,7 @@ import net.sf.rails.common.LocalText;
 import net.sf.rails.common.ReportBuffer;
 
 import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
 
 /**
@@ -30,18 +31,24 @@ public class StockRound_1837 extends StockRound {
             "discardingTrains");
 
     protected PublicCompany[] discardingCompanies;
+    
+    // States for the Pre-Round Special Action Phase
+    protected final BooleanState specialActionPhase = new BooleanState(this, "specialActionPhase", false);
+    // Tracks how many players have had their turn in the special phase
+    protected final IntegerState specialActionPlayerCount = IntegerState.create(this, "specialActionPlayerCount", 0);
+    // Tracks the actual index in the player list we are currently querying
+    protected final IntegerState specialActionCurrentIndex = IntegerState.create(this, "specialActionCurrentIndex", 0);
+
 
     public StockRound_1837(GameManager parent, String id) {
         super(parent, id);
     }
 
-    @Override
-    public void start() {
-        super.start();
-        if (discardingTrains.value()) {
-            discardingTrains.set(false);
-        }
-    }
+
+
+
+
+
 
     @Override
     protected void gameSpecificChecks(PortfolioModel boughtFrom,
@@ -69,23 +76,73 @@ public class StockRound_1837 extends StockRound {
         if (discardingTrains.value()) {
             return setTrainDiscardActions();
         }
+        // If we are reloading an old save, the log might contain "BuyCertificate" right away.
+        // We must detect this and skip the Special Phase to match the history.
+        if (specialActionPhase.value() && gameManager.isReloading()) {
+            PossibleAction next = gameManager.getNextActionFromLog();
+            if (next != null) {
+                // Check if the log action is a Special Phase action
+                boolean isSpecialAction = (next instanceof ExchangeCoalAction);
+                if (!isSpecialAction && next instanceof NullAction) {
+                    // Check if it is the specific "Done" button for the special phase
+                    if (((NullAction) next).getMode() == NullAction.Mode.DONE) {
+                         isSpecialAction = true;
+                    }
+                }
+                
+                // If the log contains a Standard Action (StartCompany, Buy, Pass), disable special phase
+                if (!isSpecialAction) {
+                    specialActionPhase.set(false);
+                }
+            }
+        }
         
-        // --- START FIX ---
+        // 0. Special Action Phase Check
+        if (specialActionPhase.value()) {
+            return setSpecialPhaseActions();
+        }
+        
         // 1. Load standard Stock Round actions (Buy, Sell, Pass)
         boolean actionsAdded = super.setPossibleActions();
 
-        // 2. Append Voluntary Merge actions (for Minors/Coal)
-        // This allows exchanging Minors (Sd, kk, Ug) or Coal companies for Major shares
-        // during the Stock Round as per Rule 7.2, alongside normal trading.
-        if (setMergeActions()) {
-            actionsAdded = true;
-        }
 
         return actionsAdded;
-        // --- END FIX ---
     }
 
-    // --- START FIX ---
+// ... (lines of unchanged context code) ...
+    private boolean setSpecialPhaseActions() {
+        possibleActions.clear();
+        
+        Set<String> processedCompanies = new HashSet<>();
+
+        // Iterate certs of the CURRENT player (set in start/process)
+        if (currentPlayer != null) {
+            for (PublicCertificate cert : currentPlayer.getPortfolioModel().getCertificates()) {
+                PublicCompany company = cert.getCompany();
+                if (company == null || processedCompanies.contains(company.getId())) continue;
+                
+                String type = company.getType().getId();
+                if ("Minor".equals(type) || "Coal".equals(type)) {
+                    
+                    PublicCompany target = getMergeTarget(company); 
+    
+                    if (target != null && target.hasFloated() && company.getPresident() == currentPlayer) {
+                         possibleActions.add(new ExchangeCoalAction(company, target));
+                         processedCompanies.add(company.getId());
+                    }
+                }
+            }
+        }
+
+        // --- START FIX ---
+        // Use Mode.DONE and .setLabel()
+        possibleActions.add(new NullAction(getRoot(), NullAction.Mode.DONE).setLabel("Done / No Exchanges"));
+        // --- END FIX ---
+        
+        return true;
+    }
+// ... (rest of the class) ...
+
     /**
      * Identifies potential voluntary mergers for the current player and adds them as actions.
      * Uses NullAction(root, Mode.PASS) for the "No" option.
@@ -160,7 +217,6 @@ public class StockRound_1837 extends StockRound {
         }
         return null; 
     }
-    // --- END FIX ---
 
     public void setBuyableCerts() {
         super.setBuyableCerts();
@@ -223,25 +279,68 @@ public class StockRound_1837 extends StockRound {
         // We come back here until all excess trains have been discarded.
         return true;
     }
-
-    @Override
+@Override
     protected boolean processGameSpecificAction(PossibleAction action) {
-
         log.debug("GameSpecificAction: {}", action);
-
         boolean result = false;
 
-        if (action instanceof MergeCompanies) {
+        if (action instanceof ExchangeCoalAction) {
+            ExchangeCoalAction exc = (ExchangeCoalAction) action;
+          // Pass 'true' for the last argument (autoMerge) to suppress internal pop-ups.
+            // The user has already confirmed via the button click.
+            result = mergeCompanies(exc.getCoalCompany(), exc.getTargetMajor(), false, true);
 
-            result = mergeCompanies((MergeCompanies) action);  // Always true
+            // If in special phase, refresh actions without ending turn
+            if (specialActionPhase.value()) {
+                setPossibleActions();
+            } else {
+                // If this happened outside special phase (shouldn't, but for safety), mark acted
+                hasActed.set(true);
+            }
+            return result;
+        }
 
+       if (action instanceof ExchangeCoalAction) {
+            ExchangeCoalAction exc = (ExchangeCoalAction) action;
+            result = mergeCompanies(exc.getCoalCompany(), exc.getTargetMajor(), false, false);
+            if (result) {
+                setPossibleActions(); 
+            }
+            return result;
+            
+        } else if (action instanceof NullAction && specialActionPhase.value()) {
+            // "Done" clicked in special phase
+            int count = specialActionPlayerCount.value() + 1;
+            specialActionPlayerCount.set(count);
+            
+            List<Player> players = gameManager.getPlayers();
+
+            if (count >= players.size()) {
+                // All players done
+                specialActionPhase.set(false);
+                // Start the REAL stock round
+                // We must manually set the current player back to Priority Deal
+                setCurrentPlayer(playerManager.getPriorityPlayer());
+                super.start(); 
+            } else {
+                // Next player in loop
+                int nextIndex = (specialActionCurrentIndex.value() + 1) % players.size();
+                specialActionCurrentIndex.set(nextIndex);
+                setCurrentPlayer(players.get(nextIndex));
+                setPossibleActions();
+            }
+            return true;
+        }
+
+        if (action instanceof MergeCompanies) { // Legacy check, can likely be removed if unused
+             result = mergeCompanies((MergeCompanies) action); 
         } else if (action instanceof DiscardTrain) {
-
             result = discardTrain((DiscardTrain) action);
         }
 
         return result;
     }
+
 
     /**
      * Merge a minor into an already started company.
@@ -309,4 +408,73 @@ public class StockRound_1837 extends StockRound {
             }
         }
     }
+
+
+
+
+
+
+@Override
+    public void start() {
+         boolean exchangePossible = false;
+        
+        for (Player p : gameManager.getPlayers()) {
+            for (PublicCertificate cert : p.getPortfolioModel().getCertificates()) {
+                PublicCompany comp = cert.getCompany();
+                if (comp == null) continue;
+                String type = comp.getType().getId();
+                
+                if ("Minor".equals(type) || "Coal".equals(type)) {
+                    PublicCompany target = getMergeTarget(comp);
+                    boolean targetFloated = (target != null && target.hasFloated());
+                    boolean isPresident = (comp.getPresident() == p);
+                    
+               
+                    if (targetFloated && isPresident) {
+                        exchangePossible = true;
+                        break;
+                    }
+                }
+            }
+            if (exchangePossible) break;
+        }
+
+
+        if (!exchangePossible) {
+            specialActionPhase.set(false);
+            super.start();
+            return;
+        }
+        
+        // Initialize Special Phase sequence
+        specialActionPhase.set(true);
+        specialActionPlayerCount.set(0);
+
+        List<Player> players = gameManager.getPlayers();
+        Player priority = playerManager.getPriorityPlayer();
+        
+        int pdIndex = 0;
+        if (priority != null && players.contains(priority)) {
+            pdIndex = players.indexOf(priority);
+        }
+        
+        specialActionCurrentIndex.set(pdIndex);
+        setCurrentPlayer(players.get(pdIndex));
+        // --- END FIX ---
+
+        if (discardingTrains.value()) {
+            discardingTrains.set(false);
+        }
+    }
+
+
+
+
+
+
+
+
+
+
+
 }

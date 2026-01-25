@@ -3,8 +3,8 @@ package net.sf.rails.game.specific._1837;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
-
-import javax.swing.JOptionPane;
+import java.util.Map;
+import java.util.HashMap;
 
 import net.sf.rails.common.*;
 import net.sf.rails.game.*;
@@ -17,6 +17,48 @@ import rails.game.action.*;
  * @date 2019-01-26
  */
 public class CoalExchangeRound extends StockRound_1837 {
+
+    // --- FIX: Static map to persist skipped companies across round re-starts ---
+    private static Map<String, String> skippedCoalCompanies = new HashMap<>();
+
+    // --- FIX: Custom Action to handle Resets without using getLabel() ---
+    private static class ResetSkipsAction extends PossibleAction implements GuiTargetedAction {
+        private static final long serialVersionUID = 1L;
+
+        public ResetSkipsAction(RailsRoot root) {
+            super(root);
+        }
+
+        @Override
+        public Owner getActor() {
+            return null; // No specific actor
+        }
+
+        @Override
+        public String getGroupLabel() {
+            return "Reset";
+        }
+
+        @Override
+        public String getButtonLabel() {
+            return "Reset Skips & Retry";
+        }
+
+        @Override
+        public java.awt.Color getButtonColor() {
+            return java.awt.Color.RED;
+        }
+
+        @Override
+        public boolean equalsAs(PossibleAction pa, boolean asOption) {
+            return pa instanceof ResetSkipsAction;
+        }
+        
+        @Override
+        public String toString() {
+            return "Reset Skips & Retry";
+        }
+    }
 
     private ArrayListMultimapState<PublicCompany, PublicCompany> coalCompsPerMajor;
     private ArrayListMultimapState<Player, PublicCompany> coalCompsPerPlayer;
@@ -32,7 +74,6 @@ public class CoalExchangeRound extends StockRound_1837 {
     // Track minors explicitly declined (Legacy/Session support)
     private ArrayListState<PublicCompany> skippedMinors;
 
-    // Persistence for UI Decisions
     private ArrayListState<String> recordedMergeChoices;
     private IntegerState mergeChoiceIndex;
 
@@ -80,9 +121,20 @@ public class CoalExchangeRound extends StockRound_1837 {
         ReportBuffer.add(this, message);
         
         init();
-
+        
+        // --- FIX: Prevent tight loop freeze ---
         if (currentMajorOrder.isEmpty()) {
-            finishRound();
+            // Check if we have skips that caused this emptiness
+            boolean hasSkips = false;
+            for (String val : skippedCoalCompanies.values()) {
+                if (getId().equals(val)) { hasSkips = true; break; }
+            }
+            
+            if (!hasSkips) {
+                finishRound();
+            } else {
+                System.out.println("CER_DEBUG: Round empty due to skips. Staying open to prevent freeze.");
+            }
         }
     }
 
@@ -90,6 +142,13 @@ public class CoalExchangeRound extends StockRound_1837 {
         List<PublicCompany> comps = companyManager.getPublicCompaniesByType("Coal");
         for (PublicCompany comp : comps) {
             if (!comp.isClosed()) {
+                
+                // --- FIX: Check static persistence for skips ---
+                String skippedInRound = skippedCoalCompanies.get(comp.getId());
+                if (getId().equals(skippedInRound)) {
+                    continue;
+                }
+                
                 PublicCompany major = companyManager
                         .getPublicCompany(comp.getRelatedPublicCompanyName());
                 if (major.hasFloated()) {
@@ -120,25 +179,32 @@ public class CoalExchangeRound extends StockRound_1837 {
     @Override
     public boolean process (PossibleAction action) {
 
+        if (action instanceof ExchangeCoalAction) {
+            ExchangeCoalAction exc = (ExchangeCoalAction) action;
+            return executeMerge(exc.getCoalCompany(), exc.getTargetMajor(), false);
+        }
+
         if (action instanceof MergeCompanies) {
-            // 1. Record YES decision for replay if not reloading
             if (!gameManager.isReloading()) {
                 recordedMergeChoices.add("YES");
             }
-            // 2. Advance the Wizard Pointer
             mergeChoiceIndex.add(1);
-            
             return executeMerge((MergeCompanies) action);
 
         } else if (action instanceof DiscardTrain) {
             return discardTrain((DiscardTrain) action);
 
+        // --- FIX: Handle Reset using custom class ---
+        } else if (action instanceof ResetSkipsAction) {
+            skippedCoalCompanies.clear();
+            skippedMinors.clear();
+            init(); // Re-initialize to find companies
+            setPossibleActions();
+            return true;
+            
         } else if (action instanceof NullAction
                 && ((NullAction)action).getMode() == NullAction.Mode.DONE) {
             
-            // "DONE" here typically means we finished the loop or the phase.
-            // If it was a manual Skip, we might have handled it in the loop already.
-            // But if the engine generated it, we ensure sync.
             return done((NullAction)action, action.getPlayer(), false);
         } else {
             return super.process(action);
@@ -149,7 +215,6 @@ public class CoalExchangeRound extends StockRound_1837 {
         PublicCompany minor = action.getMergingCompany();
         PublicCompany major = action.getSelectedTargetCompany();
         
-        // Safeguard for manual action creation
         if (major == null) {
             List<PublicCompany> targets = action.getTargetCompanies();
             if (targets != null && !targets.isEmpty()) {
@@ -172,7 +237,23 @@ public class CoalExchangeRound extends StockRound_1837 {
 
         if (result) {
             coalCompsPerPlayer.remove(currentPlayer, minor);
-            if (coalCompsPerPlayer.get(currentPlayer).isEmpty()) {
+            
+            // --- FIX: Logic to check if player has more companies for THIS major ---
+            boolean hasMoreForCurrentMajor = false;
+            
+            List<PublicCompany> coalForThisMajor = coalCompsPerMajor.get(major);
+            if (coalForThisMajor != null && coalCompsPerPlayer.containsKey(currentPlayer)) {
+                for (PublicCompany c : coalCompsPerPlayer.get(currentPlayer)) {
+                    if (coalForThisMajor.contains(c)) {
+                        hasMoreForCurrentMajor = true;
+                        break;
+                    }
+                }
+            }
+
+            if (!hasMoreForCurrentMajor) {
+                boolean removed = currentPlayerOrder.remove(currentPlayer);
+
                 if (nextPlayer()) {
                     return result;
                 } else if (checkForExcessTrains()) {
@@ -182,6 +263,8 @@ public class CoalExchangeRound extends StockRound_1837 {
                 } else {
                     step.set(MERGE);
                 }
+            } else {
+                setPossibleActions();
             }
         }
         return result;
@@ -242,21 +325,31 @@ public class CoalExchangeRound extends StockRound_1837 {
     }
 
     public boolean done(NullAction action, Player player, boolean hasAutopassed) {
-        List<PublicCompany> remainingMinors = coalCompsPerMajor.get(currentMajor.value());
-        if (!remainingMinors.isEmpty()) {
-            List<PublicCompany> rejectedMinors = new ArrayList<>(2);
-            for (PublicCompany minor : remainingMinors) {
-                if (player == minor.getPresident()) rejectedMinors.add (minor);
-            }
-            if (!rejectedMinors.isEmpty()) {
-                 // Log if needed
+        
+        Player p = (player != null) ? player : currentPlayer;
+        
+        // --- FIX: Record skips in Static Map ---
+        if (currentMajor != null && currentMajor.value() != null) {
+            PublicCompany major = currentMajor.value();
+            List<PublicCompany> potentialMinors = coalCompsPerMajor.get(major);
+            if (potentialMinors != null) {
+                for (PublicCompany minor : potentialMinors) {
+                    if (minor.getPresident() == p) {
+                        skippedCoalCompanies.put(minor.getId(), getId());
+                        if (!skippedMinors.contains(minor)) {
+                            skippedMinors.add(minor);
+                        }
+                    }
+                }
             }
         }
 
-        currentPlayerOrder.remove(currentPlayer);
+        if (currentPlayerOrder != null) currentPlayerOrder.remove(currentPlayer);
 
-        if (currentPlayerOrder.isEmpty()) {
-            currentMajorOrder.remove(currentMajor.value());
+        if (currentPlayerOrder == null || currentPlayerOrder.isEmpty()) {
+            if (currentMajor != null && currentMajor.value() != null) 
+                currentMajorOrder.remove(currentMajor.value());
+                
             if (!closedMinors.isEmpty() && checkForExcessTrains()) {
                 step.set(DISCARD);
             } else if (!nextMajorCompany()){
@@ -270,6 +363,21 @@ public class CoalExchangeRound extends StockRound_1837 {
 
     @Override
     public boolean setPossibleActions() {
+        possibleActions.clear(); 
+
+        // --- FIX: If Major Order is empty but we are here, it's the Loop Protection ---
+        if (currentMajorOrder.isEmpty()) {
+            // Add a forced pass to prevent UI freeze
+            NullAction na = new NullAction(getRoot(), NullAction.Mode.DONE);
+            na.setLabel("Pass (Enforced)");
+            na.setPlayer(currentPlayer != null ? currentPlayer : playerManager.getCurrentPlayer());
+            possibleActions.add(na);
+            
+            // Add Escape Hatch using ResetSkipsAction
+            possibleActions.add(new ResetSkipsAction(getRoot()));
+            return true;
+        }
+
         if (step.value() == MERGE) {
              if (setMinorMergeActions()) return true; 
         } 
@@ -285,80 +393,49 @@ public class CoalExchangeRound extends StockRound_1837 {
 
     private boolean setMinorMergeActions() {
 
-        // Safety: Ensure index is within bounds
-        if (mergeChoiceIndex.value() > recordedMergeChoices.size()) {
-            mergeChoiceIndex.set(recordedMergeChoices.size());
+        if (currentPlayer == null) {
+            if (!nextPlayer()) {
+                finishRound(); 
+                return false; 
+            }
         }
 
-        // --- WIZARD LOOP ---
-        // Loops until it finds a "YES" (creates action) or runs out of players/options.
-        // If "NO", it records locally and continues immediately to avoid extra clicks.
-        
-        while (nextPlayer()) {
+        while (currentPlayer != null) {
             
-            Player player = currentPlayer;
             PublicCompany major = currentMajor.value();
             List<PublicCompany> candidates = coalCompsPerMajor.get(major);
-            
+            boolean actionsAdded = false;
+
             if (candidates != null) {
                 for (PublicCompany minor : candidates) {
-                    if (player == minor.getPresident() && !minor.isClosed()) {
-                        
-                        // 1. REPLAY CHECK
-                        String choice = null;
-                        if (mergeChoiceIndex.value() < recordedMergeChoices.size()) {
-                            choice = recordedMergeChoices.get(mergeChoiceIndex.value());
-                        }
+                    
+                    if (skippedMinors.contains(minor)) continue;
 
-                        // 2. ASK USER (If no history)
-                        if (choice == null) {
-                            if (gameManager.isReloading()) return false; 
-
-                            String msg = "<html><b>" + player.getName() + "</b> can merge minor " 
-                                       + minor.getId() + " with " + major.getId() + "?</html>";
-
-                            int response = JOptionPane.showConfirmDialog(
-                                    null, msg, "Voluntary Exchange", 
-                                    JOptionPane.YES_NO_OPTION, JOptionPane.QUESTION_MESSAGE
-                            );
-                            
-                            choice = (response == JOptionPane.YES_OPTION) ? "YES" : "NO";
-                        }
-
-                        // 3. HANDLE CHOICE
-                        if ("YES".equals(choice)) {
-                             // "YES": Return the action. The UI will stop and show the button (or auto-exec).
-                             // We wait for process() to advance the index.
-                             possibleActions.add(new MergeCompanies(minor, major, false));
-                             return true; 
-                        } else {
-                             // "NO": Skip immediately.
-                             // We must record this "NO" now because we are NOT returning an action.
-                             // This effectively executes the "Skip" silently.
-                             
-                             if (!gameManager.isReloading()) {
-                                 // Only add if not already there (though the index check above handles iteration)
-                                 if (mergeChoiceIndex.value() >= recordedMergeChoices.size()) {
-                                     recordedMergeChoices.add("NO");
-                                 }
-                             }
-                             
-                             // Advance index locally to skip this entry
-                             mergeChoiceIndex.add(1);
-                             
-                             // Continue inner loop -> next candidate
-                             continue;
-                        }
+                    if (currentPlayer == minor.getPresident() && !minor.isClosed()) {
+                        possibleActions.add(new ExchangeCoalAction(minor, major));
+                        actionsAdded = true;
                     }
                 }
             }
-            // If no candidates found for this player (or all skipped), loop continues to nextPlayer()
-        }
 
-        // Loop finished = No more candidates/players
-        possibleActions.add(new NullAction(getRoot(), NullAction.Mode.DONE));
-        return true;
-     }
+            if (actionsAdded) {
+                NullAction na = new NullAction(getRoot(), NullAction.Mode.DONE);
+                na.setLabel("Done / Pass");
+                na.setPlayer(currentPlayer); 
+                possibleActions.add(na);
+                return true; 
+            }
+
+            currentPlayerOrder.remove(currentPlayer);
+            
+            if (!nextPlayer()) {
+                finishRound();
+                return false; 
+            }
+            
+        }
+        return false;
+    }
 
     private boolean nextPlayer() {
         PublicCompany major = currentMajor.value();
@@ -407,7 +484,7 @@ public class CoalExchangeRound extends StockRound_1837 {
                         step.set(DISCARD);
                         return false;
                     } else if (currentMajorOrder.isEmpty()) {
-                        if (reachedPhase5) finishRound(); 
+                        finishRound(); 
                         return false;
                     } else  {
                         continue;

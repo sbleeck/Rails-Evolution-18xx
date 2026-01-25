@@ -59,9 +59,7 @@ public class CashCorrectionManager extends CorrectionManager {
                 // "Nested Action" issues (where the Cash Action is lost because the 
                 // Menu Action is still running).
                 if (!getParent().isReloading()) {
-                    // --- START FIX ---
                     javax.swing.SwingUtilities.invokeLater(() -> runWizard());
-                    // --- END FIX ---
                 }
                 // Return true to indicate handled. 
                 return true; 
@@ -167,10 +165,8 @@ public class CashCorrectionManager extends CorrectionManager {
             }
             cca.setAmount(amount);
             
-            // --- START FIX ---
             // Send to GameManager to record the action, then it calls back to executeCorrection()
             getParent().process(cca); 
-            // --- END FIX ---
             
         } catch (NumberFormatException e) {
              DisplayBuffer.add(this, "Invalid Amount entered");

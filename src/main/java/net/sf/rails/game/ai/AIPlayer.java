@@ -432,7 +432,6 @@ if (!validTileLays.isEmpty() && operatingCompany != null) {
                     bestAction = configureTileLayAction(option);
                 }
             }
-            // --- END FIX ---
         }
 
 
@@ -820,7 +819,6 @@ if (!validTileLays.isEmpty() && operatingCompany != null) {
                 return action;
             }
         }
-        // --- END FIX ---
 
 
 // ... (lines of unchanged context code) ...
@@ -911,7 +909,5 @@ if (!validTileLays.isEmpty() && operatingCompany != null) {
         }
         return false;
     }
-    // --- END FIX ---
-
 
 }

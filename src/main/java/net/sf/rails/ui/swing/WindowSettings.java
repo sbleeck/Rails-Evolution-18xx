@@ -14,9 +14,7 @@ import org.slf4j.LoggerFactory;
 public class WindowSettings {
 
     private final Map<String, Rectangle> settings = new HashMap<>();
-    // --- START FIX ---
     private final Map<String, String> properties = new HashMap<>();
-    // --- END FIX ---
     private final String filepath;
     private final String defaultpath;
     private boolean defaultUsed = false;
@@ -77,7 +75,6 @@ public class WindowSettings {
         try (BufferedReader in = new BufferedReader (file)) {
             String line;
             while ((line = in.readLine()) != null) {
-                // --- START FIX ---
                 // Split on the first '=' only to separate key and value
                 String[] parts = line.split("=", 2);
                 if (parts.length < 2) {
@@ -108,7 +105,6 @@ public class WindowSettings {
                     // It is a generic property (like font.ui.scale)
                     properties.put(key, value);
                 }
-                // --- END FIX ---
             }
         } catch (Exception e) {
             log.error("Error while loading {}", filepath, e);
@@ -141,7 +137,6 @@ public class WindowSettings {
                 out.println(name+".H="+r.height);
             }
             
-            // --- START FIX ---
             // Save generic properties
             Set<String> propKeys = new TreeSet<>(properties.keySet());
   

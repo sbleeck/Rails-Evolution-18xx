@@ -73,7 +73,6 @@ public class Discord {
 
 public void update(String text) {
             String localPlayer = Config.get("local.player.name");
-            // --- START FIX ---
             Player currentPlayer = pm.getCurrentPlayer();
 
             // Guard against null player state (e.g. during forced actions)
@@ -91,7 +90,6 @@ public void update(String text) {
                 }
                 formerCurrentPlayer = currentPlayer;
             }
-            // --- END FIX ---
         }
 
         public Observable getObservable() {

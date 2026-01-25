@@ -661,7 +661,6 @@ public class ORUIManager implements DialogOwner {
 
         Collection<GUIHex> hexes = hexUpgrades.getHexes();
         
-        // --- START FIX ---
         // Was: if (hexes == null || hexes.isEmpty()) return;
         // Change: Removed early exit. We must proceed to repaintAll(mapBounds) 
         // at the end of the method to clear "Ghost Tiles" after an Undo, 
@@ -694,7 +693,6 @@ public class ORUIManager implements DialogOwner {
                 }
             }
         }
-        // --- END FIX ---
         
         // This line forces the Layers to mark their buffers as dirty and redraw from the Model.
         map.repaintAll(mapBounds);

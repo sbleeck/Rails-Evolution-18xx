@@ -311,7 +311,6 @@ public void setPossibleAction(PossibleAction action) {
                 contentPanel.add(lbl, gbc);
             }
 
-            // --- START FIX ---
             if (centerSingleItem) {
                 // 3. Add Right Spacer (Weight 1.0)
                 gbc.gridx = x; 
@@ -401,7 +400,6 @@ public void setState(State state) {
      * Robust Identification: Checks if this card holds the specific certificate object.
      * Use this instead of comparing string IDs or labels.
      */
-    // --- START FIX ---
     public boolean holdsCertificate(Certificate target) {
         if (target == null || certificates == null) return false;
 
@@ -606,13 +604,11 @@ public static Dimension calculateBaseSize(Font f, boolean compactMode, double sc
             return trains.get(0).getName();
         }
         
-        // --- START FIX ---
         // Safety Fallback: Use Swing Name if manually set (e.g. by GameStatus)
         String name = getName();
         if (name != null && !name.isEmpty()) {
             return name;
         }
-        // --- END FIX ---
 
         return null;
     }

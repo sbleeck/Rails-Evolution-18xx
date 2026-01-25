@@ -175,9 +175,7 @@ private static final Logger log = LoggerFactory.getLogger(GlobalHotkeyManager.cl
     private void triggerUndo() {
         // 1. Priority: Operating Round Local Undo
         if (gameUIManager.getCurrentRound() instanceof OperatingRound) {
-            // --- START FIX ---
             ORWindow win = gameUIManager.orWindow; // Direct field access
-            // --- END FIX ---
             if (win != null && win.isVisible() && win.getORPanel() != null) {
                 // Try executing on panel first. If successful, we are done.
                 if (win.getORPanel().executeUndo()) {
@@ -197,9 +195,7 @@ private static final Logger log = LoggerFactory.getLogger(GlobalHotkeyManager.cl
     private void triggerRedo() {
         // 1. Priority: Operating Round Local Redo
         if (gameUIManager.getCurrentRound() instanceof OperatingRound) {
-            // --- START FIX ---
             ORWindow win = gameUIManager.orWindow; // Direct field access
-            // --- END FIX ---
             if (win != null && win.isVisible() && win.getORPanel() != null) {
                 if (win.getORPanel().executeRedo()) {
                     return;

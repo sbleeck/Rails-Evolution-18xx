@@ -280,27 +280,26 @@ public class OperatingRound extends Round implements Observer {
         finishRound();
     }
 
-
     @Override
     public boolean process(PossibleAction action) {
 
         // JIT Correction: Ensure the Operating Company matches the Saved Action.
         if (gameManager.isReloading()) {
-            
+
             PublicCompany actionCompany = null;
             if (action instanceof PossibleORAction) {
                 actionCompany = ((PossibleORAction) action).getCompany();
             } else if (action instanceof RelayTokenAction) {
                 actionCompany = ((RelayTokenAction) action).getCompany();
             }
-            
+
             // --- FIX: EXPLICITLY EXCLUDE DiscardTrain ---
-            // The subclass (OperatingRound_1835) must handle the swap for discards 
+            // The subclass (OperatingRound_1835) must handle the swap for discards
             // to preserve the return-to-origin logic.
-            if (actionCompany != null 
-                    && actionCompany != operatingCompany.value() 
+            if (actionCompany != null
+                    && actionCompany != operatingCompany.value()
                     && !(action instanceof DiscardTrain)) {
-                
+
                 this.operatingCompany.set(actionCompany);
                 setStep(GameDef.OrStep.INITIAL);
                 try {
@@ -310,17 +309,17 @@ public class OperatingRound extends Round implements Observer {
                 nextStep();
             }
         }
-        
+
         // SAFETY NET: Zombie Company Detection
         if (operatingCompany.value() != null && operatingCompany.value().isClosed()) {
             if (!(action instanceof DiscardTrain)) {
-                log.warn("OperatingRound: Detected closed company {} attempting to act. Forcing finishTurn().", 
+                log.warn("OperatingRound: Detected closed company {} attempting to act. Forcing finishTurn().",
                         operatingCompany.value().getId());
                 finishTurn();
                 return true;
             }
         }
-        
+
         boolean result = false;
         doneAllowed.set(false);
 
@@ -337,7 +336,7 @@ public class OperatingRound extends Round implements Observer {
 
             if (company != null && company != operatingCompany.value()) {
                 String currentId = (operatingCompany.value() != null) ? operatingCompany.value().getId() : "NULL";
-                
+
                 DisplayBuffer.add(this, LocalText.getText("WrongCompany",
                         company.getId(), currentId));
                 return false;
@@ -416,6 +415,7 @@ public class OperatingRound extends Round implements Observer {
 
         return result;
     }
+
     public boolean useSpecialProperty(UseSpecialProperty action) {
 
         SpecialProperty sp = action.getSpecialProperty();
@@ -929,39 +929,24 @@ public class OperatingRound extends Round implements Observer {
         nextStep();
     }
 
-    /**
-     * The current Company is done operating.
-     *
-     * @param action TODO
-     * @return false if an error is found.
-     */
     public boolean done(NullAction action) {
 
-        // 1. This is your existing fix. It correctly checks for discards.
-        // Check for excess trains *before* proceeding to the next step.
+        // BRANCH 1: The "Discard Trap" (Modified)
         if (checkForExcessTrains()) {
-            // If excess trains are found, transition to the discard step.
             setStep(GameDef.OrStep.DISCARD_TRAINS);
-
-            // The main game loop will now call setPossibleActions(),
-            // which will see the new step and call setTrainsToDiscard().
-            return false;
+            return true; // <--- We only touched this line inside the IF block
         }
 
-        if (operatingCompany.value().getPortfolioModel().getNumberOfTrains() == 0
-                && operatingCompany.value().mustOwnATrain()) {
-            // FIXME: Need to check for valid route before throwing an
-            // error.
+        // BRANCH 2: The Normal "Done" (Unchanged)
+        // If checkForExcessTrains() returns false, the code above is skipped entirely.
 
-        }
-
-        nextStep();
+        nextStep(); // Advance to Share Trading or Finish
 
         if (getStep() == GameDef.OrStep.FINAL) {
             finishTurn();
         }
 
-        return true;
+        return true; // <--- The normal "Done" ALREADY returns true!
     }
 
     /*
@@ -981,44 +966,61 @@ public class OperatingRound extends Round implements Observer {
         return true;
     }
 
-    /**
-     * Populates the possibleActions list with specific, labeled DiscardTrain
-     * actions, one for each train the company must choose from.
-     */
+    public boolean checkForExcessTrains() {
+        excessTrainCompanies = new HashMap<>();
+        Player player;
+
+
+        for (PublicCompany comp : operatingCompanies.view()) {
+            int numTrains = comp.getPortfolioModel().getNumberOfTrains();
+            int trainLimit = comp.getCurrentTrainLimit();
+
+            if (numTrains > trainLimit) {
+                player = comp.getPresident();
+                if (player == null) {
+                    continue;
+                }
+
+                if (!excessTrainCompanies.containsKey(player)) {
+                    excessTrainCompanies.put(player, new ArrayList<>(2));
+                }
+                excessTrainCompanies.get(player).add(comp);
+            }
+        }
+
+        return !excessTrainCompanies.isEmpty();
+    }
+
+    // 2. MODIFY setTrainsToDiscard to see why it fails to generate actions
     protected void setTrainsToDiscard() {
         doneAllowed.set(false);
-        // Scan the players in SR sequence, starting with the current player
-        for (Player player : getRoot().getPlayerManager().getNextPlayers(true)) {
+
+
+        // Scan the players in SR sequence
+        List<Player> nextPlayers = getRoot().getPlayerManager().getNextPlayers(true);
+
+        for (Player player : nextPlayers) {
             if (excessTrainCompanies.containsKey(player)) {
+
                 playerManager.setCurrentPlayer(player);
                 List<PublicCompany> list = excessTrainCompanies.get(player);
                 for (PublicCompany comp : list) {
-                    // We handle one company at a time.
                     Set<Train> trainsToDiscardFrom = comp.getPortfolioModel().getUniqueTrains();
 
-                    if (trainsToDiscardFrom.isEmpty()) {
 
+                    if (trainsToDiscardFrom.isEmpty())
                         continue;
-                    }
 
-                    // Create a specific, labeled action for *each* train
                     for (Train train : trainsToDiscardFrom) {
                         DiscardTrain action = new DiscardTrain(comp, train);
-
-                        // New label: "SX discards 3 train"
                         action.setButtonLabel(
                                 LocalText.getText("CompanyDiscardsTrain", comp.getId(), train.getType().getName()));
-
-                        // Add the action to the list so the UI can see it
                         possibleActions.add(action);
                     }
-
-                    // We come back here until all excess trains have been
-                    // discarded. By handling only one company, we ensure the UI
-                    // isn't flooded with actions for multiple companies at once.
                     return;
                 }
-            }
+            } else {
+             }
         }
     }
 
@@ -3212,7 +3214,6 @@ public class OperatingRound extends Round implements Observer {
             return false; // Indicate validation failed
         }
 
-
         // --- Handle Emergency Share Selling (if required for president) ---
         if (presidentMustSellShares) {
             savedAction = action; // Save the current action state
@@ -3331,44 +3332,16 @@ public class OperatingRound extends Round implements Observer {
             return true;
         }
 
-        // // Check if the company is allowed to buy *another* train.
-        // boolean canBuyMore = Phase.getCurrent(this).canBuyMoreTrainsPerTurn();
-
-        // if (!canBuyMore) {
-
-        // nextStep();
-        // } else {
-        // // Phase allows multiple buys. Stay in the BUY_TRAIN step.
-
-        // }
+        // Immediately trigger discard step if the purchase put us over the limit.
+        // This removes the need to click "Done" to see the discard window.
+        if (checkForExcessTrains()) {
+            setStep(GameDef.OrStep.DISCARD_TRAINS);
+        }
 
         return true; // Signal successful processing
     } // end buy train
 
     protected void newPhaseChecks() {
-    }
-
-    public boolean checkForExcessTrains() {
-        excessTrainCompanies = new HashMap<>();
-        Player player;
-        for (PublicCompany comp : operatingCompanies.view()) {
-            int numTrains = comp.getPortfolioModel().getNumberOfTrains();
-            int trainLimit = comp.getCurrentTrainLimit();
-            if (numTrains > trainLimit) {
-
-            }
-            if (comp.getPortfolioModel().getNumberOfTrains() > comp.getCurrentTrainLimit()) {
-                player = comp.getPresident();
-                if (!excessTrainCompanies.containsKey(player)) {
-                    excessTrainCompanies.put(player,
-                            new ArrayList<>(2));
-                }
-                excessTrainCompanies.get(player).add(comp);
-            }
-
-        }
-        return !excessTrainCompanies.isEmpty();
-
     }
 
     /**
@@ -3955,8 +3928,6 @@ public class OperatingRound extends Round implements Observer {
         }
         label.append(")");
 
-      
-
         return label.toString();
     }
 
@@ -4151,9 +4122,8 @@ public class OperatingRound extends Round implements Observer {
     }
 
     // File: OperatingRound.java
-// Method: resetTransientStateOnLoad
+    // Method: resetTransientStateOnLoad
 
-    
     public void resetTransientStateOnLoad() {
         // 1. Reset Flags
         if (this.doneAllowed != null) {
@@ -4161,8 +4131,10 @@ public class OperatingRound extends Round implements Observer {
         }
 
         // 2. SAFE RESET: Set to the first available company.
-        // We DO NOT set this to null, because that causes crashes in setPossibleActions().
-        // We DO NOT calculate the "Next" company, because 1835 logic is fragile during reload.
+        // We DO NOT set this to null, because that causes crashes in
+        // setPossibleActions().
+        // We DO NOT calculate the "Next" company, because 1835 logic is fragile during
+        // reload.
         // We just pick the first one as a safe placeholder.
         if (operatingCompanies != null && !operatingCompanies.isEmpty()) {
             // Use the raw state object to avoid side effects
@@ -4187,19 +4159,19 @@ public class OperatingRound extends Round implements Observer {
         if (operatingCompany.value() == null) {
             if (operatingCompanies != null && !operatingCompanies.isEmpty()) {
                 // 1. PRIME THE STATE: Explicitly set to the first company.
-                // This ensures operatingCompany.value() is NOT null, protecting against 
+                // This ensures operatingCompany.value() is NOT null, protecting against
                 // subclass logic or initTurn() crashes if setNextOperatingCompany fails.
                 setOperatingCompany(operatingCompanies.get(0));
 
-                // 2. FIND ACTUAL NEXT: Call the logic to find the correct starting company 
+                // 2. FIND ACTUAL NEXT: Call the logic to find the correct starting company
                 // (e.g. skipping closed/hibernated companies).
-                setNextOperatingCompany(true); 
-                
+                setNextOperatingCompany(true);
+
                 // 3. RESET STEP: Force step to INITIAL to ensure initTurn() is called.
-                setStep(GameDef.OrStep.INITIAL); 
+                setStep(GameDef.OrStep.INITIAL);
             } else {
                 // Should not happen in a valid OR, but prevents a crash if empty
-                return false; 
+                return false;
             }
         }
 
@@ -4310,7 +4282,7 @@ public class OperatingRound extends Round implements Observer {
             // fails to generate actions but the step is still DISCARD_TRAINS.
             if (possibleActions.getType(DiscardTrain.class).isEmpty()) {
                 // This is a bug state, but we must not hang.
-                playerManager.setCurrentPlayer(operatingCompany.value().getPresident());
+                 playerManager.setCurrentPlayer(operatingCompany.value().getPresident());
                 stepObject.set(GameDef.OrStep.BUY_TRAIN);
                 return setPossibleActions(); // Re-run for the new step
             }
@@ -4335,14 +4307,14 @@ public class OperatingRound extends Round implements Observer {
                 int minPrice, maxPrice;
                 List<Player> players = playerManager.getPlayers();
                 int numberOfPlayers = playerManager.getNumberOfPlayers();
-                
+
                 for (int i = currentPlayerIndex; i < currentPlayerIndex + numberOfPlayers; i++) {
                     player = players.get(i % numberOfPlayers);
-                    
+
                     // Allow game-specific logic to restrict selling (e.g. must be President)
                     if (!maySellPrivate(player))
                         continue;
-                        
+
                     for (PrivateCompany privComp : player.getPortfolioModel().getPrivateCompanies()) {
 
                         // Check to see if the private can be sold to a company
@@ -4361,35 +4333,36 @@ public class OperatingRound extends Round implements Observer {
                 }
             }
 
-
             // // Can private companies be bought?
             // if (isPrivateSellingAllowed()) {
 
-            //     // Create a list of players with the current one in front
-            //     int currentPlayerIndex = operatingCompany.value().getPresident().getIndex();
-            //     Player player;
-            //     int minPrice, maxPrice;
-            //     List<Player> players = playerManager.getPlayers();
-            //     int numberOfPlayers = playerManager.getNumberOfPlayers();
-            //     for (int i = currentPlayerIndex; i < currentPlayerIndex + numberOfPlayers; i++) {
-            //         player = players.get(i % numberOfPlayers);
-            //         if (!maySellPrivate(player))
-            //             continue;
-            //         for (PrivateCompany privComp : player.getPortfolioModel().getPrivateCompanies()) {
+            // // Create a list of players with the current one in front
+            // int currentPlayerIndex = operatingCompany.value().getPresident().getIndex();
+            // Player player;
+            // int minPrice, maxPrice;
+            // List<Player> players = playerManager.getPlayers();
+            // int numberOfPlayers = playerManager.getNumberOfPlayers();
+            // for (int i = currentPlayerIndex; i < currentPlayerIndex + numberOfPlayers;
+            // i++) {
+            // player = players.get(i % numberOfPlayers);
+            // if (!maySellPrivate(player))
+            // continue;
+            // for (PrivateCompany privComp :
+            // player.getPortfolioModel().getPrivateCompanies()) {
 
-            //             // check to see if the private can be sold to a company
-            //             if (!privComp.tradeableToCompany()) {
-            //                 continue;
-            //             }
+            // // check to see if the private can be sold to a company
+            // if (!privComp.tradeableToCompany()) {
+            // continue;
+            // }
 
-            //             minPrice = getPrivateMinimumPrice(privComp);
+            // minPrice = getPrivateMinimumPrice(privComp);
 
-            //             maxPrice = getPrivateMaximumPrice(privComp);
+            // maxPrice = getPrivateMaximumPrice(privComp);
 
-            //             BuyPrivate buyPrivate = new BuyPrivate(privComp, minPrice, maxPrice);
-            //             possibleActions.add(buyPrivate);
-            //         }
-            //     }
+            // BuyPrivate buyPrivate = new BuyPrivate(privComp, minPrice, maxPrice);
+            // possibleActions.add(buyPrivate);
+            // }
+            // }
             // }
 
             if (operatingCompany.value().canUseSpecialProperties()) {
@@ -4760,6 +4733,12 @@ public class OperatingRound extends Round implements Observer {
 
                 if (restrictTradeToPresident && otherCompany.getPresident() != currentPresident)
                     continue;
+
+                // Enforce global parameter: Only allow trading if Presidents match
+                if (gameManager.isRestrictTrainTradingToSameOwner() && otherCompany.getPresident() != currentPresident) {
+                    continue;
+                }
+
 
                 Set<Train> otherCompanyTrains = otherCompany.getPortfolioModel().getUniqueTrains();
                 for (Train train : otherCompanyTrains) {

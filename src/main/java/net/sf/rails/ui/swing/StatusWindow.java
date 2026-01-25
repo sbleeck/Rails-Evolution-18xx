@@ -7,27 +7,19 @@ import java.awt.event.ActionListener;
 import java.awt.event.ComponentAdapter;
 import java.awt.event.ComponentEvent;
 import java.awt.event.KeyEvent;
-import java.awt.event.KeyListener;
 import java.awt.event.WindowAdapter;
 import java.awt.event.WindowEvent;
 import java.io.File;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 import net.sf.rails.game.CompanyManager;
 import net.sf.rails.game.PublicCompany;
-import java.util.stream.Collectors;
-
 import javax.swing.*;
 import javax.swing.filechooser.FileFilter;
-
 import rails.game.action.*;
-
 import net.sf.rails.util.Util;
-import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
 import net.sf.rails.common.Config;
 import net.sf.rails.common.GuiDef;
 import net.sf.rails.common.LocalText;
@@ -45,16 +37,10 @@ import net.sf.rails.ui.swing.elements.ActionCheckBoxMenuItem;
 import net.sf.rails.ui.swing.elements.ActionMenuItem;
 import net.sf.rails.ui.swing.elements.RailsIcon;
 import net.sf.rails.util.GameLoader;
-import rails.game.action.*;
 import rails.game.correct.CorrectionModeAction;
 import rails.game.correct.CorrectionType;
-// import rails.game.correct.TrainCorrectionAction;
-// import net.sf.rails.ui.swing.elements.ActionButton; // Ensure this is imported
-// import net.sf.rails.ui.swing.elements.RailsIcon; // Ensure this is imported
-
 import java.io.InputStream;
 import java.util.Properties;
-
 import rails.game.correct.ClosePrivate;
 import net.sf.rails.game.Company;
 import net.sf.rails.game.CompanyType;
@@ -891,7 +877,7 @@ public class StatusWindow extends JFrame implements ActionListener, ActionPerfor
             updateFonts(Math.max(8f, currentBaseFontSize - 1f));
         } else if (command.equals("SHOW_MOVE_MONITOR")) {
             showMoveMonitor();
-        } else if (command.equals("SHOW_ACTION_RUNNER")) { // --- START FIX ---
+        } else if (command.equals("SHOW_ACTION_RUNNER")) { 
             showActionRunner();
 
         } else if (command.equals(REM_TILES_CMD) || command.equals(ORPanel.REM_TILES_CMD)) {
@@ -1173,7 +1159,6 @@ public class StatusWindow extends JFrame implements ActionListener, ActionPerfor
         passButton.setActionCommand(DONE_CMD);
         passButton.addActionListener(this);
 
-        // --- START FIX: INITIALIZE AUTOPASS (Prevents NPE Crash) ---
         // We do NOT add this to the buttonPanel (keeping your 5-button layout),
         // but we must initialize it so updateStatus() doesn't crash.
         autopassButton = new ActionButton(RailsIcon.DONE);
@@ -1181,7 +1166,6 @@ public class StatusWindow extends JFrame implements ActionListener, ActionPerfor
         autopassButton.setIcon(null);
         autopassButton.setActionCommand(AUTOPASS_CMD);
         autopassButton.addActionListener(this);
-        // --- END FIX ---
 
         // 3. Add to Panel in Order: Pause, Undo, Redo, AI, Pass
         buttonPanel.add(pauseButton);
@@ -1403,7 +1387,6 @@ public class StatusWindow extends JFrame implements ActionListener, ActionPerfor
     }
 
     private String currentMetadata = "";
-
     public void updateMetadata(String meta) {
         this.currentMetadata = meta;
         // Force an immediate update so it doesn't lag by 1 second
@@ -2275,7 +2258,6 @@ public class StatusWindow extends JFrame implements ActionListener, ActionPerfor
         // Use the new finder signature
         net.sf.rails.ui.swing.elements.RailCard card = findRailCardRecursive(gameStatus, company, specificCert);
 
-        // --- START FIX ---
         // Fallback: Direct Grid Lookup via GameStatus if recursive search failed
         if (card == null && gameStatus != null && company instanceof PublicCompany && specificCert != null) {
             if (specificCert.getOwner() instanceof Player) {
@@ -2286,7 +2268,6 @@ public class StatusWindow extends JFrame implements ActionListener, ActionPerfor
 
             }
         }
-        // --- END FIX ---
 
         if (card != null) {
             applyActionColor(card, action);

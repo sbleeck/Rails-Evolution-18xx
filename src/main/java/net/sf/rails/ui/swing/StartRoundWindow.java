@@ -699,7 +699,6 @@ public class StartRoundWindow extends JFrame implements ActionListener, KeyListe
 
     @Override
     public void updateStatus(boolean myTurn) {
-        // --- START FIX ---
         log.info("SRW: updateStatus STARTED. MyTurn={}", myTurn);
 
         // 1. Reset all cards to their default state based on game status
@@ -879,7 +878,6 @@ if (cards[k] != null && cards[k].getPossibleActions() != null && !cards[k].getPo
         repaint(); 
         requestFocus();
         log.info("SRW: updateStatus COMPLETED.");
-        // --- END FIX ---
     }
 
 
@@ -887,7 +885,6 @@ if (cards[k] != null && cards[k].getPossibleActions() != null && !cards[k].getPo
     public void actionPerformed(ActionEvent actor) {
         JComponent source = (JComponent) actor.getSource();
 
-        // --- START FIX ---
         log.info("SRW: actionPerformed fired by Source Class: {}", source.getClass().getName());
 
       
@@ -995,7 +992,6 @@ if (cards[k] != null && cards[k].getPossibleActions() != null && !cards[k].getPo
                 process(activeItem);
             }
         }
-        // --- END FIX ---
     }
 
 }

@@ -86,7 +86,6 @@ public class OperatingRound_1835 extends OperatingRound {
 
         super.resume();
 
-        // --- START FIX: Clear Trigger Flags on Resume ---
         // If we are resuming, it means the PFR (or other interruption) has returned
         // control to us.
         // We must clear the trigger flag to prevent the "Gatekeeper" loop.
@@ -101,7 +100,6 @@ public class OperatingRound_1835 extends OperatingRound {
         if (pfrTriggeredThisOR.value() || prStarted || alreadyOffered) {
             this.needPrussianFormationCall.set(false);
         }
-        // --- END FIX ---
 
         // Resync internal index (Existing Fix)
         if (operatingCompany.value() != null) {
@@ -133,14 +131,14 @@ public class OperatingRound_1835 extends OperatingRound {
                 }
             }
         }
-
+        if (handleClosedOperatingCompany()) {
+            playerManager.setCurrentPlayer(operatingCompany.value().getPresident());
+        }
         if (checkForExcessTrains()) {
             setStep(GameDef.OrStep.DISCARD_TRAINS);
         }
 
-        if (handleClosedOperatingCompany()) {
-            playerManager.setCurrentPlayer(operatingCompany.value().getPresident());
-        }
+
     }
 
     @Override

@@ -112,6 +112,10 @@ public class GameManager extends RailsManager implements Configurable, Owner {
     private int absoluteActionCounter = 0;
 
     protected boolean dynamicOperatingOrder = true;
+   /* If true, companies can only buy trains from other companies
+     * if both companies share the same President.
+     */
+    protected boolean restrictTrainTradingToSameOwner = true;
 
     // Member variables to support reload "look-ahead"
     private transient List<PossibleAction> actionsBeingReloaded = null;
@@ -1065,7 +1069,16 @@ public class GameManager extends RailsManager implements Configurable, Owner {
                 guiParameters.put(GuiDef.Parm.REVENUE_SUGGEST, true);
             }
         }
+        // Read the global restriction for train trading
+        if (GameOption.getAsBoolean(this, "RestrictTrainTradingToSameOwner")) {
+            restrictTrainTradingToSameOwner = true;
+            log.info("Game Option: Train Trading restricted to same-owner companies.");
+        }
 
+    }
+
+    public boolean isRestrictTrainTradingToSameOwner() {
+        return restrictTrainTradingToSameOwner;
     }
 
     private void initGameParameters() {
@@ -1075,7 +1088,6 @@ public class GameManager extends RailsManager implements Configurable, Owner {
     }
 
     public void setRound(RoundFacade round) {
-        // --- START FIX ---
         String oldRound = (currentRound.value() != null) ? currentRound.value().getId() : "null";
         String newRound = (round != null) ? round.getId() : "null";
 
@@ -1741,7 +1753,6 @@ public class GameManager extends RailsManager implements Configurable, Owner {
 
         return result;
     }
-// --- END FIX ---
 
     protected void logActionTaken(PossibleAction action) {
         if (action instanceof NullAction
@@ -1880,12 +1891,17 @@ public class GameManager extends RailsManager implements Configurable, Owner {
                 break;
 
             case REDO:
-                if (index == -1) {
-                    changeStack.redo();
+   if (changeStack.isRedoPossible()) {
+                    if (index == -1) {
+                        changeStack.redo();
+                    } else {
+                        changeStack.redo(index);
+                    }
+                    result = true;
                 } else {
-                    changeStack.redo(index);
+                    log.warn("Ignored REDO request: ChangeStack indicates Redo is not possible.");
+                    result = false;
                 }
-                result = true;
                 break;
             case EXPORT:
                 result = export(gameAction);

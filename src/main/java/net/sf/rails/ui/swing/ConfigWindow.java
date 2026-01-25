@@ -73,14 +73,31 @@ class ConfigWindow extends JFrame {
         addWindowListener(new WindowAdapter() {
             @Override
             public void windowClosing(WindowEvent e) {
-                if (dirty) {
-                    JOptionPane.showMessageDialog(ConfigWindow.this, LocalText.getText("CONFIG_CLOSE_MESSAGE"), LocalText.getText("CONFIG_CLOSE_TITLE")
-                            , JOptionPane.INFORMATION_MESSAGE);
-                } else {
-                    closeConfig(true);
-                }
+                exitWindow();
             }
         });
+    }
+
+    private void exitWindow() {
+        if (dirty) {
+            // Change to a Confirm Dialog to give the user a choice
+            int result = JOptionPane.showConfirmDialog(
+                ConfigWindow.this,
+                // Assuming this text says "Unsaved changes...", we use it as a warning
+                LocalText.getText("CONFIG_CLOSE_MESSAGE"), 
+                LocalText.getText("CONFIG_CLOSE_TITLE"),
+                JOptionPane.YES_NO_OPTION,
+                JOptionPane.WARNING_MESSAGE
+            );
+
+            // If user clicks YES, we close and discard changes (cancel=true)
+            if (result == JOptionPane.YES_OPTION) {
+                closeConfig(true);
+            }
+        } else {
+            // No changes, just close normally
+            closeConfig(false);
+        }
     }
 
     public void init(final boolean startUp) {
@@ -420,7 +437,6 @@ class ConfigWindow extends JFrame {
             addEmptyLabel(panel, gbc);
         }
     }
-
     private void setupButtonPanel() {
         buttonPanel.removeAll();
 
@@ -430,7 +446,7 @@ class ConfigWindow extends JFrame {
             saveButton.addActionListener(
                     new ActionListener() {
                         public void actionPerformed(ActionEvent arg0) {
-                            ConfigWindow.this.saveConfig();
+exitWindow();
                         }
                     }
                     );
