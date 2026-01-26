@@ -1,3 +1,4 @@
+// File: StartPrussian.java
 package rails.game.specific._1835;
 
 import java.awt.Color;
@@ -5,7 +6,6 @@ import java.io.IOException;
 import java.io.ObjectInputStream;
 import net.sf.rails.game.Company;
 import net.sf.rails.game.CompanyManager;
-import net.sf.rails.util.RailsObjects;
 import com.google.common.base.Objects;
 import rails.game.action.GuiTargetedAction;
 import rails.game.action.PossibleAction;
@@ -23,12 +23,10 @@ public class StartPrussian extends PossibleAction implements GuiTargetedAction {
         this.companyToFoldName = companyToFold.getId();
     }
 
-    // --- RESTORED GETTER (Fixes GameStatus error) ---
     public Company getCompanyToFold() {
         return companyToFold;
     }
 
-    // --- GuiTargetedAction Implementation ---
     @Override
     public Owner getActor() { return companyToFold; }
 
@@ -38,10 +36,30 @@ public class StartPrussian extends PossibleAction implements GuiTargetedAction {
     @Override
     public String getButtonLabel() { return "Start (Fold " + companyToFold.getId() + ")"; }
 
-    @Override
-    public Color getButtonColor() { return new Color(34, 139, 34); } // Green
+    // --- START FIX ---
+    // UNIFIED "FORMATION" SIGNATURE (Pale Green / Forest Green)
     
-    // --- Serialization ---
+    @Override
+    public Color getButtonColor() { 
+        return new Color(152, 251, 152); // PaleGreen 
+    }
+
+    @Override
+    public Color getHighlightBackgroundColor() {
+        return new Color(152, 251, 152); // PaleGreen
+    }
+
+    @Override
+    public Color getHighlightBorderColor() {
+        return new Color(34, 139, 34); // ForestGreen
+    }
+
+    @Override
+    public Color getHighlightTextColor() {
+        return Color.BLACK;
+    }
+    // --- END FIX ---
+    
     @Override
     protected boolean equalsAs(PossibleAction pa, boolean asOption) {
         if (pa == this) return true;

@@ -420,16 +420,6 @@ String CONFIRM_KEY = "confirmAction";
             }
         });
 
-        // L: Buy IPO Train (Delegate to ORPanel logic)
-        inputMap.put(KeyStroke.getKeyStroke(KeyEvent.VK_L, 0), "buyIPOTrain");
-        actionMap.put("buyIPOTrain", new AbstractAction() {
-            @Override
-            public void actionPerformed(ActionEvent e) {
-                if (orPanel != null) {
-                    orPanel.processIPOBuy();
-                }
-            }
-        });
         
    
      }

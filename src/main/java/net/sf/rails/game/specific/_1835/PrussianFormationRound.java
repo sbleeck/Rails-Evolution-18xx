@@ -719,6 +719,17 @@ public class PrussianFormationRound extends Round implements I_MapRenderableRoun
             guiHints.setVisibilityHint(GuiDef.Panel.STOCK_MARKET, false);
             guiHints.setActivePanel(GuiDef.Panel.MAP);
 
+            // If the Operating Round was interrupted by a company (e.g. M2) that closed 
+            // during the formation, we must ensure the OR step is reset to INITIAL.
+            // This prevents the next company (e.g. M3) from inheriting a stale step 
+            // like 'BUY_TRAIN', which causes it to skip its track/token phases.
+            if (roundToResume instanceof OperatingRound) {
+                OperatingRound or = (OperatingRound) roundToResume;
+                if (or.getOperatingCompany() != null && or.getOperatingCompany().isClosed()) {
+                    or.forceStep(GameDef.OrStep.INITIAL);
+                }
+            }
+            
             roundToResume.resume();
         } else {
             gameManager.nextRound(this);

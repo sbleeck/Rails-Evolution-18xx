@@ -625,7 +625,7 @@ public class RevenueAdapter implements Runnable {
                     idList.add(vertexId);
                 } else {
                     // Log a warning: this vertex was in a visit set but not in the revenue graph
-                    log.warn("Vertex {} (part of a visit set) was not found in the rcGraph. It was likely optimized out. Skipping.", n.getStopName());
+                    // log.warn("Vertex {} (part of a visit set) was not found in the rcGraph. It was likely optimized out. Skipping.", n.getStopName());
                 }
             }
             

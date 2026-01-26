@@ -1,12 +1,9 @@
+// File: GuiNegativeAction.java
 package rails.game.action;
 
 import java.awt.Color;
 import net.sf.rails.game.state.Owner;
 
-/**
- * A wrapper that turns a generic action (like NullAction/Pass) into a 
- * GuiTargetedAction with explicit "Negative" UI semantics (No/Done/Skip).
- */
 public class GuiNegativeAction extends PossibleAction implements GuiTargetedAction {
 
     private static final long serialVersionUID = 1L;
@@ -17,7 +14,7 @@ public class GuiNegativeAction extends PossibleAction implements GuiTargetedActi
     private final String buttonLabel;
     
     public GuiNegativeAction(PossibleAction actionToWrap, Owner actor, String groupLabel, String buttonLabel) {
-        super(actionToWrap.getRoot()); // Bind to same root
+        super(actionToWrap.getRoot()); 
         this.wrappedAction = actionToWrap;
         this.actor = actor;
         this.groupLabel = groupLabel;
@@ -27,12 +24,6 @@ public class GuiNegativeAction extends PossibleAction implements GuiTargetedActi
     public PossibleAction getWrappedAction() {
         return wrappedAction;
     }
-
-    // --- Delegate Standard PossibleAction Methods ---
-    // We want the engine to execute the *wrapped* action, not this wrapper,
-    // but often the UI sends the wrapper. The UI Manager must handle unwrapping 
-    // or this class must behave like the original.
-    // Ideally, ORUIManager should call getWrappedAction() before processing.
 
     @Override
     public Owner getActor() {
@@ -50,17 +41,35 @@ public class GuiNegativeAction extends PossibleAction implements GuiTargetedActi
     }
 
     @Override
-    public Color getButtonColor() {
-        // Standard "No" color (Light Gray or White)
-        return Color.WHITE;
-    }
-
-    @Override
     public boolean isNegativeAction() {
         return true;
     }
     
-    // Ensure equality checks delegation if needed
+    // --- START FIX ---
+    // UNIFIED "NEGATIVE" SIGNATURE (White / SlateBlue)
+    // Used for "Pass", "Done", "Skip" to match standard UI buttons
+
+    @Override
+    public Color getButtonColor() {
+        return Color.WHITE;
+    }
+
+    @Override
+    public Color getHighlightBackgroundColor() {
+        return Color.WHITE;
+    }
+
+    @Override
+    public Color getHighlightBorderColor() {
+        return new Color(100, 149, 237); // Cornflower/Slate Blue
+    }
+    
+    @Override
+    public Color getHighlightTextColor() {
+        return Color.BLACK;
+    }
+    // --- END FIX ---
+
     @Override
     public boolean equals(Object o) {
         if (this == o) return true;

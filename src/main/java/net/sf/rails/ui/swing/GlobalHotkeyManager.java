@@ -20,12 +20,27 @@ public class GlobalHotkeyManager implements KeyEventDispatcher {
     private final GameUIManager gameUIManager;
 private static final Logger log = LoggerFactory.getLogger(GlobalHotkeyManager.class);
 
+
+// State tracker to prevent "Machine Gun" auto-repeat (Looping)
+    private boolean isLKeyPressed = false;
+
+
     public GlobalHotkeyManager(GameUIManager gameUIManager) {
         this.gameUIManager = gameUIManager;
     }
 
     @Override
     public boolean dispatchKeyEvent(KeyEvent e) {
+
+        // 1. Handle Key Release to reset the "Single Shot" flag
+        if (e.getID() == KeyEvent.KEY_RELEASED) {
+            if (e.getKeyCode() == KeyEvent.VK_L) {
+                isLKeyPressed = false;
+            }
+            return false; // Always let release events propagate
+        }
+
+
         if (e.getID() != KeyEvent.KEY_PRESSED) {
             return false;
         }
@@ -78,7 +93,34 @@ private static final Logger log = LoggerFactory.getLogger(GlobalHotkeyManager.cl
             return true;
         }
 
+        // 7. L ('Buy IPO Train') - SINGLE SHOT MODE
+        // We only trigger if the key was previously released. 
+        // This strictly blocks OS key-repeat events from firing multiple buys.
+        if (!isCtrlDown && !e.isAltDown() && keyCode == KeyEvent.VK_L) {
+            if (!isLKeyPressed) {
+                isLKeyPressed = true; // Lock until release
+                triggerBuyIPOTrain();
+            }
+            return true; // Consume the event even if locked
+        }
+        
+
         return false;
+    }
+
+    private void triggerBuyIPOTrain() {
+        // Only valid during Operating Rounds
+        if (gameUIManager.getCurrentRound() instanceof OperatingRound) {
+            ORWindow win = gameUIManager.orWindow;
+            if (win != null && win.isVisible()) {
+                ORPanel panel = win.getORPanel();
+                if (panel != null) {
+                    // Delegate to the existing logic in ORPanel which finds the correct 'Buy IPO' action
+                    // log.info("delegate to processIPOBuy...");
+                    panel.processIPOBuy();
+                }
+            }
+        }
     }
 
 

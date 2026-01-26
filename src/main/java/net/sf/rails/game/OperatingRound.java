@@ -10,6 +10,7 @@ import net.sf.rails.game.round.RoundFacade;
 import net.sf.rails.game.special.*;
 import net.sf.rails.game.specific._1835.GameManager_1835;
 import net.sf.rails.game.specific._1835.OperatingRound_1835;
+// import net.sf.rails.game.specific._1835.OperatingRound_1835;
 import net.sf.rails.game.state.Currency;
 import net.sf.rails.game.state.Observable;
 import net.sf.rails.game.state.Observer;
@@ -220,39 +221,43 @@ public class OperatingRound extends Round implements Observer {
     // File: OperatingRound.java (~ Line 172)
     // [REPLACE the entire 'resume' method with this]
 
+
+    // --- BEGIN FIX: OperatingRound.java (resume method) ---
     @Override
     public void resume() {
 
         // (FORCED CLEANUP) ---
         // CRITICAL: Ensure all transient/runtime lists are clean BEFORE processing any
         // saved actions.
-        // This prevents crashes in the LayToken logic when a saved state is loaded.
         if (this.currentNormalTokenLays != null)
             this.currentNormalTokenLays.clear();
         if (this.currentSpecialTokenLays != null)
             this.currentSpecialTokenLays.clear();
 
-        // Rufe die Bereinigungsfunktion auf (die sicherstellt, dass auch
-        // pendingRelayAction auf null gesetzt wird)
-        if (this.getClass() != OperatingRound_1835.class) { // Vermeide Doppelausführung, falls 1835 es überschreibt
-            resetTransientStateOnLoad();
-        }
+        // Call the cleanup hook. 
+        // 1835 will override this to be empty, while standard games use the default logic.
+        resetTransientStateOnLoad();
 
-        if (savedAction instanceof BuyTrain) {
-            buyTrain((BuyTrain) savedAction);
-            // ... (lines of unchanged context code) ...
-        } else if (savedAction instanceof RepayLoans) {
-            executeRepayLoans((RepayLoans) savedAction);
-        } else if (savedAction == null) {
+        // Fix for Double-Execution/PFR Recursion:
+        PossibleAction actionToProcess = savedAction;
+        savedAction = null;
+
+        if (actionToProcess instanceof BuyTrain) {
+            buyTrain((BuyTrain) actionToProcess);
+        } else if (actionToProcess instanceof RepayLoans) {
+            executeRepayLoans((RepayLoans) actionToProcess);
+        } else if (actionToProcess == null) {
             setPossibleActions(); // In case it wouldn't otherwise happen
         }
-        savedAction = null;
+
         wasInterrupted.set(true);
 
         guiHints.setVisibilityHint(GuiDef.Panel.STOCK_MARKET, false);
         guiHints.setVisibilityHint(GuiDef.Panel.STATUS, true);
         guiHints.setActivePanel(GuiDef.Panel.MAP);
     }
+// --- END FIX ---
+
 
     protected void finishOR() {
 
@@ -970,7 +975,6 @@ public class OperatingRound extends Round implements Observer {
         excessTrainCompanies = new HashMap<>();
         Player player;
 
-
         for (PublicCompany comp : operatingCompanies.view()) {
             int numTrains = comp.getPortfolioModel().getNumberOfTrains();
             int trainLimit = comp.getCurrentTrainLimit();
@@ -995,7 +999,6 @@ public class OperatingRound extends Round implements Observer {
     protected void setTrainsToDiscard() {
         doneAllowed.set(false);
 
-
         // Scan the players in SR sequence
         List<Player> nextPlayers = getRoot().getPlayerManager().getNextPlayers(true);
 
@@ -1006,7 +1009,6 @@ public class OperatingRound extends Round implements Observer {
                 List<PublicCompany> list = excessTrainCompanies.get(player);
                 for (PublicCompany comp : list) {
                     Set<Train> trainsToDiscardFrom = comp.getPortfolioModel().getUniqueTrains();
-
 
                     if (trainsToDiscardFrom.isEmpty())
                         continue;
@@ -1020,7 +1022,7 @@ public class OperatingRound extends Round implements Observer {
                     return;
                 }
             } else {
-             }
+            }
         }
     }
 
@@ -2938,9 +2940,11 @@ public class OperatingRound extends Round implements Observer {
 
         // --- Validation Phase ---
         while (true) {
-            // Checks
-            // Must be correct step
-            if (getStep() != GameDef.OrStep.BUY_TRAIN) {
+
+            // Relax validation: If we are resuming a saved action (e.g. returning from
+            // emergency share selling), we allow the purchase even if the step logic
+            // (like PFR triggers) has shifted the state temporarily.
+            if (getStep() != GameDef.OrStep.BUY_TRAIN && savedAction == null) {
                 errMsg = LocalText.getText("WrongActionNoTrainBuyingCost");
                 break;
             }
@@ -4124,29 +4128,6 @@ public class OperatingRound extends Round implements Observer {
     // File: OperatingRound.java
     // Method: resetTransientStateOnLoad
 
-    public void resetTransientStateOnLoad() {
-        // 1. Reset Flags
-        if (this.doneAllowed != null) {
-            this.doneAllowed.set(false);
-        }
-
-        // 2. SAFE RESET: Set to the first available company.
-        // We DO NOT set this to null, because that causes crashes in
-        // setPossibleActions().
-        // We DO NOT calculate the "Next" company, because 1835 logic is fragile during
-        // reload.
-        // We just pick the first one as a safe placeholder.
-        if (operatingCompanies != null && !operatingCompanies.isEmpty()) {
-            // Use the raw state object to avoid side effects
-            this.operatingCompany.set(operatingCompanies.get(0));
-        }
-
-        // 3. Reset Step to ensure initTurn() runs when the real move starts
-        setStep(GameDef.OrStep.INITIAL);
-
-        String coName = (this.operatingCompany.value() != null) ? this.operatingCompany.value().getId() : "NULL";
-    }
-
     @Override
     public boolean setPossibleActions() {
 
@@ -4282,7 +4263,7 @@ public class OperatingRound extends Round implements Observer {
             // fails to generate actions but the step is still DISCARD_TRAINS.
             if (possibleActions.getType(DiscardTrain.class).isEmpty()) {
                 // This is a bug state, but we must not hang.
-                 playerManager.setCurrentPlayer(operatingCompany.value().getPresident());
+                playerManager.setCurrentPlayer(operatingCompany.value().getPresident());
                 stepObject.set(GameDef.OrStep.BUY_TRAIN);
                 return setPossibleActions(); // Re-run for the new step
             }
@@ -4735,10 +4716,10 @@ public class OperatingRound extends Round implements Observer {
                     continue;
 
                 // Enforce global parameter: Only allow trading if Presidents match
-                if (gameManager.isRestrictTrainTradingToSameOwner() && otherCompany.getPresident() != currentPresident) {
+                if (gameManager.isRestrictTrainTradingToSameOwner()
+                        && otherCompany.getPresident() != currentPresident) {
                     continue;
                 }
-
 
                 Set<Train> otherCompanyTrains = otherCompany.getPortfolioModel().getUniqueTrains();
                 for (Train train : otherCompanyTrains) {
@@ -4787,7 +4768,6 @@ public class OperatingRound extends Round implements Observer {
                                 PriceMode.VARIABLE);
                         action.setForcedBuyIfHasRoute(mustBuyTrain);
                         action.setButtonLabel(createTrainButtonLabel(train, otherCompany, 0, null, mustBuyTrain));
-
                     }
                     possibleActions.add(action);
                 }
@@ -4814,4 +4794,26 @@ public class OperatingRound extends Round implements Observer {
 
     public void cleanup() {
     }
+
+    // --- BEGIN FIX: OperatingRound.java ---
+    /**
+     * Resets transient flags and safety sets the operating company to the first available one.
+     * This is primarily used during load to ensure a valid state before processing actions.
+     */
+    public void resetTransientStateOnLoad() {  // CHANGED from protected to public
+        // 1. Reset Flags
+        if (this.doneAllowed != null) {
+            this.doneAllowed.set(false);
+        }
+
+        // 2. SAFE RESET: Set to the first available company.
+        if (operatingCompanies != null && !operatingCompanies.isEmpty()) {
+            this.operatingCompany.set(operatingCompanies.get(0));
+        }
+
+        // 3. Reset Step to ensure initTurn() runs when the real move starts
+        setStep(GameDef.OrStep.INITIAL);
+    }
+// --- END FIX ---
+
 }

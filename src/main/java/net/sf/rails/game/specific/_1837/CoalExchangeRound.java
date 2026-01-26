@@ -22,7 +22,7 @@ public class CoalExchangeRound extends StockRound_1837 {
     private static Map<String, String> skippedCoalCompanies = new HashMap<>();
 
     // --- FIX: Custom Action to handle Resets without using getLabel() ---
-    private static class ResetSkipsAction extends PossibleAction implements GuiTargetedAction {
+private static class ResetSkipsAction extends PossibleAction implements GuiTargetedAction {
         private static final long serialVersionUID = 1L;
 
         public ResetSkipsAction(RailsRoot root) {
@@ -31,7 +31,7 @@ public class CoalExchangeRound extends StockRound_1837 {
 
         @Override
         public Owner getActor() {
-            return null; // No specific actor
+            return null; 
         }
 
         @Override
@@ -44,10 +44,29 @@ public class CoalExchangeRound extends StockRound_1837 {
             return "Reset Skips & Retry";
         }
 
+        // --- START FIX ---
+        // UNIFIED "SYSTEM ALERT" SIGNATURE (Misty Rose / Red)
+        
         @Override
         public java.awt.Color getButtonColor() {
+            return new java.awt.Color(255, 228, 225); // MistyRose
+        }
+
+        @Override
+        public java.awt.Color getHighlightBackgroundColor() {
+            return new java.awt.Color(255, 228, 225); // MistyRose
+        }
+
+        @Override
+        public java.awt.Color getHighlightBorderColor() {
             return java.awt.Color.RED;
         }
+        
+        @Override
+        public java.awt.Color getHighlightTextColor() {
+            return java.awt.Color.BLACK;
+        }
+        // --- END FIX ---
 
         @Override
         public boolean equalsAs(PossibleAction pa, boolean asOption) {
@@ -59,7 +78,6 @@ public class CoalExchangeRound extends StockRound_1837 {
             return "Reset Skips & Retry";
         }
     }
-
     private ArrayListMultimapState<PublicCompany, PublicCompany> coalCompsPerMajor;
     private ArrayListMultimapState<Player, PublicCompany> coalCompsPerPlayer;
 

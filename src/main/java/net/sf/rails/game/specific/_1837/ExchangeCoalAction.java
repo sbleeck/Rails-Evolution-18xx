@@ -53,10 +53,29 @@ public class ExchangeCoalAction extends PossibleAction implements GuiTargetedAct
         return "Exchange " + coalCompanyId + " for " + targetMajorId;
     }
 
+    // --- START FIX ---
+    // UNIFIED "FORMATION" SIGNATURE (Matches Prussian Actions)
+
     @Override
     public Color getButtonColor() {
-        return new Color(100, 149, 237); // Cornflower Blue
+        return new Color(152, 251, 152); // PaleGreen
     }
+
+    @Override
+    public Color getHighlightBackgroundColor() {
+        return new Color(152, 251, 152); // PaleGreen
+    }
+
+    @Override
+    public Color getHighlightBorderColor() {
+        return new Color(34, 139, 34); // ForestGreen
+    }
+
+    @Override
+    public Color getHighlightTextColor() {
+        return Color.BLACK;
+    }
+    // --- END FIX ---
 
     @Override
     public boolean equalsAs(PossibleAction pa, boolean asOption) {

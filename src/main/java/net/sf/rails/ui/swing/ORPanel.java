@@ -250,8 +250,8 @@ public class ORPanel extends GridPanel
     private void distributeStandardActions(List<PossibleAction> actions) {
         boolean doneActionFound = false;
 
-        if (activePhase == 1 || activePhase == 2)
-            enableConfirm(false);
+        // if (activePhase == 1 || activePhase == 2)
+        //     enableConfirm(false);
 
         for (PossibleAction pa : actions) {
             if (pa instanceof CorrectionModeAction)
@@ -454,10 +454,11 @@ public class ORPanel extends GridPanel
             // Phase 4: Capital - Trains (Matches Industrial Orange Palette)
         } else if (activePhase == 4) {
 
-            applyPhaseStyle(phase4Panel, null, UITheme.TRAIN_DARK, UITheme.TRAIN_LIGHT, "Done");
-            styleButton(btnTrainSkip, UITheme.ACTION_SKIP, "Done");
+if (btnTrainSkip != null) btnTrainSkip.setEnabled(true);
+
             boolean canBuy = (trainButtonsPanel != null && trainButtonsPanel.getComponentCount() > 0);
             String label = canBuy ? "Skip Buy" : "Done Buying";
+
             applyPhaseStyle(phase4Panel, null, UITheme.TRAIN_DARK, UITheme.TRAIN_LIGHT, label);
             styleButton(btnTrainSkip, UITheme.ACTION_SKIP, label);
 
@@ -634,6 +635,11 @@ public class ORPanel extends GridPanel
         }
         if (btnTrainSkip != null)
             btnTrainSkip.setEnabled(false);
+
+        // Critical: Clear the cached action list so we don't buy "Ghost Trains" from previous states
+        if (availableTrainActions != null) {
+            availableTrainActions.clear();
+        }
 
         if (trainButtonsPanel != null) {
             trainButtonsPanel.removeAll();
@@ -999,7 +1005,6 @@ public class ORPanel extends GridPanel
         this.specialModeActive = enabled;
     } // Kept for compatibility but driven by updateDynamicActions
 
-    // ... (Retain Revenue/Route calculation methods, Hotkeys, TokenDisplayPanel,
     // TrainDisplayPanel, addTrainBuyButton logic as is) ...
     // NOTE: For brevity in this response I am summarizing that the standard methods
     // (getRevenue, setDividend, etc.) remain as they were in the previous version,
@@ -1206,18 +1211,58 @@ public class ORPanel extends GridPanel
         return "yes".equalsIgnoreCase(Config.get("map.displayCurrentRoutes"));
     }
 
+
+// ... (lines of unchanged context code) ...
     public void processIPOBuy() {
-        if (!availableTrainActions.isEmpty()) {
+        log.info("TRACE: processIPOBuy() called. Actions available: {}", 
+                 (availableTrainActions == null ? "null" : availableTrainActions.size()));
+
+        if (availableTrainActions != null && !availableTrainActions.isEmpty()) {
             for (BuyTrain action : availableTrainActions) {
-                if (!action.getButtonLabel().toLowerCase().contains("pool")) {
+                
+                // Debug Logging
+                net.sf.rails.game.state.Owner seller = action.getFromOwner();
+                String sellerId = (seller != null) ? seller.getId() : "null";
+                String parentId = (seller != null && seller.getParent() != null) ? seller.getParent().getClass().getSimpleName() : "null";
+                
+                log.info("TRACE: Inspecting Action: '{}' | Seller: {} | Parent: {}", 
+                         action.getButtonLabel(), sellerId, parentId);
+
+               // Strict Filter: Only buy if seller is explicitly IPO or Bank (and NOT Pool)
+                boolean isIpo = false;
+                if (seller != null) {
+                    if ("IPO".equals(seller.getId())) {
+                        isIpo = true;
+                    } else if (seller.getParent() instanceof net.sf.rails.game.financial.Bank 
+                            && !"Pool".equals(seller.getId())) {
+                        isIpo = true;
+                    }
+                }
+
+                if (isIpo) {
+                    log.info("TRACE: >>> MATCH! Executing IPO Buy for {}", action.getButtonLabel());
+                    
+                    // Fix: Auto-fill price if missing. Engine rejects 0-price buys for standard trains.
+                    if (action.getPricePaid() == 0 && action.getFixedCost() > 0) {
+                        action.setPricePaid(action.getFixedCost());
+                        log.info("TRACE: Auto-corrected PricePaid to {}", action.getFixedCost());
+                    }
+
                     List<PossibleAction> toExec = new ArrayList<>();
                     toExec.add(action);
+                
                     orUIManager.processAction(BUY_TRAIN_CMD, toExec, this);
                     break;
+                } else {
+                    log.info("TRACE: ... Ignored (Not an IPO action)");
                 }
+
             }
+        } else {
+            log.info("TRACE: processIPOBuy() - No actions to process.");
         }
     }
+
 
     public void finishORCompanyTurn(int index) {
         resetActions();
@@ -1825,10 +1870,10 @@ public class ORPanel extends GridPanel
             activePhase = determineActivePhase(actions); 
             setStandardPanelsVisible(true);
 
-            if (activePhase == 1 || activePhase == 2) {
-                boolean hasSelection = (orUIManager != null && orUIManager.getMap().getSelectedHex() != null);
-                enableConfirm(hasSelection);
-            }
+            // if (activePhase == 1 || activePhase == 2) {
+            //     boolean hasSelection = (orUIManager != null && orUIManager.getMap().getSelectedHex() != null);
+            //     enableConfirm(hasSelection);
+            // }
 
             distributeStandardActions(actions); 
             updateSidebarData(); 
@@ -1843,43 +1888,75 @@ public class ORPanel extends GridPanel
 
 
 
-private void addSpecialActionButton(PossibleAction action) {
+// ... (lines of unchanged context code) ...
+    private void addSpecialActionButton(PossibleAction action) {
         String label = action.getButtonLabel();
-        Color color = Color.LIGHT_GRAY;
+        
+        // --- START FIX ---
+        // Defaults
+        Color bgColor = Color.LIGHT_GRAY;
+        Color borderColor = Color.GRAY;
+        Color textColor = Color.BLACK;
         String cmd = "SpecialAction";
 
-        // 1. Extract Data via Interface
+        // 1. Extract Visual Signature via Interface
         if (action instanceof GuiTargetedAction) {
             GuiTargetedAction gta = (GuiTargetedAction) action;
-            label = gta.getButtonLabel(); // Contains the HTML from DiscardTrain
-            color = gta.getButtonColor(); // Contains the Red/Cyan color
+            label = gta.getButtonLabel(); 
+            
+            // CONSUME THE SIGNATURE
+            bgColor = gta.getHighlightBackgroundColor();
+            borderColor = gta.getHighlightBorderColor();
+            textColor = gta.getHighlightTextColor();
         } 
         else if (action instanceof NullAction) {
             label = ((NullAction) action).getMode() == NullAction.Mode.PASS ? "Decline" : "Done";
-            color = UITheme.ACTION_SKIP;
+            bgColor = UITheme.ACTION_SKIP;
+            borderColor = bgColor.darker();
+            textColor = Color.WHITE;
         }
 
         // 2. Create Button
         ActionButton btn = createSidebarButton(label, cmd);
-        btn.setText(label); 
+        
+        // HTML Formatting to match RailCard text style if needed
+        if (!label.toLowerCase().startsWith("<html>")) {
+            btn.setText("<html><center>" + label + "</center></html>");
+        } else {
+            btn.setText(label); 
+        }
+
         btn.setPossibleAction(action);
         btn.setEnabled(true);
         btn.setAlignmentX(Component.CENTER_ALIGNMENT);
-        // Allow button to be taller to fit the HTML "Card" content
+        // Allow button to be taller to fit the HTML content
         btn.setMaximumSize(new Dimension(SIDEBAR_WIDTH - 20, 60)); 
 
-        // 3. Style Button to match RailCard in GameStatus
-        // Background matches action color
-        btn.setBackground(color);
-        btn.setForeground(Color.BLACK);
-        // Border matches RailCard highlight (Darker version of bg)
+        // 3. APPLY "RAILCARD" STYLING (Flattened)
+        
+        // A. Background & Text
+        btn.setBackground(bgColor);
+        btn.setForeground(textColor);
+        
+        // B. Border (Thick Line Border to match GameStatus Card)
+        // Outer: The colored line (3px)
+        // Inner: Padding (5px)
         btn.setBorder(BorderFactory.createCompoundBorder(
-                BorderFactory.createLineBorder(color.darker(), 3),
+                BorderFactory.createLineBorder(borderColor, 3),
                 BorderFactory.createEmptyBorder(2, 5, 2, 5)));
+
+        // C. Technical overrides to ensure "Flat" look
+        btn.setOpaque(true);
+        btn.setContentAreaFilled(true);
+        btn.setFocusPainted(false); // Remove dotted focus line
+        // Force the font to match RailCard
+        btn.setFont(new Font("SansSerif", Font.BOLD, 12));
+        // --- END FIX ---
 
         specialPanel.add(btn);
         specialPanel.add(Box.createVerticalStrut(8));
     }
+// ... (lines of unchanged context code) ...
 
     /**
      * Replaces the tooltip logic with a formatted log entry.

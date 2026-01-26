@@ -1,3 +1,4 @@
+// File: LayBadenHomeToken.java
 package rails.game.specific._1835;
 
 import java.awt.Color;
@@ -16,7 +17,6 @@ public class LayBadenHomeToken extends LayBaseToken implements GuiTargetedAction
 
     public LayBadenHomeToken(MapHex hex, PublicCompany company, Stop stop) {
         super(hex.getRoot(), hex);
-        // Cast or direct use of PublicCompany to satisfy LayBaseToken.setCompany()
         setCompany(company);
         setChosenStation(stop.getRelatedStationNumber());
         setType(LayBaseToken.HOME_CITY);
@@ -41,8 +41,27 @@ public class LayBadenHomeToken extends LayBaseToken implements GuiTargetedAction
         return label;
     }
 
+    // --- START FIX ---
+    // UNIFIED "TOKEN" SIGNATURE (Gold / GoldenRod)
+
     @Override
     public Color getButtonColor() {
-        return new Color(255, 140, 0); 
+        return new Color(255, 215, 0); // Gold
     }
+
+    @Override
+    public Color getHighlightBackgroundColor() {
+        return new Color(255, 215, 0); // Gold
+    }
+
+    @Override
+    public Color getHighlightBorderColor() {
+        return new Color(184, 134, 11); // DarkGoldenRod
+    }
+    
+    @Override
+    public Color getHighlightTextColor() {
+        return Color.BLACK;
+    }
+    // --- END FIX ---
 }

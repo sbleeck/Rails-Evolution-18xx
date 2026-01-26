@@ -36,5 +36,29 @@ default String getToolTip() {
     return null; // ORPanel will ignore null, or fall back to toString()
 }
 
+// --- VISUAL SIGNATURE PROTOCOL ---
+    
+    /** * The fill color for the UI element (Button or Card).
+     * Defaults to the existing getButtonColor() for compatibility.
+     */
+    default Color getHighlightBackgroundColor() {
+        return getButtonColor();
+    }
+
+    /** * The stroke color for the UI element's border.
+     * Defaults to a darker version of the background for contrast.
+     */
+    default Color getHighlightBorderColor() {
+        Color bg = getHighlightBackgroundColor();
+        return (bg != null) ? bg.darker() : Color.GRAY;
+    }
+
+    /** * The text color. Defaults to Black.
+     */
+    default Color getHighlightTextColor() {
+        return Color.BLACK;
+    }
+
+
 
 }

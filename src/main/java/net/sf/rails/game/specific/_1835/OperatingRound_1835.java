@@ -69,8 +69,15 @@ public class OperatingRound_1835 extends OperatingRound {
         }
     }
 
+@Override
+    public void resetTransientStateOnLoad() { // CHANGED from protected to public
+        // No-op for 1835. 
+        // We rely on the specific logic in resume() to restore state correctly.
+    }
+
     @Override
     public void resume() {
+
 
         // We must clear the trigger flag BEFORE super.resume() processes any saved
         // actions.
@@ -86,6 +93,21 @@ public class OperatingRound_1835 extends OperatingRound {
 
         super.resume();
 
+        // Critical Guard: If PFR started during resume (e.g. triggered by the train purchase in super.resume), 
+        // control has passed to the PrussianFormationRound. We must NOT execute further local logic.
+        if (gameManager.getCurrentRound() instanceof PrussianFormationRound) {
+            log.info("Resuming OperatingRound: PFR is active. Suspending OR resume.");
+            return;
+        }
+
+        // If PFR started during resume (e.g. triggered by the train purchase in super.resume), 
+        // control has passed to the PrussianFormationRound. 
+        // We must NOT execute further local logic (like checkForExcessTrains or switching companies)
+        // on this round instance, as it is now in the background. Continuing would overwrite the 
+        // state (e.g. setting DISCARD_TRAINS) and cause conflicts (WrongActionNoDiscardTrain).
+        if (gameManager.getCurrentRound() instanceof PrussianFormationRound) {
+            return;
+        }
         // If we are resuming, it means the PFR (or other interruption) has returned
         // control to us.
         // We must clear the trigger flag to prevent the "Gatekeeper" loop.
@@ -986,7 +1008,34 @@ public class OperatingRound_1835 extends OperatingRound {
                     possibleActions.remove(action);
                 }
             }
+
+            // Filter "Dead" Special Token Lays (e.g. PfB, NF) if the target hex is physically full.
+            // If both slots on L6 (PfB) or M15 (NF) are occupied, the action is impossible.
+            if (action instanceof LayBaseToken && sp != null) {
+                LayBaseToken lbt = (LayBaseToken) action;
+                List<MapHex> locs = lbt.getLocations();
+                if (locs != null && !locs.isEmpty()) {
+                    boolean hasSpace = false;
+                    for (MapHex h : locs) {
+                        if (h.getStops() != null) {
+                            for (Stop s : h.getStops()) {
+                                // Check physical capacity (Hardcoded to 2 as per user instruction)
+                                if (s.getTokens().size() < 2) {
+                                    hasSpace = true;
+                                    break;
+                                }
+                            }
+                        }
+                        if (hasSpace) break;
+                    }
+                    
+                    if (!hasSpace) {
+                        possibleActions.remove(action);
+                    }
+                }
+            }
         }
+        
     }
 
     @Override

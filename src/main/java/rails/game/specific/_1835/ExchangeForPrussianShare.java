@@ -1,3 +1,4 @@
+// File: ExchangeForPrussianShare.java
 package rails.game.specific._1835;
 
 import java.awt.Color;
@@ -5,7 +6,6 @@ import java.io.IOException;
 import java.io.ObjectInputStream;
 import net.sf.rails.game.Company;
 import net.sf.rails.game.CompanyManager;
-import net.sf.rails.util.RailsObjects;
 import com.google.common.base.Objects;
 import rails.game.action.GuiTargetedAction;
 import rails.game.action.PossibleAction;
@@ -23,12 +23,10 @@ public class ExchangeForPrussianShare extends PossibleAction implements GuiTarge
         this.companyToExchangeName = companyToExchange.getId();
     }
 
-    // --- RESTORED GETTER (Fixes PFR/AI/Status errors) ---
     public Company getCompanyToExchange() {
         return companyToExchange;
     }
 
-    // --- GuiTargetedAction Implementation ---
     @Override
     public Owner getActor() { return companyToExchange; }
 
@@ -38,10 +36,30 @@ public class ExchangeForPrussianShare extends PossibleAction implements GuiTarge
     @Override
     public String getButtonLabel() { return "Exchange " + companyToExchange.getId(); }
 
-    @Override
-    public Color getButtonColor() { return new Color(173, 216, 230); } // Light Blue
+    // --- START FIX ---
+    // UNIFIED "FORMATION" SIGNATURE (Matches StartPrussian)
 
-    // --- Serialization ---
+    @Override
+    public Color getButtonColor() { 
+        return new Color(152, 251, 152); // PaleGreen
+    }
+
+    @Override
+    public Color getHighlightBackgroundColor() {
+        return new Color(152, 251, 152); // PaleGreen
+    }
+
+    @Override
+    public Color getHighlightBorderColor() {
+        return new Color(34, 139, 34); // ForestGreen
+    }
+
+    @Override
+    public Color getHighlightTextColor() {
+        return Color.BLACK;
+    }
+    // --- END FIX ---
+
     @Override
     protected boolean equalsAs(PossibleAction pa, boolean asOption) {
         if (pa == this) return true;

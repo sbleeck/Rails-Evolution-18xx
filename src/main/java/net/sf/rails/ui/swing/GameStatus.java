@@ -1606,7 +1606,7 @@ int currentPrice = c.getCurrentSpace() != null ? c.getCurrentSpace().getPrice() 
             boolean isActive = c.hasFloated() || 
                                (c.getPresidentsShare() != null && c.getPresidentsShare().getOwner() instanceof Player) || 
                                (inIpo && currentPrice > 0);
-                               
+
             boolean isOperating = (c == operatingComp);
 
             // This ensures that transitioning from OR (Operating=True) to SR
@@ -4683,11 +4683,7 @@ int currentPrice = c.getCurrentSpace() != null ? c.getCurrentSpace().getPrice() 
 
 
 
-    /**
-     * Generic helper to highlight a RailCard if it matches a GuiTargetedAction.
-     * Returns TRUE if a match was found, so the loop knows to stop searching if
-     * needed.
-     */
+// ... (lines of unchanged context code) ...
     private boolean checkAndHighlight(net.sf.rails.ui.swing.elements.RailCard card, PossibleAction action) {
         // Safety check
         if (card == null || action == null)
@@ -4712,10 +4708,12 @@ int currentPrice = c.getCurrentSpace() != null ? c.getCurrentSpace().getPrice() 
                 card.setPossibleAction(action);
                 card.setState(net.sf.rails.ui.swing.elements.RailCard.State.HIGHLIGHTED);
 
-                // FORCE UNIFORMITY: Privates
-                // Exact same styling as Shares and Trains
-                card.setBackground(java.awt.Color.CYAN);
-                card.setBorder(BorderFactory.createLineBorder(Color.BLUE, 3));
+                // --- START FIX ---
+                // CONSUME THE SIGNATURE (Exact same logic as initGameSpecificActions)
+                card.setBackground(gta.getHighlightBackgroundColor());
+                card.setBorder(BorderFactory.createLineBorder(gta.getHighlightBorderColor(), 3));
+                card.setForeground(gta.getHighlightTextColor());
+                // --- END FIX ---
 
                 card.repaint();
                 return true; // Match found!
@@ -4723,6 +4721,7 @@ int currentPrice = c.getCurrentSpace() != null ? c.getCurrentSpace().getPrice() 
         }
         return false; // No match
     }
+// ... (lines of unchanged context code) ...
 
     /**
      * Visualization Component for Round Tracking (Route Style).
@@ -4784,9 +4783,10 @@ int currentPrice = c.getCurrentSpace() != null ? c.getCurrentSpace().getPrice() 
 
             try {
                 // 1. Get Phase Limits
-                net.sf.rails.game.PhaseManager pm = gameUIManager.getRoot().getPhaseManager();
-                if (pm != null && pm.getCurrentPhase() != null) {
-                    phaseMaxOrs = pm.getCurrentPhase().getNumberOfOperatingRounds();
+              // Use GameManager's latched value (numOfORs) which only updates after Stock Round.
+                // This prevents the indicator from jumping to "2 ORs" immediately when a 3-train is bought mid-round.
+                if (gameUIManager.getGameManager() != null) {
+                    phaseMaxOrs = gameUIManager.getGameManager().getNumberOfOperatingRounds();
                 }
 
                 // 2. Determine Current Round & Index
@@ -5006,29 +5006,32 @@ int currentPrice = c.getCurrentSpace() != null ? c.getCurrentSpace().getPrice() 
 
        // UNIFIED SPECIAL ACTION HANDLER
         // We iterate through all actions. If they implement GuiTargetedAction,
-        // we ask the action "What is your target?" and "What is your color?"
-        // Then we scan the board to find the corresponding RailCard and highlight it.
+        // we ask the action for its Visual Signature and apply it.
         
-    // UNIFIED SPECIAL ACTION HANDLER (Stupid Panel Logic)
-        // We blindly iterate actions. If they implement GuiTargetedAction, we highlight the target.
         for (rails.game.action.PossibleAction pa : list) {
             
             if (pa instanceof GuiTargetedAction) {
                 GuiTargetedAction gta = (GuiTargetedAction) pa;
                 Object target = gta.getTarget(); 
-                Color bg = gta.getButtonColor();
                 
                 // 1. Find the UI Component
                 net.sf.rails.ui.swing.elements.RailCard card = findRailCardFor(target);
                 
-                // 2. Apply Highlight & Action using the Interface properties
+                // 2. Apply Highlight & Action using the Signature
                 if (card != null) {
                     card.addPossibleAction(pa); 
                     
-                    // Use the ACTION'S color, not a hardcoded one.
-                    card.setBackground(bg);
-                    // Use a darker version of that color for the border (Visual consistency)
-                    card.setBorder(BorderFactory.createLineBorder(bg.darker(), 3));
+                    // --- START FIX ---
+                    // CONSUME THE SIGNATURE
+                    // A. Background
+                    card.setBackground(gta.getHighlightBackgroundColor());
+                    
+                    // B. Border (Match ORPanel thickness)
+                    card.setBorder(BorderFactory.createLineBorder(gta.getHighlightBorderColor(), 3));
+                    
+                    // C. Text
+                    card.setForeground(gta.getHighlightTextColor());
+                    // --- END FIX ---
                     
                     card.setEnabled(true);
                     card.setVisible(true);
@@ -5037,7 +5040,7 @@ int currentPrice = c.getCurrentSpace() != null ? c.getCurrentSpace().getPrice() 
             }
         }
     }
-
+// ... (lines of unchanged context code) ...
 
 
     /**
