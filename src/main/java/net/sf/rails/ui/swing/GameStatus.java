@@ -1530,9 +1530,17 @@ public class GameStatus extends GridPanel {
             if (pc != null)
                 opCompId = pc.getId();
         }
-        // 1835 PFR Fix
-        else if (currentRound != null && "PrussianFormationRound".equals(currentRound.getClass().getSimpleName())) {
-            opCompId = "PR";
+
+        else if (gameUIManager.getGameManager().getPossibleActions() != null) {
+             for (PossibleAction pa : gameUIManager.getGameManager().getPossibleActions().getList()) {
+                if (pa instanceof GuiTargetedAction) {
+                    net.sf.rails.game.state.Owner actor = ((GuiTargetedAction) pa).getActor();
+                    if (actor instanceof PublicCompany) {
+                        opCompId = actor.getId();
+                        break; 
+                    }
+                }
+            }
         }
 
         java.util.List<PublicCompany> allCompanies = gameUIManager.getAllPublicCompanies();
@@ -1592,14 +1600,13 @@ public class GameStatus extends GridPanel {
             boolean inIpo = ipoModel.getShare(c) > 0;
             boolean isPrussian = "PR".equals(c.getId());
 
-            // Check for President's Share ownership (M5 sync fix)
-            boolean hasPresidentCertOwnedByPlayer = false;
-            if (c.getPresidentsShare() != null && c.getPresidentsShare().getOwner() instanceof Player) {
-                hasPresidentCertOwnedByPlayer = true;
-            }
-
-            boolean isActive = c.hasFloated() || hasPresidentCertOwnedByPlayer || (inIpo && !isPrussian);
-
+int currentPrice = c.getCurrentSpace() != null ? c.getCurrentSpace().getPrice() : 0;
+            if (currentPrice == 0 && c.getStartSpace() != null) currentPrice = c.getStartSpace().getPrice();
+            // Active if Floated, Owned, or (In IPO and Buyable/Priced)
+            boolean isActive = c.hasFloated() || 
+                               (c.getPresidentsShare() != null && c.getPresidentsShare().getOwner() instanceof Player) || 
+                               (inIpo && currentPrice > 0);
+                               
             boolean isOperating = (c == operatingComp);
 
             // This ensures that transitioning from OR (Operating=True) to SR
@@ -2485,12 +2492,20 @@ public class GameStatus extends GridPanel {
                 opCompId = pc.getId();
         }
 
-        // 1835 PFR Fix: Force the UI to recognize "PR" as the operating company.
-        // This triggers the BG_OPERATING (Yellow) highlight for the PR row.
-        else if (gameUIManager.getGameManager().getCurrentRound() != null
-                && gameUIManager.getGameManager().getCurrentRound().getClass().getSimpleName()
-                        .equals("PrussianFormationRound")) {
-            opCompId = "PR";
+// GENERIC HIGHLIGHT LOGIC:
+        // If we are not in a standard Operating Round, check the available actions.
+        // If any action targets a specific Company (e.g. Formation, Discard, Merger),
+        // we highlight that company as if it were "Operating".
+        else if (possibleActions != null && !possibleActions.isEmpty()) {
+            for (PossibleAction pa : possibleActions.getList()) {
+                if (pa instanceof GuiTargetedAction) {
+                    net.sf.rails.game.state.Owner actor = ((GuiTargetedAction) pa).getActor();
+                    if (actor instanceof PublicCompany) {
+                        opCompId = actor.getId();
+                        break; // Highlight the first active actor found
+                    }
+                }
+            }
         }
 
         // 1. ITERATE COMPANIES (Rows)
@@ -3290,12 +3305,17 @@ public class GameStatus extends GridPanel {
     }
 
     // --- Helper: Check for "Double Paper" (Lilac Highlight) ---
-    private boolean hasDoubleShare(PortfolioModel portfolio, PublicCompany company) {
+   private boolean hasDoubleShare(PortfolioModel portfolio, PublicCompany company) {
         if (portfolio == null || company == null)
             return false;
 
-        boolean isPrussia = "PR".equals(company.getId());
-        int requiredShare = isPrussia ? 10 : 20;
+        // --- START FIX ---
+        // Generic: The "Double Share" is defined by the size of the President's Certificate.
+        // We do not assume 20% (1830) or 10% (1835 Prussia).
+        int requiredShare = 20; // Safe default
+        if (company.getPresidentsShare() != null) {
+            requiredShare = company.getPresidentsShare().getShare();
+        }
 
         // Iterate through all PublicCertificates held by this portfolio for the company
         for (net.sf.rails.game.financial.PublicCertificate cert : portfolio.getCertificates(company)) {
