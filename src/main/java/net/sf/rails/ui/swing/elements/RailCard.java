@@ -123,7 +123,10 @@ public void setPossibleAction(PossibleAction action) {
         initVisuals();
     }
 
-
+public net.sf.rails.game.Train getTrain() {
+        return trains.isEmpty() ? null : trains.get(0);
+    }
+    
     public RailCard(Certificate cert, ButtonGroup group) {
         super("", "", "", null, group);
         if (cert != null)

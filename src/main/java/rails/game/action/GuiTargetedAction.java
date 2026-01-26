@@ -30,4 +30,11 @@ public interface GuiTargetedAction {
     default String getInfoText() {
         return getGroupLabel();
     }
+
+    // Optional addition to GuiTargetedAction.java
+default String getToolTip() {
+    return null; // ORPanel will ignore null, or fall back to toString()
+}
+
+
 }

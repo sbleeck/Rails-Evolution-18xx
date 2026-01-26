@@ -12,33 +12,12 @@ import net.sf.rails.game.state.AbstractItem;
 import net.sf.rails.game.state.Owner;
 
 import org.jetbrains.annotations.NotNull;
-import rails.game.action.GuiTargetedAction; // Import
 import com.google.common.base.Objects;
 
 import net.sf.rails.util.RailsObjects;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-/**
- * Rails 2.0: Updated equals and toString methods
- *
- * Update of 6 oct 2021 by Erik Vos:
- * It turns out that loading saved files of runs that include TrainDiscard objects
- * may erratically succeed or fail. This also can break test runs of such files.
- * This is due to either or both of:
- * - different train sequences in the set of owned trains,
- * - different train ids between load or test runs.
- *
- * I suspect that this is caused by the (IMHO) ill-advised replacements
- * of List by Set collections. Almost always, order matters in Rails!
- *
- * To fix this, the following changes have been applied to the DiscardTrain class:
- *
- * - equalsAs has been modified to compare *sorted* train type sets (TreeSet objects),
- * - getDiscardedTrain has been modified to return the train in ownedTrains
- *   that has the same train *type* as the given discardedTrain.
- *   (so the actual train id may be different).
- */
 
 
 
@@ -76,7 +55,16 @@ public class DiscardTrain extends PossibleORAction implements GuiTargetedAction 
         return company;
     }
 
-   
+    /**
+     * The UI target is the specific Train object being discarded.
+     * This allows the UI to highlight the specific train card.
+     */
+    @Override
+    public Object getTarget() {
+        return discardedTrain;
+    }
+
+
 
 
 

@@ -4984,75 +4984,119 @@ public class GameStatus extends GridPanel {
         java.util.List<rails.game.action.PossibleAction> list = possibleActions.getList();
         if (list == null || list.isEmpty()) return;
 
+       // UNIFIED SPECIAL ACTION HANDLER
+        // We iterate through all actions. If they implement GuiTargetedAction,
+        // we ask the action "What is your target?" and "What is your color?"
+        // Then we scan the board to find the corresponding RailCard and highlight it.
+        
+    // UNIFIED SPECIAL ACTION HANDLER (Stupid Panel Logic)
+        // We blindly iterate actions. If they implement GuiTargetedAction, we highlight the target.
         for (rails.game.action.PossibleAction pa : list) {
             
-            // --- TYPE A: GuiTargetedAction (ExchangeCoal, StartPrussian, etc.) ---
             if (pa instanceof GuiTargetedAction) {
+                GuiTargetedAction gta = (GuiTargetedAction) pa;
+                Object target = gta.getTarget(); 
+                Color bg = gta.getButtonColor();
                 
-                net.sf.rails.game.state.Owner actor = ((GuiTargetedAction) pa).getActor();
+                // 1. Find the UI Component
+                net.sf.rails.ui.swing.elements.RailCard card = findRailCardFor(target);
                 
-                if (actor instanceof net.sf.rails.game.PublicCompany) {
-                    net.sf.rails.game.PublicCompany targetComp = (net.sf.rails.game.PublicCompany) actor;
-                    int companyIndex = targetComp.getPublicNumber();
+                // 2. Apply Highlight & Action using the Interface properties
+                if (card != null) {
+                    card.addPossibleAction(pa); 
                     
-                    // Resolve President
-                    if (targetComp.getPresident() != null) {
-                        int playerIndex = targetComp.getPresident().getIndex();
+                    // Use the ACTION'S color, not a hardcoded one.
+                    card.setBackground(bg);
+                    // Use a darker version of that color for the border (Visual consistency)
+                    card.setBorder(BorderFactory.createLineBorder(bg.darker(), 3));
+                    
+                    card.setEnabled(true);
+                    card.setVisible(true);
+                    card.repaint();
+                }
+            }
+        }
+    }
 
-                        // Apply Highlight
-                        if (companyIndex >= 0 && companyIndex < nc && playerIndex >= 0 && playerIndex < players.getNumberOfPlayers()) {
-                            
-                            // 1. Activate Button (This adds the action and enables the card)
-                            setPlayerCertButton(companyIndex, playerIndex, true, pa);
-                            
-                            // 2. Visual Highlight
-                            net.sf.rails.ui.swing.elements.RailCard card = getRailCardFor(companyIndex, playerIndex);
-                            if (card != null) {
-                                card.setBackground(java.awt.Color.CYAN);
-                                card.setBorder(BorderFactory.createLineBorder(Color.BLUE, 3));
-                                // REMOVED: card.setPossibleAction(pa); 
-                                // Reason: setPlayerCertButton already adds the action. 
-                                // Setting it again here can reset listeners or cause conflicts.
-                                card.repaint();
+
+
+    /**
+     * Central Registry: Locates the RailCard UI component for any game object.
+     * Scans: Player Shares, IPO, Pool, Treasury, Trains, and Privates.
+     */
+    private net.sf.rails.ui.swing.elements.RailCard findRailCardFor(Object target) {
+        if (target == null) return null;
+
+        // A. If Target is a TRAIN
+        if (target instanceof net.sf.rails.game.Train) {
+            net.sf.rails.game.Train targetTrain = (net.sf.rails.game.Train) target;
+            
+            // 1. Scan Company Trains
+            if (compSubTrainButtons != null) {
+                for (int i = 0; i < nc; i++) {
+                    for (int t = 0; t < MAX_TRAIN_SLOTS; t++) {
+                        RailCard card = compSubTrainButtons[i][t];
+                        if (card != null && card.getTrain() == targetTrain) return card;
+                    }
+                }
+            }
+            // 2. Scan Pool Trains
+            if (poolTrainButtons != null) {
+                for (RailCard card : poolTrainButtons) {
+                    if (card != null && card.getTrain() == targetTrain) return card;
+                }
+            }
+        }
+
+        // B. If Target is a COMPANY (Public or Private) - usually for Mergers/Exchange
+        if (target instanceof net.sf.rails.game.Company) {
+            net.sf.rails.game.Company targetComp = (net.sf.rails.game.Company) target;
+            
+            // 1. Scan Player Shares (The most common target for "Exchange Share")
+            if (playerShareCards != null) {
+                for (int i = 0; i < nc; i++) {
+                    if (companies[i] == targetComp) {
+                        for (int j = 0; j < np; j++) {
+                            // Find the first visible card in the row (usually belongs to the actor)
+                            if (playerShareCards[i][j] != null && playerShareCards[i][j].isVisible()) {
+                                return playerShareCards[i][j];
                             }
                         }
                     }
                 }
-            } 
+            }
             
-            // --- TYPE B: Discard Train ---
-            if (pa instanceof DiscardTrain) {
-                DiscardTrain dt = (DiscardTrain) pa;
-                net.sf.rails.game.PublicCompany company = (net.sf.rails.game.PublicCompany) dt.getCompany();
-                net.sf.rails.game.Train targetTrain = dt.getDiscardedTrain();
+            // 2. Scan Player Privates
+            if (playerPrivatesPanel != null) {
+                for (int j = 0; j < np; j++) {
+                    if (playerPrivatesPanel[j] != null) {
+                        for (Component c : playerPrivatesPanel[j].getComponents()) {
+                            if (c instanceof RailCard) {
+                                RailCard card = (RailCard) c;
+                                if (card.getCompany() == targetComp) return card;
+                            }
+                        }
+                    }
+                }
+            }
 
-                int companyIndex = company.getPublicNumber();
-
-                if (companyIndex >= 0 && companyIndex < nc && compSubTrainButtons[companyIndex] != null) {
-                    java.util.List<net.sf.rails.game.Train> trainList = new java.util.ArrayList<>(
-                            company.getPortfolioModel().getTrainList());
-                    int trainIdx = trainList.indexOf(targetTrain);
-
-                    if (trainIdx >= 0 && trainIdx < compSubTrainButtons[companyIndex].length) {
-                        net.sf.rails.ui.swing.elements.RailCard card = compSubTrainButtons[companyIndex][trainIdx];
-                        if (card != null) {
-                            card.setPossibleAction(pa);
-                            card.setBorder(BorderFactory.createLineBorder(Color.BLUE, 3));
-                            card.setToolTipText("Click to Discard " + targetTrain.getName());
-                            card.setEnabled(true);
-                            card.setVisible(true);
-                            card.repaint();
+            // 3. Scan Company Privates
+            if (compPrivatesPanel != null) {
+                for (int i = 0; i < nc; i++) {
+                     if (compPrivatesPanel[i] != null) {
+                        for (Component c : compPrivatesPanel[i].getComponents()) {
+                            if (c instanceof RailCard) {
+                                RailCard card = (RailCard) c;
+                                if (card.getCompany() == targetComp) return card;
+                            }
                         }
                     }
                 }
             }
         }
+        
+        return null;
     }
-// ... (rest of the method) ...
-
-
-
-
 
 
 

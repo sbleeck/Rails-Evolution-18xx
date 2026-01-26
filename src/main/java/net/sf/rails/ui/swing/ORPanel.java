@@ -106,7 +106,6 @@ public class ORPanel extends GridPanel
     private PublicCompany currentOperatingComp = null;
     private int orCompIndex = -1;
 
-    private boolean discardMode = false;
     private boolean specialModeActive = false;
     private boolean isRevenueValueToBeSet = false;
     private boolean showNumbersActive = false;
@@ -595,8 +594,7 @@ public class ORPanel extends GridPanel
 
         this.orComp = orComp;
         this.currentOperatingComp = orComp;
-        this.discardMode = false;
-        this.orCompIndex = orCompIndex;
+
 
         removeAllHighlights();
         setStandardPanelsVisible(true);
@@ -619,7 +617,6 @@ public class ORPanel extends GridPanel
             btnDone.setPossibleAction(null);
             btnDone.setEnabled(false);
         }
-        discardMode = false;
         if (btnTileSkip != null)
             btnTileSkip.setEnabled(false);
         if (btnTileConfirm != null)
@@ -1490,11 +1487,7 @@ public class ORPanel extends GridPanel
                 phaseColor = UITheme.ACTION_DONE;
                 instruction = "FINALIZE";
                 break;
-            default:
-                if (discardMode) {
-                    phaseColor = UITheme.ACTION_DISCARD;
-                    instruction = "DISCARD";
-                }
+           
         }
 
         if (lblCompanyInfo != null) {
@@ -1701,45 +1694,6 @@ public class ORPanel extends GridPanel
         }
     }
 
-    private void addDiscardTrainButton(DiscardTrain action) {
-        ActionButton btn = new ActionButton(RailsIcon.OK);
-        btn.setIcon(null);
-
-        // Extract Train Name safely
-        String trainName = "Train";
-        if (action.getDiscardedTrain() != null) {
-            trainName = action.getDiscardedTrain().getType().getName();
-        } else {
-            // Fallback parsing if object is missing
-            trainName = action.getButtonLabel().replace("Discard ", "");
-        }
-
-        // Card-like formatting: "Discard" small on top, Train Name large below
-        btn.setText("<html><center><br><font size='5'><b>" + trainName + "</b></font></center></html>");
-
-        // Train Card Styling (Beige Background)
-        btn.setBackground(new Color(255, 255, 240));
-        btn.setForeground(Color.BLACK);
-        btn.setOpaque(true);
-        btn.setFont(new Font("SansSerif", Font.PLAIN, 12));
-
-        // FAT CYAN BORDER (3 pixels)
-        btn.setBorder(BorderFactory.createCompoundBorder(
-                BorderFactory.createLineBorder(Color.CYAN, 3),
-                BorderFactory.createEmptyBorder(2, 5, 2, 5) // Internal padding
-        ));
-
-        btn.setPossibleAction(action);
-        btn.setActionCommand("SpecialAction");
-        btn.addActionListener(this);
-
-        btn.setAlignmentX(Component.CENTER_ALIGNMENT);
-        btn.setMaximumSize(new Dimension(SIDEBAR_WIDTH - 20, 50)); // Taller for card look
-
-        specialPanel.add(btn);
-        specialPanel.add(Box.createVerticalStrut(8));
-    }
-
     private boolean isActionListEmpty(ActionButton btn) {
         return btn.getPossibleActions() == null || btn.getPossibleActions().isEmpty();
     }
@@ -1802,74 +1756,51 @@ public class ORPanel extends GridPanel
                 this.orComp = this.currentOperatingComp;
             }
 
-            // --- 3. FILTER SPECIAL ACTIONS ---
+          // 3. FILTER & DETECT SPECIAL ACTIONS (Generic "Stupid Panel" Logic)
             List<PossibleAction> specialActions = new ArrayList<>();
-            boolean isDiscardActionPresent = false;
+            GuiTargetedAction contextProvider = null;
 
             for (PossibleAction pa : actions) {
-                boolean isSpecial = (pa instanceof GuiTargetedAction) ||
-                                    (pa instanceof DiscardTrain) ||
-                                    (pa instanceof LayBaseToken && ((LayBaseToken) pa).getType() == LayBaseToken.HOME_CITY);
-
-                if (pa instanceof NullAction) {
-                    NullAction na = (NullAction) pa;
-                    if (na.getMode() == NullAction.Mode.DONE || na.getMode() == NullAction.Mode.PASS) {
-                        if (!specialActions.isEmpty()) isSpecial = true;
-                    }
+                // If it implements the interface, it is definitely a special UI action
+                if (pa instanceof GuiTargetedAction) {
+                    specialActions.add(pa);
+                    if (contextProvider == null) contextProvider = (GuiTargetedAction) pa;
                 }
-
-                if (isSpecial) {
+                // Legacy Fallback for Home Token (if not yet upgraded to GuiTargetedAction)
+                else if (pa instanceof LayBaseToken && ((LayBaseToken) pa).getType() == LayBaseToken.HOME_CITY) {
                     specialActions.add(pa);
                 }
-                
-                if (pa instanceof DiscardTrain) {
-                    isDiscardActionPresent = true;
-                }
-            }
-            
-            log.info("ORPanel Trace: Filtered {} Special Actions. Discard Present: {}", specialActions.size(), isDiscardActionPresent);
-
-            // 2b. DETECT DISCARD & UPDATE CONTEXT
-            this.discardMode = false;
-            
-            // --- FIX START: Correct Loop Variable Usage ---
-            if (isDiscardActionPresent) {
-                 for (PossibleAction pa : actions) {
-                    if (pa instanceof DiscardTrain) {
-                        this.discardMode = true;
-                        PublicCompany subject = (PublicCompany) ((DiscardTrain) pa).getCompany();
-                        
-                        log.info("ORPanel Trace: Detected DiscardTrain for subject: {}", (subject != null ? subject.getId() : "null"));
-
-                        if (subject != null) {
-                            if (this.orComp != subject) {
-                                log.info("ORPanel Trace: Switching Context {} -> {}", 
-                                    (this.orComp != null ? this.orComp.getId() : "null"), subject.getId());
-                            }
-                            this.orComp = subject;
-                            updateSidebarData(); 
-                        }
-                        break; 
+                // NullAction (Pass/Done) is included if we are already in a special context
+                else if (pa instanceof NullAction) {
+                    if (!specialActions.isEmpty() || ((NullAction)pa).getMode() == NullAction.Mode.PASS) {
+                         specialActions.add(pa);
                     }
                 }
             }
-            // --- FIX END ---
+            
+            // 4. GENERIC CONTEXT SWITCH
+            // If the special action dictates a specific actor (e.g. a Company discarding out of turn),
+            // we switch the panel's focus to that actor immediately.
+            if (contextProvider != null) {
+                Owner actor = contextProvider.getActor();
+                if (actor instanceof PublicCompany && actor != this.orComp) {
+                    log.info("ORPanel: Context switch detected via {}. Switching to {}", contextProvider.getClass().getSimpleName(), actor.getId());
+                    this.orComp = (PublicCompany) actor;
+                    updateSidebarData(); 
+                }
+            }
 
-            // --- 4. RENDER SPECIAL MODE ---
+            // 5. RENDER SPECIAL MODE
             if (!specialActions.isEmpty()) {
-                log.info("ORPanel Trace: Rendering SPECIAL MODE with {} actions.", specialActions.size());
+                log.info("ORPanel: Rendering SPECIAL MODE with {} generic actions.", specialActions.size());
                 
                 this.specialModeActive = true;
                 this.activePhase = 0;
-
                 setStandardPanelsVisible(false);
 
-                // Update Header
-                for (PossibleAction spa : specialActions) {
-                    if (spa instanceof GuiTargetedAction) {
-                        updateSpecialHeader((GuiTargetedAction) spa);
-                        break;
-                    }
+                // Update Header using the Context Provider (or defaults)
+                if (contextProvider != null) {
+                    updateSpecialHeader(contextProvider);
                 }
 
                 if (specialPanel != null && specialContainer != null) {
@@ -1877,48 +1808,14 @@ public class ORPanel extends GridPanel
                     specialPanel.removeAll();
 
                     for (PossibleAction spa : specialActions) {
-                        if (spa instanceof DiscardTrain) {
-                            log.info("ORPanel Trace: Adding DISCARD BUTTON for {}", ((DiscardTrain)spa).getDiscardedTrain().getName());
-                            addDiscardTrainButton((DiscardTrain) spa);
-                            continue;
-                        }
-
-                        // Generic Button Generation
-                        String label = spa.getButtonLabel();
-                        String cmd = "SpecialAction";
-                        Color btnColor = Color.LIGHT_GRAY;
-
-                        if (spa instanceof NullAction) {
-                            NullAction na = (NullAction) spa;
-                            label = (na.getMode() == NullAction.Mode.PASS) ? "Decline" : "Done";
-                            btnColor = SYS_BLUE;
-                        } else if (spa instanceof LayBaseToken) {
-                            label = (label == null || label.isEmpty()) ? "Place Token" : label;
-                            btnColor = SYS_BLUE;
-                        }
-
-                        log.info("ORPanel Trace: Adding SPECIAL BUTTON: {}", label);
-
-                        ActionButton b = createSidebarButton("<html><center>" + label + "</center></html>", cmd);
-                        b.setPossibleAction(spa);
-                        styleButton(b, btnColor, label); 
-                        b.setEnabled(true);
-                        
-                        if (btnColor == Color.LIGHT_GRAY) {
-                            b.setBackground(Color.LIGHT_GRAY);
-                            b.setForeground(Color.BLACK);
-                        }
-
-                        specialPanel.add(b);
-                        specialPanel.add(Box.createVerticalStrut(5));
+                        addSpecialActionButton(spa);
                     }
                     specialPanel.revalidate();
                     specialPanel.repaint();
                 }
                 return;
             }
-
-            // --- 5. STANDARD MODE ---
+            // --- 6. STANDARD MODE ---
             log.info("ORPanel Trace: Rendering STANDARD MODE.");
             
             this.specialModeActive = false;
@@ -1944,7 +1841,46 @@ public class ORPanel extends GridPanel
         }
     }
 
-    
+
+
+private void addSpecialActionButton(PossibleAction action) {
+        String label = action.getButtonLabel();
+        Color color = Color.LIGHT_GRAY;
+        String cmd = "SpecialAction";
+
+        // 1. Extract Data via Interface
+        if (action instanceof GuiTargetedAction) {
+            GuiTargetedAction gta = (GuiTargetedAction) action;
+            label = gta.getButtonLabel(); // Contains the HTML from DiscardTrain
+            color = gta.getButtonColor(); // Contains the Red/Cyan color
+        } 
+        else if (action instanceof NullAction) {
+            label = ((NullAction) action).getMode() == NullAction.Mode.PASS ? "Decline" : "Done";
+            color = UITheme.ACTION_SKIP;
+        }
+
+        // 2. Create Button
+        ActionButton btn = createSidebarButton(label, cmd);
+        btn.setText(label); 
+        btn.setPossibleAction(action);
+        btn.setEnabled(true);
+        btn.setAlignmentX(Component.CENTER_ALIGNMENT);
+        // Allow button to be taller to fit the HTML "Card" content
+        btn.setMaximumSize(new Dimension(SIDEBAR_WIDTH - 20, 60)); 
+
+        // 3. Style Button to match RailCard in GameStatus
+        // Background matches action color
+        btn.setBackground(color);
+        btn.setForeground(Color.BLACK);
+        // Border matches RailCard highlight (Darker version of bg)
+        btn.setBorder(BorderFactory.createCompoundBorder(
+                BorderFactory.createLineBorder(color.darker(), 3),
+                BorderFactory.createEmptyBorder(2, 5, 2, 5)));
+
+        specialPanel.add(btn);
+        specialPanel.add(Box.createVerticalStrut(8));
+    }
+
     /**
      * Replaces the tooltip logic with a formatted log entry.
      * Cleans up UI tooltips and dumps a readable text table to the console.
