@@ -181,62 +181,44 @@ public class PrussianFormationRound extends Round implements I_MapRenderableRoun
         return null;
     }
 
-    public void start() {
 
+public void start() {
         // CRITICAL: Initialize this BEFORE checking for completion/abort.
-        // If we abort, finishRound() needs this object to know where to return.
         this.interruptedRound = gameManager.getInterruptedRound();
         
         log.info("--- PFR STARTING ---");
         PublicCompany pr = companyManager.getPublicCompany(GameDef_1835.PR_ID);
-        boolean prStarted = (pr != null && pr.hasStarted());
-        log.info("PR Started Status: {}", prStarted);
         
-        if (prussianIsComplete(gameManager)) {
+        if (PrussianFormationRound.prussianIsComplete(gameManager)) {
             log.warn("PFR Start Aborted: prussianIsComplete() returned TRUE immediately.");
             finishRound();
             return;
         }
 
-        this.interruptedRound = gameManager.getInterruptedRound();
-
-        // 1. Determine Force Status BEFORE checking the 'Already Offered' flag.
+        // 1. Determine Force Status
         phase = Phase.getCurrent(this);
-        boolean prussianStarted = companyManager.getPublicCompany(PR_ID).hasStarted();
-
-        // If we are interrupting an Operating Round, this is the Mandatory Rule 5.5.4
-        // Trigger.
-        boolean isOrTrigger = (interruptedRound instanceof OperatingRound);
-
+        boolean prussianStarted = (pr != null && pr.hasStarted());
+        
         forcedMerge = phase.getId().startsWith("5");
-
-        // PFR is forced if:
-        // a) It interrupted an OR (Train Buy) -> Always Force.
-        // b) We are in Phase 5 -> Always Force (until complete).
-        // c) We are in Phase 4+4 AND Prussian has NOT started yet -> Force the M2
-        // Merger.
-        // (Once PR starts, the 4+4 Force condition is satisfied).
+        
+        // PFR is forced if: Phase 5 OR Phase 4+4 (if PR not started)
         boolean isPhase4Plus4Forced = phase.getId().equals("4+4") && !prussianStarted;
+        
+        // --- START FIX ---
+        // Removed 'isOrTrigger'. Buying a 4-train in an OR should NOT force the formation.
+        forcedStart = forcedMerge || isPhase4Plus4Forced;
+        // --- END FIX ---
 
-        forcedStart = isOrTrigger || forcedMerge || isPhase4Plus4Forced;
-
-        // If we are forced to merge (Phase 5), we must ensure we are in the MERGE step
-        // to process the automatic closure of minors, even if the PFR object has
-        // stale state (e.g., DISCARD_TRAINS) from a previous run.
-        if (forcedMerge && !prussianIsComplete(gameManager)) {
+        // Force 'MERGE' step if we are in Phase 5 to ensure cleanup runs
+        if (forcedMerge && !PrussianFormationRound.prussianIsComplete(gameManager)) {
             if (getPrussianStep() != Step.MERGE) {
-                log.info("PFR Force-Start: Resetting stale step {} to MERGE for Phase 5 cleanup.", getPrussianStep());
                 setPrussianStep(Step.MERGE);
             }
         }
         
         // 2. LOOP GUARD: Check if PFR was already offered.
-        // We skip if it has been offered, UNLESS it is a forced start (Phase 5 OR 4+4).
-        // FIX: Check !forcedStart instead of !forcedMerge to ensure 4+4 triggers are
-        // respected.
         if (!forcedStart && gameManager instanceof GameManager_1835
                 && ((GameManager_1835) gameManager).hasPrussianFormationBeenOffered()) {
-
             if (interruptedRound != null) {
                 gameManager.setInterruptedRound(null);
                 gameManager.setRound(interruptedRound);
@@ -251,19 +233,12 @@ public class PrussianFormationRound extends Round implements I_MapRenderableRoun
         }
 
         // Initialize locals
-        this.interruptedRound = gameManager.getInterruptedRound();
         prussian = companyManager.getPublicCompany(PR_ID);
-        phase = Phase.getCurrent(this);
-        startPr = !prussian.hasStarted();
-
-        // Robust Phase detection (Handles "5", "5+5", "5 (Brown)", etc.)
-        forcedMerge = phase.getId().startsWith("5");
-
-        forcedStart = phase.getId().equals("4+4") || forcedMerge;
-        mergePr = !prussianIsComplete(gameManager);
         m2 = companyManager.getPublicCompany(M2_ID);
+        startPr = !prussian.hasStarted();
+        mergePr = !PrussianFormationRound.prussianIsComplete(gameManager);
 
-        // FINAL SAFETY NET: Ensure currentPlayer is NEVER null before proceeding
+        // FINAL SAFETY NET: Ensure currentPlayer is NEVER null
         if (this.currentPlayer == null) {
             this.currentPlayer = playerManager.getCurrentPlayer();
             if (this.currentPlayer == null) {
@@ -279,22 +254,17 @@ public class PrussianFormationRound extends Round implements I_MapRenderableRoun
                 }
             }
         }
-        // 1. DYNAMIC HEADER UPDATE
-        // Ensure the sidebar always shows the CURRENT player who is being asked, not
-        // the round starter.
+
+        // DYNAMIC HEADER UPDATE
         if (this.currentPlayer != null) {
             try {
                 Class<?> orPanelClass = Class.forName("net.sf.rails.ui.swing.ORPanel");
-                java.lang.reflect.Method setHeader = orPanelClass.getMethod("setGlobalCustomHeader", String.class,
-                        String.class);
+                java.lang.reflect.Method setHeader = orPanelClass.getMethod("setGlobalCustomHeader", String.class, String.class);
                 setHeader.invoke(null, "Prussian Formation", this.currentPlayer.getName() + " to Act");
-            } catch (Throwable t) {
-                // Ignore errors
-            }
+            } catch (Throwable t) { }
         }
 
-        // --- Only Initialize State if this is a fresh start (not a reload/undo) ---
-        // We check if the State object is "dirty" or matches default
+        // --- Only Initialize State if this is a fresh start ---
         if (getPrussianStep() == Step.START && startingPlayerName.value() == null) {
 
             ReportBuffer.add(this, LocalText.getText("StartFormationRound", PR_ID));
@@ -304,6 +274,7 @@ public class PrussianFormationRound extends Round implements I_MapRenderableRoun
             Player m2President = (m2 != null) ? m2.getPresident() : null;
 
             if (getPrussianStep() == Step.START) {
+                // Default: M2 President decides
                 if (m2President != null) {
                     setStartingPlayer(m2President);
                     setCurrentPlayer(m2President);
@@ -317,76 +288,48 @@ public class PrussianFormationRound extends Round implements I_MapRenderableRoun
                     executeStartPrussian(true);
                     setPrussianStep(Step.MERGE);
 
-                    // Rule: The Exchange Phase starts with the Priority Deal player.
-                    Player nextPlayer = playerManager.getPriorityPlayer();
-
-                    // Fallback to M2 pres or Triggerer only if Priority is somehow missing
-                    if (nextPlayer == null)
-                        nextPlayer = ((GameManager_1835) gameManager).getPrussianFormationStartingPlayer();
-                    if (nextPlayer == null)
-                        nextPlayer = prussian.getPresident();
-                    if (nextPlayer == null)
-                        nextPlayer = m2President;
+                    // --- START FIX: Enforce Rule 4.3 (Director Starts) ---
+                    Player nextPlayer = prussian.getPresident();
+                    if (nextPlayer == null) nextPlayer = m2President;
+                    if (nextPlayer == null) nextPlayer = playerManager.getPriorityPlayer();
 
                     setStartingPlayer(nextPlayer);
                     setCurrentPlayer(nextPlayer);
+                    // --- END FIX ---
 
-                    // If forced start, we need to check if the starting player has any shares
-                    // to exchange. If not, auto-advance to the next player.
                     setFoldablePrePrussians();
                     if (foldablePrePrussians.isEmpty()) {
-                        finishTurn();
+                        advanceToNextValidPlayer();
                     }
                 }
             } else if (getPrussianStep() == Step.MERGE) {
-                // If we resume in Merge phase, ensure we start with Priority Deal.
                 Player sp = playerManager.getPriorityPlayer();
-                if (sp == null)
-                    sp = ((GameManager_1835) gameManager).getPrussianFormationStartingPlayer();
+                if (sp == null) sp = ((GameManager_1835) gameManager).getPrussianFormationStartingPlayer();
 
                 setStartingPlayer(sp);
                 setCurrentPlayer(this.startingPlayer);
-                
-                // Immediately skip if the first player has nothing to do
                 advanceToNextValidPlayer();
             }
         }
 
-        // Always run forced logic if we are in merge and it's forced
+        // Phase 5 Forced Merge Cleanup
         if (getPrussianStep() == Step.MERGE && forcedMerge) {
-
-            // Use a Set to ensure unique processing
             Set<Company> foldablesSet = new LinkedHashSet<>();
-
-            // 1. Scan Privates
             for (PrivateCompany company : gameManager.getAllPrivateCompanies()) {
-                // For Privates, we check if they are explicitly NOT closed, OR if they are
-                // closed
-                // but have the exchange property (e.g. BB might be closed but exchangeable?
-                // Usually they are open until exchange).
-                // We'll stick to standard !isClosed() + Property, as PFR will close them.
-                if (!company.isClosed() && hasExchangeProperty(company)) {
-                    foldablesSet.add(company);
-                }
+                if (!company.isClosed() && hasExchangeProperty(company)) foldablesSet.add(company);
             }
-
-            // 2. Scan Publics (Minors)
             for (PublicCompany company : gameManager.getAllPublicCompanies()) {
-                // Now that OR_1835 is fixed, M1 should be OPEN (!isClosed).
-                if (!company.isClosed() && hasExchangeProperty(company)) {
-                    foldablesSet.add(company);
-                }
+                if (!company.isClosed() && hasExchangeProperty(company)) foldablesSet.add(company);
             }
-
-            List<Company> foldables = new ArrayList<>(foldablesSet);
-
-            if (!foldables.isEmpty()) {
-                executeExchange(foldables, false, false);
+            if (!foldablesSet.isEmpty()) {
+                executeExchange(new ArrayList<>(foldablesSet), false, false);
             }
-
             finishMergeStep();
         }
     }
+
+
+
 
     private boolean hasExchangeProperty(Company c) {
 
@@ -590,41 +533,40 @@ public class PrussianFormationRound extends Round implements I_MapRenderableRoun
         playerManager.setCurrentPlayer(player);
     }
 
-    private void executeStartPrussian(boolean display) {
+private void executeStartPrussian(boolean auto) {
         if (m2 == null) {
             m2 = companyManager.getPublicCompany(M2_ID);
         }
 
         prussian.start();
-        String message = LocalText.getText("START_MERGED_COMPANY",
-                PR_ID, Bank.format(this, prussian.getIPOPrice()), prussian.getStartSpace().toText());
-        ReportBuffer.add(this, message);
 
-        int capFactor = prussian.getSoldPercentage()
-                / (prussian.getShareUnit() * prussian.getShareUnitsForSharePrice());
-        int cash = capFactor * prussian.getIPOPrice();
-        if (cash > 0) {
-            ReportBuffer.add(this,
-                    LocalText.getText("FloatsWithCash", prussian.getId(),
-                            net.sf.rails.game.state.Currency.fromBank(cash, prussian)));
-        } else {
-            ReportBuffer.add(this, LocalText.getText("Floats", prussian.getId()));
-        }
+        String msg = LocalText.getText("START_MERGED_COMPANY",
+                PR_ID,
+                Bank.format(this, prussian.getIPOPrice()),
+                prussian.getStartSpace().toText());
+        ReportBuffer.add(this, msg);
 
-        executeExchange(Arrays.asList(m2), true, false);
+        // 1. Merge M2 (Force Exchange)
+        // FIX: Added 'true' (isPresident) and 'false' (display) to match the method signature
+        executeExchange(Collections.singletonList(m2), true, false);
 
         prussian.setFloated();
+        setPrussianStep(Step.MERGE);
 
-        if (interruptedRound instanceof OperatingRound) {
-            OperatingRound or = (OperatingRound) interruptedRound;
-            PublicCompany triggerCompany = or.getOperatingCompany();
-            boolean isM1 = (triggerCompany != null && "M1".equals(triggerCompany.getId()));
-
-            if (isM1) {
-                or.insertNewOperatingCompany(prussian);
-            }
+        // 2. Set the Starting Player for the Exchange Phase
+        // CORRECTED RULE 4.3: Start with the NEW Prussian Director.
+        Player newDirector = prussian.getPresident();
+        if (newDirector == null) {
+            newDirector = playerManager.getPriorityPlayer(); // Fallback
         }
+
+        setStartingPlayer(newDirector);
+        setCurrentPlayer(newDirector);
+
+        // Reset turn count so we cycle through everyone starting with the Director
+        mergeTurnCount.set(0);
     }
+
 
     /**
      * Expose the step name as a String to avoid Enum visibility issues in generic

@@ -1861,7 +1861,6 @@ if (btnTrainSkip != null) btnTrainSkip.setEnabled(true);
                 return;
             }
             // --- 6. STANDARD MODE ---
-            log.info("ORPanel Trace: Rendering STANDARD MODE.");
             
             this.specialModeActive = false;
             if (specialContainer != null)
