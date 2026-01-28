@@ -283,8 +283,8 @@ cardWrappers = new JPanel[ni];
             cards[i].addActionListener(this);
             log.error("Added ActionListener to RailCard for StartItem index {}", si.getIndex());
 
-// 2. Scale Card Down (so it doesn't touch edges)
-            cards[i].setScale(1.0);
+// // 2. Scale Card Down (so it doesn't touch edges)
+            cards[i].setScale(1.2);
 
             // 3. Create Wrapper Panel (The Green Edge)
             cardWrappers[i] = new JPanel();
@@ -427,7 +427,8 @@ cardWrappers = new JPanel[ni];
         currentFontSize = size;
         
         Font f = new Font("SansSerif", Font.BOLD, currentFontSize);
-        
+
+
         // Helper logic to update all arrays if they exist
         if (basePrice != null) for (Field c : basePrice) if (c != null) c.setFont(f);
         if (minBid != null) for (Field c : minBid) if (c != null) c.setFont(f);
