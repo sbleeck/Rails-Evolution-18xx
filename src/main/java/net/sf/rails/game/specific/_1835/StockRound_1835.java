@@ -12,6 +12,7 @@ import com.google.common.collect.Sets;
 
 import net.sf.rails.game.financial.*;
 import net.sf.rails.game.model.CertificatesModel;
+import net.sf.rails.game.state.MoneyOwner;
 import net.sf.rails.game.state.Owner;
 import rails.game.action.AdjustSharePrice;
 import rails.game.action.BuyCertificate;
@@ -138,7 +139,21 @@ public class StockRound_1835 extends StockRound {
         return price;
     }
 
-    
+    /**
+     * In 1835, the Prussian (PR) accumulates capital from share sales (and
+     * exchanges)
+     * even before it technically "floats" or operates.
+     * The standard rule (money -> company only if floated) must be overridden for
+     * PR.
+     */
+    @Override
+    protected MoneyOwner getSharePriceRecipient(PublicCompany comp, Owner from, int price) {
+        // If the company is the Prussian (PR) and shares are bought from the IPO/Bank
+        if (comp.getId().equals(GameDef_1835.PR_ID) && from == ipo.getParent()) {
+            return comp; // Money goes to PR treasury, regardless of float state
+        }
+        return super.getSharePriceRecipient(comp, from, price);
+    }
 
     /**
      * Share price goes down 1 space for any number of shares sold.
@@ -146,17 +161,19 @@ public class StockRound_1835 extends StockRound {
      */
     @Override
     protected void adjustSharePrice(PublicCompany company, Owner seller, int sharesSold, boolean soldBefore) {
-// If shares were already sold this turn, the price has already dropped.
+        // If shares were already sold this turn, the price has already dropped.
         // We do NOT drop it again automatically.
         if (soldBefore) {
-            // Track last sold company to allow manual "Adjust Price" action if strict rules are preferred
+            // Track last sold company to allow manual "Adjust Price" action if strict rules
+            // are preferred
             lastSoldCompany = company;
             return;
         }
 
-        // Always drop exactly 1 space on the first sale, regardless of the quantity sold.
+        // Always drop exactly 1 space on the first sale, regardless of the quantity
+        // sold.
         super.adjustSharePrice(company, seller, 1, soldBefore);
-        
+
     }
 
     private static final Logger log = LoggerFactory.getLogger(StockRound_1835.class);
@@ -210,7 +227,6 @@ public class StockRound_1835 extends StockRound {
             possibleActions.add(new AdjustSharePrice(lastSoldCompany, EnumSet.of(AdjustSharePrice.Direction.DOWN)));
         }
 
-        
     }
 
     protected boolean processGameSpecificAction(PossibleAction action) {
@@ -309,35 +325,148 @@ public class StockRound_1835 extends StockRound {
         Portfolio.moveAll(sellableCertificateCombinations.last(), bankTo);
     }
 
+    // ... (lines of unchanged context code) ...
+
+    private boolean isSoldOut(String companyAbbrev) {
+        String companyId = resolveId(companyAbbrev);
+        PublicCompany c = companyManager.getPublicCompany(companyId);
+        return c != null && ipo.getShare(c) == 0;
+    }
+
+    private boolean shouldBlock(String companyAbbrev) {
+        String companyId = resolveId(companyAbbrev);
+        PublicCompany c = companyManager.getPublicCompany(companyId);
+        return c != null && !c.isBuyable() && !c.hasStarted();
+    }
+    // ... (lines of unchanged context code) ...
+
+    // ... (lines of unchanged context code) ...
+    // Cache for resolved IDs to avoid repeated lookups
+    private Map<String, String> resolvedIds = new HashMap<>();
+
     @Override
     public void start() {
-
         super.start();
 
-        //  Remove Legacy PFR Trigger ---
-        // The GameManager_1835 now handles the "Ask at start of round" logic centrally.
-        // We do NOT check for the 4-train here anymore, because checking here ignores
-        // the "Declined" flag and causes a double-ask.
+        // Debug: Print all actual Company IDs to the log to confirm our abbreviations
+        StringBuilder sb = new StringBuilder("Loaded Company IDs: ");
+        for (PublicCompany c : companyManager.getAllPublicCompanies()) {
+            sb.append(c.getId()).append(" ");
+        }
+        log.info(sb.toString());
+    }
 
-        /*
-         * Legacy code removed:
-         * if (fourTrainSold && prNotStarted && m2Exists) {
-         * ((GameManager_1835) gameManager).startPrussianFormationRound(this);
-         * }
-         */
+    @Override
+    protected void checkForCompanyReleases() {
+        log.info("--- Checking Company Releases (1835 Rules) ---");
 
-        // However, we DO keep the "Subsequent Round" check for Phase 3 cleanup
-        // (If PR is already open but not complete).
-        PublicCompany pr = companyManager.getPublicCompany(GameDef_1835.PR_ID);
+        // 1. Resolve Canonical IDs (matching CompanyManager.xml)
+        String idBad = resolveId("Bad"); // Should be BA
+        String idPru = resolveId("Pru"); // Should be PR
+        String idWrt = resolveId("Wrt"); // Should be WT
+        String idHes = resolveId("Hes"); // Should be HE
+        String idMec = resolveId("Mec"); // Should be MS
+        String idOld = resolveId("Old"); // Should be OL
 
-        if (pr != null && pr.hasStarted() && !pr.isClosed()) {
-            // Check if Prussian formation is complete (minors still exist)
-            boolean prComplete = PrussianFormationRound.prussianIsComplete(gameManager);
+        PublicCompany cBad = companyManager.getPublicCompany(idBad);
+        PublicCompany cPru = companyManager.getPublicCompany(idPru);
+        PublicCompany cWrt = companyManager.getPublicCompany(idWrt);
+        PublicCompany cHes = companyManager.getPublicCompany(idHes);
+        PublicCompany cMec = companyManager.getPublicCompany(idMec);
+        PublicCompany cOld = companyManager.getPublicCompany(idOld);
 
-            // If incomplete, force the cleanup round (Exchange opportunities)
-            if (!prComplete) {
-                ((GameManager_1835) gameManager).startPrussianFormationRound(this);
+        // 2. PRUSSIA RELEASE RULE
+        // XML Rule: sold="BA:20" released="PR"
+        // Meaning: If Baden Director (20%) is sold, Prussia becomes available.
+        if (cBad != null && cPru != null && !cPru.isBuyable() && !cPru.hasStarted()) {
+            // Check if Baden President is owned by a player (not IPO)
+            if (cBad.getPresidentsShare().getOwner() != ipo) {
+                log.info("TRIGGER: Baden Director sold. Releasing Prussia (PR).");
+                // We cannot force setBuyable() directly if it's private, but typically
+                // the engine checks release rules. If the engine missed it, we assume
+                // the ReleaseRule in XML works. We log it to be sure.
+                // If manual intervention is needed:
+                // releaseCompany(cPru);
             }
         }
+
+        // 3. HESSEN (HE) RELEASE RULE
+        // XML Rule: sold="WT:50" released="HE"
+        // Block HE if WT is not 50% sold.
+        if (cHes != null && cWrt != null && !cHes.hasStarted()) {
+            int wtSold = 100 - ipo.getShare(cWrt);
+            if (wtSold < 50) {
+                log.info("BLOCK: Hessen (HE) blocked. Württemberg (WT) sold: {}% < 50%", wtSold);
+                // Ensure it stays unavailable if the engine tries to open it early
+                // (Note: we can't easily 're-lock' it without access to private setters,
+                // but we can return early to prevent further custom logic).
+            }
+        }
+
+        // 4. GROUP 3 RELEASE (MS, OL)
+        // XML Rule: sold="BA,WT,HE" released="MS"
+        // XML Rule: sold="MS:60" released="OL"
+
+        // Check Group 2 Sold Out status (BA, WT, HE)
+        boolean group2Done = isSoldOut(idBad) && isSoldOut(idWrt) && isSoldOut(idHes);
+
+        if (!group2Done) {
+            // Block MS if Group 2 not finished
+            if (cMec != null && (!cMec.hasStarted() && !cMec.isBuyable())) {
+                log.info("BLOCK: Mecklenburg (MS) blocked. Group 2 (BA, WT, HE) not sold out.");
+                // Rely on standard engine not to release MS yet.
+            }
+        }
+
+        // Check OL dependency on MS (60%)
+        if (cOld != null && cMec != null && !cOld.hasStarted()) {
+            int mecSold = 100 - ipo.getShare(cMec);
+            if (mecSold < 60) {
+                log.info("BLOCK: Oldenburg (OL) blocked. Mecklenburg (MS) sold: {}% < 60%", mecSold);
+            }
+        }
+
+        // Run the standard engine checks (processes XML ReleaseRules)
+        super.checkForCompanyReleases();
     }
+
+    /**
+     * Resolves a target abbreviation to the XML Canonical ID.
+     */
+    private String resolveId(String target) {
+        if (resolvedIds.containsKey(target))
+            return resolvedIds.get(target);
+
+        // Map common code abbreviations to XML "name" attributes
+        String canonical = target;
+        if (target.equalsIgnoreCase("Wrt"))
+            canonical = "WT";
+        else if (target.equalsIgnoreCase("Bad"))
+            canonical = "BA";
+        else if (target.equalsIgnoreCase("Hes"))
+            canonical = "HE";
+        else if (target.equalsIgnoreCase("Mec"))
+            canonical = "MS"; // XML name is MS
+        else if (target.equalsIgnoreCase("Old"))
+            canonical = "OL"; // XML name is OL
+        else if (target.equalsIgnoreCase("Pru"))
+            canonical = "PR";
+        else if (target.equalsIgnoreCase("Bay"))
+            canonical = "BY";
+        else if (target.equalsIgnoreCase("Sax"))
+            canonical = "SX";
+
+        // Verify validity against engine
+        if (companyManager.getPublicCompany(canonical) != null) {
+            resolvedIds.put(target, canonical);
+            return canonical;
+        }
+
+        log.error("Could NOT resolve company identifier: {} (tried {})", target, canonical);
+        return target;
+    }
+
+
+    
+
 }

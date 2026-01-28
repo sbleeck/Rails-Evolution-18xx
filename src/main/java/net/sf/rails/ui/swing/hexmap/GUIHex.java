@@ -114,8 +114,8 @@ public class GUIHex implements Observer {
         SELECTABLE(0.9, Color.RED),
         // Phase 2: Lay Token (Forest Green - Matching OR Panel)
         TOKEN_SELECTABLE(0.8,Color.RED),
-        // Selected Hex (Construction Brown)
-        SELECTED(0.8, new Color(139, 69, 19)),
+        // Selected Hex (Construction red)
+        SELECTED(0.8, Color.GREEN),
         INVALIDS(0.9, Color.pink);
 
         private final double scale;

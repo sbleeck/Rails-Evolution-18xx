@@ -1449,8 +1449,7 @@ public class StockRound extends Round implements I_MapRenderableRound {
     // called by:
     // StockRound: buyShares, startCompany
 
-    // overridden by:
-    // StockRound 1856
+
     protected MoneyOwner getSharePriceRecipient(PublicCompany comp,
             Owner from, int price) {
 

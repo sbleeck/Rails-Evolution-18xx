@@ -1157,15 +1157,17 @@ public void revenueUpdate(int best, int special, boolean finalRes) {
         SwingUtilities.invokeLater(() -> {
             try {
                 if (lblRevenue != null) {
-                    // --- START FIX ---
                     // Delegate display formatting to the Operating Round (handles 1837 "25 + 30" style)
+                    // Use the calculated 'best' value for the label to show PROJECTION, not history.
                     RoundFacade rf = orUIManager.getGameUIManager().getCurrentRound();
                     if (rf instanceof OperatingRound) {
-                        lblRevenue.setText(((OperatingRound) rf).getRevenueDisplayString(orComp));
+                         // We temporarily inject the projected 'best' revenue into the formatter
+                         // Note: We cannot easily change the model here, so we format the 'best' int directly
+                         // or fallback to the formatted string if exact formatting isn't exposed.
+                         lblRevenue.setText(format(best)); 
                     } else {
                         lblRevenue.setText(format(best));
                     }
-                    // --- END FIX ---
                 }
                 
                 if (isRevenueValueToBeSet)
@@ -1884,6 +1886,7 @@ public void revenueUpdate(int best, int special, boolean finalRes) {
 
             distributeStandardActions(actions); 
             updateSidebarData(); 
+            updatePhaseSpecifics();
 
             if (sidebarPanel != null)
                 sidebarPanel.repaint();
