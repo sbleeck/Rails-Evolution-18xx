@@ -1156,20 +1156,8 @@ if (btnTrainSkip != null) btnTrainSkip.setEnabled(true);
 public void revenueUpdate(int best, int special, boolean finalRes) {
         SwingUtilities.invokeLater(() -> {
             try {
-                if (lblRevenue != null) {
-                    // Delegate display formatting to the Operating Round (handles 1837 "25 + 30" style)
-                    // Use the calculated 'best' value for the label to show PROJECTION, not history.
-                    RoundFacade rf = orUIManager.getGameUIManager().getCurrentRound();
-                    if (rf instanceof OperatingRound) {
-                         // We temporarily inject the projected 'best' revenue into the formatter
-                         // Note: We cannot easily change the model here, so we format the 'best' int directly
-                         // or fallback to the formatted string if exact formatting isn't exposed.
-                         lblRevenue.setText(format(best)); 
-                    } else {
-                        lblRevenue.setText(format(best));
-                    }
-                }
-                
+                if (lblRevenue != null)
+                    lblRevenue.setText(format(best));
                 if (isRevenueValueToBeSet)
                     setRevenue(orCompIndex, best);
                 if (finalRes && isDisplayCurrentRoutes()) {

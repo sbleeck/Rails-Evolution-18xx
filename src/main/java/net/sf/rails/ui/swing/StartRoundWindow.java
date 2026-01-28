@@ -97,6 +97,7 @@ public class StartRoundWindow extends JFrame implements ActionListener, KeyListe
     private Field[][] upperPlayerCaption;
     private Field[] lowerPlayerCaption;
     private JComponent[][] fields;
+    private int currentFontSize = 14; // Default to larger size
 
     private ActionButton bidButton;
     private ActionButton buyButton;
@@ -138,14 +139,21 @@ public class StartRoundWindow extends JFrame implements ActionListener, KeyListe
 
     private ORUIManager orUIManager;
     private int selectedItemIndex = -1;
+    private JPanel[] cardWrappers;
+    private static final Color COLOR_AVAILABLE = new Color(204, 255, 204); // Light Green
+    private static final Color COLOR_SOLD = new Color(220, 220, 220);      // Light Gray
 
     private void initCells() {
         int lastX = -1;
         int lastY = 0;
 
+
         int np = players.getNumberOfPlayers();
         int ni = round.getNumberOfStartItems();
         cards = new RailCard[ni];
+cardWrappers = new JPanel[ni];
+        Font cellFont = new Font("SansSerif", Font.BOLD, currentFontSize);
+        
 
         basePrice = new Field[ni];
         minBid = new Field[ni];
@@ -251,6 +259,7 @@ public class StartRoundWindow extends JFrame implements ActionListener, KeyListe
                     playerCaptionXOffset[col], 0, np, 1, 0);
             for (int i = 0; i < np; i++) {
                 upperPlayerCaption[col][i] = new Field(players.getPlayerByPosition(i).getPlayerNameModel());
+             upperPlayerCaption[col][i].setFont(cellFont);
                 addField(upperPlayerCaption[col][i], playerCaptionXOffset[col] + i,
                         upperPlayerCaptionYOffset, 1, 1, WIDE_BOTTOM);
             }
@@ -274,32 +283,58 @@ public class StartRoundWindow extends JFrame implements ActionListener, KeyListe
             cards[i].addActionListener(this);
             log.error("Added ActionListener to RailCard for StartItem index {}", si.getIndex());
 
-            // Apply scaling
-            cards[i].setScale(1.3);
+// 2. Scale Card Down (so it doesn't touch edges)
+            cards[i].setScale(1.0);
 
-            // Layout
-            addField(cards[i], itemNameXOffset[col], itemNameYOffset + row,
-                    1, 1, WIDE_LEFT + WIDE_RIGHT);
+            // 3. Create Wrapper Panel (The Green Edge)
+            cardWrappers[i] = new JPanel();
+            cardWrappers[i].setLayout(new GridBagLayout()); // Centers component by default
+            cardWrappers[i].setBackground(COLOR_AVAILABLE);
+            cardWrappers[i].setBorder(BorderFactory.createEtchedBorder()); // Optional: defined edge
+
+            // 4. Add Card to Wrapper (Center it)
+            cardWrappers[i].add(cards[i], new GridBagConstraints());
+
+            // 5. Add Wrapper to Main Grid
+            // The Wrapper FILLS the cell, creating the background area
+            gbc.gridx = itemNameXOffset[col];
+            gbc.gridy = itemNameYOffset + row;
+            gbc.gridwidth = 1;
+            gbc.gridheight = 1;
+            gbc.weightx = 0.5;
+            gbc.weighty = 0.5;
+            gbc.fill = GridBagConstraints.BOTH; 
+            gbc.insets = new Insets(1, 1, 1, 1); // Tiny gap between wrappers
+
+            statusPanel.add(cardWrappers[i], gbc);
+            
+            // IMPORTANT: The "field" logic must track the Wrapper now, not the card
+            if (fields != null && gbc.gridx < fields.length && gbc.gridy < fields[0].length) {
+                fields[gbc.gridx][gbc.gridy] = cardWrappers[i];
+            }
 
             if (showBasePrices) {
                 basePrice[i] = new Field(si.getBasePriceModel());
+                basePrice[i].setFont(cellFont);
                 addField(basePrice[i], basePriceXOffset[col], basePriceYOffset + row,
                         1, 1, 0);
             }
 
             if (includeBidding == StartRound.Bidding.ON_ITEMS) {
                 minBid[i] = new Field(round.getMinimumBidModel(i));
+                minBid[i].setFont(cellFont);
                 addField(minBid[i], minBidXOffset[col], minBidYOffset + row,
                         1, 1, WIDE_RIGHT);
             }
 
             for (int j = 0; j < np; j++) {
                 bidPerPlayer[i][j] = new Field(round.getBidModel(i, players.getPlayerByPosition(j)));
+                bidPerPlayer[i][j].setFont(cellFont);
                 addField(bidPerPlayer[i][j], bidPerPlayerXOffset[col] + j, bidPerPlayerYOffset + row,
                         1, 1, 0);
+                        
             }
 
-            // --- CONSOLIDATION: Info + Hex Highlighting on Card ---
             Certificate cert = si.getPrimary();
             Company comp = null;
             if (cert instanceof PublicCertificate) {
@@ -317,7 +352,6 @@ public class StartRoundWindow extends JFrame implements ActionListener, KeyListe
                 // Passing 'si' (StartItem) as the token source
                 HexHighlightMouseListener.addMouseListener(cards[i], gameUIManager.getORUIManager(), si);
             }
-            // --- END CONSOLIDATION ---
 
             // Invisible field, only used to hold current item status.
             itemStatus[i] = new Field(si.getStatusModel());
@@ -331,6 +365,7 @@ public class StartRoundWindow extends JFrame implements ActionListener, KeyListe
 
             for (int i = 0; i < np; i++) {
                 playerBids[i] = new Field(round.getBlockedCashModel(players.getPlayerByPosition(i)));
+               playerBids[i].setFont(cellFont);
                 addField(playerBids[i], playerBidsXOffset[0] + i, playerBidsYOffset,
                         1, 1, WIDE_TOP);
             }
@@ -349,16 +384,20 @@ public class StartRoundWindow extends JFrame implements ActionListener, KeyListe
             playerFree[i] = new Field(includeBidding != StartRound.Bidding.NO
                     ? round.getFreeCashModel(players.getPlayerByPosition(i))
                     : players.getPlayerByPosition(i).getWallet());
+                    playerFree[i].setFont(cellFont);
             addField(playerFree[i], playerFreeCashXOffset[0] + i, playerFreeCashYOffset, 1, 1,
                     firstBelowTable ? WIDE_TOP : 0);
         }
 
         for (int i = 0; i < np; i++) {
             lowerPlayerCaption[i] = new Field(players.getPlayerByPosition(i).getPlayerNameModel());
+            lowerPlayerCaption[i].setFont(cellFont);
             addField(lowerPlayerCaption[i], playerFreeCashXOffset[0] + i, playerFreeCashYOffset + 1, 1, 1, WIDE_TOP);
         }
 
         dummyButton = new ClickField("", "", "", this, itemGroup);
+    
+    updateFonts(currentFontSize);
     }
 
     private void addField(JComponent comp, int x, int y, int width, int height, int wideGapPositions) {
@@ -381,6 +420,36 @@ public class StartRoundWindow extends JFrame implements ActionListener, KeyListe
             fields[x][y] = comp;
         }
     }
+
+    private void updateFonts(int size) {
+        if (size < 8) size = 8;
+        if (size > 48) size = 48;
+        currentFontSize = size;
+        
+        Font f = new Font("SansSerif", Font.BOLD, currentFontSize);
+        
+        // Helper logic to update all arrays if they exist
+        if (basePrice != null) for (Field c : basePrice) if (c != null) c.setFont(f);
+        if (minBid != null) for (Field c : minBid) if (c != null) c.setFont(f);
+        if (playerBids != null) for (Field c : playerBids) if (c != null) c.setFont(f);
+        if (playerFree != null) for (Field c : playerFree) if (c != null) c.setFont(f);
+        if (lowerPlayerCaption != null) for (Field c : lowerPlayerCaption) if (c != null) c.setFont(f);
+        
+        if (upperPlayerCaption != null) {
+            for (Field[] row : upperPlayerCaption) {
+                if (row != null) for (Field c : row) if (c != null) c.setFont(f);
+            }
+        }
+        if (bidPerPlayer != null) {
+            for (Field[] row : bidPerPlayer) {
+                if (row != null) for (Field c : row) if (c != null) c.setFont(f);
+            }
+        }
+        
+        // Re-pack window to accommodate new size
+        if (gameUIManager != null) gameUIManager.packAndApplySizing(this);
+    }
+
 
     @Override
     public boolean processImmediateAction() {
@@ -690,10 +759,34 @@ public class StartRoundWindow extends JFrame implements ActionListener, KeyListe
 
         gameUIManager.packAndApplySizing(this);
     }
+private void setupHotkeys() {
+        // --- START FIX ---
+        // Bind Command/Ctrl + and - to font size adjustment
+        InputMap inputMap = statusPanel.getInputMap(JComponent.WHEN_IN_FOCUSED_WINDOW);
+        ActionMap actionMap = statusPanel.getActionMap();
+        
+        int mask = Toolkit.getDefaultToolkit().getMenuShortcutKeyMaskEx();
+        
+        // Increase Font (Cmd = and Cmd +)
+        inputMap.put(KeyStroke.getKeyStroke(KeyEvent.VK_EQUALS, mask), "increaseFont");
+        inputMap.put(KeyStroke.getKeyStroke(KeyEvent.VK_ADD, mask), "increaseFont");
+        actionMap.put("increaseFont", new AbstractAction() {
+            private static final long serialVersionUID = 1L;
+            public void actionPerformed(ActionEvent e) {
+                updateFonts(currentFontSize + 2);
+            }
+        });
 
-    private void setupHotkeys() {
-        // Hotkeys are now handled globally by GlobalHotkeyManager.
-        // This method remains empty to satisfy the call in init().
+        // Decrease Font (Cmd -)
+        inputMap.put(KeyStroke.getKeyStroke(KeyEvent.VK_MINUS, mask), "decreaseFont");
+        inputMap.put(KeyStroke.getKeyStroke(KeyEvent.VK_SUBTRACT, mask), "decreaseFont");
+        actionMap.put("decreaseFont", new AbstractAction() {
+            private static final long serialVersionUID = 1L;
+            public void actionPerformed(ActionEvent e) {
+                updateFonts(currentFontSize - 2);
+            }
+        });
+        // --- END FIX ---
     }
 
 
@@ -709,12 +802,18 @@ public class StartRoundWindow extends JFrame implements ActionListener, KeyListe
             // Clear previous actions
             cards[i].clearPossibleActions();
 
-            if (status == StartItem.SOLD) {
+if (status == StartItem.SOLD) {
                 cards[i].setState(RailCard.State.DISABLED);
                 String tooltipKey = itemStatusTextKeys[status];
                 cards[i].setToolTipText(LocalText.getText(tooltipKey));
+                
+                // Turn background Gray to indicate Sold
+                if (cardWrappers[i] != null) cardWrappers[i].setBackground(COLOR_SOLD);
             } else {
                 cards[i].setState(RailCard.State.PASSIVE);
+                // Turn background Green to indicate Available
+                if (cardWrappers[i] != null) cardWrappers[i].setBackground(COLOR_AVAILABLE);
+                
                 Certificate cert = si.getPrimary();
                 Company comp = null;
                 if (cert instanceof PublicCertificate) {
