@@ -10,7 +10,6 @@ import org.slf4j.LoggerFactory;
 
 import java.util.List;
 
-
 /**
  * @author martin, erik
  *
@@ -21,13 +20,11 @@ public class GameManager_1837 extends GameManager {
 
     private StringState newPhaseId = StringState.create(this, "newPhaseId", null);
 
-    protected final GenericState<Round> previousSRorOR =
-            new GenericState<> (this, "previousSRorOR");
+    protected final GenericState<Round> previousSRorOR = new GenericState<>(this, "previousSRorOR");
 
-    private SetState<String> doneThisRound = HashSetState.create (this, "doneThisRound");
+    private SetState<String> doneThisRound = HashSetState.create(this, "doneThisRound");
 
-    protected final BooleanState buyOnly =
-            new BooleanState(this, "buyOnly", false);
+    protected final BooleanState buyOnly = new BooleanState(this, "buyOnly", false);
 
     protected CompanyManager companyManager;
     protected PhaseManager phaseManager;
@@ -49,7 +46,7 @@ public class GameManager_1837 extends GameManager {
     }
 
     public void nextRound(Round prevRound) {
-log.info("Transitioning Round. Previous: {} ({})", prevRound.getId(), prevRound.getClass().getSimpleName());
+        log.info("Transitioning Round. Previous: {} ({})", prevRound.getId(), prevRound.getClass().getSimpleName());
 
         if (prevRound instanceof StartRound) {
             // In version 2, any subsequent start round will be buy-only (no bidding).
@@ -61,26 +58,40 @@ log.info("Transitioning Round. Previous: {} ({})", prevRound.getId(), prevRound.
                 startOperatingRound(runIfStartPacketIsNotCompletelySold());
             }
         } else if (prevRound instanceof CoalExchangeRound) {
-            //Since the CoalExchangeRound can happen after both types of rounds we need to move the
-            //round decision down to this class and cant call the superclass :(
+            // Since the CoalExchangeRound can happen after both types of rounds we need to
+            // move the
+            // round decision down to this class and cant call the superclass :(
 
             doneThisRound.add("CER");
-            if (checkAndRunNFR(newPhaseId.value(), previousSRorOR.value(), (Round)getInterruptedRound())) {
+            if (checkAndRunNFR(newPhaseId.value(), previousSRorOR.value(), (Round) getInterruptedRound())) {
                 return;
-            } else if (previousSRorOR.value() instanceof StockRound) {
-                // Start the first OR after an SR.
-                Phase currentPhase = getRoot().getPhaseManager().getCurrentPhase();
-                if (currentPhase == null) log.error("Current Phase is null??", new Exception(""));
-                numOfORs.set(currentPhase.getNumberOfOperatingRounds());
-                log.debug("Phase={} ORs={}", currentPhase.toText(), numOfORs.value());
+            }
 
-                // Create a new OperatingRound (never more than one Stock Round)
+            // --- FIX: Logic to prevent "Rogue" Stock Rounds ---
+            // If the round preceding CER was a Stock Round, we MUST go to Operating Round.
+            // Rule: "After the end of the next stock round there will be [X] operating
+            // rounds"
+
+            boolean cameFromStockRound = (previousSRorOR.value() instanceof StockRound);
+
+            if (cameFromStockRound) {
+
+                // Ensure we have the correct number of ORs for the current phase
+                Phase currentPhase = getRoot().getPhaseManager().getCurrentPhase();
+                if (currentPhase != null) {
+                    numOfORs.set(currentPhase.getNumberOfOperatingRounds());
+                }
+
+                // Force start of Operating Round 1
                 relativeORNumber.set(0);
                 startOperatingRound(true);
+
             } else if (relativeORNumber.value() < numOfORs.value()) {
-                // There will be another OR
+                // We came from an OR (e.g. OR 1.1 triggered Phase 5 -> CER).
+                // If there are more ORs left in this set, continue ORs.
                 startOperatingRound(true);
             } else {
+                // We came from the LAST OR, so now we go to Stock Round.
                 startStockRound();
             }
 
@@ -100,7 +111,7 @@ log.info("Transitioning Round. Previous: {} ({})", prevRound.getId(), prevRound.
                 super.nextRound(previousSRorOR.value());
             }
         } else if (prevRound instanceof StockRound_1837 || prevRound instanceof OperatingRound_1837) {
-            previousSRorOR.set (prevRound); // Remember where we came from!
+            previousSRorOR.set(prevRound); // Remember where we came from!
             doneThisRound.clear();
             setInterruptedRound(prevRound);
             log.info("Saving Interrupted Round: {}", prevRound.getId());
@@ -115,9 +126,9 @@ log.info("Transitioning Round. Previous: {} ({})", prevRound.getId(), prevRound.
     }
 
     public boolean checkAndRunCER(String newPhaseId, Round namingRound, Round interruptedRound) {
-        if (doneThisRound.contains("CER")) return false;
-        List<PublicCompany> coalCompanies =
-                getRoot().getCompanyManager().getPublicCompaniesByType("Coal");
+        if (doneThisRound.contains("CER"))
+            return false;
+        List<PublicCompany> coalCompanies = getRoot().getCompanyManager().getPublicCompaniesByType("Coal");
         boolean runCER = false;
         for (PublicCompany coalComp : coalCompanies) {
             if (!coalComp.isClosed()
@@ -129,18 +140,19 @@ log.info("Transitioning Round. Previous: {} ({})", prevRound.getId(), prevRound.
             }
         }
         if (runCER) {
-            //CoalRoundFollowedByOR.set(prevRound instanceof StockRound_1837);
+            // CoalRoundFollowedByOR.set(prevRound instanceof StockRound_1837);
             // Number the CER with the numeric part of the previous round.
             // After SR_n: CER_n.0
             // After OR_n.m: CER_n.m; if OR_n then CER_n.1
             String cerId;
             if (newPhaseId != null) {
-                cerId = "CER_phase_"+newPhaseId;
+                cerId = "CER_phase_" + newPhaseId;
             } else if (namingRound instanceof StockRound_1837) {
                 cerId = namingRound.getId().replaceFirst("SR_(\\d+)", "CER_$1.0");
             } else {
                 cerId = namingRound.getId().replaceFirst("OR_(\\d+)(\\.\\d+)?", "CER_$1$2");
-                if (!cerId.contains(".")) cerId += ".1";
+                if (!cerId.contains("."))
+                    cerId += ".1";
             }
             log.debug("Prev round {}, new round {}", namingRound.getId(), cerId);
             createRound(CoalExchangeRound.class, cerId).start();
@@ -152,8 +164,11 @@ log.info("Transitioning Round. Previous: {} ({})", prevRound.getId(), prevRound.
 
     /**
      * Check if a national formation (or minor merge) round needs be started
-     * @param namingRound The OR in which a phase has changed. Null if we are between rounds.
-     * @param interruptedRound The OR in which a phase has changed. Null if we are between rounds.
+     * 
+     * @param namingRound      The OR in which a phase has changed. Null if we are
+     *                         between rounds.
+     * @param interruptedRound The OR in which a phase has changed. Null if we are
+     *                         between rounds.
      */
     public boolean checkAndRunNFR(String newPhaseId, Round namingRound, Round interruptedRound) {
         // Check the nationals for having reached one of their formation steps
@@ -163,14 +178,15 @@ log.info("Transitioning Round. Previous: {} ({})", prevRound.getId(), prevRound.
         setInterruptedRound(interruptedRound);
         String[] nationalNames = GameDef_1837.Nationals;
         for (String nationalName : nationalNames) {
-            if (doneThisRound.contains(nationalName)) continue;
+            if (doneThisRound.contains(nationalName))
+                continue;
             PublicCompany_1837 national = (PublicCompany_1837) companyManager.getPublicCompany(nationalName);
             if (phaseManager.hasReachedPhase(national.getFormationStartPhase())
                     && !NationalFormationRound.nationalIsComplete(national)) {
                 // Check if this national is affected by a phase change
                 if (newPhaseId != null) {
                     if (newPhaseId.equals(national.getFormationStartPhase())
-                                && NationalFormationRound.presidencyIsInPool(national)
+                            && NationalFormationRound.presidencyIsInPool(national)
                             || newPhaseId.equals(national.getForcedStartPhase())
                             || newPhaseId.equals(national.getForcedMergePhase())) {
                         startNationalFormationRound(nationalName);
@@ -198,7 +214,8 @@ log.info("Transitioning Round. Previous: {} ({})", prevRound.getId(), prevRound.
             if (previousSRorOR.value() instanceof OperatingRound_1837) {
                 nfrReportName = previousSRorOR.value().getId().replaceFirst(
                         "OR_(\\d+)(\\.\\d+)?", "$1$2");
-                if (!nfrReportName.contains(".")) nfrReportName += ".1";
+                if (!nfrReportName.contains("."))
+                    nfrReportName += ".1";
             } else {
                 nfrReportName = previousSRorOR.value().getId().replaceFirst(
                         "SR_(\\d+)", "$1.0");
@@ -215,12 +232,14 @@ log.info("Transitioning Round. Previous: {} ({})", prevRound.getId(), prevRound.
                 .start(national, newPhaseId.value() != null, nfrReportName);
     }
 
-    /* (non-Javadoc)
+    /*
+     * (non-Javadoc)
+     * 
      * @see net.sf.rails.game.GameManager#runIfStartPacketIsNotCompletelySold()
      */
     @Override
     protected boolean runIfStartPacketIsNotCompletelySold() {
-        //After the first Startpacket sold out there will be Operation Rounds
+        // After the first Startpacket sold out there will be Operation Rounds
         StartPacket nextStartPacket = getRoot().getCompanyManager().getNextUnfinishedStartPacket();
         return !(nextStartPacket.getId().equalsIgnoreCase("Coal Mines"));
     }
@@ -260,6 +279,7 @@ log.info("Transitioning Round. Previous: {} ({})", prevRound.getId(), prevRound.
      *
      * In 1837, this refers to CoalExchangeRound and NationalFormationRound
      * instances. These can occur both in and between regular rounds.
+     * 
      * @param newPhaseId String value representing the phase just started, or null.
      */
     public void setNewPhaseId(String newPhaseId) {

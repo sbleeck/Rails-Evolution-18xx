@@ -793,14 +793,8 @@ public class StartRoundWindow extends JFrame implements ActionListener, KeyListe
             StartItem item = action.getStartItem();
 
             // LOGGING ASSIGNMENT
-            log.info("SRW: Assigning Action {} to Card Index {}", action, i);
             cards[i].setPossibleAction(action);
             
-            // Verify immediate assignment
-            if (cards[i].getPossibleActions().isEmpty()) {
-                 log.error("SRW: IMMEDIATE CHECK FAILED. Card {} has empty actions after setPossibleAction!", i);
-            }
-
             if (action instanceof BuyStartItem) {
                 buyAction = (BuyStartItem) action;
                 
@@ -848,12 +842,6 @@ public class StartRoundWindow extends JFrame implements ActionListener, KeyListe
             }
         }
         
-        // Final State Check Logging
-        for (int k = 0; k < cards.length; k++) {
-if (cards[k] != null && cards[k].getPossibleActions() != null && !cards[k].getPossibleActions().isEmpty()) {
-                     log.info("SRW: FINAL CHECK - Card {} has {} actions. State: {}", k, cards[k].getPossibleActions().size(), cards[k].getState());
-             }
-        }
 
         // 3. Pass Button Logic
         boolean passAllowed = false;
@@ -885,8 +873,6 @@ if (cards[k] != null && cards[k].getPossibleActions() != null && !cards[k].getPo
     public void actionPerformed(ActionEvent actor) {
         JComponent source = (JComponent) actor.getSource();
 
-        log.info("SRW: actionPerformed fired by Source Class: {}", source.getClass().getName());
-
       
 
         // Identify RailCard Clicks
@@ -910,7 +896,6 @@ if (cards[k] != null && cards[k].getPossibleActions() != null && !cards[k].getPo
             }
             
             StartItemAction currentActiveItem = (StartItemAction) actions.get(0);
-            log.info("SRW: Processing RailCard action: {}", currentActiveItem);
             SoundManager.notifyOfClickFieldSelection(currentActiveItem);
 
             if (currentActiveItem instanceof BuyStartItem) {
@@ -972,7 +957,6 @@ if (cards[k] != null && cards[k].getPossibleActions() != null && !cards[k].getPo
                 return;
             }
             PossibleAction activeItem = actions.get(0);
-            log.info("SRW: ActionButton Action: {}", activeItem);
 
             if (source == buyButton) {
                 if (activeItem instanceof BuyStartItem && ((BuyStartItem) activeItem).hasSharePriceToSet()) {

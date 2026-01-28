@@ -5,11 +5,16 @@ import java.util.List;
 import java.util.Set;
 import java.util.Map;
 import java.util.HashMap;
+import java.util.HashSet;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import net.sf.rails.common.*;
 import net.sf.rails.game.*;
 import net.sf.rails.game.financial.Bank;
 import net.sf.rails.game.state.*;
+
 import rails.game.action.*;
 
 /**
@@ -18,11 +23,13 @@ import rails.game.action.*;
  */
 public class CoalExchangeRound extends StockRound_1837 {
 
-    // --- FIX: Static map to persist skipped companies across round re-starts ---
+    private static final Logger log = LoggerFactory.getLogger(CoalExchangeRound.class);
+
+    // Static map to persist skipped companies across round re-starts
     private static Map<String, String> skippedCoalCompanies = new HashMap<>();
 
-    // --- FIX: Custom Action to handle Resets without using getLabel() ---
-private static class ResetSkipsAction extends PossibleAction implements GuiTargetedAction {
+    // --- FIX: Custom Action to handle Resets ---
+    private static class ResetSkipsAction extends PossibleAction implements GuiTargetedAction {
         private static final long serialVersionUID = 1L;
 
         public ResetSkipsAction(RailsRoot root) {
@@ -30,43 +37,25 @@ private static class ResetSkipsAction extends PossibleAction implements GuiTarge
         }
 
         @Override
-        public Owner getActor() {
-            return null; 
-        }
+        public Owner getActor() { return null; }
 
         @Override
-        public String getGroupLabel() {
-            return "Reset";
-        }
+        public String getGroupLabel() { return "Reset"; }
 
         @Override
-        public String getButtonLabel() {
-            return "Reset Skips & Retry";
-        }
+        public String getButtonLabel() { return "Reset Skips & Retry"; }
 
-        // --- START FIX ---
-        // UNIFIED "SYSTEM ALERT" SIGNATURE (Misty Rose / Red)
+        @Override
+        public java.awt.Color getButtonColor() { return new java.awt.Color(255, 228, 225); }
+
+        @Override
+        public java.awt.Color getHighlightBackgroundColor() { return new java.awt.Color(255, 228, 225); }
+
+        @Override
+        public java.awt.Color getHighlightBorderColor() { return java.awt.Color.RED; }
         
         @Override
-        public java.awt.Color getButtonColor() {
-            return new java.awt.Color(255, 228, 225); // MistyRose
-        }
-
-        @Override
-        public java.awt.Color getHighlightBackgroundColor() {
-            return new java.awt.Color(255, 228, 225); // MistyRose
-        }
-
-        @Override
-        public java.awt.Color getHighlightBorderColor() {
-            return java.awt.Color.RED;
-        }
-        
-        @Override
-        public java.awt.Color getHighlightTextColor() {
-            return java.awt.Color.BLACK;
-        }
-        // --- END FIX ---
+        public java.awt.Color getHighlightTextColor() { return java.awt.Color.BLACK; }
 
         @Override
         public boolean equalsAs(PossibleAction pa, boolean asOption) {
@@ -74,10 +63,9 @@ private static class ResetSkipsAction extends PossibleAction implements GuiTarge
         }
         
         @Override
-        public String toString() {
-            return "Reset Skips & Retry";
-        }
+        public String toString() { return "Reset Skips & Retry"; }
     }
+
     private ArrayListMultimapState<PublicCompany, PublicCompany> coalCompsPerMajor;
     private ArrayListMultimapState<Player, PublicCompany> coalCompsPerPlayer;
 
@@ -89,9 +77,7 @@ private static class ResetSkipsAction extends PossibleAction implements GuiTarge
     private ArrayListState<PublicCompany> closedMinors;
     private IntegerState numberOfExcessTrains;
 
-    // Track minors explicitly declined (Legacy/Session support)
     private ArrayListState<PublicCompany> skippedMinors;
-
     private ArrayListState<String> recordedMergeChoices;
     private IntegerState mergeChoiceIndex;
 
@@ -115,6 +101,7 @@ private static class ResetSkipsAction extends PossibleAction implements GuiTarge
     public void start() {
         String rawId = getId().replaceFirst("CER_(.+)", "$1");
         cerNumber = rawId.endsWith(".0") ? rawId.substring(0, rawId.length() - 2) : rawId;
+        log.info("CER_DEBUG: Starting Coal Exchange Round {}", cerNumber);
 
         coalCompsPerMajor = ArrayListMultimapState.create(this, "CoalsPerMajor_"+getId());
         coalCompsPerPlayer = ArrayListMultimapState.create(this, "CoalsPerPlayer_"+getId());
@@ -132,56 +119,65 @@ private static class ResetSkipsAction extends PossibleAction implements GuiTarge
         mergeChoiceIndex = IntegerState.create(this, "mergeChoiceIndex_" + getId());
 
         reachedPhase5 = getRoot().getPhaseManager().hasReachedPhase("5");
-
         step = IntegerState.create(this, "CERstep");
 
-        String message = "Start of Coal Exchange Round " + cerNumber;
-        ReportBuffer.add(this, message);
+        ReportBuffer.add(this, "Start of Coal Exchange Round " + cerNumber);
         
         init();
         
-        // --- FIX: Prevent tight loop freeze ---
         if (currentMajorOrder.isEmpty()) {
-            // Check if we have skips that caused this emptiness
-            boolean hasSkips = false;
-            for (String val : skippedCoalCompanies.values()) {
-                if (getId().equals(val)) { hasSkips = true; break; }
-            }
-            
-            if (!hasSkips) {
-                finishRound();
-            } else {
-                System.out.println("CER_DEBUG: Round empty due to skips. Staying open to prevent freeze.");
-            }
+            log.info("CER_DEBUG: No majors found in init(), finishing round immediately.");
+            finishRound();
         }
     }
 
-    private void init() {
+private void init() {
+        log.info("CER_DEBUG: Executing init()...");
+        step.set(MERGE);
+
         List<PublicCompany> comps = companyManager.getPublicCompaniesByType("Coal");
         for (PublicCompany comp : comps) {
             if (!comp.isClosed()) {
                 
-                // --- FIX: Check static persistence for skips ---
                 String skippedInRound = skippedCoalCompanies.get(comp.getId());
                 if (getId().equals(skippedInRound)) {
+                    // --- FIX: Use getId() instead of getName() ---
+                    log.info("CER_DEBUG: Skipping {} (already skipped in this round)", comp.getId());
                     continue;
                 }
                 
                 PublicCompany major = companyManager
                         .getPublicCompany(comp.getRelatedPublicCompanyName());
+                
                 if (major.hasFloated()) {
-                    coalCompsPerMajor.put(major, comp);
-                    coalCompsPerPlayer.put (comp.getPresident(), comp);
+                    if (!coalCompsPerMajor.containsEntry(major, comp)) {
+                        coalCompsPerMajor.put(major, comp);
+                        log.info("CER_DEBUG: Mapped {} to Major {}", comp.getId(), major.getId());
+                    } else {
+                        log.warn("CER_DEBUG: DUPLICATE DETECTED! {} -> {} was already mapped.", comp.getId(), major.getId());
+                    }
+
+                    if (!coalCompsPerPlayer.containsEntry(comp.getPresident(), comp)) {
+                        coalCompsPerPlayer.put(comp.getPresident(), comp);
+                    }
                 }
             }
         }
+        
         for (PublicCompany major : setOperatingCompanies("Major")) {
             if (coalCompsPerMajor.containsKey(major)) {
-                currentMajorOrder.add(major);
+                if (!currentMajorOrder.contains(major)) {
+                    currentMajorOrder.add(major);
+                    log.info("CER_DEBUG: Added Major {} to Order.", major.getId());
+                } else {
+                    log.warn("CER_DEBUG: DUPLICATE MAJOR! {} is already in order list.", major.getId());
+                }
             }
         }
-        step.set(MERGE);
+        log.info("CER_DEBUG: Init complete. Major Order Size: {}", currentMajorOrder.size());
     }
+
+
 
     @Override
     public String getOwnWindowTitle() {
@@ -196,10 +192,14 @@ private static class ResetSkipsAction extends PossibleAction implements GuiTarge
 
     @Override
     public boolean process (PossibleAction action) {
+        log.info("CER_DEBUG: Processing Action: {}", action.getClass().getSimpleName());
 
         if (action instanceof ExchangeCoalAction) {
             ExchangeCoalAction exc = (ExchangeCoalAction) action;
-            return executeMerge(exc.getCoalCompany(), exc.getTargetMajor(), false);
+            log.info("CER_DEBUG: Exchanging {} into {}", exc.getCoalCompany().getId(), exc.getTargetMajor().getId());
+            executeMerge(exc.getCoalCompany(), exc.getTargetMajor(), false);
+            setPossibleActions(); 
+            return true;
         }
 
         if (action instanceof MergeCompanies) {
@@ -207,112 +207,79 @@ private static class ResetSkipsAction extends PossibleAction implements GuiTarge
                 recordedMergeChoices.add("YES");
             }
             mergeChoiceIndex.add(1);
-            return executeMerge((MergeCompanies) action);
+            
+            PublicCompany minor = ((MergeCompanies)action).getMergingCompany();
+            PublicCompany major = ((MergeCompanies)action).getSelectedTargetCompany();
+             if (major == null && ((MergeCompanies)action).getTargetCompanies() != null) {
+                major = ((MergeCompanies)action).getTargetCompanies().get(0);
+            }
+            log.info("CER_DEBUG: MergeCompanies Action {} -> {}", minor.getId(), major.getId());
+            executeMerge(minor, major, false);
+            setPossibleActions();
+            return true;
 
         } else if (action instanceof DiscardTrain) {
             return discardTrain((DiscardTrain) action);
 
-        // --- FIX: Handle Reset using custom class ---
         } else if (action instanceof ResetSkipsAction) {
+            log.info("CER_DEBUG: Resetting Skips requested by user.");
             skippedCoalCompanies.clear();
             skippedMinors.clear();
-            init(); // Re-initialize to find companies
+            
+            if (currentMajor.value() != null) {
+                populatePlayersForMajor(currentMajor.value());
+            }
+            
             setPossibleActions();
             return true;
             
         } else if (action instanceof NullAction
                 && ((NullAction)action).getMode() == NullAction.Mode.DONE) {
             
+            log.info("CER_DEBUG: Player {} clicked Done.", action.getPlayer().getName());
             return done((NullAction)action, action.getPlayer(), false);
         } else {
             return super.process(action);
         }
     }
 
-    public boolean executeMerge (MergeCompanies action) {
-        PublicCompany minor = action.getMergingCompany();
-        PublicCompany major = action.getSelectedTargetCompany();
-        
-        if (major == null) {
-            List<PublicCompany> targets = action.getTargetCompanies();
-            if (targets != null && !targets.isEmpty()) {
-                major = targets.get(0);
-            }
-        }
-        
-        return executeMerge(minor, major, false);
-    }
-
     public boolean executeMerge (PublicCompany minor, PublicCompany major, boolean autoMerge) {
+        
         for (Train train : minor.getPortfolioModel().getTrainList()) {
             discardableTrains.put (train.getType(), train);
         }
 
-        boolean result = mergeCompanies(minor, major,false, autoMerge);
+        boolean result = mergeCompanies(minor, major, false, autoMerge);
+        
         closedMinors.add (minor);
         coalCompsPerMajor.remove (major, minor);
+        coalCompsPerPlayer.remove(currentPlayer, minor);
+        
         major.checkPresidency();
+        log.info("CER_DEBUG: Merge complete. Minor {} closed.", minor.getId());
 
-        if (result) {
-            coalCompsPerPlayer.remove(currentPlayer, minor);
-            
-            // --- FIX: Logic to check if player has more companies for THIS major ---
-            boolean hasMoreForCurrentMajor = false;
-            
-            List<PublicCompany> coalForThisMajor = coalCompsPerMajor.get(major);
-            if (coalForThisMajor != null && coalCompsPerPlayer.containsKey(currentPlayer)) {
-                for (PublicCompany c : coalCompsPerPlayer.get(currentPlayer)) {
-                    if (coalForThisMajor.contains(c)) {
-                        hasMoreForCurrentMajor = true;
-                        break;
-                    }
-                }
-            }
-
-            if (!hasMoreForCurrentMajor) {
-                boolean removed = currentPlayerOrder.remove(currentPlayer);
-
-                if (nextPlayer()) {
-                    return result;
-                } else if (checkForExcessTrains()) {
-                    step.set(DISCARD);
-                } else if (!nextMajorCompany()) {
-                    finishRound();
-                } else {
-                    step.set(MERGE);
-                }
-            } else {
-                setPossibleActions();
-            }
-        }
         return result;
     }
 
     private boolean checkForExcessTrains () {
         PublicCompany major = currentMajor.value();
+        if (major == null) return false;
+
         int excess = major.getNumberOfTrains() - major.getCurrentTrainLimit();
         int maxExcessFromMerger = discardableTrains.values().size();
-        int excessFromMerger = Math.min(excess, maxExcessFromMerger);
-        if (excessFromMerger <= 0) {
+        int actualExcess = Math.min(excess, maxExcessFromMerger);
+        
+        log.info("CER_DEBUG: Checking Trains for {}. Excess={}, FromMerger={}, Result={}", 
+                major.getId(), excess, maxExcessFromMerger, actualExcess);
+
+        if (actualExcess <= 0) {
+            clearDiscardableTrains(); 
             step.set(MERGE);
             return false;
         }
-        numberOfExcessTrains.set(excessFromMerger);
-
-        if (discardableTrains.keySet().size() > 1) return true;
-
-        List<Train> trains = discardableTrains.values().asList();
-
-        for (int i=0; i<excessFromMerger; i++) {
-            Train train = trains.get(i);
-            train.discard();
-            DisplayBuffer.add (this, LocalText.getText(
-                    "CompanyDiscardsTrain", major,
-                    train.getType(), pool));
-        }
-        clearDiscardableTrains();
-        numberOfExcessTrains.set(0);
-        return false;
+        
+        numberOfExcessTrains.set(actualExcess);
+        return true; 
     }
 
     @Override
@@ -326,12 +293,14 @@ private static class ResetSkipsAction extends PossibleAction implements GuiTarge
             numberOfExcessTrains.add(-1);
         }
 
-        if (numberOfExcessTrains.value() == 0) {
+        if (numberOfExcessTrains.value() <= 0) {
+            clearDiscardableTrains(); 
+            step.set(MERGE);
             if (!nextMajorCompany()) {
                 finishRound();
-            } else {
-                step.set(MERGE);
             }
+        } else {
+             setPossibleActions();
         }
         return result;
     }
@@ -346,14 +315,16 @@ private static class ResetSkipsAction extends PossibleAction implements GuiTarge
         
         Player p = (player != null) ? player : currentPlayer;
         
-        // --- FIX: Record skips in Static Map ---
         if (currentMajor != null && currentMajor.value() != null) {
             PublicCompany major = currentMajor.value();
             List<PublicCompany> potentialMinors = coalCompsPerMajor.get(major);
+            
             if (potentialMinors != null) {
                 for (PublicCompany minor : potentialMinors) {
                     if (minor.getPresident() == p) {
+                        log.info("CER_DEBUG: SKIP REGISTERED. Player {} skips minor {}", p.getName(), minor.getId());
                         skippedCoalCompanies.put(minor.getId(), getId());
+                        
                         if (!skippedMinors.contains(minor)) {
                             skippedMinors.add(minor);
                         }
@@ -362,164 +333,204 @@ private static class ResetSkipsAction extends PossibleAction implements GuiTarge
             }
         }
 
-        if (currentPlayerOrder != null) currentPlayerOrder.remove(currentPlayer);
-
-        if (currentPlayerOrder == null || currentPlayerOrder.isEmpty()) {
-            if (currentMajor != null && currentMajor.value() != null) 
-                currentMajorOrder.remove(currentMajor.value());
-                
-            if (!closedMinors.isEmpty() && checkForExcessTrains()) {
-                step.set(DISCARD);
-            } else if (!nextMajorCompany()){
-                finishRound();
-            }
-        } else {
-            nextPlayer();
+        if (currentPlayerOrder != null) {
+            boolean removed = currentPlayerOrder.remove(p);
+            log.info("CER_DEBUG: Removed player {} from current queue. Success={}", p.getName(), removed);
         }
-        return true;
+
+        return nextPlayer();
     }
 
-    @Override
+
+
+@Override
     public boolean setPossibleActions() {
         possibleActions.clear(); 
 
-        // --- FIX: If Major Order is empty but we are here, it's the Loop Protection ---
         if (currentMajorOrder.isEmpty()) {
-            // Add a forced pass to prevent UI freeze
-            NullAction na = new NullAction(getRoot(), NullAction.Mode.DONE);
-            na.setLabel("Pass (Enforced)");
-            na.setPlayer(currentPlayer != null ? currentPlayer : playerManager.getCurrentPlayer());
-            possibleActions.add(na);
-            
-            // Add Escape Hatch using ResetSkipsAction
-            possibleActions.add(new ResetSkipsAction(getRoot()));
-            return true;
+             log.info("CER_DEBUG: No majors left. Finishing round.");
+             finishRound();
+             return true;
         }
 
         if (step.value() == MERGE) {
              if (setMinorMergeActions()) return true; 
         } 
         
-        if (step.value() == DISCARD
-                && checkForExcessTrains()
-                && setTrainDiscardActions()) { 
-            return true;
-        } else {
-            return super.setPossibleActions();
-        }
+        if (step.value() == DISCARD) {
+             log.info("CER_DEBUG: Setting Train Discard Actions.");
+             setTrainDiscardActions();
+             return true;
+        } 
+        
+        possibleActions.add(new ResetSkipsAction(getRoot()));
+        
+        // --- FIX: Removed .size() call to prevent compilation error ---
+        log.info("CER_DEBUG: Actions have been set."); 
+
+        return super.setPossibleActions();
     }
 
+
+
+
     private boolean setMinorMergeActions() {
-
-        if (currentPlayer == null) {
+        
+        if (currentPlayer == null || !currentPlayerOrder.contains(currentPlayer)) {
+            log.info("CER_DEBUG: Current player is null or not in order. Moving to next player.");
             if (!nextPlayer()) {
-                finishRound(); 
-                return false; 
-            }
-        }
-
-        while (currentPlayer != null) {
-            
-            PublicCompany major = currentMajor.value();
-            List<PublicCompany> candidates = coalCompsPerMajor.get(major);
-            boolean actionsAdded = false;
-
-            if (candidates != null) {
-                for (PublicCompany minor : candidates) {
-                    
-                    if (skippedMinors.contains(minor)) continue;
-
-                    if (currentPlayer == minor.getPresident() && !minor.isClosed()) {
-                        possibleActions.add(new ExchangeCoalAction(minor, major));
-                        actionsAdded = true;
-                    }
-                }
-            }
-
-            if (actionsAdded) {
-                NullAction na = new NullAction(getRoot(), NullAction.Mode.DONE);
-                na.setLabel("Done / Pass");
-                na.setPlayer(currentPlayer); 
-                possibleActions.add(na);
                 return true; 
             }
-
-            currentPlayerOrder.remove(currentPlayer);
-            
-            if (!nextPlayer()) {
-                finishRound();
-                return false; 
-            }
-            
         }
-        return false;
+
+        PublicCompany major = currentMajor.value();
+        List<PublicCompany> candidates = coalCompsPerMajor.get(major);
+        boolean actionsAdded = false;
+
+        log.info("CER_DEBUG: Setting actions for Player {} regarding Major {}", 
+                currentPlayer.getName(), major.getId());
+
+        if (candidates != null) {
+            for (PublicCompany minor : candidates) {
+                if (skippedMinors.contains(minor)) {
+                    log.info("CER_DEBUG: Ignoring {} (in skippedMinors)", minor.getId());
+                    continue;
+                }
+
+                if (currentPlayer == minor.getPresident() && !minor.isClosed()) {
+                    possibleActions.add(new ExchangeCoalAction(minor, major));
+                    log.info("CER_DEBUG: Added exchange action for {}", minor.getId());
+                    actionsAdded = true;
+                }
+            }
+        }
+
+        if (actionsAdded) {
+            NullAction na = new NullAction(getRoot(), NullAction.Mode.DONE);
+            na.setLabel("Done / Pass"); 
+            na.setPlayer(currentPlayer); 
+            possibleActions.add(na);
+            return true; 
+        } else {
+            log.info("CER_DEBUG: No actions added for player. Auto-skipping.");
+            done(null, currentPlayer, true);
+            return true;
+        }
     }
 
     private boolean nextPlayer() {
-        PublicCompany major = currentMajor.value();
-        if (currentPlayerOrder.isEmpty()) {
-            if (major != null) {
-                currentMajorOrder.remove(major);
-            }
-            return nextMajorCompany();
-        } else {
-            Player nextPlayer = currentPlayerOrder.get(0);
-            setCurrentPlayer(nextPlayer);
+        log.info("CER_DEBUG: nextPlayer() called.");
+        
+        if (currentPlayerOrder != null && !currentPlayerOrder.isEmpty()) {
+            Player next = currentPlayerOrder.get(0);
+            log.info("CER_DEBUG: Switching to next player: {}", next.getName());
+            setCurrentPlayer(next);
+            setPossibleActions();
             return true;
+        }
+        
+        log.info("CER_DEBUG: No players left for this major. Checking excess trains.");
+        if (checkForExcessTrains()) {
+            step.set(DISCARD);
+            setPossibleActions(); 
+            return true;
+        }
+
+        return nextMajorCompany();
+    }
+
+    // --- FIX: Helper Method to populate players while respecting skips ---
+    private void populatePlayersForMajor(PublicCompany major) {
+        currentPlayerOrder.clear();
+        Player president = major.getPresident();
+        List<PublicCompany> coalCompanies = coalCompsPerMajor.get(major);
+        
+        log.info("CER_DEBUG: Populating players for Major {}. Candidates total: {}", 
+                major.getId(), (coalCompanies == null ? 0 : coalCompanies.size()));
+        
+        if (coalCompanies != null && !coalCompanies.isEmpty()) {
+            for (Player player : playerManager.getNextPlayersAfter(
+                    president, true, false)) {
+                
+                boolean hasEligibleCompany = false;
+                
+                for (PublicCompany coalComp : coalCompanies) {
+                    // FIX: CRITICAL LOOP PREVENTION CHECK
+                    boolean isSkipped = skippedMinors.contains(coalComp);
+                    
+                    if (!isSkipped && !coalComp.isClosed() && player == coalComp.getPresident()) {
+                        hasEligibleCompany = true;
+                        break; 
+                    } else {
+                        if (isSkipped && player == coalComp.getPresident()) {
+                            log.info("CER_DEBUG: Player {} excluded because {} is skipped.", player.getName(), coalComp.getId());
+                        }
+                    }
+                }
+
+                if (hasEligibleCompany) {
+                    if (!currentPlayerOrder.contains(player)) {
+                        currentPlayerOrder.add(player);
+                        log.info("CER_DEBUG: Player {} added to queue.", player.getName());
+                    }
+                }
+            }
         }
     }
 
     private boolean nextMajorCompany () {
         currentPlayerOrder.clear();
         closedMinors.clear();
+        
+        if (currentMajor.value() != null) {
+            currentMajorOrder.remove(currentMajor.value());
+        }
 
         while (true) {
             if (currentMajorOrder.isEmpty()) {
+                log.info("CER_DEBUG: Major Order Empty. Finishing.");
+                finishRound();
                 return false;
             } else {
                 PublicCompany major = currentMajorOrder.get(0);
                 currentMajor.set(major);
-                Player president = major.getPresident();
+                log.info("CER_DEBUG: Selected Next Major: {}", major.getId());
+                
                 clearDiscardableTrains();
+                numberOfExcessTrains.set(0);
+                step.set(MERGE);
 
                 if (majorMustMerge(major)) {
+                    log.info("CER_DEBUG: Mandatory Merge for {}", major.getId());
                     currentPlayer = null; 
-                    for (PublicCompany minor : coalCompsPerMajor.get(major)) {
-                        for (Train train : minor.getPortfolioModel().getTrainList()) {
-                            discardableTrains.put(train.getType(), train);
+                    List<PublicCompany> minors = coalCompsPerMajor.get(major);
+                    
+                    if (minors != null) {
+                        for (PublicCompany minor : new ArrayList<>(minors)) {
+                            executeMerge(minor, major, true);
                         }
-                        DisplayBuffer.add(this,
-                                LocalText.getText("AutoMergeMinorLog",
-                                        minor, major,
-                                        Bank.format(this, minor.getCash()),
-                                        minor.getPortfolioModel().getTrainList().size()));
-                        mergeCompanies(minor, major, false, true);
-                        closedMinors.add(minor);
                     }
-                    major.checkPresidency();
-                    currentMajorOrder.remove(major);
-                    if (!closedMinors.isEmpty() && checkForExcessTrains()) {
+                    
+                    if (checkForExcessTrains()) {
                         step.set(DISCARD);
-                        return false;
-                    } else if (currentMajorOrder.isEmpty()) {
-                        finishRound(); 
-                        return false;
-                    } else  {
+                        setPossibleActions();
+                        return true; 
+                    } else {
+                        currentMajorOrder.remove(major);
                         continue;
                     }
 
                 } else {
-                    List<PublicCompany> coalCompanies = coalCompsPerMajor.get(major);
-                    for (Player player : playerManager.getNextPlayersAfter(
-                            president, true, false)) {
-                        for (PublicCompany coalComp : coalCompanies) {
-                            if (!coalComp.isClosed() && player == coalComp.getPresident()) {
-                                currentPlayerOrder.add(player);
-                                break;
-                            }
-                        }
+                    log.info("CER_DEBUG: Optional Merge. Populating players.");
+                    populatePlayersForMajor(major);
+
+                    if (currentPlayerOrder.isEmpty()) {
+                        log.info("CER_DEBUG: No players for {}. Skipping.", major.getId());
+                        currentMajorOrder.remove(major);
+                        continue;
+                    } else {
+                        return nextPlayer();
                     }
-                    return nextPlayer();
                 }
             }
         }
@@ -528,28 +539,30 @@ private static class ResetSkipsAction extends PossibleAction implements GuiTarge
     protected boolean setTrainDiscardActions() {
         PublicCompany major = currentMajor.value();
         Set<Train> trains = java.util.Collections.emptySet(); 
+        
         if (!discardableTrains.isEmpty()) {
              java.util.Set<Train> tSet = new java.util.HashSet<>();
              for (TrainType type : discardableTrains.keySet()) {
-                tSet.add(discardableTrains.get(type).asList().get(0));
+                tSet.addAll(discardableTrains.get(type));
              }
              trains = tSet;
         }
         
-        possibleActions.add(new DiscardTrain(major, trains, true));
+        setCurrentPlayer(major.getPresident());
+        
+        DiscardTrain dt = new DiscardTrain(major, trains, true);
+        possibleActions.add(dt);
 
         discardingTrains.set(true);
         if (discardingCompanies == null) discardingCompanies = new PublicCompany[4];
         discardingCompanies[discardingCompanyIndex.value()] = major;
-        discardingCompanyIndex.add(1);
-
+        
         return true;
     }
 
     @Override
     protected void initPlayer() {  
-        currentPlayer = playerManager.getCurrentPlayer();
-        hasActed.set(false);
+        // Managed manually
     }
 
     @Override

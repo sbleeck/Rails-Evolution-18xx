@@ -1028,7 +1028,7 @@ if (btnTrainSkip != null) btnTrainSkip.setEnabled(true);
         targetBtn.setEnabled(true);
         if (hasSelection) {
             Color phaseColor = (activePhase == 1) ? PH_TILE_DARK : PH_TOKEN_DARK;
-            styleButton(targetBtn, phaseColor, "Confirm");
+            styleButton(targetBtn, SYS_BLUE, "Confirm");
         } else {
             styleButton(targetBtn, SYS_BLUE, "Skip");
         }
@@ -1153,11 +1153,21 @@ if (btnTrainSkip != null) btnTrainSkip.setEnabled(true);
         updateRevenueButton(btnRevSplit, a);
     }
 
-    public void revenueUpdate(int best, int special, boolean finalRes) {
+public void revenueUpdate(int best, int special, boolean finalRes) {
         SwingUtilities.invokeLater(() -> {
             try {
-                if (lblRevenue != null)
-                    lblRevenue.setText(format(best));
+                if (lblRevenue != null) {
+                    // --- START FIX ---
+                    // Delegate display formatting to the Operating Round (handles 1837 "25 + 30" style)
+                    RoundFacade rf = orUIManager.getGameUIManager().getCurrentRound();
+                    if (rf instanceof OperatingRound) {
+                        lblRevenue.setText(((OperatingRound) rf).getRevenueDisplayString(orComp));
+                    } else {
+                        lblRevenue.setText(format(best));
+                    }
+                    // --- END FIX ---
+                }
+                
                 if (isRevenueValueToBeSet)
                     setRevenue(orCompIndex, best);
                 if (finalRes && isDisplayCurrentRoutes()) {
@@ -1214,9 +1224,7 @@ if (btnTrainSkip != null) btnTrainSkip.setEnabled(true);
 
 // ... (lines of unchanged context code) ...
     public void processIPOBuy() {
-        log.info("TRACE: processIPOBuy() called. Actions available: {}", 
-                 (availableTrainActions == null ? "null" : availableTrainActions.size()));
-
+  
         if (availableTrainActions != null && !availableTrainActions.isEmpty()) {
             for (BuyTrain action : availableTrainActions) {
                 
@@ -1224,10 +1232,7 @@ if (btnTrainSkip != null) btnTrainSkip.setEnabled(true);
                 net.sf.rails.game.state.Owner seller = action.getFromOwner();
                 String sellerId = (seller != null) ? seller.getId() : "null";
                 String parentId = (seller != null && seller.getParent() != null) ? seller.getParent().getClass().getSimpleName() : "null";
-                
-                log.info("TRACE: Inspecting Action: '{}' | Seller: {} | Parent: {}", 
-                         action.getButtonLabel(), sellerId, parentId);
-
+         
                // Strict Filter: Only buy if seller is explicitly IPO or Bank (and NOT Pool)
                 boolean isIpo = false;
                 if (seller != null) {
@@ -1240,12 +1245,10 @@ if (btnTrainSkip != null) btnTrainSkip.setEnabled(true);
                 }
 
                 if (isIpo) {
-                    log.info("TRACE: >>> MATCH! Executing IPO Buy for {}", action.getButtonLabel());
                     
                     // Fix: Auto-fill price if missing. Engine rejects 0-price buys for standard trains.
                     if (action.getPricePaid() == 0 && action.getFixedCost() > 0) {
                         action.setPricePaid(action.getFixedCost());
-                        log.info("TRACE: Auto-corrected PricePaid to {}", action.getFixedCost());
                     }
 
                     List<PossibleAction> toExec = new ArrayList<>();
@@ -1254,12 +1257,10 @@ if (btnTrainSkip != null) btnTrainSkip.setEnabled(true);
                     orUIManager.processAction(BUY_TRAIN_CMD, toExec, this);
                     break;
                 } else {
-                    log.info("TRACE: ... Ignored (Not an IPO action)");
                 }
 
             }
         } else {
-            log.info("TRACE: processIPOBuy() - No actions to process.");
         }
     }
 
@@ -1583,8 +1584,17 @@ if (btnTrainSkip != null) btnTrainSkip.setEnabled(true);
             tokenDisplay.setTokens(available, orComp);
         }
 
-        if (lblRevenue != null)
-            lblRevenue.setText(format(orComp.getLastRevenue()));
+       
+        if (lblRevenue != null) {
+            // Use the smart display string instead of raw LastRevenue
+            RoundFacade rf = orUIManager.getGameUIManager().getCurrentRound();
+            if (rf instanceof OperatingRound) {
+                lblRevenue.setText(((OperatingRound) rf).getRevenueDisplayString(orComp));
+            } else {
+                lblRevenue.setText(format(orComp.getLastRevenue()));
+            }
+        }
+
         if (trainDisplay != null)
             trainDisplay.updateAssets(orComp);
     }
@@ -1829,7 +1839,6 @@ if (btnTrainSkip != null) btnTrainSkip.setEnabled(true);
             if (contextProvider != null) {
                 Owner actor = contextProvider.getActor();
                 if (actor instanceof PublicCompany && actor != this.orComp) {
-                    log.info("ORPanel: Context switch detected via {}. Switching to {}", contextProvider.getClass().getSimpleName(), actor.getId());
                     this.orComp = (PublicCompany) actor;
                     updateSidebarData(); 
                 }
@@ -1837,7 +1846,6 @@ if (btnTrainSkip != null) btnTrainSkip.setEnabled(true);
 
             // 5. RENDER SPECIAL MODE
             if (!specialActions.isEmpty()) {
-                log.info("ORPanel: Rendering SPECIAL MODE with {} generic actions.", specialActions.size());
                 
                 this.specialModeActive = true;
                 this.activePhase = 0;

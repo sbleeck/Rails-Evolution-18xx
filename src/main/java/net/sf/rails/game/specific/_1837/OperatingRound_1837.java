@@ -537,42 +537,118 @@ NullAction na = new NullAction(getRoot(), NullAction.Mode.DONE);
         return dividend;
     }
 
+
+@Override
+    public int getTileLayCost(PublicCompany company, MapHex hex, int standardCost) {
+        // 1. If the hex is NOT blocked, just return the standard cost (paying for rivers, etc.)
+        if (!hex.isBlockedByPrivateCompany()) {
+            return standardCost;
+        }
+
+        // 2. If the hex IS blocked, but isTileLayAllowed returned TRUE, 
+        // it means we are exercising the "Mountain Railway" exception (Owner/President check).
+        // In 1837, exercising this right waives the terrain cost.
+        if (isTileLayAllowed(company, hex, -1)) {
+            log.info("OR_1837: Waiving cost for hex " + hex.getId() + " due to Mountain Railway rights.");
+            return 0;
+        }
+
+        // Fallback (shouldn't happen if isTileLayAllowed is checked first)
+        return standardCost;
+    }
+
     @Override
-    protected boolean gameSpecificTileLayAllowed(PublicCompany company,
+    public String getRevenueDisplayString(PublicCompany company) {
+        // 1. If it's not a Coal company (or Minor representing one), use default
+        if (!company.getType().getId().equals("Coal") && !company.getType().getId().equals("Minor")) {
+            return super.getRevenueDisplayString(company);
+        }
+
+        // 2. Calculate the split
+        // We replicate the logic from calculateCurrentPotentialRevenue but keep components separate
+        if (!company.hasTrains()) return Bank.format(this, 0);
+
+        RevenueAdapter ra = RevenueAdapter.createRevenueAdapter(getRoot(), company, Phase.getCurrent(this));
+        if (ra == null) return super.getRevenueDisplayString(company);
+
+        ra.initRevenueCalculator(true);
+        int baseRevenue = ra.calculateRevenue();
+        int coalRevenue = ra.getSpecialRevenue(); // This comes from RunToCoalMineModifier
+
+        // 3. Format the output
+        // If there is special coal revenue, show the split
+        if (coalRevenue > 0) {
+            // e.g. "20 + 30"
+            return Bank.format(this, baseRevenue) + " + " + Bank.format(this, coalRevenue);
+        }
+
+        // Fallback if no coal income found this turn
+        return super.getRevenueDisplayString(company);
+    }
+
+    @Override
+    public boolean gameSpecificTileLayAllowed(PublicCompany company,
             MapHex hex, int orientation) {
+
         RailsRoot root = gameManager.getRoot();
-        List<MapHex> italyMapHexes = new ArrayList<>();
-        // 1. check Phase
-
         int phaseIndex = root.getPhaseManager().getCurrentPhase().getIndex();
+        String hexId = hex.getId();
+                
+        // -----------------------------------------------------------
+        // 1. CHECK PRIVATE BLOCKING
+        // -----------------------------------------------------------
         if (phaseIndex < 3) {
-            // Check if the Hex is blocked by a private ?
             if (hex.isBlockedByPrivateCompany()) {
-                if (company.getPresident().getPortfolioModel().getPrivateCompanies()
-                        .contains(hex.getBlockingPrivateCompany())) {
-                    // Check if the Owner of the PublicCompany is owner of the Private Company that
-                    // blocks
-                    // the hex (1837)
-                    return true;
-                }
-                return false;
-            }
-        }
-        if (phaseIndex >= 4) {
+                PrivateCompany blocker = hex.getBlockingPrivateCompany();
+                Owner owner = blocker.getOwner();
+                Player president = company.getPresident();
 
-            // 2. retrieve Italy vertices ...
-            String[] italyHexes = GameDef_1837.ItalyHexes.split(",");
-            for (String italyHex : italyHexes) {
-                italyMapHexes.add(root.getMapManager().getHex(italyHex));
-            }
-            if (italyMapHexes.contains(hex)) {
-                return false;
+
+                // Exception 1: Company owns the private
+                if (owner != null && (owner == company || owner.equals(company))) {
+                }
+                // Exception 2: President owns the private
+                else if (owner != null && president != null && (owner == president || owner.equals(president))) {
+                }
+                else {
+                    return false;
+                }
             }
         }
+
+        // -----------------------------------------------------------
+        // 2. CHECK RESERVATIONS
+        // -----------------------------------------------------------
+        if (hex.isReservedForCompany()) {
+            PublicCompany reservedFor = hex.getReservedForCompany();
+            
+
+            if (reservedFor != null && reservedFor != company) {
+                // FIX: If the reserved company is CLOSED (e.g. WT absorbed by S2), ignore the reservation
+                if (reservedFor.isClosed()) {
+                } else {
+                     return false;
+                }
+            }
+        }
+
+        // -----------------------------------------------------------
+        // 3. CHECK PHASE RESTRICTIONS
+        // -----------------------------------------------------------
+        if (phaseIndex >= 4) {
+             String[] italyHexes = GameDef_1837.ItalyHexes.split(",");
+             for (String italyHex : italyHexes) {
+                 if (hex.getId().equals(italyHex)) {
+                     return false;
+                 }
+             }
+        }
+        
         return true;
     }
 
-    // ... (lines 405-410)
+
+    
     @Override
     protected void prepareRevenueAndDividendAction() {
 

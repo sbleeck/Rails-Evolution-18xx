@@ -1540,14 +1540,33 @@ public class OperatingRound extends Round implements Observer {
         // performance impact.
         int potentialRevenue = ra.calculateRevenue();
 
-        // Consider special/direct income if applicable and part of presetRevenue logic
-        // int specialRevenue = ra.getSpecialRevenue();
-        // potentialRevenue += specialRevenue; // Or however it's combined
+// 1. Get the special revenue (calculated by RunToCoalMineModifier)
+        int specialRevenue = ra.getSpecialRevenue();
+
+        // log.info("OR_TRACE: Revenue for " + company.getId() 
+        //         + " | Base=" + potentialRevenue 
+        //         + " | Special=" + specialRevenue);
+
+        // 2. Add it to the total (This was commented out in your file!)
+        potentialRevenue += specialRevenue;
 
         return potentialRevenue;
     }
 
-    /*
+    /**
+     * Returns a formatted string for the current potential revenue.
+     * Default behavior: Returns the formatted currency (e.g. "£ 50").
+     * Subclasses can override this to show breakdowns (e.g. "20 + 30").
+     */
+    public String getRevenueDisplayString(PublicCompany company) {
+        // Default: Just calculate the total and format it
+        int total = calculateCurrentPotentialRevenue(company);
+        return Bank.format(this, total);
+    }
+
+
+
+/*
      * Extracted method, to be overridden for any extra cost.
      * Examples: SOH (river bridge), 1846 (generic lay cost), 1861 (second tile)
      */
@@ -1555,12 +1574,18 @@ public class OperatingRound extends Round implements Observer {
 
         SpecialTileLay stl = action.getSpecialProperty();
         int cost = 0;
+        
+        // 1. Calculate Standard Cost (Base Rails Logic)
         if (stl == null || !stl.isFree()) {
             cost = action.getChosenHex().getTileCost();
             if (stl != null) {
                 cost = Math.max(0, cost - stl.getDiscount());
             }
         }
+
+        // 2. Apply Game-Specific Overrides (e.g. 1837 Mountain Railway Waiver)
+        // We pass the calculated standard cost to the hook. If the hook returns 0, it overrides the cost.
+        cost = getTileLayCost(action.getCompany(), action.getChosenHex(), cost);
 
         return cost;
     }
@@ -1889,15 +1914,28 @@ public class OperatingRound extends Round implements Observer {
      * @param hex         The hex on which a tile is laid.
      * @param orientation The orientation in which the tile is laid (-1 is any).
      */
-    protected boolean isTileLayAllowed(PublicCompany company, MapHex hex,
+    public boolean isTileLayAllowed(PublicCompany company, MapHex hex,
             int orientation) {
 
         return gameSpecificTileLayAllowed(company, hex, orientation);
     }
 
+    /**
+     * Calculates the cost for a specific company to lay a tile on a hex.
+     * @param company The acting company.
+     * @param hex The target hex.
+     * @param standardCost The standard terrain/action cost calculated by the Rails engine.
+     * @return The final cost (possibly adjusted by private company ownership, etc).
+     */
+    public int getTileLayCost(PublicCompany company, MapHex hex, int standardCost) {
+        // Default behavior: The cost is exactly what the map says (mountains, rivers, etc.)
+        return standardCost;
+    }
+
+    
     protected boolean gameSpecificTileLayAllowed(PublicCompany company,
             MapHex hex, int orientation) {
-        return hex.isBlockedByPrivateCompany();
+        return !hex.isBlockedByPrivateCompany();
     }
 
     /*
@@ -3976,6 +4014,7 @@ public class OperatingRound extends Round implements Observer {
         MapHex hex = action.getChosenHex();
         int orientation = action.getOrientation();
 
+  
         while (true) {
             if (!companyName.equals(operatingCompany.value().getId())) {
                 errMsg = LocalText.getText("WrongCompany", companyName, operatingCompany.value().getId());
@@ -3996,6 +4035,17 @@ public class OperatingRound extends Round implements Observer {
                 errMsg = LocalText.getText("TileNotAvailable", tile.toText());
                 break;
             }
+
+            // Add Logging to debug why tiles are blocked
+            boolean allowed = isTileLayAllowed(operatingCompany.value(), hex, orientation);
+
+            if (!allowed) {
+                // Use a generic existing error message since "Blocked" might not exist
+                errMsg = LocalText.getText("TileMayNotBeLaidInHex", tile.toText(), hex.getId());
+                break;
+            }
+
+
             List<Tile> allowedTiles = action.getTiles();
             if (allowedTiles != null && !allowedTiles.isEmpty() && !allowedTiles.contains(tile)) {
                 errMsg = LocalText.getText("TileMayNotBeLaidInHex", tile.toText(), hex.getId());
