@@ -326,75 +326,111 @@ public static void loadAndStartGame(File gameFile) {
     }
 
 
-// [REPLACE the entire 'replayGame' method with this]
-    public boolean replayGame() {
+// // [REPLACE the entire 'replayGame' method with this]
+//     public boolean replayGame() {
+
+//         int actionCount;
+//         GameManager gameManager = railsRoot.getGameManager();
+//         log.info("--- GAMELOADER: REPLAYGAME START ---");
+//         if (moveLimit > 0) {
+//             log.info("GAMELOADER: Replay limited to {} actions.", moveLimit);
+//         }
+
+//         gameManager.setReloading(true);
+
+//         // CRITICAL: We must reset transient state for ALL round types that
+//         // have a reset method, otherwise they will be null on reload.
+//         if (gameManager.getCurrentRound() instanceof net.sf.rails.game.OperatingRound) {
+//             log.info("GAMELOADER: Detected OperatingRound. Calling resetTransientStateOnLoad().");
+//             ((net.sf.rails.game.OperatingRound) gameManager.getCurrentRound()).resetTransientStateOnLoad();
+//         } else if (gameManager.getCurrentRound() instanceof net.sf.rails.game.financial.StockRound) {
+//             log.info("GAMELOADER: Detected StockRound. Calling resetTransientStateOnLoad().");
+//             ((net.sf.rails.game.financial.StockRound) gameManager.getCurrentRound()).resetTransientStateOnLoad();
+//         } else if (gameManager.getCurrentRound() != null) {
+//             log.warn("GAMELOADER: Loaded round is of type '{}', no reset method specified.", gameManager.getCurrentRound().getClass().getName());
+//         } else {
+//             log.error("GAMELOADER: FATAL: getCurrentRound() is null on reload.");
+//         }
+
+//         if (gameIOData.getActions() != null) {
+//             // set possible actions for first action
+//             gameManager.getCurrentRound().setPossibleActions();
+
+//             int processedCount = 0; // Initialize counter
+//             for (PossibleAction action : gameIOData.getActions()) {
+//                 if (moveLimit > 0 && processedCount >= moveLimit) {
+//                     log.info("GAMELOADER: Replay limit reached ({}). Stopping replay.", moveLimit);
+//                     break;
+//                 }
+//                 processedCount++; // Increment counter
+
+//                 actionCount = increaseActionCounter();
+
+//                 // RE-APPLYING the brute-force try-catch block to the GameLoader.
+//                 // We must ignore errors in BOTH the loader and the manager.
+//                 try {
+//                     // GameManager.processOnReload() is also patched to always return 'true'
+//                     if (!gameManager.processOnReload(action)) {
+//                          // This block should theoretically not be reached if GameManager is patched,
+//                          // but we keep it for safety.
+//                         log.warn("GAMELOADER [BruteForce]: processOnReload returned false for action {}. IGNORING.", actionCount);
+//                     }
+//                 } catch (Exception e) {
+//                     // This handles any unexpected crash during the processOnReload call
+//                     log.error("GAMELOADER [BruteForce]: CRASH during replay of action {}. Action: {}. IGNORING. Error: {} -> {}",
+//                         actionCount,
+//                         action.getClass().getSimpleName(),
+//                         e.getClass().getSimpleName(),
+//                         e.getMessage());
+//                 }
+//             }
+//         }
+
+//         gameManager.setReloading(false);
+
+//         // FIXME (Rails2.0): CommentItems have to be replaced
+//         // ReportBuffer.setCommentItems(gameData.userComments);
+
+//         // callback to GameManager
+//         gameManager.finishLoading();
+//         // return true if no exception occurred
+//         return (exception == null);
+//     }
+
+
+public boolean replayGame() {
 
         int actionCount;
         GameManager gameManager = railsRoot.getGameManager();
-        log.info("--- GAMELOADER: REPLAYGAME START ---");
-        if (moveLimit > 0) {
-            log.info("GAMELOADER: Replay limited to {} actions.", moveLimit);
-        }
+        log.info("--- GAMELOADER: REPLAYGAME START (STRICT) ---");
 
+        // Note: Reloading=true disables some UI updates, but we need strict logic checking.
         gameManager.setReloading(true);
 
-        // CRITICAL: We must reset transient state for ALL round types that
-        // have a reset method, otherwise they will be null on reload.
         if (gameManager.getCurrentRound() instanceof net.sf.rails.game.OperatingRound) {
-            log.info("GAMELOADER: Detected OperatingRound. Calling resetTransientStateOnLoad().");
             ((net.sf.rails.game.OperatingRound) gameManager.getCurrentRound()).resetTransientStateOnLoad();
         } else if (gameManager.getCurrentRound() instanceof net.sf.rails.game.financial.StockRound) {
-            log.info("GAMELOADER: Detected StockRound. Calling resetTransientStateOnLoad().");
             ((net.sf.rails.game.financial.StockRound) gameManager.getCurrentRound()).resetTransientStateOnLoad();
-        } else if (gameManager.getCurrentRound() != null) {
-            log.warn("GAMELOADER: Loaded round is of type '{}', no reset method specified.", gameManager.getCurrentRound().getClass().getName());
-        } else {
-            log.error("GAMELOADER: FATAL: getCurrentRound() is null on reload.");
         }
 
         if (gameIOData.getActions() != null) {
-            // set possible actions for first action
             gameManager.getCurrentRound().setPossibleActions();
 
-            int processedCount = 0; // Initialize counter
             for (PossibleAction action : gameIOData.getActions()) {
-                if (moveLimit > 0 && processedCount >= moveLimit) {
-                    log.info("GAMELOADER: Replay limit reached ({}). Stopping replay.", moveLimit);
-                    break;
-                }
-                processedCount++; // Increment counter
-
                 actionCount = increaseActionCounter();
-
-                // RE-APPLYING the brute-force try-catch block to the GameLoader.
-                // We must ignore errors in BOTH the loader and the manager.
-                try {
-                    // GameManager.processOnReload() is also patched to always return 'true'
-                    if (!gameManager.processOnReload(action)) {
-                         // This block should theoretically not be reached if GameManager is patched,
-                         // but we keep it for safety.
-                        log.warn("GAMELOADER [BruteForce]: processOnReload returned false for action {}. IGNORING.", actionCount);
-                    }
-                } catch (Exception e) {
-                    // This handles any unexpected crash during the processOnReload call
-                    log.error("GAMELOADER [BruteForce]: CRASH during replay of action {}. Action: {}. IGNORING. Error: {} -> {}",
-                        actionCount,
-                        action.getClass().getSimpleName(),
-                        e.getClass().getSimpleName(),
-                        e.getMessage());
-                }
+                
+                // --- START FIX ---
+                // DIRECT CALL: No try-catch. 
+                // If processOnReload crashes, the exception escapes immediately.
+                // This stops the loop and fails the RegressionTest instantly.
+                gameManager.processOnReload(action);
+                // --- END FIX ---
             }
         }
 
         gameManager.setReloading(false);
-
-        // FIXME (Rails2.0): CommentItems have to be replaced
-        // ReportBuffer.setCommentItems(gameData.userComments);
-
-        // callback to GameManager
         gameManager.finishLoading();
-        // return true if no exception occurred
-        return (exception == null);
+        return true;
     }
 
     public RailsRoot getRoot() {

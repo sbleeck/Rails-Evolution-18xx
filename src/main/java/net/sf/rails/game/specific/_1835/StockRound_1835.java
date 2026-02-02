@@ -348,12 +348,12 @@ public class StockRound_1835 extends StockRound {
     public void start() {
         super.start();
 
-        // Debug: Print all actual Company IDs to the log to confirm our abbreviations
-        StringBuilder sb = new StringBuilder("Loaded Company IDs: ");
-        for (PublicCompany c : companyManager.getAllPublicCompanies()) {
-            sb.append(c.getId()).append(" ");
-        }
-        log.info(sb.toString());
+        // // Debug: Print all actual Company IDs to the log to confirm our abbreviations
+        // StringBuilder sb = new StringBuilder("Loaded Company IDs: ");
+        // for (PublicCompany c : companyManager.getAllPublicCompanies()) {
+        //     sb.append(c.getId()).append(" ");
+        // }
+        // log.info(sb.toString());
     }
 
     @Override

@@ -719,37 +719,39 @@ private void executeStartPrussian(boolean auto) {
                 }
             }
         }
+        
+        // ... (inside setPossibleActions) ...
         if (getPrussianStep() == Step.PRESIDENCY_SWAP) {
-            // Re-calculate options to display buttons
+// --- START FIX ---
+            // Automate the Presidency Swap (10% for 10%)
             Player oldPres = getPlayerByName(swapOldPresName.value());
             Player newPres = getPlayerByName(swapNewPresName.value());
 
-            if (oldPres == null || newPres == null) {
-                setPrussianStep(Step.MERGE);
-                return setPossibleActions();
+            if (oldPres != null && newPres != null) {
+                // Reuse existing logic to find the valid 10% share (or shares) to return
+                List<List<PublicCertificate>> options = calculateSwapOptions(newPres, oldPres);
+
+                if (!options.isEmpty()) {
+                    log.info("PFR: Automating presidency swap from {} to {}", oldPres.getName(), newPres.getName());
+                    // Execute the first valid option using the EXISTING method in this class
+                    performSwap(newPres, oldPres, options.get(0));
+                }
+                
+                // Ensure the loop continues with the NEW president (who triggered the swap)
+                setCurrentPlayer(newPres);
             }
 
-            // Ensure current player is the OLD president (the one choosing)
-            if (this.currentPlayer != oldPres) {
-                setCurrentPlayer(oldPres);
-            }
+            // Reset internal swap state
+            swapOldPresName.set(null);
+            swapNewPresName.set(null);
 
-            List<List<PublicCertificate>> options = calculateSwapOptions(newPres, oldPres);
-
-            int index = 0;
-            for (List<PublicCertificate> opt : options) {
-                PresidencySwapChoice action = new PresidencySwapChoice(index++);
-
-                String label = opt.stream()
-                        .map(c -> c.getShare() + "%")
-                        .collect(Collectors.joining(" + "));
-
-                action.setButtonLabel(
-                        "<html><center><b>Receive: " + label + "</b><br>Give Director Cert</center></html>");
-                possibleActions.add(action);
-            }
-            return true;
+            // Advance step to MERGE and immediately recurse to generate the next valid actions
+            setPrussianStep(Step.MERGE);
+            return setPossibleActions();
+// --- END FIX ---
         }
+// ...
+
 
         PublicCompany m2 = companyManager.getPublicCompany(M2_ID);
 
@@ -819,6 +821,7 @@ private void executeStartPrussian(boolean auto) {
         }
         return true;
     }
+
 
     private List<List<PublicCertificate>> calculateSwapOptions(Player newCandidate, Player currentPres) {
         int needed = prussian.getPresidentsShare().getShares(); // 10% usually (2 shares of 5%)

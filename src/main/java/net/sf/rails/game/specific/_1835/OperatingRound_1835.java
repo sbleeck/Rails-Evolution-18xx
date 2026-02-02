@@ -46,25 +46,28 @@ public class OperatingRound_1835 extends OperatingRound {
     protected final GenericState<PublicCompany> interruptedCompany = new GenericState<>(this, "InterruptedCompany");
     protected final BooleanState awaitingBadenHomeToken = new BooleanState(this, "AwaitingBadenHomeToken");
 
+    // Tracks if PFR has been triggered in this specific OR step to prevent "Double
+    // Trigger"
+    private final BooleanState pfrTriggeredThisOR = new BooleanState(this, "PfrTriggeredThisOR");
+    // Tracks how many trains we have processed to distinguish new purchases from
+    // old ones
+    private final IntegerState pfrHandledTrainCount = IntegerState.create(this, "PfrHandledTrainCount", 0);
 
-    // Tracks if PFR has been triggered in this specific OR step to prevent "Double Trigger"
-private final BooleanState pfrTriggeredThisOR = new BooleanState(this, "PfrTriggeredThisOR");
-// Tracks how many trains we have processed to distinguish new purchases from old ones
-private final IntegerState pfrHandledTrainCount = IntegerState.create(this, "PfrHandledTrainCount", 0);
-
+    // Tracks which company actually triggered the PFR (e.g. M1) so we can calculate
+    // relative turn order even if the engine auto-advances the pointer after the trigger closes.
+private final StringState pfrTriggerId = StringState.create(this, "PfrTriggerId", null);
 
     public OperatingRound_1835(GameManager parent, String id) {
         super(parent, id);
     }
 
-
     @Override
     protected void initTurn() {
         PublicCompany current = operatingCompany.value();
-    if (current == null || current.isClosed() || current.getPresident() == null) {
-        log.warn("initTurn() aborted: Operating company is null, closed, or has no president.");
-        return;
-    }
+        if (current == null || current.isClosed() || current.getPresident() == null) {
+            log.warn("initTurn() aborted: Operating company is null, closed, or has no president.");
+            return;
+        }
 
         super.initTurn();
         tokensLaidCount = 0;
@@ -84,89 +87,17 @@ private final IntegerState pfrHandledTrainCount = IntegerState.create(this, "Pfr
         }
     }
 
-@Override
+    @Override
     public void resetTransientStateOnLoad() { // CHANGED from protected to public
-        // No-op for 1835. 
+        // No-op for 1835.
         // We rely on the specific logic in resume() to restore state correctly.
     }
-
-@Override
-    public void resume() {
-        // 1. Clear trigger flags immediately to prevent false alarms during restoration
-        if (pfrTriggeredThisOR.value()) {
-            log.info("Resuming OperatingRound. Clearing PFR Trigger Flag.");
-            pfrTriggeredThisOR.set(false);
-            needPrussianFormationCall.set(false);
-        }
-
-        super.resume();
-
-        // 2. SELF-HEALING: If the company we resumed into is closed (e.g. M5 merged into PR),
-        // we must auto-advance to the next valid company (e.g. M6) immediately.
-        PublicCompany current = operatingCompany.value();
-        if (current != null && current.isClosed()) {
-            log.info("Resume Check: Operating Company {} is CLOSED. Advancing turn.", current.getId());
-            advanceToNextOperationalCompany(); // This helper must be in your file (see below)
-            
-            // Recurse: Call resume() again to ensure the NEW company (e.g. M6) is set up correctly
-            resume();
-            return;
-        }
-
-        // 3. Critical Guard: If PFR started during resume (e.g. triggered by super.resume logic), 
-        // control has passed to PFR. We must suspend local logic.
-        if (gameManager.getCurrentRound() instanceof PrussianFormationRound) {
-            log.info("Resuming OperatingRound: PFR is active. Suspending OR resume.");
-            return;
-        }
-
-        // 4. Cleanup legacy flags (Standard 1835 Logic)
-        boolean prStarted = companyManager.getPublicCompany(GameDef_1835.PR_ID).hasStarted();
-        boolean alreadyOffered = ((GameManager_1835) gameManager).hasPrussianFormationBeenOffered();
-        if (prStarted || alreadyOffered) {
-            this.needPrussianFormationCall.set(false);
-        }
-
-        // 5. Index Resync (Keep your existing safety check for non-closed companies)
-        if (operatingCompany.value() != null) {
-            PublicCompany activeComp = operatingCompany.value();
-            List<PublicCompany> comps = getOperatingCompanies();
-            if (comps != null && comps.contains(activeComp)) {
-                int correctIndex = comps.indexOf(activeComp);
-                try {
-                    java.lang.reflect.Field indexField = null;
-                    Class<?> clazz = this.getClass();
-                    while (clazz != null && indexField == null) {
-                        try { indexField = clazz.getDeclaredField("orCompIndex"); } catch (Exception e) {}
-                        if (indexField == null) try { indexField = clazz.getDeclaredField("index"); } catch (Exception e) {}
-                        if (indexField == null) clazz = clazz.getSuperclass();
-                    }
-                    if (indexField != null) {
-                        indexField.setAccessible(true);
-                        indexField.setInt(this, correctIndex);
-                    }
-                } catch (Exception e) {
-                    // Ignore reflection errors
-                }
-            }
-        }
-
-        // 6. Ensure the correct player is active
-        if (operatingCompany.value() != null && !operatingCompany.value().isClosed()) {
-            playerManager.setCurrentPlayer(operatingCompany.value().getPresident());
-        }
-
-        // 7. Check for Excess Trains (Standard Logic)
-        if (checkForExcessTrains()) {
-            setStep(GameDef.OrStep.DISCARD_TRAINS);
-        }
-    }
-
 
     @Override
     public boolean setPossibleActions() {
         // --- GUARD 1: Dead Company Check ---
-        // If the engine asks for actions but the company is closed (e.g. M5 just merged),
+        // If the engine asks for actions but the company is closed (e.g. M5 just
+        // merged),
         // we advance to the next company and retry.
         PublicCompany current = operatingCompany.value();
         if (current != null && current.isClosed()) {
@@ -189,7 +120,7 @@ private final IntegerState pfrHandledTrainCount = IntegerState.create(this, "Pfr
         }
 
         // --- EXISTING 1835 LOGIC STARTS HERE ---
-        
+
         if (awaitingBadenHomeToken.value()) {
             possibleActions.clear();
             doneAllowed.set(false);
@@ -278,65 +209,67 @@ private final IntegerState pfrHandledTrainCount = IntegerState.create(this, "Pfr
         return result;
     }
 
-
-@Override
+    @Override
     public boolean buyTrain(BuyTrain action) {
         boolean success = super.buyTrain(action);
-        if (!success) return false;
+        if (!success)
+            return false;
 
         // --- START FIX: PFR TRIGGER LOGIC ---
         if (!trainsBoughtThisTurn.isEmpty() && trainsBoughtThisTurn.size() > pfrHandledTrainCount.value()) {
             TrainCardType bought = trainsBoughtThisTurn.get(trainsBoughtThisTurn.size() - 1);
             String id = bought.getId();
-            
+
             // Identify Trigger Trains
             boolean isFirst4 = "4".equals(id) && bought.getNumberBoughtFromIPO() == 1;
             boolean isFirst4Plus4 = "4+4".equals(id) && bought.getNumberBoughtFromIPO() == 1;
             boolean isFirst5 = "5".equals(id) && bought.getNumberBoughtFromIPO() == 1;
 
             if (isFirst4 || isFirst4Plus4 || isFirst5) {
-                 GameManager_1835 gm = (GameManager_1835) gameManager;
-                 PublicCompany pr = companyManager.getPublicCompany(GameDef_1835.PR_ID);
-                 boolean prStarted = (pr != null && pr.hasStarted());
+                GameManager_1835 gm = (GameManager_1835) gameManager;
+                PublicCompany pr = companyManager.getPublicCompany(GameDef_1835.PR_ID);
+                boolean prStarted = (pr != null && pr.hasStarted());
 
-                 // CRITICAL FIX: The trigger is MANDATORY if:
-                 // 1. It is the 5-train (Phase 5 closing).
-                 // 2. It is the 4+4 train AND Prussia hasn't started yet (Forces M2 to merge).
-                 boolean isMandatory = isFirst5 || (isFirst4Plus4 && !prStarted);
-                 
-                 // Trigger if it's the first time we ask, OR if the event is mandatory
-                 if (!gm.hasPrussianFormationBeenOffered() || isMandatory) {
-                     
-                     log.info(">>> PFR Triggered by {} buying {} (Mandatory={})", action.getCompany().getId(), id, isMandatory);
-                     
-                     // 1. Lock the OR
-                     pfrHandledTrainCount.set(trainsBoughtThisTurn.size());
-                     pfrTriggeredThisOR.set(true);
-                     
-                     // 2. Identify Starter
-                     Player starter = playerManager.getCurrentPlayer();
-                     PublicCompany m2 = companyManager.getPublicCompany(GameDef_1835.M2_ID);
-                     
-                     // If Prussia isn't open, M2 is the "Primary Target" for the forced merge
-                     if (!prStarted && m2 != null && !m2.isClosed() && m2.getPresident() != null) {
-                         starter = m2.getPresident();
-                     } else if (prStarted && pr != null && pr.getPresident() != null) {
-                         starter = pr.getPresident();
-                     }
-                     
-                     // 3. Fire the Round Switch
-                     gm.setPrussianFormationStartingPlayer(starter);
-                     gm.startPrussianFormationRound(this);
-                 }
+                // CRITICAL FIX: The trigger is MANDATORY if:
+                // 1. It is the 5-train (Phase 5 closing).
+                // 2. It is the 4+4 train AND Prussia hasn't started yet (Forces M2 to merge).
+                boolean isMandatory = isFirst5 || (isFirst4Plus4 && !prStarted);
+
+                // Trigger if it's the first time we ask, OR if the event is mandatory
+                if (!gm.hasPrussianFormationBeenOffered() || isMandatory) {
+
+                    log.info(">>> PFR Triggered by {} buying {} (Mandatory={})", action.getCompany().getId(), id,
+                            isMandatory);
+
+                    // 1. Lock the OR
+                    pfrHandledTrainCount.set(trainsBoughtThisTurn.size());
+                    pfrTriggeredThisOR.set(true);
+                    
+                    // Capture the Trigger Company (M1) immediately
+                    pfrTriggerId.set(action.getCompany().getId());
+
+
+                    // 2. Identify Starter
+                    Player starter = playerManager.getCurrentPlayer();
+                    PublicCompany m2 = companyManager.getPublicCompany(GameDef_1835.M2_ID);
+
+                    // If Prussia isn't open, M2 is the "Primary Target" for the forced merge
+                    if (!prStarted && m2 != null && !m2.isClosed() && m2.getPresident() != null) {
+                        starter = m2.getPresident();
+                    } else if (prStarted && pr != null && pr.getPresident() != null) {
+                        starter = pr.getPresident();
+                    }
+
+                    // 3. Fire the Round Switch
+                    gm.setPrussianFormationStartingPlayer(starter);
+                    gm.startPrussianFormationRound(this);
+                }
             }
         }
         // --- END FIX ---
 
         return true;
     }
-
-
-
 
     @Override
     protected void newPhaseChecks() {
@@ -547,7 +480,7 @@ private final IntegerState pfrHandledTrainCount = IntegerState.create(this, "Pfr
                 } else {
                     ((GameManager_1835) gameManager).startPrussianFormationRound(this);
                 }
-                // After PFR returns, the company that bought the train (e.g., M5) 
+                // After PFR returns, the company that bought the train (e.g., M5)
                 // might be closed. We must switch context now.
                 handleClosedOperatingCompany();
             }
@@ -562,7 +495,7 @@ private final IntegerState pfrHandledTrainCount = IntegerState.create(this, "Pfr
 
                 if (!companySwitched) {
                     playerManager.setCurrentPlayer(operatingCompany.value().getPresident());
-                    // If the current company hasn't bought trains yet, this discard 
+                    // If the current company hasn't bought trains yet, this discard
                     // was likely an interrupt triggered by the PREVIOUS player (e.g. limit drop).
                     // We must let the current company start their turn from the beginning.
                     if (trainsBoughtThisTurn.isEmpty()) {
@@ -981,7 +914,8 @@ private final IntegerState pfrHandledTrainCount = IntegerState.create(this, "Pfr
                 }
             }
 
-            // Filter "Dead" Special Token Lays (e.g. PfB, NF) if the target hex is physically full.
+            // Filter "Dead" Special Token Lays (e.g. PfB, NF) if the target hex is
+            // physically full.
             // If both slots on L6 (PfB) or M15 (NF) are occupied, the action is impossible.
             if (action instanceof LayBaseToken && sp != null) {
                 LayBaseToken lbt = (LayBaseToken) action;
@@ -998,16 +932,17 @@ private final IntegerState pfrHandledTrainCount = IntegerState.create(this, "Pfr
                                 }
                             }
                         }
-                        if (hasSpace) break;
+                        if (hasSpace)
+                            break;
                     }
-                    
+
                     if (!hasSpace) {
                         possibleActions.remove(action);
                     }
                 }
             }
         }
-        
+
     }
 
     @Override
@@ -1252,16 +1187,17 @@ private final IntegerState pfrHandledTrainCount = IntegerState.create(this, "Pfr
                 // 1. Update the State
                 operatingCompany.set(nextComp);
                 // Force the step to INITIAL so that next can lay tiles/tokens.
-            setStep(GameDef.OrStep.INITIAL);
-            
-            // Clear the trains bought list so the new company isn't blocked from buying trains later.
-            if (trainsBoughtThisTurn != null) {
-                trainsBoughtThisTurn.clear();
-            }
-            
-            // Clear any "normal tile laid" flags inherited from the previous company.
-            normalTileLaidThisTurn.set(false);
-            normalTokenLaidThisTurn.set(false);
+                setStep(GameDef.OrStep.INITIAL);
+
+                // Clear the trains bought list so the new company isn't blocked from buying
+                // trains later.
+                if (trainsBoughtThisTurn != null) {
+                    trainsBoughtThisTurn.clear();
+                }
+
+                // Clear any "normal tile laid" flags inherited from the previous company.
+                normalTileLaidThisTurn.set(false);
+                normalTokenLaidThisTurn.set(false);
 
                 // 2. Update the internal index via Reflection (Best Effort)
                 try {
@@ -1301,59 +1237,240 @@ private final IntegerState pfrHandledTrainCount = IntegerState.create(this, "Pfr
         return false;
     }
 
+    /**
+     * Safely advances the operating company pointer if the current one is closed.
+     * This replaces "finishTurn()" for the specific case of a closed company skip.
+     */
+    private void advanceToNextOperationalCompany() {
+        PublicCompany current = operatingCompany.value();
+        List<PublicCompany> companies = getOperatingCompanies();
 
-    // --- START NEW HELPER METHOD ---
-/**
- * Safely advances the operating company pointer if the current one is closed.
- * This replaces "finishTurn()" for the specific case of a closed company skip.
- */
-private void advanceToNextOperationalCompany() {
-    PublicCompany current = operatingCompany.value();
-    List<PublicCompany> companies = getOperatingCompanies();
-    
-    if (companies == null || companies.isEmpty()) return;
+        if (companies == null || companies.isEmpty())
+            return;
 
-    int currentIndex = companies.indexOf(current);
-    if (currentIndex == -1) currentIndex = 0;
+        int currentIndex = companies.indexOf(current);
+        if (currentIndex == -1)
+            currentIndex = 0;
 
-    // Cycle forward to find the next OPEN and FLOATED company
-    int attempts = 0;
-    int nextIndex = currentIndex;
-    PublicCompany nextComp = null;
+        // Cycle forward to find the next OPEN and FLOATED company
+        int attempts = 0;
+        int nextIndex = currentIndex;
+        PublicCompany nextComp = null;
 
-    while (attempts < companies.size()) {
-        nextIndex = (nextIndex + 1) % companies.size();
-        PublicCompany candidate = companies.get(nextIndex);
-        // CRITICAL: Must be floated AND not closed
-        if (!candidate.isClosed() && candidate.hasFloated()) {
-            nextComp = candidate;
-            break;
+        while (attempts < companies.size()) {
+            nextIndex = (nextIndex + 1) % companies.size();
+            PublicCompany candidate = companies.get(nextIndex);
+            // CRITICAL: Must be floated AND not closed
+            if (!candidate.isClosed() && candidate.hasFloated()) {
+                nextComp = candidate;
+                break;
+            }
+            attempts++;
         }
-        attempts++;
+
+        if (nextComp != null && nextComp != current) {
+            log.info("Self-Healing: Company {} is closed. forcing switch to {}.",
+                    (current != null ? current.getId() : "null"), nextComp.getId());
+
+            operatingCompany.set(nextComp);
+
+            // Reset the round step to INITIAL so the new company starts fresh
+            // (Prevents inheriting 'BUY_TRAIN' or 'DISCARD_TRAINS' from the dead company)
+            setStep(GameDef.OrStep.INITIAL);
+
+            // Clear transient turn flags
+            trainsBoughtThisTurn.clear();
+            normalTileLaidThisTurn.set(false);
+            normalTokenLaidThisTurn.set(false);
+
+            // Ensure the engine knows who is playing
+            if (nextComp.getPresident() != null) {
+                playerManager.setCurrentPlayer(nextComp.getPresident());
+            }
+        }
     }
 
-    if (nextComp != null && nextComp != current) {
-        log.info("Self-Healing: Company {} is closed. forcing switch to {}.", 
-                 (current != null ? current.getId() : "null"), nextComp.getId());
-        
-        operatingCompany.set(nextComp);
-        
-        // Reset the round step to INITIAL so the new company starts fresh
-        // (Prevents inheriting 'BUY_TRAIN' or 'DISCARD_TRAINS' from the dead company)
+    private void refreshOperatingCompaniesList() {
+        // 1. Get the raw truth from the CompanyManager
+        List<PublicCompany> all = companyManager.getAllPublicCompanies();
+        List<PublicCompany> minors = new ArrayList<>();
+        List<PublicCompany> majors = new ArrayList<>();
+
+        for (PublicCompany c : all) {
+            if (c.isClosed())
+                continue; // Filter out closed companies (M2)
+
+            if (c.getType().getId().equals("Minor")) {
+                minors.add(c);
+            } else if (c.hasFloated()) {
+                majors.add(c);
+            }
+        }
+
+        // 2. Sort Minors (ID Ascending)
+        Collections.sort(minors, (c1, c2) -> c1.getId().compareTo(c2.getId()));
+
+        // 3. Sort Majors (Price Descending, then ID)
+        Collections.sort(majors, new Comparator<PublicCompany>() {
+            @Override
+            public int compare(PublicCompany c1, PublicCompany c2) {
+                int p1 = (c1.getCurrentSpace() != null) ? c1.getCurrentSpace().getPrice() : 0;
+                int p2 = (c2.getCurrentSpace() != null) ? c2.getCurrentSpace().getPrice() : 0;
+                if (p1 != p2)
+                    return p2 - p1;
+                return c1.getId().compareTo(c2.getId());
+            }
+        });
+
+        // 4. Combine
+        List<PublicCompany> newOrder = new ArrayList<>(minors);
+        newOrder.addAll(majors);
+
+        // 5. UPDATE THE SOURCE OF TRUTH
+        // Fix: ArrayListState does not support addAll, so we use clear() + loop add()
+        this.operatingCompanies.clear();
+        for (PublicCompany c : newOrder) {
+            this.operatingCompanies.add(c);
+        }
+
+        log.info("Refreshed Operating Companies. New Count: " + this.operatingCompanies.size());
+    }
+
+    @Override
+    public void resume() {
+        // 1. Standard Resume Logic
+        if (pfrTriggeredThisOR.value()) {
+            pfrTriggeredThisOR.set(false);
+            needPrussianFormationCall.set(false);
+        }
+        super.resume();
+
+        // 2. SURGICAL FIX:
+        // Check if we need to patch the list (M2 closed, Prussia open but missing).
+        // This modifies the list in-place without disturbing other companies.
+        surgicalPrussiaFix();
+    }
+
+
+    @Override
+    protected boolean setNextOperatingCompany(boolean initial) {
+
+        // 1. Navigation using the trusted list (No sorting!)
+        if (operatingCompanies.isEmpty())
+            return false;
+
+        PublicCompany current = operatingCompany.value();
+        PublicCompany next = null;
+
+        if (initial || current == null) {
+            next = operatingCompanies.get(0);
+        } else {
+            int index = operatingCompanies.indexOf(current);
+            if (index >= 0 && index < operatingCompanies.size() - 1) {
+                next = operatingCompanies.get(index + 1);
+            } else {
+                return false; // End of OR
+            }
+        }
+
+        // 2. Skip Closed Companies (Recursive check)
+        // If we hit M2 (and it wasn't removed yet for some reason), skip it.
+        if (next != null && next.isClosed()) {
+            operatingCompany.set(next);
+            return setNextOperatingCompany(false);
+        }
+
+        // 3. Apply Switch
+        operatingCompany.set(next);
+
+        // 4. BADEN FIX: Force INITIAL step
         setStep(GameDef.OrStep.INITIAL);
-        
-        // Clear transient turn flags
-        trainsBoughtThisTurn.clear();
-        normalTileLaidThisTurn.set(false);
-        normalTokenLaidThisTurn.set(false);
-        
-        // Ensure the engine knows who is playing
-        if (nextComp.getPresident() != null) {
-            playerManager.setCurrentPlayer(nextComp.getPresident());
-        }
+
+        return true;
     }
-}
-// --- END NEW HELPER METHOD ---
 
 
+// ... (lines of unchanged context code) ...
+    private void surgicalPrussiaFix() {
+        PublicCompany m1 = companyManager.getPublicCompany("M1");
+        PublicCompany m2 = companyManager.getPublicCompany("M2");
+        PublicCompany pr = companyManager.getPublicCompany("PR");
+
+        if (m2 == null || pr == null) return;
+
+        // --- START FIX ---
+        // 1. Resolve Trigger (Anchor)
+        PublicCompany trigger = null;
+        if (pfrTriggerId.value() != null) {
+            trigger = companyManager.getPublicCompany(pfrTriggerId.value());
+        }
+        if (trigger == null) trigger = operatingCompany.value(); // Fallback
+
+        // 2. Analyze Turn Order
+        int triggerIndex = operatingCompanies.indexOf(trigger);
+        int m2Index = operatingCompanies.indexOf(m2); // Might be -1 if already gone
+
+        // M2 is "Future" if it sits AFTER the trigger in the list.
+        boolean m2IsFuture = (triggerIndex != -1 && m2Index > triggerIndex);
+        boolean prReady = (pr.getPresident() != null);
+
+        log.info("Surgical Fix: Trigger={}, M2_Index={}, Status={}, PR_Ready={}", 
+                trigger.getId(), m2Index, m2IsFuture ? "FUTURE" : "PAST", prReady);
+
+        List<PublicCompany> newMinors = new ArrayList<>();
+        List<PublicCompany> newMajors = new ArrayList<>();
+        
+        // 3. Partition and Filter
+        for (PublicCompany c : operatingCompanies) {
+            
+            // Handle M2 Special Case
+            if (c == m2) {
+                if (m2.isClosed()) {
+                    // M2 is closed. It is removed.
+                    // We check for PR replacement later.
+                    log.info("Surgical Fix: M2 Closed -> Removing from list.");
+                } else {
+                    // M2 did NOT close (e.g. didn't exchange). It stays.
+                    log.info("Surgical Fix: M2 NOT Closed -> Keeping M2 in list.");
+                    newMinors.add(c);
+                }
+                continue; 
+            }
+
+            // Partition others: Minors (M1-M6) vs Majors (BY, SA, PR, MS, etc.)
+            // Note: In 1835, Minors are strictly M1-M6.
+            if (c.getId().matches("M[1-6]")) {
+                newMinors.add(c);
+            } else {
+                newMajors.add(c);
+            }
+        }
+
+        // 4. Insert Prussia into MAJOR list (Only if Swap conditions met)
+        // Condition: M2 was "Future" (hadn't acted), M2 is now Closed, and PR is valid.
+        if (m2IsFuture && prReady && m2.isClosed()) {
+            
+            int prValue = pr.getCurrentPrice(); 
+            int insertPos = newMajors.size(); // Default to end (lowest price)
+
+            for (int i = 0; i < newMajors.size(); i++) {
+                // Descending Order: Insert PR before the first company with LOWER price
+                if (newMajors.get(i).getCurrentPrice() < prValue) {
+                    insertPos = i;
+                    break;
+                }
+            }
+            newMajors.add(insertPos, pr);
+            log.info("Surgical Fix: Inserted PR into Major List at index {}", insertPos);
+        }
+
+        // 5. Reassemble: Minors First -> Then Majors
+        operatingCompanies.clear();
+        for (PublicCompany c : newMinors) operatingCompanies.add(c);
+        for (PublicCompany c : newMajors) operatingCompanies.add(c);
+        
+        // --- END FIX ---
+    }
+
 }
+

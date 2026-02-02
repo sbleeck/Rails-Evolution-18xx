@@ -112,7 +112,8 @@ public class GameManager extends RailsManager implements Configurable, Owner {
     private int absoluteActionCounter = 0;
 
     protected boolean dynamicOperatingOrder = true;
-   /* If true, companies can only buy trains from other companies
+    /*
+     * If true, companies can only buy trains from other companies
      * if both companies share the same President.
      */
     protected boolean restrictTrainTradingToSameOwner = true;
@@ -1489,9 +1490,7 @@ public class GameManager extends RailsManager implements Configurable, Owner {
         }
     }
 
-
     public boolean process(PossibleAction action) {
-
 
         // EMERGENCY OVERRIDE: Check for "FORCE_SKIP" signal
         if (action != null && action.toString().contains("FORCE_SKIP")) {
@@ -1505,40 +1504,39 @@ public class GameManager extends RailsManager implements Configurable, Owner {
         // 1. CRITICAL INTERCEPT: Navigation Actions (Undo/Redo)
         // -----------------------------------------------------------
         // This MUST happen before 'logActionTaken' or 'logAction'.
-        // If we let it pass, the engine treats Undo as "Move #267", 
+        // If we let it pass, the engine treats Undo as "Move #267",
         // increments the counter, and creates the "Death Spiral".
-        
+
         if (action instanceof GameAction) {
             GameAction ga = (GameAction) action;
             GameAction.Mode mode = ga.getMode();
-            
-            if (mode == GameAction.Mode.UNDO || 
-                mode == GameAction.Mode.FORCED_UNDO || 
-                mode == GameAction.Mode.REDO) {
-                
+
+            if (mode == GameAction.Mode.UNDO ||
+                    mode == GameAction.Mode.FORCED_UNDO ||
+                    mode == GameAction.Mode.REDO) {
 
                 // Clear hints to ensure clean UI rebuild
                 guiHints.clearVisibilityHints();
-                
+
                 // Execute the undo/redo logic directly
                 // This reloads the old state without incrementing the "Move Counter"
                 boolean success = processGameActions(ga);
-                
+
                 // We must update the list of possible moves for the new state immediately.
                 // Otherwise, the UI will have stale buttons (e.g., missing Redo).
                 if (success) {
                     possibleActions.clear();
-                    
+
                     // Allow action generation check
                     boolean allowActionGeneration = !isGameOver() || (getCurrentRound() instanceof EndOfGameRound);
-                    
+
                     if (allowActionGeneration) {
                         if (getCurrentRound() != null) {
-                             getCurrentRound().setPossibleActions();
+                            getCurrentRound().setPossibleActions();
                         }
-                        
+
                         ChangeStack changeStack = getRoot().getStateManager().getChangeStack();
-                        if (changeStack.isUndoPossible()) { 
+                        if (changeStack.isUndoPossible()) {
                             possibleActions.add(new GameAction(getRoot(), GameAction.Mode.FORCED_UNDO));
                         }
                         if (changeStack.isRedoPossible()) {
@@ -1547,7 +1545,6 @@ public class GameManager extends RailsManager implements Configurable, Owner {
                     }
                 }
 
-                
                 // Force a UI refresh cycle immediately after the state change
                 if (success && gameUIManager != null && gameUIManager.getStatusWindow() != null) {
                     SwingUtilities.invokeLater(() -> {
@@ -1567,7 +1564,6 @@ public class GameManager extends RailsManager implements Configurable, Owner {
             }
         }
         // -----------------------------------------------------------
-
 
         // Capture the active entity (Player or Company) BEFORE processing the action.
         RoundFacade roundBefore = getCurrentRound();
@@ -1596,12 +1592,12 @@ public class GameManager extends RailsManager implements Configurable, Owner {
         // 2. STANDARD LOGGING (Only for real moves)
         // -----------------------------------------------------------
         // Since we returned early for Undo/Redo, code reaching here is a REAL move.
-        
+
         logActionTaken(action); // Increments the official move counter (Move #265 -> #266)
-        logAction(action);      // Logs "Move #266: Laid Tile..."
-        
+        logAction(action); // Logs "Move #266: Laid Tile..."
+
         boolean isBuyTrainAction = action instanceof BuyTrain;
-        boolean result = false; 
+        boolean result = false;
 
         // -----------------------------------------------------------
         // 3. STANDARD PROCESSING
@@ -1609,10 +1605,10 @@ public class GameManager extends RailsManager implements Configurable, Owner {
 
         if (action instanceof NullAction && ((NullAction) action).getMode() == NullAction.Mode.START_GAME) {
             startGameAction = true;
-            result = true; 
+            result = true;
 
         } else if (action != null) {
-            action.setActed(); 
+            action.setActed();
 
             // Validation checks
             String actionPlayerName = action.getPlayerName();
@@ -1630,12 +1626,12 @@ public class GameManager extends RailsManager implements Configurable, Owner {
 
             if (!nameMatch) {
                 DisplayBuffer.add(this, LocalText.getText("WrongPlayer", actionPlayerName, currentPlayerName));
-                return false; 
+                return false;
             }
 
             if (!possibleActions.validate(action)) {
                 DisplayBuffer.add(this, LocalText.getText("ActionNotAllowed", action.toString()));
-                return false; 
+                return false;
             }
 
             // Process the action
@@ -1643,7 +1639,7 @@ public class GameManager extends RailsManager implements Configurable, Owner {
                 if (action instanceof GameAction) {
                     // This handles Save/Load/Export (Undo/Redo handled above)
                     GameAction gameAction = (GameAction) action;
-                    result = processGameActions(gameAction); 
+                    result = processGameActions(gameAction);
                 } else {
                     // Logic/Correction Actions
                     boolean correctionHandled = processCorrectionActions(action);
@@ -1660,21 +1656,21 @@ public class GameManager extends RailsManager implements Configurable, Owner {
                 if (result && !(action instanceof GameAction)) {
                     this.absoluteActionCounter++;
 
-                    if (action.hasActed()) { 
+                    if (action.hasActed()) {
                         executedActions.add(action);
                     }
                     updatePayoutTracker(action);
-                    
+
                     // Re-log strictly for history consistency if needed
                     logAction(action);
 
-                } 
+                }
             } catch (Exception e) {
-                result = false; 
+                result = false;
             }
 
-        } else { 
-            result = true; 
+        } else {
+            result = true;
         }
 
         // BuyTrain logging cleanup
@@ -1690,10 +1686,10 @@ public class GameManager extends RailsManager implements Configurable, Owner {
         // 4. POST-PROCESSING (Autosave, ChangeStack)
         boolean allowActionGeneration = !isGameOver() || (getCurrentRound() instanceof EndOfGameRound);
 
-        if (allowActionGeneration) { 
+        if (allowActionGeneration) {
 
             getCurrentRound().setPossibleActions();
-            
+
             if (result && !(action instanceof GameAction) && !(startGameAction)) {
                 changeStack.close(action);
 
@@ -1715,11 +1711,13 @@ public class GameManager extends RailsManager implements Configurable, Owner {
 
                 if (Config.getBoolean("ai.save.state.on.move", false)) {
                     File stateDir = new File("logs/state");
-                    if (!stateDir.exists()) stateDir.mkdirs();
+                    if (!stateDir.exists())
+                        stateDir.mkdirs();
                     try {
                         String filename = String.format("logs/state/state_%05d.json", this.absoluteActionCounter);
                         JsonStateSerializer.serialize(this, filename);
-                    } catch (IOException e) {}
+                    } catch (IOException e) {
+                    }
                 }
             }
 
@@ -1739,17 +1737,17 @@ public class GameManager extends RailsManager implements Configurable, Owner {
                 }
             }
 
-            if (!isGameOver()) 
+            if (!isGameOver())
                 setCorrectionActions();
 
-            if (changeStack.isUndoPossible()) { 
+            if (changeStack.isUndoPossible()) {
                 possibleActions.add(new GameAction(getRoot(), GameAction.Mode.FORCED_UNDO));
             }
             if (changeStack.isRedoPossible()) {
                 possibleActions.add(new GameAction(getRoot(), GameAction.Mode.REDO));
             }
 
-        } 
+        }
 
         return result;
     }
@@ -1891,7 +1889,7 @@ public class GameManager extends RailsManager implements Configurable, Owner {
                 break;
 
             case REDO:
-   if (changeStack.isRedoPossible()) {
+                if (changeStack.isRedoPossible()) {
                     if (index == -1) {
                         changeStack.redo();
                     } else {
@@ -2677,7 +2675,6 @@ public class GameManager extends RailsManager implements Configurable, Owner {
         if (action == null)
             return;
 
-
         if (action instanceof SetDividend) {
             SetDividend sd = (SetDividend) action;
             PublicCompany company = sd.getCompany();
@@ -3241,11 +3238,9 @@ public class GameManager extends RailsManager implements Configurable, Owner {
         return null;
     }
 
-public boolean processOnReload(PossibleAction action) {
+    public boolean processOnReload(PossibleAction action) {
         getRoot().getReportManager().getDisplayBuffer().clear();
         RoundFacade roundBefore = getCurrentRound();
-        
-      
 
         if (this.logOutputDirectory != null) {
             try {
@@ -3256,90 +3251,191 @@ public boolean processOnReload(PossibleAction action) {
             }
         }
 
-
         logActionTaken(action);
         logAction(action);
-        try {
-            if (action instanceof NullAction
-                    && !possibleActions.contains(NullAction.class)) {
-                return true;
-            }
 
-            if (!possibleActions.validate(action)) {
-                DisplayBuffer.add(this, LocalText.getText("ActionNotAllowed",
-                        action.toString()));
-
-                StringBuilder sb = new StringBuilder();
-                sb.append("!!! RELOAD VALIDATION FAILURE ANALYSIS !!!\n");
-                sb.append("Failed Action: ").append(action).append("\n");
-                sb.append("Current Round: ").append(getCurrentRound() != null ? getCurrentRound().toString() : "null")
-                        .append("\n");
-
-                sb.append("Bank Cash: ").append(getRoot().getBank().getPurse().value()).append("\n");
-
-                sb.append("Game Over Pending: ").append(gameOverPending.value()).append("\n");
-                sb.append("Is Game Over: ").append(isGameOver()).append("\n");
-
-                int actionCount = (possibleActions.getList() != null) ? possibleActions.getList().size() : 0;
-                sb.append("--- Available Possible Actions (" + actionCount + ") ---\n");
-
-                if (actionCount == 0) {
-                    sb.append("  (NONE)\n");
-                } else {
-                    for (PossibleAction pa : possibleActions.getList()) {
-                        sb.append("  > ").append(pa).append("\n");
-                    }
-                }
-                sb.append("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n");
-                log.warn(sb.toString());
-
-            }
-
-            boolean doProcess = true;
-            if (skipNextDone) {
-                if (action instanceof NullAction
-                        && ((NullAction) action).getMode() == NullAction.Mode.DONE) {
-                    if (currentRound.value() instanceof OperatingRound
-                            && ((OperatingRound) currentRound.value()).getStep() == skippedStep) {
-                        doProcess = false;
-                    }
-                }
-            }
-            skipNextDone = false;
-            skippedStep = null;
-
-            ChangeStack changeStack = getRoot().getStateManager().getChangeStack();
-
-            if (doProcess && !processCorrectionActions(action) && !getCurrentRound().process(action)) {
-                
-            
-                String msg = "Player " + action.getPlayerName() + "'s action \""
-                        + action + "\"\n  in " + getCurrentRound().getRoundName()
-                        + " is considered invalid by the game engine";
-                log.error(msg);
-                DisplayBuffer.add(this, msg);
-                log.warn("GAMEMANAGER [BruteForce]: Engine failed to process action. IGNORING and continuing replay.",
-                        action);
-            }
-
-            executedActions.add(action);
-            updatePayoutTracker(action);
-
-            possibleActions.clear();
-            getCurrentRound().setPossibleActions();
-            changeStack.close(action);
-
-            if (!isGameOver())
-                setCorrectionActions();
-
-        } catch (Exception e) {
-            log.error("GAMEMANAGER [BruteForce]: CRASH during replay. IGNORING and continuing. Error: {} -> {}",
-                    e.getClass().getSimpleName(), e.getMessage());
+        // --- 1. STRICT VALIDATION CHECK ---
+        if (action instanceof NullAction && !possibleActions.contains(NullAction.class)) {
+            return true;
         }
 
-        return true;
+        if (!possibleActions.validate(action)) {
+            DisplayBuffer.add(this, LocalText.getText("ActionNotAllowed", action.toString()));
 
+            StringBuilder sb = new StringBuilder();
+            sb.append("\n!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n");
+            sb.append("FATAL RELOAD ERROR: Action not in PossibleActions list.\n");
+            sb.append("Failed Action: ").append(action).append("\n");
+            sb.append("Current Round: ").append(getCurrentRound() != null ? getCurrentRound().toString() : "null")
+                    .append("\n");
+            sb.append("Bank Cash:     ").append(getRoot().getBank().getPurse().value()).append("\n");
+
+            int actionCount = (possibleActions.getList() != null) ? possibleActions.getList().size() : 0;
+            sb.append("--- Available Possible Actions (" + actionCount + ") ---\n");
+
+            if (actionCount == 0) {
+                sb.append("  (NONE)\n");
+            } else {
+                for (PossibleAction pa : possibleActions.getList()) {
+                    sb.append("  > ").append(pa).append("\n");
+                }
+            }
+            sb.append("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n");
+
+            String error = sb.toString();
+            log.error(error);
+
+            // CRASH IMMEDIATELY
+            throw new RuntimeException(error);
+        }
+
+        boolean doProcess = true;
+        if (skipNextDone) {
+            if (action instanceof NullAction
+                    && ((NullAction) action).getMode() == NullAction.Mode.DONE) {
+                if (currentRound.value() instanceof OperatingRound
+                        && ((OperatingRound) currentRound.value()).getStep() == skippedStep) {
+                    doProcess = false;
+                }
+            }
+        }
+        skipNextDone = false;
+        skippedStep = null;
+
+        ChangeStack changeStack = getRoot().getStateManager().getChangeStack();
+
+        // --- 2. STRICT EXECUTION CHECK ---
+        // If process() returns false, we crash instead of logging/ignoring.
+        if (doProcess && !processCorrectionActions(action) && !getCurrentRound().process(action)) {
+
+            String msg = "FATAL ERROR: Engine returned false for action \""
+                    + action + "\" in round " + getCurrentRound().getRoundName();
+
+            log.error(msg);
+            DisplayBuffer.add(this, msg);
+
+            // CRASH IMMEDIATELY
+            throw new RuntimeException(msg);
+        }
+
+        executedActions.add(action);
+        updatePayoutTracker(action);
+
+        possibleActions.clear();
+        getCurrentRound().setPossibleActions();
+        changeStack.close(action);
+
+        if (!isGameOver())
+            setCorrectionActions();
+
+        return true;
     }
+
+    // public boolean processOnReload(PossibleAction action) {
+    // getRoot().getReportManager().getDisplayBuffer().clear();
+    // RoundFacade roundBefore = getCurrentRound();
+
+    // if (this.logOutputDirectory != null) {
+    // try {
+    // String filename = String.format("state_%05d.json",
+    // getActionCountModel().value());
+    // File outputFile = new File(this.logOutputDirectory, filename);
+    // net.sf.rails.game.ai.snapshot.JsonStateSerializer.serialize(this,
+    // outputFile.getAbsolutePath());
+    // } catch (Exception e) {
+    // }
+    // }
+
+    // logActionTaken(action);
+    // logAction(action);
+    // try {
+    // if (action instanceof NullAction
+    // && !possibleActions.contains(NullAction.class)) {
+    // return true;
+    // }
+
+    // if (!possibleActions.validate(action)) {
+    // DisplayBuffer.add(this, LocalText.getText("ActionNotAllowed",
+    // action.toString()));
+
+    // StringBuilder sb = new StringBuilder();
+    // sb.append("!!! RELOAD VALIDATION FAILURE ANALYSIS !!!\n");
+    // sb.append("Failed Action: ").append(action).append("\n");
+    // sb.append("Current Round: ").append(getCurrentRound() != null ?
+    // getCurrentRound().toString() : "null")
+    // .append("\n");
+
+    // sb.append("Bank Cash:
+    // ").append(getRoot().getBank().getPurse().value()).append("\n");
+
+    // sb.append("Game Over Pending:
+    // ").append(gameOverPending.value()).append("\n");
+    // sb.append("Is Game Over: ").append(isGameOver()).append("\n");
+
+    // int actionCount = (possibleActions.getList() != null) ?
+    // possibleActions.getList().size() : 0;
+    // sb.append("--- Available Possible Actions (" + actionCount + ") ---\n");
+
+    // if (actionCount == 0) {
+    // sb.append(" (NONE)\n");
+    // } else {
+    // for (PossibleAction pa : possibleActions.getList()) {
+    // sb.append(" > ").append(pa).append("\n");
+    // }
+    // }
+    // sb.append("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n");
+    // log.warn(sb.toString());
+
+    // }
+
+    // boolean doProcess = true;
+    // if (skipNextDone) {
+    // if (action instanceof NullAction
+    // && ((NullAction) action).getMode() == NullAction.Mode.DONE) {
+    // if (currentRound.value() instanceof OperatingRound
+    // && ((OperatingRound) currentRound.value()).getStep() == skippedStep) {
+    // doProcess = false;
+    // }
+    // }
+    // }
+    // skipNextDone = false;
+    // skippedStep = null;
+
+    // ChangeStack changeStack = getRoot().getStateManager().getChangeStack();
+
+    // if (doProcess && !processCorrectionActions(action) &&
+    // !getCurrentRound().process(action)) {
+
+    // String msg = "Player " + action.getPlayerName() + "'s action \""
+    // + action + "\"\n in " + getCurrentRound().getRoundName()
+    // + " is considered invalid by the game engine";
+    // log.error(msg);
+    // DisplayBuffer.add(this, msg);
+    // log.warn("GAMEMANAGER [BruteForce]: Engine failed to process action. IGNORING
+    // and continuing replay.",
+    // action);
+    // }
+
+    // executedActions.add(action);
+    // updatePayoutTracker(action);
+
+    // possibleActions.clear();
+    // getCurrentRound().setPossibleActions();
+    // changeStack.close(action);
+
+    // if (!isGameOver())
+    // setCorrectionActions();
+
+    // } catch (Exception e) {
+    // log.error("GAMEMANAGER [BruteForce]: CRASH during replay. IGNORING and
+    // continuing. Error: {} -> {}",
+    // e.getClass().getSimpleName(), e.getMessage());
+    // }
+
+    // return true;
+
+    // }
+
     public LinkedHashMap<String, Map<String, Integer>> getInstantaneousPayoutHistory() {
         return instantaneousPayoutHistory.value();
     }
@@ -3505,7 +3601,7 @@ public boolean processOnReload(PossibleAction action) {
             passedPlayers.clear();
     }
 
-     /**
+    /**
      * Calculate the worth of a public company certificate for player
      * net-worth/bankruptcy,
      * used to override the market price (e.g., for 1835 Minors before flotation).
@@ -3584,15 +3680,14 @@ public boolean processOnReload(PossibleAction action) {
         }
     }
 
-
     /**
      * Called by process() to record human-readable history.
      * Includes robust error handling to prevent game freezes.
      */
 
-private transient PossibleAction lastLoggedAction = null;
+    private transient PossibleAction lastLoggedAction = null;
     private transient int lastLoggedMoveNumber = -1;
-    
+
     public void logAction(PossibleAction action) {
         logAction(action, actionCount.value());
     }
@@ -3602,8 +3697,10 @@ private transient PossibleAction lastLoggedAction = null;
             return;
 
         // Strict De-duplication:
-        // If we are asked to log the EXACT same action object for the EXACT same move number,
-        // we ignore it. This suppresses the double/triple logs caused by UI/Engine overlaps.
+        // If we are asked to log the EXACT same action object for the EXACT same move
+        // number,
+        // we ignore it. This suppresses the double/triple logs caused by UI/Engine
+        // overlaps.
         if (action == lastLoggedAction && moveNumber == lastLoggedMoveNumber) {
             return;
         }
@@ -3703,7 +3800,7 @@ private transient PossibleAction lastLoggedAction = null;
                         if (!passedPlayers.contains(actorName)) {
                             passedPlayers.add(actorName);
                         }
-                    } 
+                    }
                 }
                 // Note: If they Buy *after* selling, the Buy block above will
                 // trigger on the next action and clear this entry. Correct.
@@ -3759,7 +3856,6 @@ private transient PossibleAction lastLoggedAction = null;
 
                 // Extract Price
                 int price = bt.getPricePaid();
-
 
                 if ("IPO".equals(sourceName)) {
                     entry = "buys fresh " + trainName;
@@ -3821,9 +3917,6 @@ private transient PossibleAction lastLoggedAction = null;
                 }
                 log.info(sb.toString());
             }
-
-        
-            
 
             // --- 4. SMART APPEND LOGIC ---
             String currentHistory = statusMessageState.value();

@@ -18,7 +18,6 @@ import net.sf.rails.ui.swing.hexmap.HexHighlightMouseListener;
 import net.sf.rails.util.Util;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import java.awt.geom.Line2D;
 import rails.game.action.*;
 import rails.game.correct.CashCorrectionAction;
 import rails.game.correct.TrainCorrectionAction;
@@ -35,6 +34,26 @@ import java.util.Map;
 /**
  * This class is incorporated into StatusWindow and displays the bulk of
  * rails.game status information.
+ * 
+ * Core Functionality
+ * 
+ * This class serves as the primary dashboard for the Rails game application. It
+ * is a monolithic UI controller responsible for rendering the game state matrix
+ * (Players/Companies vs. Assets).
+ * 
+ * Status Matrix: Dynamically constructs a GridPanel displaying the intersection
+ * of Companies (rows) and Players/Assets (columns). Key data includes share
+ * distribution (certPerPlayer), treasury holdings, IPO/Pool availability, and
+ * company finances (Cash, Revenue, Trains).
+ * 
+ * Interactive Controls: Acts as the primary input surface for financial
+ * actions. It converts UI clicks (on ClickField or RailCard elements) into game
+ * commands like BuyFromIPO, Sell, or BuyTrain.
+ * 
+ * Dynamic Layout: The grid structure is not fixed; it calculates row/column
+ * offsets (certPerPlayerXOffset, compTrainsXOffset) at runtime based on game
+ * parameters (e.g., whether "Bonds" or "Rights" are enabled in the rules).
+ * 
  */
 public class GameStatus extends GridPanel {
 
@@ -44,7 +63,6 @@ public class GameStatus extends GridPanel {
     // private final Dimension DIM_ARROW = new Dimension(20, 20); // 1. Visible
     // Arrow
     private final Dimension DIM_STD = new Dimension(52, 20); // 5. Fix clipping (was 45, now 52)
- 
 
     // Width Definitions
     private final Dimension DIM_PLAYER = new Dimension(60, 20);
@@ -418,6 +436,7 @@ public class GameStatus extends GridPanel {
     protected JPanel[][] playerSharePanels;
     protected RailCard[][] playerShareCards;
     protected javax.swing.JLabel[][] playerSoldDots;
+    private LinearRoundTracker linearRoundTracker;
 
     public GameStatus() {
         super();
@@ -594,6 +613,10 @@ public class GameStatus extends GridPanel {
         playerTimerXOffset = certPerPlayerXOffset;
         playerTimerYOffset = ++lastY;
 
+        // Implement Linear Operating Round Tracker (The Reclamation)
+        // Spans columns: Pool -> Tokens
+        // Spans rows: Fixed Inc -> Time (Assuming Fixed Inc is immediately above Time)
+
         newTrainsXOffset = certInIPOXOffset;
         newTrainsYOffset = playerPrivatesYOffset;
 
@@ -622,7 +645,7 @@ public class GameStatus extends GridPanel {
         }
 
         // Initialize the visualization panel
-        roundCounterPanel = new RoundCounterPanel();
+        roundCounterPanel = new RoundCounterPanel(gameUIManager);
 
         initFields();
         javax.swing.SwingUtilities.invokeLater(this::hijackParentComponents);
@@ -775,7 +798,6 @@ public class GameStatus extends GridPanel {
         // (e.g. "10%", "Owner") so the user never sees the empty state.
 
         int currentActor = -1;
-        boolean isLocal = false;
 
         if (players != null && players.getCurrentPlayer() != null) {
             currentActor = players.getCurrentPlayer().getIndex();
@@ -792,23 +814,6 @@ public class GameStatus extends GridPanel {
     }
 
     public void updatePlayerOrder(List<String> newPlayerNames) {
-        List<String> oldPlayerNames = gameUIManager.getCurrentGuiPlayerNames();
-        // log.debug("GS: old player list: {}", Util.join(oldPlayerNames.toArray(new
-        // String[0]), ","));
-        // log.debug("GS: new player list: {}", Util.join(newPlayerNames.toArray(new
-        // String[0]), ","));
-        /*
-         * Currently, the passed new player order is ignored.
-         * A call to this method only serves as a signal to rebuild the player columns
-         * in the proper order
-         * (in fact, the shortcut is taken to rebuild the whole GameStatus panel).
-         * For simplicity reasons, the existing reference to the (updated)
-         * players list in GameManager is used.
-         *
-         * In the future (e.g. when implementing a client/server split),
-         * newPlayerNames may actually become to be used to reorder the
-         * (then internal) UI player list.
-         */
         recreate();
         gameUIManager.packAndApplySizing(parent);
     }
@@ -1032,41 +1037,6 @@ public class GameStatus extends GridPanel {
     }
 
     /**
-     * Generates a formatted HTML tooltip showing the stack of certificates (e.g.
-     * "20% x 1").
-     * Uses manual grouping since PortfolioModel lacks getCertificatesByType.
-     */
-    private String getCertStackTooltip(net.sf.rails.game.model.PortfolioModel portfolio, PublicCompany company) {
-        if (portfolio == null || company == null)
-            return null;
-
-        // Use getCertificates() which returns a Collection
-        java.util.Collection<net.sf.rails.game.financial.PublicCertificate> certs = portfolio.getCertificates(company);
-        if (certs == null || certs.isEmpty())
-            return null;
-
-        // Group by Share Percentage
-        // Use TreeMap with reverse order to show larger shares (e.g. 20%) first
-        java.util.Map<Integer, Integer> counts = new java.util.TreeMap<>(java.util.Collections.reverseOrder());
-
-        for (net.sf.rails.game.financial.PublicCertificate cert : certs) {
-            int s = cert.getShare();
-            counts.put(s, counts.getOrDefault(s, 0) + 1);
-        }
-
-        StringBuilder text = new StringBuilder();
-        for (java.util.Map.Entry<Integer, Integer> entry : counts.entrySet()) {
-            if (text.length() > 0)
-                text.append("<br>");
-            // Format: "20% x 1"
-            text.append(entry.getKey()).append("% x ").append(entry.getValue());
-        }
-
-        // Return wrapped in HTML with increased font size
-        return "<html><font size='+1'>" + text.toString() + "</font></html>";
-    }
-
-    /**
      * EVENT UPDATE: Call this explicitly from GameManager/Engine when a bonus
      * occurs.
      * Updates the text AND flashes the background.
@@ -1087,9 +1057,9 @@ public class GameStatus extends GridPanel {
         PossibleAction chosenAction = null;
         StockRound.manualSwapChoice = null;
 
-       if (source instanceof ClickField || source instanceof RailCard) {
+        if (source instanceof ClickField || source instanceof RailCard) {
             gbc = gb.getConstraints(source);
-            
+
             if (source instanceof ClickField) {
                 actions = ((ClickField) source).getPossibleActions();
             } else {
@@ -1319,9 +1289,7 @@ public class GameStatus extends GridPanel {
         chosenAction = processGameSpecificFollowUpActions(actor, chosenAction);
 
         if (chosenAction != null) {
-            if (chosenAction instanceof SellShares) {
-                SellShares ss = (SellShares) chosenAction;
-            }
+            
             (parent).process(chosenAction);
         }
 
@@ -1532,12 +1500,12 @@ public class GameStatus extends GridPanel {
         }
 
         else if (gameUIManager.getGameManager().getPossibleActions() != null) {
-             for (PossibleAction pa : gameUIManager.getGameManager().getPossibleActions().getList()) {
+            for (PossibleAction pa : gameUIManager.getGameManager().getPossibleActions().getList()) {
                 if (pa instanceof GuiTargetedAction) {
                     net.sf.rails.game.state.Owner actor = ((GuiTargetedAction) pa).getActor();
                     if (actor instanceof PublicCompany) {
                         opCompId = actor.getId();
-                        break; 
+                        break;
                     }
                 }
             }
@@ -1598,14 +1566,14 @@ public class GameStatus extends GridPanel {
         java.util.List<String> currentSignature = new java.util.ArrayList<>();
         for (PublicCompany c : displayList) {
             boolean inIpo = ipoModel.getShare(c) > 0;
-            boolean isPrussian = "PR".equals(c.getId());
 
-int currentPrice = c.getCurrentSpace() != null ? c.getCurrentSpace().getPrice() : 0;
-            if (currentPrice == 0 && c.getStartSpace() != null) currentPrice = c.getStartSpace().getPrice();
+            int currentPrice = c.getCurrentSpace() != null ? c.getCurrentSpace().getPrice() : 0;
+            if (currentPrice == 0 && c.getStartSpace() != null)
+                currentPrice = c.getStartSpace().getPrice();
             // Active if Floated, Owned, or (In IPO and Buyable/Priced)
-            boolean isActive = c.hasFloated() || 
-                               (c.getPresidentsShare() != null && c.getPresidentsShare().getOwner() instanceof Player) || 
-                               (inIpo && currentPrice > 0);
+            boolean isActive = c.hasFloated() ||
+                    (c.getPresidentsShare() != null && c.getPresidentsShare().getOwner() instanceof Player) ||
+                    (inIpo && currentPrice > 0);
 
             boolean isOperating = (c == operatingComp);
 
@@ -1628,6 +1596,31 @@ int currentPrice = c.getCurrentSpace() != null ? c.getCurrentSpace().getPrice() 
 
     // Method 1: WITH 'Object o' (Handles Actions & Colors)
     protected void setPlayerCertButton(int i, int j, boolean clickable, Object o) {
+
+        // Safety Check: If the observer for this company row is missing (e.g. during
+        // re-init), abort.
+        if (shareRowVisibilityObservers[i] == null) {
+            return;
+        }
+
+        // Fix NPE: Check if the observer exists before accessing lastValue()
+        boolean visible = true;
+        if (shareRowVisibilityObservers != null && i < shareRowVisibilityObservers.length
+                && shareRowVisibilityObservers[i] != null) {
+            visible = shareRowVisibilityObservers[i].lastValue();
+        }
+
+        if (!visible)
+            return;
+
+        if (shareRowVisibilityObservers != null && i < shareRowVisibilityObservers.length
+                && shareRowVisibilityObservers[i] != null) {
+            // The line causing the crash is likely accessing .lastValue() or .setValue()
+            boolean isVisible = shareRowVisibilityObservers[i].lastValue();
+            // (Keep the rest of your existing logic here that uses isVisible)
+            // If you cannot identify the exact lines, just wrapping the observer usage is
+            // enough.
+        }
         // SAFETY CHECK: Prevent NPE if observers are missing
         if (shareRowVisibilityObservers == null
                 || i < 0
@@ -1745,6 +1738,17 @@ int currentPrice = c.getCurrentSpace() != null ? c.getCurrentSpace().getPrice() 
 
     // Method 2: WITHOUT 'Object o' (Base Setup)
     protected void setPlayerCertButton(int i, int j, boolean clickable) {
+
+        // // Fix NPE: Check if the observer exists before accessing lastValue()
+        // boolean visible = true;
+        // if (shareRowVisibilityObservers != null && i <
+        // shareRowVisibilityObservers.length && shareRowVisibilityObservers[i] != null)
+        // {
+        // visible = shareRowVisibilityObservers[i].lastValue();
+        // }
+
+        // if (!visible) return;
+
         // SAFETY CHECK
         if (shareRowVisibilityObservers == null
                 || i < 0
@@ -2095,8 +2099,7 @@ int currentPrice = c.getCurrentSpace() != null ? c.getCurrentSpace().getPrice() 
                 } else if (pa instanceof BuyPrivate) {
                     // NEW: Explicitly catch BuyPrivate actions
                     target = ((BuyPrivate) pa).getPrivateCompany();
-                }
-                else if (pa instanceof GuiTargetedAction && !(pa instanceof DiscardTrain)) {
+                } else if (pa instanceof GuiTargetedAction && !(pa instanceof DiscardTrain)) {
                     try {
                         // Catch generic Targeted Actions (e.g. Exchange) targeting a Private
                         Object t = ((GuiTargetedAction) pa).getTarget();
@@ -2457,9 +2460,7 @@ int currentPrice = c.getCurrentSpace() != null ? c.getCurrentSpace().getPrice() 
 
     public void initTurn(int actorIndex, boolean myTurn) {
 
-
-
-// We use the existing gameUIManager field directly.
+        // We use the existing gameUIManager field directly.
         // We removed the 'getRoot()' fallback that was causing compilation errors.
         if (gameUIManager != null && gameUIManager.getGameManager() != null) {
             this.possibleActions = gameUIManager.getGameManager().getPossibleActions();
@@ -2468,7 +2469,6 @@ int currentPrice = c.getCurrentSpace() != null ? c.getCurrentSpace().getPrice() 
         if (!myTurn) {
             actorIndex = -1;
         }
-        
 
         int cIdx, pIdx;
 
@@ -2492,7 +2492,7 @@ int currentPrice = c.getCurrentSpace() != null ? c.getCurrentSpace().getPrice() 
                 opCompId = pc.getId();
         }
 
-// GENERIC HIGHLIGHT LOGIC:
+        // GENERIC HIGHLIGHT LOGIC:
         // If we are not in a standard Operating Round, check the available actions.
         // If any action targets a specific Company (e.g. Formation, Discard, Merger),
         // we highlight that company as if it were "Operating".
@@ -2820,9 +2820,7 @@ int currentPrice = c.getCurrentSpace() != null ? c.getCurrentSpace().getPrice() 
                         if (!isZero) {
                             card.setOpaque(true);
 
-                            boolean hasSold = player.getSoldThisRoundModel(c).value();
-                            boolean doubleShare = hasDoubleShare(player.getPortfolioModel(), c);
-
+                        
                             String cleanText = raw.replace("PU", "P");
 
                             // TEXT LOGIC: Only show "Owner" for Minors (no stock price).
@@ -3047,6 +3045,13 @@ int currentPrice = c.getCurrentSpace() != null ? c.getCurrentSpace().getPrice() 
             roundCounterPanel.updateState();
         }
 
+        // Trigger the LinearRoundTracker animation
+        // We use updateState() to internally fetch the round and trigger the timer
+        // This matches the logic of RoundCounterPanel exactly.
+        if (linearRoundTracker != null) {
+            linearRoundTracker.updateState();
+        }
+
         // Force Update Parent Timer immediately
         if (parentTimerLabel != null && actorIndex >= 0 && actorIndex < np) {
             Player p = players.getPlayerByPosition(actorIndex);
@@ -3112,13 +3117,12 @@ int currentPrice = c.getCurrentSpace() != null ? c.getCurrentSpace().getPrice() 
             setTrainBuyingActions(possibleActions.getList());
         }
 
-
         try {
             initGameSpecificActions();
         } catch (Exception e) {
             e.printStackTrace();
         }
-                repaint();
+        repaint();
     }
 
     /**
@@ -3305,12 +3309,13 @@ int currentPrice = c.getCurrentSpace() != null ? c.getCurrentSpace().getPrice() 
     }
 
     // --- Helper: Check for "Double Paper" (Lilac Highlight) ---
-   private boolean hasDoubleShare(PortfolioModel portfolio, PublicCompany company) {
+    private boolean hasDoubleShare(PortfolioModel portfolio, PublicCompany company) {
         if (portfolio == null || company == null)
             return false;
 
         // --- START FIX ---
-        // Generic: The "Double Share" is defined by the size of the President's Certificate.
+        // Generic: The "Double Share" is defined by the size of the President's
+        // Certificate.
         // We do not assume 20% (1830) or 10% (1835 Prussia).
         int requiredShare = 20; // Safe default
         if (company.getPresidentsShare() != null) {
@@ -3578,8 +3583,6 @@ int currentPrice = c.getCurrentSpace() != null ? c.getCurrentSpace().getPrice() 
     }
 
     // Shared Styling Constants (Promoted from local variables for modular access)
-    private static final Color BG_PLAYER_COL = Color.WHITE;
-    private static final Color BG_DETAILS_COL = new Color(235, 230, 255);
     private static final Color BG_MINOR = Color.BLACK;
     private static final Color FG_MINOR = Color.WHITE;
     // Synchronized with ORPanel.java's getTrainHighlightColor()
@@ -3593,8 +3596,7 @@ int currentPrice = c.getCurrentSpace() != null ? c.getCurrentSpace().getPrice() 
     private static final int THIN = 1;
     private static final javax.swing.border.Border BORDER_THIN = BorderFactory.createMatteBorder(0, 0, 1, 1,
             Color.GRAY);
-    private static final javax.swing.border.Border BORDER_OP_THIN = BorderFactory.createMatteBorder(2, 0, 2, 1,
-            Color.BLACK);
+
     private static final javax.swing.border.Border BORDER_BOX = BorderFactory.createLineBorder(OUT, THICK);
 
     // Train Borders
@@ -3747,6 +3749,34 @@ int currentPrice = c.getCurrentSpace() != null ? c.getCurrentSpace().getPrice() 
         playerFixedIncomeYOffset = currentFooterY++;
         playerTimerYOffset = currentFooterY++;
         playerStartOrderYOffset = currentFooterY++;
+
+        // We place this in initFields() so it persists after recreate() calls.
+        linearRoundTracker = new LinearRoundTracker(gameUIManager, companies);
+
+        // Calculate Grid Spans (using offsets calculated in init)
+        int startCol = certInPoolXOffset;
+        int endCol = compTokensXOffset;
+        int gridWidth = endCol - startCol + 1;
+
+        // Rows: "Fixed Inc" (Timer-1) to "Time" (Timer)
+        int startRow = playerTimerYOffset - 1;
+        int gridHeight = 2;
+
+        // Reset GBC constraints
+        gbc.gridx = startCol;
+        gbc.gridy = startRow;
+        gbc.gridwidth = gridWidth;
+        gbc.gridheight = gridHeight;
+        gbc.fill = GridBagConstraints.BOTH;
+        gbc.insets = new Insets(2, 2, 2, 2);
+        gbc.weightx = 1.0;
+        gbc.weighty = 0.0;
+
+        gb.setConstraints(linearRoundTracker, gbc);
+        add(linearRoundTracker);
+
+        // Implement Linear Operating Round Tracker
+        // We add this here because 'recreate()' calls removeAll() then initFields().
 
         // 5. Initialize Grid
         fields = new JComponent[col + 5][playerStartOrderYOffset + 5];
@@ -4482,7 +4512,7 @@ int currentPrice = c.getCurrentSpace() != null ? c.getCurrentSpace().getPrice() 
         f.setBackground(BG_BANK);
         f.setOpaque(true);
         f.setFont(new Font("SansSerif", Font.BOLD, 12));
-        addField(f, bankX - 1, bankY - 1, 1, 1, 0, true);
+        addField(f, bankX - 1, bankY - 4, 1, 1, 0, true);
 
         bankCash = new Field(bank.getPurse());
         bankCash.setBorder(BORDER_BOX);
@@ -4490,7 +4520,7 @@ int currentPrice = c.getCurrentSpace() != null ? c.getCurrentSpace().getPrice() 
         bankCash.setOpaque(true);
         Font bankFont = bankCash.getFont();
         bankCash.setFont(bankFont.deriveFont(Font.BOLD, bankFont.getSize()));
-        addField(bankCash, bankX, bankY - 1, 1, 1, 0, true);
+        addField(bankCash, bankX, bankY - 4, 1, 1, 0, true);
 
         f = new Caption("Time");
         f.setBackground(Color.WHITE);
@@ -4681,305 +4711,6 @@ int currentPrice = c.getCurrentSpace() != null ? c.getCurrentSpace().getPrice() 
         return null;
     }
 
-
-
-// ... (lines of unchanged context code) ...
-    private boolean checkAndHighlight(net.sf.rails.ui.swing.elements.RailCard card, PossibleAction action) {
-        // Safety check
-        if (card == null || action == null)
-            return false;
-
-        if (action instanceof GuiTargetedAction) {
-            GuiTargetedAction gta = (GuiTargetedAction) action;
-            Object target = gta.getTarget();
-            String targetId = null;
-
-            // SAFELY EXTRACT ID based on object type
-            if (target instanceof net.sf.rails.game.Company) {
-                targetId = ((net.sf.rails.game.Company) target).getId();
-            } else if (target instanceof net.sf.rails.game.Train) {
-                targetId = ((net.sf.rails.game.Train) target).getName();
-            } else if (target instanceof net.sf.rails.game.StartItem) {
-                targetId = ((net.sf.rails.game.StartItem) target).getId();
-            }
-
-            // Perform the match
-            if (targetId != null && card.getUniqueId() != null && card.getUniqueId().equals(targetId)) {
-                card.setPossibleAction(action);
-                card.setState(net.sf.rails.ui.swing.elements.RailCard.State.HIGHLIGHTED);
-
-                // --- START FIX ---
-                // CONSUME THE SIGNATURE (Exact same logic as initGameSpecificActions)
-                card.setBackground(gta.getHighlightBackgroundColor());
-                card.setBorder(BorderFactory.createLineBorder(gta.getHighlightBorderColor(), 3));
-                card.setForeground(gta.getHighlightTextColor());
-                // --- END FIX ---
-
-                card.repaint();
-                return true; // Match found!
-            }
-        }
-        return false; // No match
-    }
-// ... (lines of unchanged context code) ...
-
-    /**
-     * Visualization Component for Round Tracking (Route Style).
-     * Displays a linear track: [OR 1] -- [OR 2] -- [OR 3] -- [SR]
-     * ANIMATED: The train smoothly travels between stations.
-     */
-    private class RoundCounterPanel extends JPanel {
-        private static final int WIDTH = 240;
-        private static final int HEIGHT = 45;
-
-        // Game State
-        private int phaseMaxOrs = 1;
-        private int currentOrNum = 1;
-        private boolean isStockRound = true;
-
-        // Animation State
-        private double currentTrainX = -1; // Current visual position (-1 = not set)
-        private double targetTrainX = -1; // Destination position
-        private javax.swing.Timer animTimer;
-
-        public RoundCounterPanel() {
-            setPreferredSize(new Dimension(WIDTH, HEIGHT));
-            setMinimumSize(new Dimension(WIDTH, HEIGHT));
-            setMaximumSize(new Dimension(WIDTH, HEIGHT));
-            setOpaque(false);
-
-            // Animation Timer: Runs at ~60 FPS (16ms delay)
-            animTimer = new javax.swing.Timer(16, e -> stepAnimation());
-        }
-
-        /**
-         * Physics Step: Moves the train towards the target.
-         */
-        private void stepAnimation() {
-            double distance = targetTrainX - currentTrainX;
-
-            // Snap if close enough (0.5 pixel)
-            if (Math.abs(distance) < 0.5) {
-                currentTrainX = targetTrainX;
-                animTimer.stop();
-            } else {
-                // Ease-Out Logic: Move 5% of the remaining distance per frame
-                // This creates a smooth deceleration effect.
-                double step = distance * 0.05;
-
-                // Enforce minimum speed so it doesn't stall at the end (Linear finish)
-                // 0.8 pixels per frame ensures it completes in ~1 second total
-                if (Math.abs(step) < 0.8)
-                    step = Math.signum(distance) * 0.8;
-
-                currentTrainX += step;
-            }
-            repaint(); // Redraw frame
-        }
-
-        public void updateState() {
-            if (gameUIManager == null || gameUIManager.getRoot() == null)
-                return;
-
-            try {
-                // 1. Get Phase Limits
-              // Use GameManager's latched value (numOfORs) which only updates after Stock Round.
-                // This prevents the indicator from jumping to "2 ORs" immediately when a 3-train is bought mid-round.
-                if (gameUIManager.getGameManager() != null) {
-                    phaseMaxOrs = gameUIManager.getGameManager().getNumberOfOperatingRounds();
-                }
-
-                // 2. Determine Current Round & Index
-                net.sf.rails.game.round.RoundFacade round = gameUIManager.getGameManager().getCurrentRound();
-
-                if (round instanceof net.sf.rails.game.financial.StockRound) {
-                    isStockRound = true;
-                    currentOrNum = 0;
-                } else if (round instanceof net.sf.rails.game.OperatingRound) {
-                    isStockRound = false;
-                    String orId = gameUIManager.getGameManager().getORId();
-                    currentOrNum = 1;
-                    if (orId != null && orId.contains(".")) {
-                        try {
-                            String suffix = orId.substring(orId.lastIndexOf('.') + 1);
-                            currentOrNum = Integer.parseInt(suffix);
-                        } catch (NumberFormatException e) {
-                            currentOrNum = 1;
-                        }
-                    }
-                } else {
-                    isStockRound = true;
-                }
-
-                // 3. Calculate Target Position (Pixels)
-                int startX = 25;
-                int gap = 55;
-
-                int activeIndex;
-                if (isStockRound) {
-                    activeIndex = 3; // SR is always at the end
-                } else {
-                    activeIndex = currentOrNum - 1; // OR 1 -> Index 0
-                    if (activeIndex < 0)
-                        activeIndex = 0;
-                    if (activeIndex > 2)
-                        activeIndex = 2;
-                }
-
-                double newTarget = startX + (activeIndex * gap);
-
-                // 4. Trigger Animation
-                if (currentTrainX < 0) {
-                    // First Load: Snap instantly (no animation on startup)
-                    currentTrainX = newTarget;
-                    targetTrainX = newTarget;
-                } else if (Math.abs(newTarget - targetTrainX) > 0.1) {
-                    // Destination Changed: Set target and start engine
-                    targetTrainX = newTarget;
-                    if (!animTimer.isRunning()) {
-                        animTimer.start();
-                    }
-                }
-
-            } catch (Exception e) {
-                // Fail safe
-            }
-            repaint();
-        }
-
-        @Override
-        protected void paintComponent(Graphics g) {
-            super.paintComponent(g);
-            Graphics2D g2 = (Graphics2D) g;
-            g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-
-            int startX = 25;
-            int gap = 55;
-            int trackY = HEIGHT - 12;
-
-            // Capsule Dimensions
-            int capW = 34;
-            int capH = 18;
-            int capArc = 10;
-
-            // --- 1. DRAW TRACK ---
-            g2.setStroke(new BasicStroke(3));
-            for (int i = 0; i < 3; i++) { // 3 segments for 4 nodes
-                int x1 = startX + (i * gap);
-                int x2 = startX + ((i + 1) * gap);
-
-                boolean isFutureDisabled = ((i + 1) < 3 && (i + 1) >= phaseMaxOrs);
-
-                if (isFutureDisabled) {
-                    g2.setColor(Color.LIGHT_GRAY);
-                    g2.setStroke(new BasicStroke(2, BasicStroke.CAP_BUTT, BasicStroke.JOIN_BEVEL, 0,
-                            new float[] { 4, 4 }, 0));
-                } else {
-                    g2.setColor(Color.GRAY);
-                    g2.setStroke(new BasicStroke(3));
-                }
-                g2.draw(new Line2D.Float(x1, trackY, x2, trackY));
-            }
-
-            // --- 2. DRAW STATIONS ---
-            g2.setStroke(new BasicStroke(1.5f));
-            for (int i = 0; i < 4; i++) {
-                int cx = startX + (i * gap);
-
-                String label = (i == 3) ? "SR" : "OR" + (i + 1);
-                boolean isDisabled = (i < 3 && i >= phaseMaxOrs);
-
-                java.awt.geom.RoundRectangle2D capsule = new java.awt.geom.RoundRectangle2D.Float(
-                        cx - (capW / 2), trackY - (capH / 2), capW, capH, capArc, capArc);
-
-                if (isDisabled) {
-                    g2.setColor(new Color(245, 245, 245));
-                    g2.fill(capsule);
-                    g2.setColor(Color.LIGHT_GRAY);
-                    g2.setStroke(
-                            new BasicStroke(1, BasicStroke.CAP_BUTT, BasicStroke.JOIN_BEVEL, 0, new float[] { 2 }, 0));
-                    g2.draw(capsule);
-                    g2.setColor(Color.LIGHT_GRAY);
-                } else {
-                    g2.setColor(Color.WHITE);
-                    g2.fill(capsule);
-                    g2.setColor(Color.BLACK);
-                    g2.setStroke(new BasicStroke(1.5f));
-                    g2.draw(capsule);
-                    g2.setColor(Color.BLACK);
-                }
-
-                g2.setFont(new Font("SansSerif", Font.BOLD, 10));
-                FontMetrics fm = g2.getFontMetrics();
-                int tx = cx - (fm.stringWidth(label) / 2);
-                int ty = trackY + (fm.getAscent() / 2) - 2;
-                g2.drawString(label, tx, ty);
-            }
-
-            // --- 3. DRAW ANIMATED TRAIN ---
-            // Use currentTrainX calculated by Timer
-            int drawX = (int) currentTrainX;
-            int trainY = trackY - 10;
-
-            // Safety: if drawX is still -1 (render before updateState), assume start
-            if (drawX < 0)
-                drawX = startX;
-
-            drawTrain(g2, drawX, trainY);
-        }
-
-        private void drawTrain(Graphics2D g2, int x, int y) {
-            int w = 32;
-            int h = 20;
-            int left = x - (w / 2);
-            int bottom = y;
-
-            Color locoColor = new Color(40, 40, 40);
-            Color accentColor = new Color(200, 50, 50);
-
-            // Wheels
-            g2.setColor(Color.BLACK);
-            int wheelSize = 8;
-            for (int i = 0; i < 3; i++) {
-                g2.fillOval(left + 2 + (i * 9), bottom - wheelSize + 2, wheelSize, wheelSize);
-            }
-
-            // Chassis
-            java.awt.geom.GeneralPath body = new java.awt.geom.GeneralPath();
-            body.moveTo(left, bottom - 4);
-            body.lineTo(left + w, bottom - 4);
-            body.lineTo(left + w, bottom - 12);
-            body.lineTo(left + 8, bottom - 12);
-            body.lineTo(left + 8, bottom - 18);
-            body.lineTo(left, bottom - 18);
-            body.closePath();
-
-            g2.setColor(locoColor);
-            g2.fill(body);
-
-            // Cab Window
-            g2.setColor(Color.WHITE);
-            g2.fillRect(left + 2, bottom - 16, 4, 4);
-
-            // Funnel
-            g2.setColor(locoColor);
-            g2.fillRect(left + 22, bottom - 16, 4, 6);
-            g2.fillRect(left + 21, bottom - 18, 6, 2);
-
-            // Cowcatcher
-            g2.setColor(accentColor);
-            java.awt.geom.GeneralPath cow = new java.awt.geom.GeneralPath();
-            cow.moveTo(left + w, bottom - 4);
-            cow.lineTo(left + w + 4, bottom);
-            cow.lineTo(left + w, bottom);
-            cow.closePath();
-            g2.fill(cow);
-
-            // Roof Accent
-            g2.fillRect(left - 1, bottom - 19, 10, 2);
-        }
-    }
-
     /**
      * Custom Caption to render a Green "Pass" Dot behind the Priority Train icon.
      */
@@ -4994,45 +4725,46 @@ int currentPrice = c.getCurrentSpace() != null ? c.getCurrentSpace().getPrice() 
 
     }
 
-
-// ... (lines of unchanged context code) ...
     protected void initGameSpecificActions() {
         // 1. Safety Checks
-        if (possibleActions == null) return;
-        if (players == null) return;
+        if (possibleActions == null)
+            return;
+        if (players == null)
+            return;
 
         java.util.List<rails.game.action.PossibleAction> list = possibleActions.getList();
-        if (list == null || list.isEmpty()) return;
+        if (list == null || list.isEmpty())
+            return;
 
-       // UNIFIED SPECIAL ACTION HANDLER
+        // UNIFIED SPECIAL ACTION HANDLER
         // We iterate through all actions. If they implement GuiTargetedAction,
         // we ask the action for its Visual Signature and apply it.
-        
+
         for (rails.game.action.PossibleAction pa : list) {
-            
+
             if (pa instanceof GuiTargetedAction) {
                 GuiTargetedAction gta = (GuiTargetedAction) pa;
-                Object target = gta.getTarget(); 
-                
+                Object target = gta.getTarget();
+
                 // 1. Find the UI Component
                 net.sf.rails.ui.swing.elements.RailCard card = findRailCardFor(target);
-                
+
                 // 2. Apply Highlight & Action using the Signature
                 if (card != null) {
-                    card.addPossibleAction(pa); 
-                    
+                    card.addPossibleAction(pa);
+
                     // --- START FIX ---
                     // CONSUME THE SIGNATURE
                     // A. Background
                     card.setBackground(gta.getHighlightBackgroundColor());
-                    
+
                     // B. Border (Match ORPanel thickness)
                     card.setBorder(BorderFactory.createLineBorder(gta.getHighlightBorderColor(), 3));
-                    
+
                     // C. Text
                     card.setForeground(gta.getHighlightTextColor());
                     // --- END FIX ---
-                    
+
                     card.setEnabled(true);
                     card.setVisible(true);
                     card.repaint();
@@ -5040,33 +4772,34 @@ int currentPrice = c.getCurrentSpace() != null ? c.getCurrentSpace().getPrice() 
             }
         }
     }
-// ... (lines of unchanged context code) ...
-
 
     /**
      * Central Registry: Locates the RailCard UI component for any game object.
      * Scans: Player Shares, IPO, Pool, Treasury, Trains, and Privates.
      */
     private net.sf.rails.ui.swing.elements.RailCard findRailCardFor(Object target) {
-        if (target == null) return null;
+        if (target == null)
+            return null;
 
         // A. If Target is a TRAIN
         if (target instanceof net.sf.rails.game.Train) {
             net.sf.rails.game.Train targetTrain = (net.sf.rails.game.Train) target;
-            
+
             // 1. Scan Company Trains
             if (compSubTrainButtons != null) {
                 for (int i = 0; i < nc; i++) {
                     for (int t = 0; t < MAX_TRAIN_SLOTS; t++) {
                         RailCard card = compSubTrainButtons[i][t];
-                        if (card != null && card.getTrain() == targetTrain) return card;
+                        if (card != null && card.getTrain() == targetTrain)
+                            return card;
                     }
                 }
             }
             // 2. Scan Pool Trains
             if (poolTrainButtons != null) {
                 for (RailCard card : poolTrainButtons) {
-                    if (card != null && card.getTrain() == targetTrain) return card;
+                    if (card != null && card.getTrain() == targetTrain)
+                        return card;
                 }
             }
         }
@@ -5074,7 +4807,7 @@ int currentPrice = c.getCurrentSpace() != null ? c.getCurrentSpace().getPrice() 
         // B. If Target is a COMPANY (Public or Private) - usually for Mergers/Exchange
         if (target instanceof net.sf.rails.game.Company) {
             net.sf.rails.game.Company targetComp = (net.sf.rails.game.Company) target;
-            
+
             // 1. Scan Player Shares (The most common target for "Exchange Share")
             if (playerShareCards != null) {
                 for (int i = 0; i < nc; i++) {
@@ -5088,7 +4821,7 @@ int currentPrice = c.getCurrentSpace() != null ? c.getCurrentSpace().getPrice() 
                     }
                 }
             }
-            
+
             // 2. Scan Player Privates
             if (playerPrivatesPanel != null) {
                 for (int j = 0; j < np; j++) {
@@ -5096,7 +4829,8 @@ int currentPrice = c.getCurrentSpace() != null ? c.getCurrentSpace().getPrice() 
                         for (Component c : playerPrivatesPanel[j].getComponents()) {
                             if (c instanceof RailCard) {
                                 RailCard card = (RailCard) c;
-                                if (card.getCompany() == targetComp) return card;
+                                if (card.getCompany() == targetComp)
+                                    return card;
                             }
                         }
                     }
@@ -5106,23 +4840,20 @@ int currentPrice = c.getCurrentSpace() != null ? c.getCurrentSpace().getPrice() 
             // 3. Scan Company Privates
             if (compPrivatesPanel != null) {
                 for (int i = 0; i < nc; i++) {
-                     if (compPrivatesPanel[i] != null) {
+                    if (compPrivatesPanel[i] != null) {
                         for (Component c : compPrivatesPanel[i].getComponents()) {
                             if (c instanceof RailCard) {
                                 RailCard card = (RailCard) c;
-                                if (card.getCompany() == targetComp) return card;
+                                if (card.getCompany() == targetComp)
+                                    return card;
                             }
                         }
                     }
                 }
             }
         }
-        
+
         return null;
     }
-
-
-
-
 
 }
