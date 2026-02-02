@@ -17,6 +17,7 @@ import net.sf.rails.game.PublicCompany;
 import net.sf.rails.game.Train;
 import net.sf.rails.game.TrainManager;
 import net.sf.rails.game.financial.BankPortfolio;
+import net.sf.rails.game.model.PortfolioModel;
 import net.sf.rails.game.state.Owner;
 
 public class TrainCorrectionManager extends CorrectionManager {
@@ -132,25 +133,39 @@ public class TrainCorrectionManager extends CorrectionManager {
 
         Train train = tmgr.getTrainByUniqueId(action.getTrainId());
         Owner dest = ownerMap.get(action.getDestOwnerName());
+        Owner source = ownerMap.get(action.getSourceOwnerName());
 
         if (train == null || dest == null) {
             DisplayBuffer.add(this, "Error: Train or Destination not found during execution.");
             return false;
         }
 
-        // [COMPILATION FIX] Removed invalid 'removeTrainCard' call. 
-        // transferTrain(train, dest) automatically updates ownership in the model.
+
+        // We prioritize using the PortfolioModel API ("addTrainCard") over TrainManager.transferTrain.
+        // using 'addTrainCard' ensures the card is correctly removed from the Source list (fixing Ghost Trains)
+        // before being added to the Destination. 
+        // If we called transferTrain first, the owner update would prevent the removal logic from firing.
+
+        net.sf.rails.game.model.PortfolioModel destModel = null;
+
+        if (dest instanceof net.sf.rails.game.financial.BankPortfolio) {
+            destModel = ((net.sf.rails.game.financial.BankPortfolio) dest).getPortfolioModel();
+        } else if (dest instanceof net.sf.rails.game.PublicCompany) {
+            destModel = ((net.sf.rails.game.PublicCompany) dest).getPortfolioModel();
+        } else if (dest instanceof net.sf.rails.game.Player) {
+            destModel = ((net.sf.rails.game.Player) dest).getPortfolioModel();
+        }
 
         if (action.getDestOwnerName().contains("Trash") || action.getDestOwnerName().contains("Scrap")) {
             tmgr.trashTrain(train);
+        } else if (destModel != null) {
+            // "Pull" the train to the new portfolio. This handles the remove(source) + add(dest) atomically.
+            destModel.addTrainCard(train.getCard());
         } else {
+            // Fallback for destinations without a PortfolioModel (should be rare)
             tmgr.transferTrain(train, dest);
-            
-            // Explicitly add to Bank dest if needed (Workaround for BankPortfolio quirks)
-            if (dest instanceof BankPortfolio) {
-                ((BankPortfolio)dest).getPortfolioModel().addTrainCard(train.getCard());
-            }
         }
+        
 
         String msg = LocalText.getText("CorrectTrainTransfer", 
                 train.getName(), 

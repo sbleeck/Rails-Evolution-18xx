@@ -57,13 +57,13 @@ public class DiscardTrain extends PossibleORAction implements GuiTargetedAction 
             setOwnedTrains(Set.of());
         }
     }
-    
-    // ... (Existing logic methods: setOwnedTrains, process, equalsAs, etc. omitted) ...
-    // These methods remain identical to your upload.
 
     @Override
     public String getButtonLabel() {
-        return "Discard " + (discardedTrain != null ? discardedTrain.getName() : "?");
+        // return "Discard " + (discardedTrain != null ? discardedTrain.getName() :
+        // "?");
+        return "Discard " + (discardedTrain != null ? discardedTrain.toText() : "?");
+
     }
 
     @Override
