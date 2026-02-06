@@ -1289,7 +1289,7 @@ public class GameStatus extends GridPanel {
         chosenAction = processGameSpecificFollowUpActions(actor, chosenAction);
 
         if (chosenAction != null) {
-            
+
             (parent).process(chosenAction);
         }
 
@@ -2820,7 +2820,6 @@ public class GameStatus extends GridPanel {
                         if (!isZero) {
                             card.setOpaque(true);
 
-                        
                             String cleanText = raw.replace("PU", "P");
 
                             // TEXT LOGIC: Only show "Owner" for Minors (no stock price).
@@ -4142,25 +4141,36 @@ public class GameStatus extends GridPanel {
             // Income exists.
             // We inline the ternary to avoid needing to know the exact fully qualified name
             // of the common interface (Model/State).
+
             f = compRevenue[i] = new Field(
                     hasDirectCompanyIncomeInOr ? c.getLastDividendModel() : c.getLastRevenueModel()) {
                 @Override
                 public void setText(String t) {
-                    if (t == null || t.trim().length() == 0) {
+                    // Ignore 't' (the total). Fetch strictly the Base Revenue (Route Revenue).
+                    int val = 0;
+                    net.sf.rails.game.round.RoundFacade rf = gameUIManager.getGameManager().getCurrentRound();
+                    if (rf instanceof net.sf.rails.game.OperatingRound) {
+                        val = ((net.sf.rails.game.OperatingRound) rf).getBaseRevenueOnly(c);
+                    } else if (t != null && t.trim().length() > 0) {
+                        // Fallback for non-OR states
+                        try {
+                            val = Integer.parseInt(t.trim());
+                        } catch (Exception e) {
+                        }
+                    }
+
+                    // Existing formatting logic (Colors/Suffixes) applied to the specific Base
+                    // value
+                    if (val == 0 && (t == null || t.length() == 0)) {
                         super.setText("");
                         return;
                     }
-                    boolean isZero = false;
-                    try {
-                        if (Integer.parseInt(t.trim()) == 0)
-                            isZero = true;
-                    } catch (Exception e) {
-                    }
+
                     String suffix = " +";
                     String color = "black";
                     try {
                         Object rawAlloc = c.getLastRevenueAllocation();
-                        if (!isZero && rawAlloc != null) {
+                        if (val != 0 && rawAlloc != null) {
                             String alloc = rawAlloc.toString();
                             if (alloc.contains("Withhold")) {
                                 suffix = " -";
@@ -4172,7 +4182,10 @@ public class GameStatus extends GridPanel {
                         }
                     } catch (Exception e) {
                     }
-                    super.setText("<html><div align='right'><font color='" + color + "'><b>" + t + suffix
+
+                    // Use Bank.format for currency consistency or raw integer as preferred
+                    String display = gameUIManager.format(val);
+                    super.setText("<html><div align='right'><font color='" + color + "'><b>" + display + suffix
                             + "</b></font></div></html>");
                 }
             };
@@ -4185,16 +4198,40 @@ public class GameStatus extends GridPanel {
 
             // DIRECT INCOME COLUMN (1837 Fixed Coal Income)
             if (hasDirectCompanyIncomeInOr) {
-                f = compDirectRevenue[i] = new Field(c.getLastDirectIncomeModel()) {
+
+                f = compDirectRevenue[i] = new Field(
+                        hasDirectCompanyIncomeInOr ? c.getLastDividendModel() : c.getLastRevenueModel()) {
                     @Override
                     public void setText(String t) {
-                        if (t == null || t.trim().equals("0") || t.isEmpty()) {
+                        // --- START FIX ---
+                        int val = 0;
+                        net.sf.rails.game.round.RoundFacade rf = gameUIManager.getGameManager().getCurrentRound();
+
+                        if (rf instanceof net.sf.rails.game.OperatingRound) {
+                            net.sf.rails.game.OperatingRound or = (net.sf.rails.game.OperatingRound) rf;
+                            val = or.getSpecialRevenueOnly(c);
+
+                            // DEBUG LOGGING
+                            // if (c.getType().getId().equals("Coal") ||
+                            // c.getType().getId().equals("Minor")) {
+                            // log.info("GAMESTATUS DEBUG: " + c.getId() + " calling getSpecialRevenueOnly.
+                            // Result: " + val);
+                            // }
+                        } else {
+                            // log.info("GAMESTATUS DEBUG: Round is not OperatingRound (" +
+                            // rf.getClass().getSimpleName() + ")");
+                        }
+
+                        if (val == 0) {
                             super.setText("");
                         } else {
-                            super.setText("<html><center><b>" + t + "</b></center></html>");
+                            String display = gameUIManager.format(val);
+                            super.setText("<html><div align='right'><b>" + display + "</b></div></html>");
                         }
+                        // --- END FIX ---
                     }
                 };
+
                 f.setBackground(isOperating ? BG_OPERATING : (!isActive ? BG_INACTIVE : BG_MAUVE));
                 f.setOpaque(true);
                 f.setBorder(bDet);

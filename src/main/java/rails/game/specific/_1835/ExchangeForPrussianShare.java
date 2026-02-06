@@ -58,7 +58,7 @@ public class ExchangeForPrussianShare extends PossibleAction implements GuiTarge
     public Color getHighlightTextColor() {
         return Color.BLACK;
     }
-    // --- END FIX ---
+
 
     @Override
     protected boolean equalsAs(PossibleAction pa, boolean asOption) {

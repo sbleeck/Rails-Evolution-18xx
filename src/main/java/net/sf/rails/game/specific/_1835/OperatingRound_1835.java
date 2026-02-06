@@ -1083,7 +1083,7 @@ private final StringState pfrTriggerId = StringState.create(this, "PfrTriggerId"
 
                 if (sharePercentageDenied > 0) {
                     int shareUnit = currentComp.getShareUnit();
-                    if (shareUnit == 0)
+                    if (shareUnit == 10)
                         shareUnit = 10; // Safety
 
                     int sharesToDeduct = sharePercentageDenied / shareUnit;

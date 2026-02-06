@@ -6,7 +6,6 @@ import net.sf.rails.common.parser.Configurable;
 import net.sf.rails.common.parser.ConfigurationException;
 import net.sf.rails.common.parser.Configure;
 import net.sf.rails.common.parser.Tag;
-import net.sf.rails.game.GameManager.TimeConsequence;
 import net.sf.rails.game.PlayerManager.PlayerOrderModel;
 import net.sf.rails.game.financial.*;
 import net.sf.rails.game.model.PortfolioModel;

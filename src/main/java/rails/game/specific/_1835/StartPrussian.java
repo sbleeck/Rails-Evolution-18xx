@@ -36,8 +36,7 @@ public class StartPrussian extends PossibleAction implements GuiTargetedAction {
     @Override
     public String getButtonLabel() { return "Start (Fold " + companyToFold.getId() + ")"; }
 
-    // --- START FIX ---
-    // UNIFIED "FORMATION" SIGNATURE (Pale Green / Forest Green)
+// UNIFIED "FORMATION" SIGNATURE (Pale Green / Forest Green)
     
     @Override
     public Color getButtonColor() { 

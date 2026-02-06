@@ -283,10 +283,7 @@ public class ORPanel extends GridPanel
                     setupButton(btnDone, pa);
                     doneActionFound = true;
                 }
-            } else if (pa instanceof DiscardTrain) {
-                // Handled in discard mode, usually via popups, but if button needed:
-                // could add to misc panel or special
-            }
+            } 
         }
     }
 
@@ -1153,11 +1150,24 @@ if (btnTrainSkip != null) btnTrainSkip.setEnabled(true);
         updateRevenueButton(btnRevSplit, a);
     }
 
-public void revenueUpdate(int best, int special, boolean finalRes) {
+
+    public void revenueUpdate(int best, int special, boolean finalRes) {
         SwingUtilities.invokeLater(() -> {
             try {
-                if (lblRevenue != null)
-                    lblRevenue.setText(format(best));
+                // --- START FIX ---
+                if (lblRevenue != null) {
+                    // Do not use format(best) directly, as it bypasses game-specific split logic (e.g. 1837 Coal).
+                    // We delegate back to the OperatingRound to get the consistent "X + Y" string.
+                    RoundFacade rf = orUIManager.getGameUIManager().getCurrentRound();
+                    if (rf instanceof OperatingRound) {
+                        lblRevenue.setText(((OperatingRound) rf).getRevenueDisplayString(orComp));
+                    } else {
+                        // Fallback for non-standard states
+                        lblRevenue.setText(format(best));
+                    }
+                }
+                // --- END FIX ---
+
                 if (isRevenueValueToBeSet)
                     setRevenue(orCompIndex, best);
                 if (finalRes && isDisplayCurrentRoutes()) {
@@ -1168,7 +1178,7 @@ public void revenueUpdate(int best, int special, boolean finalRes) {
             }
         });
     }
-
+    
     // Revenue Helpers
     private void updateRevenueButton(ActionButton btn, int amount) {
         if (btn == null || !btn.isEnabled())
@@ -1805,6 +1815,11 @@ public void revenueUpdate(int best, int special, boolean finalRes) {
             List<PossibleAction> specialActions = new ArrayList<>();
             GuiTargetedAction contextProvider = null;
 
+            // Fix: Buffer the NullAction to process it AFTER checking for other special actions.
+            // This prevents the "Done" button from being swallowed if it appears 
+            // before the Discard/Special action in the list.
+            PossibleAction deferredNullAction = null;
+
             for (PossibleAction pa : actions) {
                 // If it implements the interface, it is definitely a special UI action
                 if (pa instanceof GuiTargetedAction) {
@@ -1815,11 +1830,18 @@ public void revenueUpdate(int best, int special, boolean finalRes) {
                 else if (pa instanceof LayBaseToken && ((LayBaseToken) pa).getType() == LayBaseToken.HOME_CITY) {
                     specialActions.add(pa);
                 }
-                // NullAction (Pass/Done) is included if we are already in a special context
+                // Buffer the NullAction; do not decide yet
                 else if (pa instanceof NullAction) {
-                    if (!specialActions.isEmpty() || ((NullAction)pa).getMode() == NullAction.Mode.PASS) {
-                         specialActions.add(pa);
-                    }
+                    deferredNullAction = pa;
+                }
+            }
+
+            // Post-Loop: Now we know if special actions exist, so we can safely decide on the Done button
+            if (deferredNullAction != null) {
+                // If we have special actions (like Discards), enable the Done button.
+                // Also enable it if it is an explicit PASS.
+                if (!specialActions.isEmpty() || ((NullAction)deferredNullAction).getMode() == NullAction.Mode.PASS) {
+                    specialActions.add(deferredNullAction);
                 }
             }
             

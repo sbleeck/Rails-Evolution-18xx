@@ -263,9 +263,6 @@ public class GameManager_1835 extends GameManager {
     }
 
 
-    // File: net.sf.rails.game.specific._1835.GameManager_1835.java
-// Method: startPrussianFormationRound
-
     public void startPrussianFormationRound(Round currentRound) {
 
         setInterruptedRound(currentRound);
@@ -304,8 +301,6 @@ public class GameManager_1835 extends GameManager {
     public PublicCompany getM2() {
         return getRoot().getCompanyManager().getPublicCompany(GameDef_1835.M2_ID);
     }
-
-
 
 
 }

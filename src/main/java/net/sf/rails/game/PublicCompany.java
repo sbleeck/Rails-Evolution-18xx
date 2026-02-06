@@ -2691,6 +2691,9 @@ public class PublicCompany extends RailsAbstractItem
 
         return foundingStartCompany;
     }
+    public BaseTokensModel getBaseTokens() {
+        return baseTokens;
+    }
 
     /**
      * @param foundingCompany the foundingStartCompany to set

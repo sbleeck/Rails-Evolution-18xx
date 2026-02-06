@@ -4864,6 +4864,13 @@ public class OperatingRound extends Round implements Observer {
         // 3. Reset Step to ensure initTurn() runs when the real move starts
         setStep(GameDef.OrStep.INITIAL);
     }
-// --- END FIX ---
+
+    public int getBaseRevenueOnly(PublicCompany company) {
+        return company.getLastRevenue(); // Fallback to model value
+    }
+
+    public int getSpecialRevenueOnly(PublicCompany company) {
+        return 0;
+    }
 
 }

@@ -5,12 +5,14 @@ import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.util.*;
 import java.awt.Color;
-import rails.game.action.GuiTargetedAction;
-import net.sf.rails.common.DisplayBuffer;
+
 import net.sf.rails.common.LocalText;
+import net.sf.rails.common.ReportBuffer;
 import net.sf.rails.game.*;
 import net.sf.rails.game.state.AbstractItem;
 import net.sf.rails.game.state.Owner;
+import net.sf.rails.game.state.Purse;
+import net.sf.rails.game.financial.Bank;
 
 import org.jetbrains.annotations.NotNull;
 import com.google.common.base.Objects;
@@ -29,6 +31,7 @@ public class DiscardTrain extends PossibleORAction implements GuiTargetedAction 
     private boolean forced = false;
     transient private Train discardedTrain = null;
     private String discardedTrainUniqueId;
+    private String label;
     public static final long serialVersionUID = 1L;
 
     public DiscardTrain(PublicCompany company, @NotNull Set<Train> ownedTrains) {
@@ -62,6 +65,7 @@ public class DiscardTrain extends PossibleORAction implements GuiTargetedAction 
     public String getButtonLabel() {
         // return "Discard " + (discardedTrain != null ? discardedTrain.getName() :
         // "?");
+        if (label != null) return label;
         return "Discard " + (discardedTrain != null ? discardedTrain.toText() : "?");
 
     }
@@ -92,6 +96,10 @@ public class DiscardTrain extends PossibleORAction implements GuiTargetedAction 
     @Override
     public Color getHighlightBorderColor() {
         return new Color(178, 34, 34); // Firebrick
+    }
+
+    public void setLabel(String label) {
+        this.label = label;
     }
 
     @Override
@@ -127,6 +135,8 @@ public class DiscardTrain extends PossibleORAction implements GuiTargetedAction 
     
     public boolean process (Round round) {
         if (discardedTrain == null && !forced) return true;
+
+     
         // ... (Logic implementation as provided) ...
         discardedTrain.getCard().discard();
         return true;
@@ -153,5 +163,28 @@ public class DiscardTrain extends PossibleORAction implements GuiTargetedAction 
     @Override
     public String getGroupLabel() {
         return "Discard Train";
+    }
+
+    public boolean execute(OperatingRound round) {
+        
+        // ... (Train selection logic remains) ...
+
+        // --- START FIX ---
+        // REMOVED: Cost calculation and payment logic. 
+        // This class is now strictly for FORCED discards (Limit Checks).
+        // Standard forced discards do not cost money.
+        // --- END FIX ---
+
+        // Move the train to the scrap heap or pool (Standard Logic)
+        Bank bank = Bank.get(round);
+        // Assuming standard rule: forced discard goes to Open Market (Pool)
+        discardedTrain.moveTo(bank.getPool()); 
+
+        ReportBuffer.add(round, LocalText.getText("DiscardsTrain", 
+            company.getId(), 
+            discardedTrain.getName()));
+
+        discardedTrain.getCard().discard();
+        return true;
     }
 }

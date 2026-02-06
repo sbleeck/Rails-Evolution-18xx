@@ -794,35 +794,72 @@ public class MapHex extends RailsModel implements RailsOwner, Configurable, Seri
         }
     }
 
-    /**
-     * Execute a tile replacement. This method should only be called from
-     * TileMove objects. It is also used to undo tile lays.
-     *
-     * @param newTile        The new tile to be laid on this hex.
-     * @param newOrientation The orientation of the new tile (0-5).
-     * @param newStops       The new stops used now
-     */
-    public void executeTileLay(Tile newTile, HexSide newOrientation,
-                                BiMap<Stop, Station> newStops) {
-
-        // TODO: Is the check for null still required?
-        if (currentTile.value() != null) {
-            currentTile.value().remove(this);
-        }
 
 
-        newTile.add(this);
+// File: MapHex.java
+
+    // ... (lines 720-730 approx) ...
+
+    // --- START FIX ---
+    // FIX: Method signature must accept BiMap<Stop, Station> to match AIEvaluatorService calls.
+    public void executeTileLay(Tile newTile, HexSide rotation, BiMap<Stop, Station> stopsToNewStations) {
+        
         currentTile.set(newTile);
-        currentTileRotation.set(newOrientation);
+        currentTileRotation.set(rotation);
 
         stops.clear();
-        if (newStops != null) {
-            for ( Map.Entry<Stop, Station> entry  : newStops.entrySet()) {
-                stops.put(entry.getValue(), entry.getKey());
-                entry.getKey().setRelatedStation(entry.getValue());
-           }
+
+        if (stopsToNewStations != null) {
+            // RESTORE CONTEXT (AI/Undo):
+            // The input maps Stop -> Station. We need to populate our local 'stops' map (Station -> Stop).
+            for (Map.Entry<Stop, Station> entry : stopsToNewStations.entrySet()) {
+                Stop stop = entry.getKey();
+                Station station = entry.getValue();
+
+                // Ensure the Stop points to the correct Station on this restored tile
+                stop.setStation(station);
+
+                // Re-register in the local map
+                stops.put(station, stop);
+
+            }
+        } else {
+            // STANDARD TILE LAY:
+            // Calculate new stops safely, reusing existing objects to prevent ID collisions.
+
+            for (Station station : newTile.getStations()) {
+
+                // ID Format: MapHexID + "/" + StationNumber (e.g. "G17/1")
+                String expectedStopId = this.getId() + "/" + station.getNumber();
+
+                Stop stop;
+
+                // Check global registry (Root) for the "Zombie" stop from previous tile
+                Item existingItem = getRoot().locate(expectedStopId);
+
+                if (existingItem instanceof Stop) {
+                    // REUSE: Update the existing stop. 
+                    // This preserves tokens and avoids "Root already contains item" crash.
+                    stop = (Stop) existingItem;
+                    stop.setStation(station); 
+                } else {
+                    // CREATE: New station slot.
+                    stop = Stop.create(this, station);
+                }
+                
+                stops.put(station, stop);
+            }
+
         }
+
     }
+
+
+
+
+
+
+
 
     public boolean layBaseToken(PublicCompany company, Stop stop) {
         if (stops.isEmpty()) {
