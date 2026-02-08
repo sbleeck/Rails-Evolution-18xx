@@ -97,6 +97,12 @@ public class StockRound extends Round implements I_MapRenderableRound {
     protected final ArrayListState<String> recordedSwapChoices;
     protected final IntegerState swapChoiceIndex;
 
+    // --- START FIX ---
+    // Persist choice of share size (e.g. 10 vs 20) for reloads
+    protected final ArrayListState<Integer> recordedBuyShareChoices;
+    protected final IntegerState buyShareChoiceIndex;
+
+
     // Transient choice container (reset every action)
     public static List<Integer> manualSwapChoice = null;
 
@@ -156,6 +162,9 @@ public class StockRound extends Round implements I_MapRenderableRound {
         String uniqueId = id.replaceAll("\\s+", "_");
         recordedSwapChoices = new ArrayListState<>(parent, "recordedSwapChoices_" + uniqueId);
         swapChoiceIndex = IntegerState.create(parent, "swapChoiceIndex_" + uniqueId);
+
+recordedBuyShareChoices = new ArrayListState<>(parent, "recordedBuyShareChoices_" + uniqueId);
+        buyShareChoiceIndex = IntegerState.create(parent, "buyShareChoiceIndex_" + uniqueId);
 
         numberOfPlayers = getRoot().getPlayerManager().getPlayers().size();
 
@@ -569,8 +578,8 @@ public class StockRound extends Round implements I_MapRenderableRound {
                 if (!stockSpace.isNoBuyLimit()) {
                     number = 1;
                     /* Would the player exceed the per-company share hold limit? */
-                    if (!checkAgainstHoldLimit(currentPlayer, comp, number))
-                        continue;
+                    if (!checkAgainstHoldLimit(currentPlayer, comp, number * shares))
+                            continue;
 
                     /* Would the player exceed the total certificate limit? */
                     if (!stockSpace.isNoCertLimit()
@@ -1224,6 +1233,91 @@ public class StockRound extends Round implements I_MapRenderableRound {
                         from.getId());
                 break;
             }
+
+
+
+          if (from == pool && number == 1 ) {
+                
+                List<Integer> validSizes = new ArrayList<>();
+                StockSpace poolSpace = (company.hasStockPrice()) ? company.getCurrentSpace() : null;
+                
+                // 1. Identify valid certificate sizes
+                for (PublicCertificate c : from.getCertificates(company)) {
+                    int size = c.getShare();
+                    if (validSizes.contains(size)) continue;
+
+                    // Cert Limit
+                    if ((!company.hasStockPrice() || (poolSpace != null && !poolSpace.isNoCertLimit()))
+                            && !mayPlayerBuyCertificate(currentPlayer, company, c.getCertificateCount()))
+                        continue;
+
+                    // Hold Limit
+                    if ((!company.hasStockPrice() || (poolSpace != null && !poolSpace.isNoHoldLimit()))
+                            && !checkAgainstHoldLimit(currentPlayer, company, size / shareUnit))
+                        continue;
+
+                    // Cash Check
+                    int checkPrice = (company.hasStockPrice()) ? poolSpace.getPrice() : company.getFixedPrice();
+                    int checkCost = (size / shareUnit) * checkPrice / company.getShareUnitsForSharePrice();
+                    if (currentPlayer.getCashValue() < checkCost) continue;
+
+                    validSizes.add(size);
+                }
+
+                Collections.sort(validSizes);
+
+                // 2. Resolve Ambiguity
+                if (validSizes.size() > 1) {
+                    
+                    // CHECK: Does the action already specify a valid size? (e.g. from Reload or specific Button)
+                    int actionSize = action.getSharePerCertificate();
+                    
+                    if (validSizes.contains(actionSize)) {
+                        // Trust the action - skip dialog
+                        sharePerCert = actionSize;
+                        
+                    } else {
+                        // Ambiguous Action (sharePerCert=0 or invalid) -> Ask User
+                        List<String> options = new ArrayList<>();
+                        int currentSelectionIndex = -1;
+                        for (int i = 0; i < validSizes.size(); i++) {
+                            int s = validSizes.get(i);
+                            options.add(s + "%");
+                            if (s == sharePerCert) currentSelectionIndex = i;
+                        }
+                        options.add("Cancel");
+
+                        String defaultOption = (currentSelectionIndex >= 0) ? options.get(currentSelectionIndex) : options.get(0);
+
+                        int choice = JOptionPane.showOptionDialog(null, 
+                                "Select certificate size for " + companyName + " (Pool):", 
+                                "Buy Certificate",
+                                JOptionPane.DEFAULT_OPTION, JOptionPane.QUESTION_MESSAGE, null, 
+                                options.toArray(), defaultOption);
+
+                        if (choice == -1 || choice == options.size() - 1) {
+                            return false;
+                        }
+
+                        sharePerCert = validSizes.get(choice);
+                        
+                        // CRITICAL: Update the action so the Replay Log records the specific choice
+                        action.setSharePerCertificate(sharePerCert);
+                    }
+
+                    // Apply the specific choice
+                    share = number * sharePerCert;
+                    shares = share / shareUnit;
+                    
+                    president = false;
+                    if (from.findCertificate(company, sharePerCert / shareUnit, true) != null) {
+                        president = true;
+                    }
+                }
+            }
+
+
+
 
             StockSpace currentSpace;
             if (from == ipo && company.hasParPrice()) {

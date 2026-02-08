@@ -2,6 +2,8 @@ package rails.game.action;
 
 import java.awt.Color;
 import net.sf.rails.game.state.Owner;
+import java.awt.event.KeyEvent;
+
 
 public interface GuiTargetedAction {
 
@@ -59,6 +61,12 @@ default String getToolTip() {
         return Color.BLACK;
     }
 
-
+/**
+     * Hotkey Management.
+     * @return The KeyEvent virtual key code (e.g. KeyEvent.VK_ENTER), or 0 if none.
+     */
+    default int getHotkey() {
+        return 0;
+    }
 
 }

@@ -252,6 +252,8 @@ public class RemainingTilesWindow extends JFrame implements WindowListener, Acti
             super.removeNotify();
         }
 
+        
+
         private void attachObservers() {
             if (listenersAttached)
                 return;
@@ -455,5 +457,20 @@ public class RemainingTilesWindow extends JFrame implements WindowListener, Acti
             }
         }
     }
+
+
+public void refreshMiniDock() {
+    // Refresh the tile counts/labels
+    refreshCounts();
+    
+    // If the "MiniDock" is a specific sub-panel or the tilePanel itself,
+    // ensure it is repainted to reflect the new phase color/availability.
+    if (tilePanel != null) {
+        tilePanel.revalidate();
+        tilePanel.repaint();
+    }
+    this.repaint();
+}
+
 
 }

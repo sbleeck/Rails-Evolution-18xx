@@ -10,6 +10,7 @@ import net.sf.rails.game.PublicCompany;
 import net.sf.rails.game.Train;
 import net.sf.rails.game.financial.Bank;
 import net.sf.rails.game.state.Purse;
+import java.awt.event.KeyEvent;
 
 public class DiscardTrainVoluntarily extends DiscardTrain {
 
@@ -23,6 +24,11 @@ public class DiscardTrainVoluntarily extends DiscardTrain {
     // --- FIX 3: Custom Button Label ---
     public void setLabel(String label) {
         this.customLabel = label;
+    }
+
+    @Override
+    public int getHotkey() {
+return 0;
     }
 
     @Override

@@ -6,11 +6,14 @@ import javax.swing.*;
 import net.sf.rails.game.round.RoundFacade;
 import net.sf.rails.game.financial.StockRound;
 import net.sf.rails.game.OperatingRound;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class RoundCounterPanel extends JPanel {
     private static final long serialVersionUID = 1L;
     private static final int WIDTH = 240;
     private static final int HEIGHT = 45;
+    private static final Logger log = LoggerFactory.getLogger(GameStatus.class);
 
     // External Dependency
     private final GameUIManager gameUIManager;
@@ -19,6 +22,7 @@ public class RoundCounterPanel extends JPanel {
     private int phaseMaxOrs = 1;
     private int currentOrNum = 1;
     private boolean isStockRound = true;
+    private Color currentPhaseColor = Color.WHITE;
 
     // Animation State
     private double currentTrainX = -1; // -1 = not set
@@ -27,7 +31,7 @@ public class RoundCounterPanel extends JPanel {
 
     public RoundCounterPanel(GameUIManager gameUIManager) {
         this.gameUIManager = gameUIManager;
-        
+
         setPreferredSize(new Dimension(WIDTH, HEIGHT));
         setMinimumSize(new Dimension(WIDTH, HEIGHT));
         setMaximumSize(new Dimension(WIDTH, HEIGHT));
@@ -62,72 +66,92 @@ public class RoundCounterPanel extends JPanel {
     }
 
     public void updateState() {
-        if (gameUIManager == null || gameUIManager.getRoot() == null) return;
+        if (gameUIManager == null || gameUIManager.getRoot() == null)
+            return;
 
-        try {
-            // 1. Get Phase Limits
-            if (gameUIManager.getGameManager() != null) {
-                phaseMaxOrs = gameUIManager.getGameManager().getNumberOfOperatingRounds();
+        // 1. Get Phase Limits and Color
+        if (gameUIManager.getGameManager() != null) {
+            phaseMaxOrs = gameUIManager.getGameManager().getNumberOfOperatingRounds();
+
+            var phase = gameUIManager.getRoot().getPhaseManager().getCurrentPhase();
+            String phaseName = phase.toText().toLowerCase();
+
+
+            if (phaseName.contains("1")) {
+                currentPhaseColor = Color.YELLOW;
+            } else if (phaseName.contains("2")) {
+                currentPhaseColor = Color.decode("#00B400");
+            } else if (phaseName.contains("3")) {
+                currentPhaseColor = Color.decode("#8B4513");
+            } else {
+                currentPhaseColor = Color.WHITE;
             }
 
-            // 2. Determine Current Round & Index
-            RoundFacade round = gameUIManager.getGameManager().getCurrentRound();
+        }
 
-            // Exclude Prussia/Formation rounds: Maintain previous state (Freeze)
-        // We use getClass().getSimpleName() to match the log output you saw (PrussianFormationRound).
+        // 1. Get Phase Limits
+        if (gameUIManager.getGameManager() != null) {
+            phaseMaxOrs = gameUIManager.getGameManager().getNumberOfOperatingRounds();
+        }
+
+        // 2. Determine Current Round & Index
+        RoundFacade round = gameUIManager.getGameManager().getCurrentRound();
+
+        // Exclude Prussia/Formation rounds: Maintain previous state (Freeze)
+        // We use getClass().getSimpleName() to match the log output you saw
+        // (PrussianFormationRound).
         String rName = round.getClass().getSimpleName();
         if (rName.contains("Prussian") || rName.contains("Formation")) {
-             return; // Stop here. Do not fall through to "isStockRound = true".
+            return; // Stop here. Do not fall through to "isStockRound = true".
         }
-        
-            if (round instanceof StockRound) {
-                isStockRound = true;
-                currentOrNum = 0;
-            } else if (round instanceof OperatingRound) {
-                isStockRound = false;
-                String orId = gameUIManager.getGameManager().getORId();
-                currentOrNum = 1;
-                if (orId != null && orId.contains(".")) {
-                    try {
-                        String suffix = orId.substring(orId.lastIndexOf('.') + 1);
-                        currentOrNum = Integer.parseInt(suffix);
-                    } catch (NumberFormatException e) {
-                        currentOrNum = 1;
-                    }
-                }
-            } else {
-                isStockRound = true;
-            }
 
-            // 3. Calculate Target Position
-            int startX = 25;
-            int gap = 55;
-            int activeIndex;
-
-            if (isStockRound) {
-                activeIndex = 3; // SR always last
-            } else {
-                activeIndex = currentOrNum - 1;
-                if (activeIndex < 0) activeIndex = 0;
-                if (activeIndex > 2) activeIndex = 2;
-            }
-
-            double newTarget = startX + (activeIndex * gap);
-
-            // 4. Trigger Animation
-            if (currentTrainX < 0) {
-                currentTrainX = newTarget;
-                targetTrainX = newTarget;
-            } else if (Math.abs(newTarget - targetTrainX) > 0.1) {
-                targetTrainX = newTarget;
-                if (!animTimer.isRunning()) {
-                    animTimer.start();
+        if (round instanceof StockRound) {
+            isStockRound = true;
+            currentOrNum = 0;
+        } else if (round instanceof OperatingRound) {
+            isStockRound = false;
+            String orId = gameUIManager.getGameManager().getORId();
+            currentOrNum = 1;
+            if (orId != null && orId.contains(".")) {
+                try {
+                    String suffix = orId.substring(orId.lastIndexOf('.') + 1);
+                    currentOrNum = Integer.parseInt(suffix);
+                } catch (NumberFormatException e) {
+                    currentOrNum = 1;
                 }
             }
-
-        } catch (Exception e) {
-            // Fail safe
+        } else {
+            isStockRound = true;
         }
+
+        // 3. Calculate Target Position
+        int startX = 25;
+        int gap = 55;
+        int activeIndex;
+
+        if (isStockRound) {
+            activeIndex = 3; // SR always last
+        } else {
+            activeIndex = currentOrNum - 1;
+            if (activeIndex < 0)
+                activeIndex = 0;
+            if (activeIndex > 2)
+                activeIndex = 2;
+        }
+
+        double newTarget = startX + (activeIndex * gap);
+
+        // 4. Trigger Animation
+        if (currentTrainX < 0) {
+            currentTrainX = newTarget;
+            targetTrainX = newTarget;
+        } else if (Math.abs(newTarget - targetTrainX) > 0.1) {
+            targetTrainX = newTarget;
+            if (!animTimer.isRunning()) {
+                animTimer.start();
+            }
+        }
+
         repaint();
     }
 
@@ -140,7 +164,7 @@ public class RoundCounterPanel extends JPanel {
         int startX = 25;
         int gap = 55;
         int trackY = HEIGHT - 12;
-        int capW = 34; 
+        int capW = 34;
         int capH = 18;
 
         // --- 1. DRAW TRACK ---
@@ -152,7 +176,8 @@ public class RoundCounterPanel extends JPanel {
 
             if (isFutureDisabled) {
                 g2.setColor(Color.LIGHT_GRAY);
-                g2.setStroke(new BasicStroke(2, BasicStroke.CAP_BUTT, BasicStroke.JOIN_BEVEL, 0, new float[]{4, 4}, 0));
+                g2.setStroke(
+                        new BasicStroke(2, BasicStroke.CAP_BUTT, BasicStroke.JOIN_BEVEL, 0, new float[] { 4, 4 }, 0));
             } else {
                 g2.setColor(Color.GRAY);
                 g2.setStroke(new BasicStroke(3));
@@ -166,23 +191,29 @@ public class RoundCounterPanel extends JPanel {
             int cx = startX + (i * gap);
             String label = (i == 3) ? "SR" : "OR" + (i + 1);
             boolean isDisabled = (i < 3 && i >= phaseMaxOrs);
-            
-            RoundRectangle2D capsule = new RoundRectangle2D.Float(cx - (capW / 2f), trackY - (capH / 2f), capW, capH, 10, 10);
+
+            RoundRectangle2D capsule = new RoundRectangle2D.Float(cx - (capW / 2f), trackY - (capH / 2f), capW, capH,
+                    10, 10);
 
             if (isDisabled) {
                 g2.setColor(new Color(245, 245, 245));
                 g2.fill(capsule);
                 g2.setColor(Color.LIGHT_GRAY);
-                g2.setStroke(new BasicStroke(1, BasicStroke.CAP_BUTT, BasicStroke.JOIN_BEVEL, 0, new float[]{2}, 0));
+                g2.setStroke(new BasicStroke(1, BasicStroke.CAP_BUTT, BasicStroke.JOIN_BEVEL, 0, new float[] { 2 }, 0));
                 g2.draw(capsule);
             } else {
-                g2.setColor(Color.WHITE);
+                // --- START FIX ---
+                // Apply the dynamically determined phase color
+                g2.setColor(currentPhaseColor);
                 g2.fill(capsule);
+                // --- END FIX ---
+
                 g2.setColor(Color.BLACK);
                 g2.setStroke(new BasicStroke(1.5f));
                 g2.draw(capsule);
-                
+
                 g2.setColor(Color.BLACK);
+
                 g2.setFont(getFont().deriveFont(Font.BOLD, 10f));
                 FontMetrics fm = g2.getFontMetrics();
                 g2.drawString(label, cx - (fm.stringWidth(label) / 2), trackY + (fm.getAscent() / 2) - 2);
@@ -191,7 +222,8 @@ public class RoundCounterPanel extends JPanel {
 
         // --- 3. DRAW ANIMATED TRAIN ---
         int drawX = (int) currentTrainX;
-        if (drawX < 0) drawX = startX;
+        if (drawX < 0)
+            drawX = startX;
         drawTrain(g2, drawX, trackY - 10);
     }
 
@@ -237,7 +269,7 @@ public class RoundCounterPanel extends JPanel {
         cow.lineTo(left + w, bottom);
         cow.closePath();
         g2.fill(cow);
-        
+
         g2.fillRect(left - 1, bottom - 19, 10, 2); // Roof
     }
 }

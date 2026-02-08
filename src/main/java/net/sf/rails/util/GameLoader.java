@@ -416,15 +416,25 @@ public boolean replayGame() {
         if (gameIOData.getActions() != null) {
             gameManager.getCurrentRound().setPossibleActions();
 
+            // --- START FIX ---
+            int processedCount = 0;
+            // --- END FIX ---
+
             for (PossibleAction action : gameIOData.getActions()) {
-                actionCount = increaseActionCounter();
-                
                 // --- START FIX ---
+                if (moveLimit > 0 && processedCount >= moveLimit) {
+                    log.info("GAMELOADER: Replay stopped at limit: " + moveLimit);
+                    break;
+                }
+                processedCount++;
+                // --- END FIX ---
+
+                actionCount = increaseActionCounter();
+
                 // DIRECT CALL: No try-catch. 
                 // If processOnReload crashes, the exception escapes immediately.
                 // This stops the loop and fails the RegressionTest instantly.
                 gameManager.processOnReload(action);
-                // --- END FIX ---
             }
         }
 

@@ -17,7 +17,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.awt.Font; // Fügt den fehlenden Font-Import hinzu
-
+import java.awt.Shape; // --- FIX: ADD THIS IMPORT ---
 import rails.game.action.LayBaseToken;
 import rails.game.action.LayBonusToken;
 import net.sf.rails.algorithms.RevenueBonusTemplate;
@@ -39,7 +39,9 @@ import net.sf.rails.ui.swing.GUIToken;
 
 import com.google.common.collect.Lists;
 import java.util.Objects; // Fügt den fehlenden Import hinzu
-
+// ... (existing imports)
+import java.awt.font.GlyphVector; // Add import
+import java.awt.font.FontRenderContext; // Add import
 
 /**
  * Base class that holds common components for GUIHexes of all orientations.
@@ -547,6 +549,79 @@ public class GUIHex implements Observer {
         if (customOverlayText != null) {
             drawString(g, customOverlayText, 0, 0); // Zeichnet den Text zentriert
         }
+
+
+        // ... (inside paintTokensAndText) ...
+
+        // --- START FIX: Purple Pointy Hexagon Highlight ---
+        if (activeOwnerHighlight) {
+            Stroke originalStroke = g.getStroke();
+            Color originalColor = g.getColor();
+            java.awt.Font originalFont = g.getFont();
+
+            // 1. Setup PURPLE Style
+            Color purple = new Color(128, 0, 128);
+            g.setColor(purple);
+            g.setStroke(new BasicStroke(5.0f)); 
+
+            // 2. Calculate Pointy-Topped Hexagon Path
+            Rectangle r = dimensions.rectBound;
+            GeneralPath hexPath = new GeneralPath();
+            
+            float x = r.x; 
+            float y = r.y;
+            float w = r.width;
+            float h = r.height;
+
+            // Pointy-Topped Coordinates
+            // P1: Top Center
+            hexPath.moveTo(x + w * 0.5f, y);           
+            // P2: Top Right
+            hexPath.lineTo(x + w, y + h * 0.25f);      
+            // P3: Bottom Right
+            hexPath.lineTo(x + w, y + h * 0.75f);      
+            // P4: Bottom Center
+            hexPath.lineTo(x + w * 0.5f, y + h);       
+            // P5: Bottom Left
+            hexPath.lineTo(x, y + h * 0.75f);          
+            // P6: Top Left
+            hexPath.lineTo(x, y + h * 0.25f);          
+            
+            hexPath.closePath();
+            g.draw(hexPath);
+
+            // 3. Draw Label (Purple Text)
+            if (activeOwnerLabel != null) {
+                g.setFont(new java.awt.Font("SansSerif", java.awt.Font.BOLD, 20));
+                FontMetrics fm = g.getFontMetrics();
+                
+                int textW = fm.stringWidth(activeOwnerLabel);
+                int textH = fm.getAscent();
+                
+                // Center
+                int cx = (int)(x + w / 2);
+                int cy = (int)(y + h / 2);
+                int tx = cx - (textW / 2);
+                int ty = cy + (textH / 4);
+
+                // Outline (White)
+                g.setColor(Color.WHITE);
+                g.setStroke(new BasicStroke(3.0f));
+                g.drawString(activeOwnerLabel, tx-1, ty-1);
+                g.drawString(activeOwnerLabel, tx+1, ty+1);
+                g.drawString(activeOwnerLabel, tx-1, ty+1);
+                g.drawString(activeOwnerLabel, tx+1, ty-1);
+                
+                // Fill (Purple)
+                g.setColor(purple);
+                g.drawString(activeOwnerLabel, tx, ty);
+            }
+
+            g.setStroke(originalStroke);
+            g.setColor(originalColor);
+            g.setFont(originalFont); 
+        }
+        // --- END FIX ---
     
     }
 
@@ -969,4 +1044,65 @@ public String getCustomOverlayText() {
         }
     }
     
+    private boolean activeOwnerHighlight = false;
+    private String activeOwnerLabel = null;
+
+    public void setActiveOwnerHighlight(boolean active, String label) {
+        this.activeOwnerHighlight = active;
+        this.activeOwnerLabel = label;
+    }
+
+    /**
+     * Helper to draw the Meme-style text and border.
+     * Call this at the END of your paint/draw method.
+     */
+    private void drawActiveOwnerHighlight(Graphics2D g2, Rectangle bounds) {
+        if (!activeOwnerHighlight || bounds == null) return;
+
+        Stroke originalStroke = g2.getStroke();
+        Color originalColor = g2.getColor();
+
+        // 1. Draw White Glow Border
+        g2.setColor(new Color(255, 255, 255, 180));
+        g2.setStroke(new BasicStroke(4f));
+        g2.drawRect(bounds.x + 2, bounds.y + 2, bounds.width - 4, bounds.height - 4);
+
+        // 2. Draw Meme Text
+        if (activeOwnerLabel != null && !activeOwnerLabel.isEmpty()) {
+            Font font = new Font("Impact", Font.BOLD, 20);
+            g2.setFont(font);
+
+            // Calculate Center
+            int cx = bounds.x + (bounds.width / 2);
+            int cy = bounds.y + (bounds.height / 2);
+
+            FontRenderContext frc = g2.getFontRenderContext();
+            GlyphVector gv = font.createGlyphVector(frc, activeOwnerLabel);
+            Shape textShape = gv.getOutline();
+            
+            Rectangle textBounds = textShape.getBounds();
+            int x = cx - (textBounds.width / 2);
+            int y = cy + (textBounds.height / 2); 
+            
+            AffineTransform transform = AffineTransform.getTranslateInstance(x, y);
+            Shape centeredShape = transform.createTransformedShape(textShape);
+
+            // Draw Outline (White)
+            g2.setStroke(new BasicStroke(3.0f));
+            g2.setColor(Color.WHITE);
+            g2.draw(centeredShape);
+
+            // Draw Fill (Black)
+            g2.setColor(Color.BLACK);
+            g2.fill(centeredShape);
+        }
+
+        g2.setStroke(originalStroke);
+        g2.setColor(originalColor);
+
+
+        
+    }
+
+
 }

@@ -50,6 +50,10 @@ public class BuyCertificate extends PossibleAction {
 
     public static final long serialVersionUID = 1L;
 
+    public void setSharePerCertificate(int sharePerCertificate) {
+        this.sharePerCert = sharePerCertificate;
+    }
+    
     public BuyCertificate(PublicCompany company, int sharePerCert,
             PortfolioOwner from,
             int price, int maximumNumber) {

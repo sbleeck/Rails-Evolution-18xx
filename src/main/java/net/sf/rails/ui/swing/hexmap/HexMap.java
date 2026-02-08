@@ -17,12 +17,20 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
-
-
+import java.awt.Component; // --- FIX: ADDED MISSING IMPORT ---
+import java.awt.Font; // Add this missing import
 import javax.swing.JComponent;
 import javax.swing.JLayeredPane;
 import javax.swing.SwingUtilities;
 import javax.swing.ToolTipManager;
+import java.awt.RenderingHints;
+import java.awt.Font; // FIXED: Added missing import
+import java.awt.font.GlyphVector;
+import java.awt.font.FontRenderContext;
+import java.awt.geom.AffineTransform;
+import java.awt.Shape;
+import net.sf.rails.game.PublicCompany; // Added for the new method signature
+import net.sf.rails.game.Token;       // Added to check tokens
 
 import net.sf.rails.common.Config;
 import net.sf.rails.common.parser.ConfigurationException;
@@ -42,6 +50,11 @@ import org.slf4j.LoggerFactory;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
+import java.awt.RenderingHints;
+import java.awt.font.GlyphVector;
+import java.awt.font.FontRenderContext;
+import java.awt.geom.AffineTransform;
+import java.awt.Shape;
 
 
 /**
@@ -1101,5 +1114,53 @@ private boolean displayHexNames = false;
             l.addMouseMotionListener(ml);
         }
     }
+
+
+    // 1. Return the list from the internal map
+    // (GUIHex objects are not added as Swing Components, so iterating layer components fails)
+    public List<GUIHex> getGuiHexList() {
+        return new ArrayList<>(hex2gui.values());
+    }
+
+    // Added to satisfy ORUIManager requirement
+    public Map<MapHex, GUIHex> getGuiHexes() {
+        return hex2gui;
+    }
+
+
+
+    // 2. Track highlighted hexes
+    private List<GUIHex> currentHighlightedGuiHexes = new ArrayList<>();
+
+// 3. Set highlights
+    public void setOwnerHighlight(List<GUIHex> guiHexes, String label) {
+
+
+        if (currentHighlightedGuiHexes != null) {
+            for (GUIHex h : currentHighlightedGuiHexes) {
+                h.setActiveOwnerHighlight(false, null);
+            }
+            currentHighlightedGuiHexes.clear();
+        }
+
+        if (guiHexes != null && !guiHexes.isEmpty()) {
+            for (GUIHex h : guiHexes) {
+                h.setActiveOwnerHighlight(true, label);
+                currentHighlightedGuiHexes.add(h);
+
+            }
+        }
+        
+        Rectangle r = new Rectangle(getSize());
+        repaintAll(r); 
+    }
+
+
+
+
+
+
+
+
 
 }

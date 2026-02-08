@@ -164,11 +164,11 @@ public class CoalExchangeRound extends StockRound_1837 {
     public boolean process(PossibleAction action) {
         log.info("CER_DEBUG: Processing Action: {}", action.getClass().getSimpleName());
 
-        if (action instanceof ExchangeCoalAction) {
-            ExchangeCoalAction exc = (ExchangeCoalAction) action;
-            log.info("CER_DEBUG: Exchanging {} into {}", exc.getCoalCompany().getId(), exc.getTargetMajor().getId());
+        if (action instanceof ExchangeMinorAction) {
+            ExchangeMinorAction exc = (ExchangeMinorAction) action;
+            log.info("CER_DEBUG: Exchanging {} into {}", exc.getMinor().getId(), exc.getTargetMajor().getId());
             
-            executeMerge(exc.getCoalCompany(), exc.getTargetMajor(), false);
+            executeMerge(exc.getMinor(), exc.getTargetMajor(), false);
             setPossibleActions(); 
             return true;
         }
@@ -248,7 +248,7 @@ public class CoalExchangeRound extends StockRound_1837 {
                             major.getId(), p.getName(), exchangeableCoals.size());
 
                     for (PublicCompany c : exchangeableCoals) {
-                        possibleActions.add(new ExchangeCoalAction(c, major));
+                        possibleActions.add(new ExchangeMinorAction(c, major,false));
                     }
                     
                     NullAction pass = new NullAction(getRoot(), NullAction.Mode.DONE);

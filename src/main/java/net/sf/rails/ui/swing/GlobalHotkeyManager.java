@@ -87,11 +87,21 @@ private static final Logger log = LoggerFactory.getLogger(GlobalHotkeyManager.cl
             return true;
         }
 
-        // 6. ENTER ('Yes' / 'Default' / 'Payout')
-        if (keyCode == KeyEvent.VK_ENTER) {
-            triggerEnter();
-            return true;
+
+
+if (e.getID() == KeyEvent.KEY_PRESSED && e.getKeyCode() == KeyEvent.VK_ENTER) {
+            if (gameUIManager.orWindow != null && gameUIManager.orWindow.isVisible()) {
+                // Try to click the Pass button. 
+                // IF it works, return true (consume key).
+                // IF it fails (no pass button), return false (let key propagate to other buttons).
+                if (gameUIManager.orWindow.getORPanel().clickPassButton()) {
+                    log.info("DEBUG GLOBAL: ENTER consumed by ORPanel Pass button.");
+                    return true; 
+                }
+                log.info("DEBUG GLOBAL: ENTER not handled by Pass button. Propagating to focus owner...");
+            }
         }
+
 
         // 7. L ('Buy IPO Train') - SINGLE SHOT MODE
         // We only trigger if the key was previously released. 
@@ -103,6 +113,9 @@ private static final Logger log = LoggerFactory.getLogger(GlobalHotkeyManager.cl
             }
             return true; // Consume the event even if locked
         }
+
+
+        
         
 
         return false;

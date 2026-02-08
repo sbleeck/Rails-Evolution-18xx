@@ -352,6 +352,9 @@ public class GameStatus extends GridPanel {
     protected ClickField futureTrainsButton;
     // Config
     private final int MAX_POOL_SLOTS = 3;
+    private final int MAX_IPO_SLOTS = 2; // Create space for 2 IPO trains
+    protected javax.swing.JLabel[] newTrainQtyLabels;
+    protected RailCard[] newTrainButtons;
 
     // 1. Restore the missing panel array
     protected JPanel[] compTrainsButtonPanel;
@@ -359,7 +362,7 @@ public class GameStatus extends GridPanel {
     // 2. Define Train Buttons as RailCards
     protected RailCard[][] compSubTrainButtons;
     protected RailCard[] poolTrainButtons;
-    protected RailCard newTrainButton;
+    // protected RailCard newTrainButton;
     protected RailCard[] futureTrainButtons;
 
     // 3. Labels and Panels
@@ -773,7 +776,6 @@ public class GameStatus extends GridPanel {
     }
 
     public void recreate() {
-        // log.debug("GameStatus.recreate() called");
 
         // Refresh Snapshots and Force Layout
         if (gameUIManager != null) {
@@ -1000,10 +1002,6 @@ public class GameStatus extends GridPanel {
         int lastTime = lastPlayerTimes[playerIndex];
         int diff = (lastTime == Integer.MIN_VALUE) ? 0 : (newTime - lastTime);
         // Log every significant update to trace why Green is missing
-        if (lastTime != newTime && lastTime != Integer.MIN_VALUE) {
-            // log.info("TRACE-TIME-UPDATE: P{} Old={} New={} Diff={}", playerIndex,
-            // lastTime, newTime, diff);
-        }
 
         lastPlayerTimes[playerIndex] = newTime; // Update stored time
 
@@ -1247,6 +1245,12 @@ public class GameStatus extends GridPanel {
                 } else {
                     chosenAction = buyActions.get(index);
                     ((BuyCertificate) chosenAction).setNumberBought(buyAmounts.get(index));
+                    // "Un-set" the share size for Pool buys to force StockRound to detect ambiguity.
+                // If we leave the default (e.g. 10), StockRound assumes it's a deliberate choice (Replay) and skips the dialog.
+                // By setting it to 0, validSizes.contains(0) fails, triggering the StockRound dialog.
+                if (((BuyCertificate) chosenAction).getFromPortfolio() == pool) {
+                    ((BuyCertificate) chosenAction).setSharePerCertificate(0);
+                }
                 }
             } else if (actions.get(0) instanceof CashCorrectionAction) {
                 // Delegate to GameUIManagers
@@ -1264,7 +1268,7 @@ public class GameStatus extends GridPanel {
                 // Explicitly handle StartPrussian to ensure it triggers
                 chosenAction = actions.get(0);
                 // } else if
-                // (actions.get(0).getClass().getSimpleName().equals("ExchangeCoalAction")) {
+                // (actions.get(0).getClass().getSimpleName().equals("ExchangeMinorAction")) {
                 // // Explicitly handle ExchangeCoalAction (1837)
                 // chosenAction = actions.get(0);
 
@@ -1548,12 +1552,6 @@ public class GameStatus extends GridPanel {
                     : (c1.getStartSpace() != null ? c1.getStartSpace().getPrice() : 0);
             int p2 = c2.getCurrentSpace() != null ? c2.getCurrentSpace().getPrice()
                     : (c2.getStartSpace() != null ? c2.getStartSpace().getPrice() : 0);
-
-            // Log strictly to verify correct renderer sorting
-            // if ("PR".equals(c1.getId()) || "PR".equals(c2.getId())) {
-            // log.info("REAL initFields Sort: {} val={}, {} val={}.", c1.getId(), p1,
-            // c2.getId(), p2);
-            // }
 
             if (p1 != p2) {
                 return Integer.compare(p2, p1);
@@ -2359,98 +2357,134 @@ public class GameStatus extends GridPanel {
 
             int currentIndex = tm.getNewTypeIndex().value();
             java.util.List<net.sf.rails.game.TrainCardType> types = tm.getTrainCardTypes();
+            java.util.List<net.sf.rails.game.Train> ipoInventory = new java.util.ArrayList<>(ipo.getTrainList());
 
-            // 1. CURRENT TRAIN (IPO)
-            if (newTrainButton != null && currentIndex < types.size()) {
-                net.sf.rails.game.TrainCardType currentTct = types.get(currentIndex);
-                int cost = 0;
-                if (!currentTct.getPotentialTrainTypes().isEmpty()) {
-                    cost = currentTct.getPotentialTrainTypes().get(0).getCost();
+            // 1. COLLECT & SORT IPO TRAINS
+            // We first identify all unique types present in the IPO
+            java.util.List<net.sf.rails.game.TrainCardType> presentTypes = new java.util.ArrayList<>();
+
+            for (net.sf.rails.game.TrainCardType tct : types) {
+                String tctName = tct.getId().replaceAll("_\\d+$", "");
+                for (net.sf.rails.game.Train t : ipoInventory) {
+                    String tName = t.getName().replaceAll("_\\d+$", "");
+                    if (tName.equals(tctName)) {
+                        presentTypes.add(tct);
+                        break; // Found this type, move to next type
+                    }
                 }
-
-                String name = currentTct.getId().replaceAll("_\\d+$", "");
-
-                // Calculate Qty String
-                String qtyStr = currentTct.hasInfiniteQuantity() ? "\u221E"
-                        : String.valueOf(currentTct.getQuantity() - currentTct.getNumberBoughtFromIPO());
-
-                // Use RailCard setters
-                newTrainButton.reset();
-                // Enforce 3-char abbreviation logic
-                newTrainButton.setCustomLabel(getAbbreviatedTrainName(name));
-
-                // Standard Passive Style (Green/Active logic handles enablement later)
-                newTrainButton.setBackground(BG_CARD_PASSIVE);
-                newTrainButton.setBorder(BorderFactory.createCompoundBorder(
-                        BorderFactory.createLineBorder(Color.BLACK, 1),
-                        BorderFactory.createEmptyBorder(1, 1, 1, 1)));
-                newTrainButton.setVisible(true);
-
-                if (newTrainInfoLabel != null) {
-                    newTrainInfoLabel.setText("<html><center>(" + qtyStr + ")<br>" +
-                            "<font color='#000080'><b>" + gameUIManager.format(cost) + "</b></font>" +
-                            "</center></html>");
-
-                }
-
-            } else if (newTrainButton != null) {
-                newTrainButton.setVisible(false);
-                newTrainInfoLabel.setText("");
             }
 
-            // 2. FUTURE TRAINS
-            int buttonIdx = 0;
-            // Iterate future types
-            for (int i = currentIndex + 1; i < types.size() && buttonIdx < MAX_FUTURE_SLOTS; i++) {
-                net.sf.rails.game.TrainCardType tct = types.get(i);
+            // FIX: Sort by Cost (Ascending) to ensure 2G (Cheaper) is before 4 (Expensive)
+            java.util.Collections.sort(presentTypes, (t1, t2) -> {
+                int c1 = (!t1.getPotentialTrainTypes().isEmpty()) ? t1.getPotentialTrainTypes().get(0).getCost() : 0;
+                int c2 = (!t2.getPotentialTrainTypes().isEmpty()) ? t2.getPotentialTrainTypes().get(0).getCost() : 0;
+                return Integer.compare(c1, c2);
+            });
+
+            // 2. RENDER IPO BUTTONS
+            int ipoSlot = 0;
+            for (net.sf.rails.game.TrainCardType tct : presentTypes) {
+                if (ipoSlot >= MAX_IPO_SLOTS)
+                    break;
+
+                String tctName = tct.getId().replaceAll("_\\d+$", "");
+                int count = 0;
                 int cost = 0;
-                if (!tct.getPotentialTrainTypes().isEmpty()) {
+
+                for (net.sf.rails.game.Train t : ipoInventory) {
+                    if (t.getName().replaceAll("_\\d+$", "").equals(tctName)) {
+                        count++;
+                        cost = t.getCost();
+                    }
+                }
+
+                RailCard btn = newTrainButtons[ipoSlot];
+                javax.swing.JLabel lbl = newTrainQtyLabels[ipoSlot];
+
+                if (cost == 0 && !tct.getPotentialTrainTypes().isEmpty()) {
                     cost = tct.getPotentialTrainTypes().get(0).getCost();
                 }
 
-                String qtyStr = tct.hasInfiniteQuantity() ? "\u221E" : "(" + tct.getQuantity() + ")";
-                String priceStr = (cost > 0) ? gameUIManager.format(cost) : "";
+                btn.reset();
+                btn.setCustomLabel(getAbbreviatedTrainName(tctName));
+                btn.setName(tctName); // Store normalized name
 
-                // Get Components
+                // Default Passive Style
+                btn.setBackground(BG_CARD_PASSIVE);
+                btn.setBorder(BorderFactory.createCompoundBorder(
+                        BorderFactory.createLineBorder(Color.BLACK, 1),
+                        BorderFactory.createEmptyBorder(1, 1, 1, 1)));
+                btn.setVisible(true);
 
-                RailCard btn = futureTrainButtons[buttonIdx];
-                javax.swing.JLabel lbl = futureTrainInfoLabels[buttonIdx];
-                buttonIdx++;
+                if (lbl != null) {
+                    String qtyStr = tct.hasInfiniteQuantity() ? "\u221E" : "(" + count + ")";
+                    lbl.setText("<html><center>" + qtyStr + "<br>" +
+                            "<font color='#000080'><b>" + gameUIManager.format(cost) + "</b></font>" +
+                            "</center></html>");
+                    lbl.setVisible(true);
+                }
+                ipoSlot++;
+            }
+
+            // Clear remaining IPO slots
+            for (int i = ipoSlot; i < MAX_IPO_SLOTS; i++) {
+                if (newTrainButtons[i] != null) {
+                    newTrainButtons[i].setVisible(false);
+                    newTrainButtons[i].setName(null);
+                }
+                if (newTrainQtyLabels[i] != null)
+                    newTrainQtyLabels[i].setVisible(false);
+            }
+
+            // 3. FUTURE TRAINS (Unchanged logic, just ensure we skip ipoSlot types)
+            int futSlot = 0;
+            for (int i = currentIndex; i < types.size() && futSlot < MAX_FUTURE_SLOTS; i++) {
+                net.sf.rails.game.TrainCardType tct = types.get(i);
+                String tctName = tct.getId().replaceAll("_\\d+$", "");
+
+                boolean alreadyShown = false;
+                for (int k = 0; k < ipoSlot; k++) {
+                    if (newTrainButtons[k].getName() != null && newTrainButtons[k].getName().equals(tctName)) {
+                        alreadyShown = true;
+                        break;
+                    }
+                }
+                if (alreadyShown)
+                    continue;
+
+                RailCard btn = futureTrainButtons[futSlot];
+                javax.swing.JLabel lbl = futureTrainInfoLabels[futSlot];
+                futSlot++;
+
+                // ... (standard future render code) ...
+                int cost = 0;
+                if (!tct.getPotentialTrainTypes().isEmpty())
+                    cost = tct.getPotentialTrainTypes().get(0).getCost();
 
                 if (btn != null) {
-                    // Configure RailCard
                     btn.reset();
-
-                    String cleanName = tct.getId().replaceAll("_\\d+$", "");
-                    btn.setCustomLabel(getAbbreviatedTrainName(cleanName));
-                    btn.setName(tct.getId()); // Store ID for action mapping
-
-                    // Passive Style
+                    btn.setCustomLabel(getAbbreviatedTrainName(tctName));
+                    btn.setName(tctName);
                     btn.setBackground(BG_CARD_PASSIVE);
                     btn.setBorder(BorderFactory.createCompoundBorder(
                             BorderFactory.createLineBorder(Color.BLACK, 1),
                             BorderFactory.createEmptyBorder(1, 1, 1, 1)));
                     btn.setVisible(true);
                 }
-
-                // 2. Configure Label (Qty + Price stacked)
                 if (lbl != null) {
-                    lbl.setText("<html><center>" +
-                            qtyStr + "<br>" +
-                            "<font color='#000080'><b>" + priceStr + "</b></font>" +
+                    String qtyStr = tct.hasInfiniteQuantity() ? "\u221E" : "(" + tct.getQuantity() + ")";
+                    lbl.setText("<html><center>" + qtyStr + "<br>" +
+                            "<font color='#000080'><b>" + (cost > 0 ? gameUIManager.format(cost) : "") + "</b></font>" +
                             "</center></html>");
-
                     lbl.setVisible(true);
                 }
-
             }
-
-            // Hide unused slots
-            for (; buttonIdx < MAX_FUTURE_SLOTS; buttonIdx++) {
-                if (futureTrainButtons[buttonIdx] != null)
-                    futureTrainButtons[buttonIdx].setVisible(false);
-                if (futureTrainInfoLabels[buttonIdx] != null)
-                    futureTrainInfoLabels[buttonIdx].setVisible(false);
+            // Clear unused future slots
+            for (; futSlot < MAX_FUTURE_SLOTS; futSlot++) {
+                if (futureTrainButtons[futSlot] != null)
+                    futureTrainButtons[futSlot].setVisible(false);
+                if (futureTrainInfoLabels[futSlot] != null)
+                    futureTrainInfoLabels[futSlot].setVisible(false);
             }
 
         } catch (Exception e) {
@@ -3210,8 +3244,15 @@ public class GameStatus extends GridPanel {
             setCompanyTrainButton(i, false, null);
         }
         setPoolTrainButton(false, null);
-        setNewTrainButton(false, null);
+        // Reset ALL IPO buttons by looping through the array index
+        for (int i = 0; i < MAX_IPO_SLOTS; i++) {
+            setNewTrainButton(i, false, null);
+        }
         setFutureTrainButton(false, null);
+
+        for (int i = 0; i < MAX_IPO_SLOTS; i++) {
+            setNewTrainButton(i, false, null);
+        }
 
         // 2. Fetch available train actions
         java.util.List<rails.game.correct.TrainCorrectionAction> actions = possibleActions
@@ -3234,8 +3275,16 @@ public class GameStatus extends GridPanel {
                     setPoolTrainButton(true, a);
                     found = true;
                 } else if (ipo.getTrainList().contains(target)) {
-                    setNewTrainButton(true, a);
+                    // Convert Set to List to find the correct slot index for the UI
+                    java.util.List<net.sf.rails.game.Train> ipoList = new java.util.ArrayList<>(ipo.getTrainList());
+                    int idx = ipoList.indexOf(target);
+
+                    // Only set the button if the train fits in our visible slots
+                    if (idx >= 0 && idx < MAX_IPO_SLOTS) {
+                        setNewTrainButton(idx, true, a);
+                    }
                     found = true;
+
                 } else if (bank.getUnavailable().getPortfolioModel().getTrainList().contains(target)) {
                     setFutureTrainButton(true, a);
                     found = true;
@@ -3256,6 +3305,38 @@ public class GameStatus extends GridPanel {
         }
 
         return actionsFound;
+    }
+
+    protected void setNewTrainButton(int index, boolean clickable, PossibleAction action) {
+        if (index < 0 || index >= MAX_IPO_SLOTS)
+            return;
+
+        RailCard btn = newTrainButtons[index];
+        if (btn == null)
+            return;
+
+        // Reset Logic
+        btn.clearPossibleActions();
+
+        // Base Style (Passive)
+        btn.setBackground(BG_CARD_PASSIVE);
+        btn.setBorder(BorderFactory.createCompoundBorder(
+                BorderFactory.createLineBorder(Color.BLACK, 1),
+                BorderFactory.createEmptyBorder(1, 1, 1, 1)));
+        btn.setEnabled(true);
+
+        if (clickable) {
+            btn.setVisible(true);
+            btn.setEnabled(true);
+
+            // FIX: Use Beige Background + Green Border for "Buyable" state
+            btn.setBackground(BG_CARD_PASSIVE);
+            btn.setBorder(BorderFactory.createLineBorder(BORDER_COL_BUY, 3));
+
+            if (action != null) {
+                btn.addPossibleAction(action);
+            }
+        }
     }
 
     protected void setFutureTrainButton(boolean clickable, PossibleAction action) {
@@ -3293,15 +3374,21 @@ public class GameStatus extends GridPanel {
             }
 
             for (RailCard cf : futureTrainButtons) {
+                if (cf == null)
+                    continue;
+
+                String btnName = cf.getName();
+                boolean isVis = cf.isVisible();
+
                 // We stored the train Name/ID in Component Name in updateTrainCosts
-                if (cf != null && cf.isVisible() && targetName.equals(cf.getName())) {
+                if (isVis && targetName.equals(btnName)) {
+
                     cf.addPossibleAction(action);
                     // Apply Active Style
                     cf.setBackground(BG_BUY);
                     cf.setBorder(BorderFactory.createLineBorder(Color.BLACK, 2));
                     break;
                 }
-
             }
         }
 
@@ -3332,25 +3419,19 @@ public class GameStatus extends GridPanel {
     }
 
     public void setTrainBuyingActions(List<PossibleAction> actions) {
-
-        // We must update the train costs (which resets the NewTrainButton to DISABLED)
-        // BEFORE we iterate through the actions to ENABLE it.
         updateTrainCosts();
 
-        // 1. Reset all train buttons to non-clickable first
         int nc = companies.length;
-        for (int i = 0; i < nc; i++) {
+        for (int i = 0; i < nc; i++)
             setCompanyTrainButton(i, false, null);
-        }
         setPoolTrainButton(false, null);
-        setNewTrainButton(false, null);
+        for (int i = 0; i < MAX_IPO_SLOTS; i++)
+            setNewTrainButton(i, false, null);
         setFutureTrainButton(false, null);
 
-        if (actions == null || actions.isEmpty()) {
+        if (actions == null || actions.isEmpty())
             return;
-        }
 
-        // 2. Map actions to fields
         for (PossibleAction pa : actions) {
             if (pa instanceof BuyTrain) {
                 BuyTrain bt = (BuyTrain) pa;
@@ -3360,47 +3441,54 @@ public class GameStatus extends GridPanel {
                 if (source == null)
                     continue;
 
-                // : 'source' might be the Bank OR a Bank Portfolio (IPO/Pool).
-                // We check if the source itself is the Bank, or if its parent is the Bank.
                 boolean isBankSource = (source instanceof net.sf.rails.game.financial.Bank) ||
                         (source.getParent() instanceof net.sf.rails.game.financial.Bank);
 
                 if (isBankSource) {
-                    // 1. Identify IPO vs Pool via ID (e.g., source.getId() == "IPO")
                     String id = source.getId();
                     boolean srcIsIPO = "IPO".equals(id);
                     boolean srcIsPool = "Pool".equals(id);
 
-                    // 2. Fallback: Identify via Train Location (if source was generic Bank)
                     if (!srcIsIPO && !srcIsPool) {
-                        // : Check list size for null train (unlimited purchase)
                         srcIsIPO = (targetTrain == null && ipo.getTrainList().size() > 0)
                                 || (targetTrain != null && ipo.getTrainList().contains(targetTrain));
                         srcIsPool = (targetTrain != null && pool.getTrainList().contains(targetTrain));
                     }
 
                     if (srcIsIPO) {
-                        // Update IPO button style for active state
-                        setNewTrainButton(true, bt);
+                        if (targetTrain != null) {
+                            // --- START FIX ---
+                            // Normalize Name ("4_0" -> "4")
+                            String tName = targetTrain.getName().replaceAll("_\\d+$", "");
+                            boolean matched = false;
+
+                            for (int i = 0; i < MAX_IPO_SLOTS; i++) {
+                                // Match against the button's stored name (which is already normalized)
+                                if (newTrainButtons[i].getName() != null &&
+                                        newTrainButtons[i].getName().equals(tName)) {
+                                    setNewTrainButton(i, true, bt);
+                                    matched = true;
+                                    break;
+                                }
+                            }
+
+                        } else {
+                            setNewTrainButton(0, true, bt);
+                        }
                     } else if (srcIsPool) {
                         setPoolTrainButton(true, bt);
                     } else {
-                        // Fallback: likely future/unavailable
                         setFutureTrainButton(true, bt);
                     }
                 } else if (source instanceof net.sf.rails.game.PublicCompany) {
-                    // Direct ownership by company
                     PublicCompany c = (PublicCompany) source;
                     setCompanyTrainButton(c.getPublicNumber(), true, bt);
                 } else if (source.getParent() instanceof net.sf.rails.game.PublicCompany) {
-                    // Portfolio ownership (standard for most games)
                     PublicCompany c = (PublicCompany) source.getParent();
                     setCompanyTrainButton(c.getPublicNumber(), true, bt);
                 }
             }
-
         }
-
         repaint();
     }
 
@@ -3554,33 +3642,6 @@ public class GameStatus extends GridPanel {
 
     }
 
-    protected void setNewTrainButton(boolean clickable, PossibleAction action) {
-        if (newTrainButton == null)
-            return;
-
-        // Note: We do NOT reset the label here, as updateTrainCosts set the specific
-        // IPO Train Name.
-        newTrainButton.clearPossibleActions();
-
-        // Reset Visuals (Passive default)
-        newTrainButton.setBackground(BG_CARD_PASSIVE);
-        newTrainButton.setBorder(BorderFactory.createCompoundBorder(
-                BorderFactory.createLineBorder(Color.BLACK, 1),
-                BorderFactory.createEmptyBorder(1, 1, 1, 1)));
-        newTrainButton.setEnabled(true);
-
-        if (clickable) {
-            newTrainButton.setVisible(true);
-            newTrainButton.setEnabled(true);
-            newTrainButton.setBackground(BG_CARD_PASSIVE); // Beige
-            newTrainButton.setBorder(BorderFactory.createLineBorder(BORDER_COL_BUY, 3)); // Thick Green Border
-
-            if (action != null) {
-                newTrainButton.addPossibleAction(action);
-            }
-        }
-    }
-
     // Shared Styling Constants (Promoted from local variables for modular access)
     private static final Color BG_MINOR = Color.BLACK;
     private static final Color FG_MINOR = Color.WHITE;
@@ -3688,6 +3749,22 @@ public class GameStatus extends GridPanel {
             poolShareCards = new RailCard[nc];
         if (poolPriceLabels == null || poolPriceLabels.length != nc)
             poolPriceLabels = new javax.swing.JLabel[nc];
+
+        // --- START FIX: NEW TRAIN (IPO) ARRAYS ---
+        // We must ensure the arrays AND the objects inside them exist before
+        // initTrainMarket uses them.
+        if (newTrainButtons == null || newTrainButtons.length != MAX_IPO_SLOTS) {
+            newTrainButtons = new RailCard[MAX_IPO_SLOTS];
+            for (int i = 0; i < MAX_IPO_SLOTS; i++) {
+                newTrainButtons[i] = createTrainButton();
+            }
+        }
+        if (newTrainQtyLabels == null || newTrainQtyLabels.length != MAX_IPO_SLOTS) {
+            newTrainQtyLabels = new javax.swing.JLabel[MAX_IPO_SLOTS];
+            for (int i = 0; i < MAX_IPO_SLOTS; i++) {
+                newTrainQtyLabels[i] = new javax.swing.JLabel("");
+            }
+        }
 
         if (playerSharePanels == null || playerSharePanels.length != nc)
             playerSharePanels = new JPanel[nc][np];
@@ -4211,15 +4288,6 @@ public class GameStatus extends GridPanel {
                             net.sf.rails.game.OperatingRound or = (net.sf.rails.game.OperatingRound) rf;
                             val = or.getSpecialRevenueOnly(c);
 
-                            // DEBUG LOGGING
-                            // if (c.getType().getId().equals("Coal") ||
-                            // c.getType().getId().equals("Minor")) {
-                            // log.info("GAMESTATUS DEBUG: " + c.getId() + " calling getSpecialRevenueOnly.
-                            // Result: " + val);
-                            // }
-                        } else {
-                            // log.info("GAMESTATUS DEBUG: Round is not OperatingRound (" +
-                            // rf.getClass().getSimpleName() + ")");
                         }
 
                         if (val == 0) {
@@ -4376,6 +4444,9 @@ public class GameStatus extends GridPanel {
         addField(f, compNameCol, playerPrivatesYOffset, 1, 2, 0, true);
         playerPrivatesPanel = new JPanel[np];
         for (int i = 0; i < np; i++) {
+            if (playerPrivatesPanel[i] == null) {
+                    continue; 
+                }
             playerPrivatesPanel[i] = new JPanel();
             playerPrivatesPanel[i].setLayout(new BoxLayout(playerPrivatesPanel[i], BoxLayout.Y_AXIS));
             playerPrivatesPanel[i].setBorder(BORDER_THIN);
@@ -4468,8 +4539,7 @@ public class GameStatus extends GridPanel {
 
         // 2. IPO (CURRENT)
 
-        // Refactor to match Future/Pool structure exactly: FlowLayout -> Slot Panel ->
-        // Button + Label
+        // Refactor to handle multiple slots (MAX_IPO_SLOTS)
         newTrainsPanel = new JPanel(new FlowLayout(FlowLayout.CENTER, 3, 0));
         newTrainsPanel.setBorder(BorderFactory.createCompoundBorder(
                 B_BOT_M,
@@ -4477,23 +4547,22 @@ public class GameStatus extends GridPanel {
         newTrainsPanel.setBackground(BG_TRAINS);
         newTrainsPanel.setOpaque(true);
 
-        newTrainButton = createTrainButton();
+        for (int i = 0; i < MAX_IPO_SLOTS; i++) {
+            // Create a wrapper slot identical to Future/Pool
+            JPanel ipoSlot = new JPanel(new BorderLayout());
+            ipoSlot.setOpaque(false);
 
-        // Create a wrapper slot identical to Future/Pool
-        JPanel ipoSlot = new JPanel(new BorderLayout());
-        ipoSlot.setOpaque(false);
-        // No fixed size on slot (let it grow with button)
+            newTrainButtons[i] = createTrainButton();
+            ipoSlot.add(newTrainButtons[i], BorderLayout.NORTH);
 
-        ipoSlot.add(newTrainButton, BorderLayout.NORTH);
+            newTrainQtyLabels[i] = new javax.swing.JLabel(" ");
+            newTrainQtyLabels[i].setFont(new Font("SansSerif", Font.PLAIN, 10));
+            newTrainQtyLabels[i].setHorizontalAlignment(javax.swing.SwingConstants.CENTER);
+            newTrainQtyLabels[i].setForeground(Color.BLACK);
 
-        newTrainInfoLabel = new javax.swing.JLabel(" ");
-        newTrainInfoLabel.setFont(new Font("SansSerif", Font.PLAIN, 10));
-        newTrainInfoLabel.setHorizontalAlignment(javax.swing.SwingConstants.CENTER);
-        newTrainInfoLabel.setForeground(Color.BLACK);
-
-        ipoSlot.add(newTrainInfoLabel, BorderLayout.CENTER);
-
-        newTrainsPanel.add(ipoSlot);
+            ipoSlot.add(newTrainQtyLabels[i], BorderLayout.CENTER);
+            newTrainsPanel.add(ipoSlot);
+        }
 
         addField(newTrainsPanel, colCurr, trainY_Data, 1, 1, 0, true);
 

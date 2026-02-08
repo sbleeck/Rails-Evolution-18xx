@@ -82,7 +82,7 @@ public class StockRound_1837 extends StockRound {
             PossibleAction next = gameManager.getNextActionFromLog();
             if (next != null) {
                 // Check if the log action is a Special Phase action
-                boolean isSpecialAction = (next instanceof ExchangeCoalAction);
+                boolean isSpecialAction = (next instanceof ExchangeMinorAction);
                 if (!isSpecialAction && next instanceof NullAction) {
                     // Check if it is the specific "Done" button for the special phase
                     if (((NullAction) next).getMode() == NullAction.Mode.DONE) {
@@ -127,7 +127,7 @@ public class StockRound_1837 extends StockRound {
                     PublicCompany target = getMergeTarget(company); 
     
                     if (target != null && target.hasFloated() && company.getPresident() == currentPlayer) {
-                         possibleActions.add(new ExchangeCoalAction(company, target));
+possibleActions.add(new ExchangeMinorAction(company, target, false));
                          processedCompanies.add(company.getId());
                     }
                 }
@@ -284,11 +284,11 @@ public class StockRound_1837 extends StockRound {
         log.debug("GameSpecificAction: {}", action);
         boolean result = false;
 
-        if (action instanceof ExchangeCoalAction) {
-            ExchangeCoalAction exc = (ExchangeCoalAction) action;
+        if (action instanceof ExchangeMinorAction) {
+            ExchangeMinorAction exc = (ExchangeMinorAction) action;
           // Pass 'true' for the last argument (autoMerge) to suppress internal pop-ups.
             // The user has already confirmed via the button click.
-            result = mergeCompanies(exc.getCoalCompany(), exc.getTargetMajor(), false, true);
+            result = mergeCompanies(exc.getMinor(), exc.getTargetMajor(), false, true);
 
             // If in special phase, refresh actions without ending turn
             if (specialActionPhase.value()) {
@@ -300,9 +300,9 @@ public class StockRound_1837 extends StockRound {
             return result;
         }
 
-       if (action instanceof ExchangeCoalAction) {
-            ExchangeCoalAction exc = (ExchangeCoalAction) action;
-            result = mergeCompanies(exc.getCoalCompany(), exc.getTargetMajor(), false, false);
+       if (action instanceof ExchangeMinorAction) {
+            ExchangeMinorAction exc = (ExchangeMinorAction) action;
+            result = mergeCompanies(exc.getMinor(), exc.getTargetMajor(), false, false);
             if (result) {
                 setPossibleActions(); 
             }

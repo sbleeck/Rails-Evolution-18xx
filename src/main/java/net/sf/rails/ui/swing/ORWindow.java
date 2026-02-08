@@ -47,6 +47,7 @@ public class ORWindow extends DockingFrame implements ActionPerformer {
     protected final MapPanel mapPanel;
     protected final ORPanel orPanel;
     protected final UpgradesPanel upgradePanel;
+    protected RemainingTilesWindow remainingTilesWindow; // Add this field
     protected final MessagePanel messagePanel; // Kept for logic, removed from GUI
 
     protected Rectangle lastBounds;
@@ -209,6 +210,11 @@ sidebarWrapper.setPreferredSize(new Dimension(ORPanel.SIDEBAR_WIDTH, 0));
         return orPanel;
     }
 
+    // Add a getter to allow ORPanel to reach it
+    public RemainingTilesWindow getRemainingTilesWindow() {
+        return remainingTilesWindow;
+    }
+
     public UpgradesPanel getUpgradePanel() {
         return upgradePanel;
     }
@@ -324,13 +330,14 @@ String CONFIRM_KEY = "confirmAction";
             }
         });
 
-        // SPACE KEY: Show Map Numbers (Remapped from 'N' to 'SPACE' per request)
+        // SPACE KEY: toggle through visuals
         String SHOW_NUMBERS_KEY = "showNumbersAction";
         inputMap.put(KeyStroke.getKeyStroke(KeyEvent.VK_SPACE, 0), SHOW_NUMBERS_KEY);
         actionMap.put(SHOW_NUMBERS_KEY, new AbstractAction() {
             public void actionPerformed(ActionEvent e) {
                 if (orPanel != null) {
                     orPanel.toggleTileBuildNumbers();
+                    orUIManager.toggleCompanyHighlights();
                 }
             }
         });

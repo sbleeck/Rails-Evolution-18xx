@@ -109,6 +109,18 @@ public class ORPanel extends GridPanel
     private boolean specialModeActive = false;
     private boolean isRevenueValueToBeSet = false;
     private boolean showNumbersActive = false;
+private AbstractButton directPassButton;
+
+public boolean clickPassButton() {
+        // isShowing() checks if the button is actually currently displayed on the screen.
+        // This prevents clicking "stale" buttons from previous phases.
+        if (directPassButton != null && directPassButton.isShowing() && directPassButton.isEnabled()) {
+            log.info("DEBUG ORPANEL: directPassButton clicked via Global Manager");
+            directPassButton.doClick();
+            return true; // signal that we handled the event
+        }
+        return false; // signal that we did nothing
+    }
 
     // Game Params
     private boolean privatesCanBeBought;
@@ -249,7 +261,7 @@ public class ORPanel extends GridPanel
 
     private void distributeStandardActions(List<PossibleAction> actions) {
         boolean doneActionFound = false;
-
+PossibleAction donePa = null;
         // if (activePhase == 1 || activePhase == 2)
         //     enableConfirm(false);
 
@@ -262,6 +274,8 @@ public class ORPanel extends GridPanel
                 ActionButton b = createSidebarButton(pa.getButtonLabel(), "SpecialProperty");
                 b.setPossibleAction(pa);
                 b.setEnabled(true);
+                bindActionHotkey(b, pa); // Bind hotkey for Special Properties
+
                 if (miscActionPanel != null) {
                     miscActionPanel.add(b);
                     miscActionPanel.add(Box.createVerticalStrut(2));
@@ -281,13 +295,28 @@ public class ORPanel extends GridPanel
                 NullAction.Mode mode = ((NullAction) pa).getMode();
                 if (mode == NullAction.Mode.DONE || mode == NullAction.Mode.PASS) {
                     setupButton(btnDone, pa);
+                    bindActionHotkey(btnDone, pa); // Bind hotkey for Done/Pass
+                    
+                    // Save for later re-binding
+                    donePa = pa;
                     doneActionFound = true;
                 }
             } 
         }
+        // CRITICAL: Re-bind the DONE action last. 
+        // This ensures that if DiscardTrain (or any other action) claimed 'Enter' 
+        // during the loop or via addSpecialActionButton, the DONE button overwrites it.
+        if (doneActionFound && donePa != null) {
+            // log.info(">>> ENSURING DONE HAS HOTKEY PRIORITY <<<");
+            bindActionHotkey(btnDone, donePa);
+        }
+
     }
 
     private void updatePhaseSpecifics() {
+
+
+
         if (activePhase == 1 || activePhase == 2) {
             setTileBuildNumbers(true);
             updateCurrentRoutes(false);
@@ -304,9 +333,9 @@ public class ORPanel extends GridPanel
             if (activePhase == 4 && btnTrainSkip != null)
                 btnTrainSkip.setEnabled(true);
         }
+
     }
 
-    // --- HELPER METHODS FOR SPECIAL MODE ---
 
     private void updateSpecialHeader(GuiTargetedAction context) {
         // Update special header to use the new separated labels
@@ -1597,6 +1626,14 @@ if (btnTrainSkip != null) btnTrainSkip.setEnabled(true);
 
         if (trainDisplay != null)
             trainDisplay.updateAssets(orComp);
+
+
+        // Force the UpgradesPanel's mini tile dock to refresh immediately on state changes
+        if (orWindow != null && orWindow.getUpgradePanel() != null) {
+            orWindow.getUpgradePanel().refreshMiniDock();
+        }
+
+
     }
 
     private void setupHotkeys() {
@@ -1790,7 +1827,29 @@ if (btnTrainSkip != null) btnTrainSkip.setEnabled(true);
         // log.info(sb.toString());
         // // --- 1. OPTIMAL LOGGING END ---
 
+
+        // Deduplicate incoming actions using their String representation (Visual Identity).
+        // This filters out "logical" duplicates that are distinct objects in memory.
+        if (actions != null && !actions.isEmpty()) {
+            List<PossibleAction> uniqueActions = new ArrayList<>();
+            java.util.Set<String> signatures = new java.util.HashSet<>();
+
+            for (PossibleAction action : actions) {
+                // We use toString() as the signature because it typically contains
+                // the label, parameters, and mode - everything the user sees.
+                String signature = action.toString();
+
+                // add() returns true only if the set did not already contain the element
+                if (signatures.add(signature)) {
+                    uniqueActions.add(action);
+                }
+            }
+            actions = uniqueActions;
+        }
+
+
         try {
+
             cleanupUpgradesPanel();
             resetSidebarState();
 
@@ -1912,7 +1971,7 @@ if (btnTrainSkip != null) btnTrainSkip.setEnabled(true);
     private void addSpecialActionButton(PossibleAction action) {
         String label = action.getButtonLabel();
         
-        // --- START FIX ---
+
         // Defaults
         Color bgColor = Color.LIGHT_GRAY;
         Color borderColor = Color.GRAY;
@@ -1951,6 +2010,7 @@ if (btnTrainSkip != null) btnTrainSkip.setEnabled(true);
         btn.setAlignmentX(Component.CENTER_ALIGNMENT);
         // Allow button to be taller to fit the HTML content
         btn.setMaximumSize(new Dimension(SIDEBAR_WIDTH - 20, 60)); 
+bindActionHotkey(btn, action);
 
         // 3. APPLY "RAILCARD" STYLING (Flattened)
         
@@ -1971,7 +2031,7 @@ if (btnTrainSkip != null) btnTrainSkip.setEnabled(true);
         btn.setFocusPainted(false); // Remove dotted focus line
         // Force the font to match RailCard
         btn.setFont(new Font("SansSerif", Font.BOLD, 12));
-        // --- END FIX ---
+   
 
         specialPanel.add(btn);
         specialPanel.add(Box.createVerticalStrut(8));
@@ -2038,5 +2098,77 @@ if (btnTrainSkip != null) btnTrainSkip.setEnabled(true);
 
         log.info(sb.toString());
     }
+
+
+
+
+
+private void bindActionHotkey(ActionButton btn, PossibleAction action) {
+        int key = 0;
+        String actionName = action.getClass().getSimpleName();
+        
+        // 0. Capture the button reference for the Global Manager
+        if (action instanceof NullAction) {
+             this.directPassButton = btn;
+        }
+        
+        // LOG 1: Verify this method is called for the NullAction
+        if (action instanceof NullAction) {
+             log.info("DEBUG: bindActionHotkey called for NullAction. Button Text: " + btn.getText());
+        }
+
+        // 1. Check if the Action defines a hotkey (via Interface)
+        if (action instanceof GuiTargetedAction) {
+            key = ((GuiTargetedAction) action).getHotkey();
+        }
+
+        // 2. FORCE 'ENTER' FOR DONE/PASS (NullAction)
+        if (action instanceof NullAction) {
+            key = KeyEvent.VK_ENTER;
+            log.info("DEBUG: Forcing VK_ENTER for NullAction.");
+        }
+
+        if (key != 0) {
+            InputMap im = this.getInputMap(JComponent.WHEN_IN_FOCUSED_WINDOW);
+            ActionMap am = this.getActionMap();
+            
+            // Unique command name using identityHashCode to avoid collisions
+            String commandKey = "invoke_" + actionName + "_" + System.identityHashCode(action);
+            
+            im.put(KeyStroke.getKeyStroke(key, 0), commandKey);
+            
+            log.info("DEBUG: Mapped KeyCode " + key + " to command " + commandKey);
+
+            am.put(commandKey, new AbstractAction() {
+                @Override
+                public void actionPerformed(ActionEvent e) {
+                    log.info("DEBUG: Hotkey triggered for " + actionName);
+                    if (btn.isEnabled() && btn.isVisible()) {
+                        log.info("DEBUG: Button is valid. Clicking...");
+                        btn.doClick();
+                    } else {
+                        log.info("DEBUG: FAILURE - Button disabled or invisible.");
+                    }
+                }
+            });
+        }
+
+        
+    }
+
+
+
+@Override
+    protected boolean processKeyBinding(KeyStroke ks, KeyEvent e, int condition, boolean pressed) {
+        if (e.getKeyCode() == KeyEvent.VK_ENTER) {
+            log.info("DEBUG ORPANEL: processKeyBinding checking ENTER. Condition: " + condition + ", Pressed: " + pressed);
+            boolean result = super.processKeyBinding(ks, e, condition, pressed);
+            log.info("DEBUG ORPANEL: Result: " + result);
+            return result;
+        }
+        return super.processKeyBinding(ks, e, condition, pressed);
+    }
+
+
 
 }

@@ -138,11 +138,6 @@ public class UpgradesPanel extends JPanel {
         revalidate();
     }
 
-    public void refreshMiniDock() {
-        if (this.miniDock != null) {
-            this.miniDock.repaint();
-        }
-    }
 
     private void addLegendItem(JPanel panel, String key, String desc) {
         JLabel lbl = new JLabel("<html><font color='#222222' size='3'><b>[" + key + "]</b></font> " + desc + "</html>");
@@ -192,6 +187,12 @@ public class UpgradesPanel extends JPanel {
     
     public void setActive() {
         resetUpgrades(true);
+    }
+
+    public void refreshMiniDock() {
+        if (miniDock != null) {
+            miniDock.repaint();
+        }
     }
     
     public void setSelect(GUIHex hex) {

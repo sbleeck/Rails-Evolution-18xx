@@ -89,6 +89,18 @@ public class ORUIManager implements DialogOwner {
     public ORUIManager() {
     }
 
+    private boolean showCompanyHighlights = true; // Default to ON, or set to false
+
+    public void toggleCompanyHighlights() {
+        this.showCompanyHighlights = !this.showCompanyHighlights;
+        
+        // Force an immediate update
+        updateCompanyHighlights(); 
+        map.repaintAll(new Rectangle(map.getSize()));
+        
+        log.info("DEBUG: Toggled Company Highlights: " + showCompanyHighlights);
+    }
+
     // FIXED: Must be public for subclasses in other packages
     public void setGameUIManager(GameUIManager gameUIManager) {
         this.gameUIManager = gameUIManager;
@@ -148,6 +160,10 @@ public class ORUIManager implements DialogOwner {
     public void updateStatus(PossibleAction actionToComplete, boolean myTurn) {
 
 
+        // Inject the highlight update here
+        updateCompanyHighlights();
+
+
         if (map != null && getRoot() != null && getRoot().getMapManager() != null) {
         String[] testHexIds = {"L12", "M13"}; 
         
@@ -170,6 +186,7 @@ public class ORUIManager implements DialogOwner {
             }
         }
     }
+    
 
 
         RoundFacade currentRound = gameUIManager.getCurrentRound();
@@ -1232,4 +1249,80 @@ public void setMapRelatedActions(PossibleActions actions) {
     private void rebindVisualHexes() {
         return;
     }
+
+
+private void updateCompanyHighlights() {
+        if (map == null || oRound == null) return;
+
+        // If toggled OFF, clear map and return immediately
+        if (!showCompanyHighlights) {
+            map.setOwnerHighlight(null, null);
+            return;
+        }
+        
+        PublicCompany currentComp = oRound.getOperatingCompany();
+        if (currentComp == null) {
+            map.setOwnerHighlight(null, null);
+            return;
+        }
+
+        Player currentOwner = currentComp.getPresident();
+        List<GUIHex> hexesToHighlight = new ArrayList<>();
+        // Store specific labels for each hex
+        Map<GUIHex, String> specificLabels = new HashMap<>();
+
+        net.sf.rails.game.MapManager mapManager = getRoot().getMapManager();
+        net.sf.rails.game.CompanyManager companyManager = getRoot().getCompanyManager();
+        Map<MapHex, GUIHex> guiHexesMap = map.getGuiHexes();
+
+        if (guiHexesMap != null && mapManager != null && companyManager != null) {
+            
+            // 1. Get all companies for this player
+            List<PublicCompany> playerCompanies = new ArrayList<>();
+            for (PublicCompany comp : companyManager.getAllPublicCompanies()) {
+                if (comp.getPresident() != null && 
+                    comp.getPresident().getName().equals(currentOwner.getName()) && 
+                    !comp.isClosed()) {
+                    playerCompanies.add(comp);
+                }
+            }
+
+            // 2. Scan Hexes
+            for (GUIHex guiHex : guiHexesMap.values()) {
+                if (guiHex == null || guiHex.getHex() == null) continue;
+
+                String hexId = guiHex.getHex().getId();
+                MapHex liveHex = mapManager.getHex(hexId);
+
+                if (liveHex != null && liveHex.getStopsMap() != null) {
+                    for (Stop stop : liveHex.getStopsMap().values()) {
+                        
+                        // Check for ANY player company on this stop
+                        for (PublicCompany comp : playerCompanies) {
+                             if (stop.hasTokenOf(comp)) {
+                                 // Found a match! Store the hex and the specific company ID
+                                 hexesToHighlight.add(guiHex);
+                                 specificLabels.put(guiHex, comp.getId());
+                                 break; // Done with this hex
+                             }
+                        }
+                        if (hexesToHighlight.contains(guiHex)) break;
+                    }
+                }
+            }
+        }
+        
+        // 3. Activate Highlights (Pass NULL as label to avoid overwriting everything with one name)
+        map.setOwnerHighlight(hexesToHighlight, null);
+
+        // 4. Apply Specific Labels individually
+        for (Map.Entry<GUIHex, String> entry : specificLabels.entrySet()) {
+            // Re-apply the active flag with the CORRECT specific label
+            entry.getKey().setActiveOwnerHighlight(true, entry.getValue());
+        }
+        
+        // 5. Force Repaint to show changes
+map.repaintAll(new Rectangle(map.getSize()));
+    }
+
 }
