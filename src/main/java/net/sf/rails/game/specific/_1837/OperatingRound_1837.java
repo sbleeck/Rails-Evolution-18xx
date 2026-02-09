@@ -182,11 +182,38 @@ protected final IntegerState kkFormationState = IntegerState.create(this, "kkFor
                 && (company.getHomeHexes().isEmpty()
                         || !company.hasLaidHomeBaseTokens())) {
 
-            initTurn();
+            // RELOAD RECOVERY: Fixes "Action not in PossibleActions" crash for S5.
+            // If the log contains a LayTile action next, but S5 has no home token (due to Undo bug),
+            // we infer the home was successfully chosen and manually inject it to allow the reload to proceed.
+            if (gameManager.isReloading()) {
+                PossibleAction next = gameManager.getNextActionFromLog();
+                if (next instanceof LayTile) {
+                    LayTile lay = (LayTile) next;
+                    MapHex target = lay.getChosenHex();
+                    
+                    // If laying on L8 or L2, assume that is the home.
+                    // (S5 starts unconnected, so the first tile MUST be on the home hex).
+                    if (target != null && (target.getId().equals("L8") || target.getId().equals("L2"))) {
+                        log.warn("1837 Reload Recovery: Restoring missing S5 Home Token on " + target.getId());
+                        company.setHomeHex(target);
+                        company.layHomeBaseTokens();
+                    }
+                }
+            }
+            
+            // Re-check: If recovery worked, this block is now false and we skip to standard actions.
+            if (company.getHomeHexes().isEmpty() || !company.hasLaidHomeBaseTokens()) {
+                initTurn();
+                possibleActions.clear();
+                possibleActions.add(new SetHomeHexLocation(getRoot(),
+                        company, GameDef_1837.S5homes));
+                return true;
+            }
+            // If we reach here, the recovery logic worked (Home Token is set).
+            // We must regenerate standard actions (like LayTile) because the initial check saw no token.
             possibleActions.clear();
-            possibleActions.add(new SetHomeHexLocation(getRoot(),
-                    company, GameDef_1837.S5homes));
-            return true;
+            return super.setPossibleActions();
+
         } else if (company.isClosed()) {
             // This can occur if a Sd minor buys the first 4-train
             finishTurn();
@@ -876,7 +903,6 @@ protected final IntegerState kkFormationState = IntegerState.create(this, "kkFor
         }
     }
 
-// --- START FIX ---
     @Override
     public boolean buyTrain(BuyTrain action) {
         boolean result = super.buyTrain(action);
@@ -985,7 +1011,17 @@ if (major == null) continue;
             
             // Fix for missing LocalText key: Use direct string construction
             ReportBuffer.add(this, "Company " + coal.getId() + " merged into " + major.getId() + " (" + reason + ")");
-            // --- END FIX ---
+       
+            // Debug logging to verify values
+            log.info("DEBUG MANDATORY MERGE: " + major.getId() + " Train Count: " + major.getNumberOfTrains() + " Limit: " + major.getCurrentTrainLimit());
+
+// Use shared helper to check limits and generate discard actions if needed
+            if (checkAndGenerateDiscardActions(major)) {
+                String warning = "WARNING: " + major.getId() + " exceeds train limit after mandatory merger.";
+                ReportBuffer.add(this, warning);
+            }
+       
+       
         }
     }
 
@@ -1131,7 +1167,6 @@ if (major == null) continue;
         Phase currentPhase = getRoot().getPhaseManager().getCurrentPhase();
 
         if (currentPhase.getId().equals("3")) {
-            // --- START FIX ---
             if (!phase3Triggered.value()) {
                 phase3Triggered.set(true);
                 // ... (Existing Phase 3 logic for Bosnia/Private Companies) ...
@@ -1159,7 +1194,7 @@ if (major == null) continue;
                     e.printStackTrace();
                 }
             }
-            // --- END FIX ---
+
 
         } else if (currentPhase.getId().equals("5")) {
             // --- PHASE 5 LOGIC ---
@@ -1213,14 +1248,11 @@ if (major == null) continue;
 
 
 
-
-    // ... (lines of unchanged context code) ...
     private boolean processExchangeMinor(ExchangeMinorAction action) {
         PublicCompany minor = action.getMinor();
         PublicCompany major = action.getTargetMajor();
         String minorId = minor.getId();
 
-        // --- START FIX ---
         // 1. Formation: Par & Float ONLY (No Flush)
         boolean isK1Formation = action.isFormation() || "K1".equals(minorId);
         boolean isU1Formation = action.isFormation() || "U1".equals(minorId);
@@ -1350,6 +1382,18 @@ if (major == null) continue;
         // 4. Cleanup
         Merger1837.mergeMinor(gameManager, minor, major);
         Merger1837.fixDirectorship(gameManager, major);
+
+
+        // Debug logging to verify values
+        log.info("DEBUG VOLUNTARY MERGE: " + major.getId() + " Train Count: " + major.getNumberOfTrains() + " Limit: " + major.getCurrentTrainLimit());
+
+// Use shared helper to check limits and generate discard actions if needed
+        if (checkAndGenerateDiscardActions(major)) {
+            String warning = "WARNING: " + major.getId() + " exceeds train limit after voluntary merger.";
+            ReportBuffer.add(this, warning);
+        }
+
+
 
         // 5. Update State
         if ("K1".equals(minorId)) kkFormationState.set(2);
@@ -1560,5 +1604,16 @@ if (major == null) continue;
         }
     }
 
+
+    
+
+
+
+
+
+
+
+
+    
 
 }

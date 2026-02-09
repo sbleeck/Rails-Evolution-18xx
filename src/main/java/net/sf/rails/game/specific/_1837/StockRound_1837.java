@@ -235,25 +235,7 @@ possibleActions.add(new ExchangeMinorAction(company, target, false));
         }
     }
 
-    public boolean buyShares(String playerName, BuyCertificate action) {
 
-        boolean result = super.buyShares(playerName, action);
-
-        PublicCompany company = action.getCompany();
-
-        // If the president certificate is bought from the Pool,
-        // make sure that it is handled correctly
-        if (action.isPresident()) {
-            if (!company.hasStarted()) company.start();
-            if (company.getType().getId().equals("National")) {
-                if (!company.hasFloated()) floatCompany(company);
-            } else if (company.getType().getId().equals("Major")) {
-                company.checkPresidencyOnBuy(action.getPlayer());
-            }
-        }
-
-        return result;
-    }
 
     public boolean startCompany(String playerName, StartCompany action) {
 
@@ -465,12 +447,84 @@ possibleActions.add(new ExchangeMinorAction(company, target, false));
         if (discardingTrains.value()) {
             discardingTrains.set(false);
         }
+        
     }
 
 
 
 
+// ... (lines of unchanged context code) ...
+    public boolean buyShares(String playerName, BuyCertificate action) {
 
+        boolean result = super.buyShares(playerName, action);
+
+        PublicCompany company = action.getCompany();
+
+        // If the president certificate is bought from the Pool,
+        // make sure that it is handled correctly
+        if (action.isPresident()) {
+            if (!company.hasStarted()) company.start();
+            if (company.getType().getId().equals("National")) {
+                if (!company.hasFloated()) floatCompany(company);
+            } else if (company.getType().getId().equals("Major")) {
+                company.checkPresidencyOnBuy(action.getPlayer());
+            }
+        }
+
+        // --- START FIX ---
+        // Rule: If a Major becomes Sold Out (no shares in IPO), 
+        // connected Coal/Minors must merge immediately.
+        if (result) {
+            processSoldOutMergers();
+        }
+        // --- END FIX ---
+
+        return result;
+    }
+
+    // --- START FIX ---
+    /**
+     * Checks all Coal/Minor companies. If their target Major is "Sold Out" (IPO empty),
+     * forces an immediate automatic merger.
+     */
+    private void processSoldOutMergers() {
+        // Create a safe copy to avoid ConcurrentModificationException if companies close during iteration
+        List<PublicCompany> allCompanies = new java.util.ArrayList<>(gameManager.getAllPublicCompanies());
+
+        for (PublicCompany minor : allCompanies) {
+            if (minor.isClosed()) continue;
+
+            String type = minor.getType().getId();
+            // Only Coal and Minors are subject to this rule
+            if (!"Coal".equals(type) && !"Minor".equals(type)) continue;
+
+            PublicCompany major = getMergeTarget(minor);
+            // Major must exist and be floated to accept a Sold Out merger
+            if (major == null || !major.hasFloated() || major.isClosed()) continue;
+
+            // Check if Major is Sold Out (No shares remaining in IPO)
+            boolean isSoldOut = true;
+            for (PublicCertificate cert : net.sf.rails.game.financial.Bank.getIpo(gameManager).getPortfolioModel().getCertificates()) {
+                if (cert.getCompany().equals(major)) {
+                    isSoldOut = false;
+                    break;
+                }
+            }
+
+            if (isSoldOut) {
+                log.info("Major " + major.getId() + " is Sold Out. Force merging " + minor.getId());
+                
+                // Report to UI
+                ReportBuffer.add(this,LocalText.getText("MergeSoldOut", minor.getId(), major.getId()));
+
+                // Execute Merge:
+                // majorPresident=false (system forced)
+                // autoMerge=true (suppress confirmation pop-ups)
+                mergeCompanies(minor, major, false, true);
+            }
+        }
+    }
+    // --- END FIX ---
 
 
 

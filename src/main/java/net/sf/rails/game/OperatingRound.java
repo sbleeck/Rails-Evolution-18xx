@@ -995,8 +995,10 @@ public class OperatingRound extends Round implements Observer {
         return !excessTrainCompanies.isEmpty();
     }
 
-    // 2. MODIFY setTrainsToDiscard to see why it fails to generate actions
     protected void setTrainsToDiscard() {
+        // Override generic logic to show ONLY the train name (e.g. "3_4").
+        // Forced discards in 1837 provide 0 refund, so we display no cost/value.
+        
         doneAllowed.set(false);
 
         // Scan the players in SR sequence
@@ -1005,7 +1007,7 @@ public class OperatingRound extends Round implements Observer {
         for (Player player : nextPlayers) {
             if (excessTrainCompanies.containsKey(player)) {
 
-                playerManager.setCurrentPlayer(player);
+                getRoot().getPlayerManager().setCurrentPlayer(player);
                 List<PublicCompany> list = excessTrainCompanies.get(player);
                 for (PublicCompany comp : list) {
                     Set<Train> trainsToDiscardFrom = comp.getPortfolioModel().getUniqueTrains();
@@ -1015,13 +1017,14 @@ public class OperatingRound extends Round implements Observer {
 
                     for (Train train : trainsToDiscardFrom) {
                         DiscardTrain action = new DiscardTrain(comp, train);
-                        action.setButtonLabel(
-                                LocalText.getText("CompanyDiscardsTrain", comp.getId(), train.getType().getName()));
+                        
+                        // Set label to the train name only (e.g., "3_4")
+                        action.setButtonLabel(train.getName());
+                        
                         possibleActions.add(action);
                     }
                     return;
                 }
-            } else {
             }
         }
     }
@@ -4872,5 +4875,45 @@ public class OperatingRound extends Round implements Observer {
     public int getSpecialRevenueOnly(PublicCompany company) {
         return 0;
     }
+
+
+
+     
+     // (Reminder of the correct helper in OperatingRound.java)
+    public boolean checkAndGenerateDiscardActions(PublicCompany company) {
+        int count = company.getNumberOfTrains();
+        int limit = company.getCurrentTrainLimit();
+
+        if (count > limit) {
+            log.info("LIMIT CHECK FAILED: " + company.getId() + " has " + count + "/" + limit + " trains.");
+            
+            // Fix: Handle Set vs List by wrapping in ArrayList
+            Collection<Train> trains = company.getPortfolioModel().getTrainList();
+            List<Train> trainList = new ArrayList<>(trains);
+            Set<String> addedTypes = new HashSet<>();
+            
+            if (company.getPresident() != null) {
+                playerManager.setCurrentPlayer(company.getPresident());
+            }
+
+            for (Train train : trainList) {
+                if (!addedTypes.contains(train.getName())) {
+                    Set<Train> trainOption = new HashSet<>();
+                    trainOption.add(train);
+                    DiscardTrain action = new DiscardTrain(company, trainOption);
+                    // The DiscardTrain logic now handles the rest via getButtonLabel()
+                    possibleActions.add(action);
+                    addedTypes.add(train.getName());
+                }
+            }
+            return true;
+        }
+        return false;
+    }
+     
+
+
+
+
 
 }

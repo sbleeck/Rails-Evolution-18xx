@@ -111,16 +111,6 @@ public class ORPanel extends GridPanel
     private boolean showNumbersActive = false;
 private AbstractButton directPassButton;
 
-public boolean clickPassButton() {
-        // isShowing() checks if the button is actually currently displayed on the screen.
-        // This prevents clicking "stale" buttons from previous phases.
-        if (directPassButton != null && directPassButton.isShowing() && directPassButton.isEnabled()) {
-            log.info("DEBUG ORPANEL: directPassButton clicked via Global Manager");
-            directPassButton.doClick();
-            return true; // signal that we handled the event
-        }
-        return false; // signal that we did nothing
-    }
 
     // Game Params
     private boolean privatesCanBeBought;
@@ -188,6 +178,25 @@ public boolean clickPassButton() {
         setFocusable(true);
 
         round = gameUIManager.getCurrentRound();
+
+if (round instanceof OperatingRound) {
+            companies = ((OperatingRound) round).getOperatingCompanies().toArray(new PublicCompany[0]);
+            nc = companies.length;
+            this.orComp = ((OperatingRound) round).getOperatingCompany();
+        } else {
+            // Reflection hook to find BK in CoalExchangeRound
+            try {
+                java.lang.reflect.Method method = round.getClass().getMethod("getOperatingCompany");
+                Object result = method.invoke(round);
+                if (result instanceof PublicCompany) {
+                    this.orComp = (PublicCompany) result;
+                    this.currentOperatingComp = (PublicCompany) result;
+                }
+            } catch (Exception e) {
+                // No company context available
+            }
+        }
+
         privatesCanBeBought = gameUIManager.getGameParameterAsBoolean(GuiDef.Parm.CAN_ANY_COMPANY_BUY_PRIVATES);
         bonusTokensExist = gameUIManager.getGameParameterAsBoolean(GuiDef.Parm.DO_BONUS_TOKENS_EXIST);
         hasCompanyLoans = gameUIManager.getGameParameterAsBoolean(GuiDef.Parm.HAS_ANY_COMPANY_LOANS);
@@ -1668,62 +1677,7 @@ if (btnTrainSkip != null) btnTrainSkip.setEnabled(true);
         });
     }
 
-    /**
-     * Centralized handler for the Enter Key.
-     * Called by ORWindow's global hotkey listener.
-     * This robustly checks for Enabled buttons directly, removing dependency on
-     * potentially stale activePhase logic.
-     */
-    public void handleEnterPress() {
-        // 1. REVENUE (Phase 3) - Prioritize Payout/Split/Hold
-        // We do NOT check activePhase here. If the buttons are enabled, they are the
-        // valid action.
-        if (tryClick(btnRevPayout))
-            return;
-        if (tryClick(btnRevSplit))
-            return;
-        if (tryClick(btnRevWithhold))
-            return;
 
-        // 2. TOKEN (Phase 2)
-        // Checks if the token confirmation/skip button is available
-        if (tryClick(btnTokenConfirm))
-            return;
-
-        // 3. TILE (Phase 1)
-        // Checks if the tile confirmation/skip button is available
-        if (tryClick(btnTileConfirm))
-            return;
-
-        // 4. TRAIN (Phase 4)
-        if (tryClick(btnTrainSkip))
-            return;
-
-        // 5. DONE / END TURN (Phase 5 or Generic)
-        if (tryClick(btnDone))
-            return;
-
-        // 6. SWING DEFAULT (Fallback)
-        if (tryClick(currentDefaultButton))
-            return;
-
-        // 7. MAP FALLBACK (Crucial for Phase 1 Upgrades)
-        // If no button matched, try to confirm a selected map action (Tile/Token).
-        if (orUIManager != null) {
-            orUIManager.confirmUpgrade();
-        }
-    }
-
-    /**
-     * Helper to safely click a button if it exists, is enabled, and is visible.
-     */
-    private boolean tryClick(ActionButton btn) {
-        if (btn != null && btn.isEnabled() && btn.isVisible()) {
-            btn.doClick();
-            return true;
-        }
-        return false;
-    }
 
     @Override
     public void actionPerformed(ActionEvent e) {
@@ -1798,6 +1752,142 @@ if (btnTrainSkip != null) btnTrainSkip.setEnabled(true);
         }
         return false;
     }
+
+
+
+
+// ... (lines of unchanged context code) ...
+    private void addSpecialActionButton(PossibleAction action) {
+        String label = action.getButtonLabel();
+        
+
+        // Defaults
+        Color bgColor = Color.LIGHT_GRAY;
+        Color borderColor = Color.GRAY;
+        Color textColor = Color.BLACK;
+        String cmd = "SpecialAction";
+
+        // 1. Extract Visual Signature via Interface
+        if (action instanceof GuiTargetedAction) {
+            GuiTargetedAction gta = (GuiTargetedAction) action;
+            label = gta.getButtonLabel(); 
+            
+            // CONSUME THE SIGNATURE
+            bgColor = gta.getHighlightBackgroundColor();
+            borderColor = gta.getHighlightBorderColor();
+            textColor = gta.getHighlightTextColor();
+        } 
+        else if (action instanceof NullAction) {
+            label = ((NullAction) action).getMode() == NullAction.Mode.PASS ? "Decline" : "Done";
+            bgColor = UITheme.ACTION_SKIP;
+            borderColor = bgColor.darker();
+            textColor = Color.WHITE;
+        }
+
+        // 2. Create Button
+        ActionButton btn = createSidebarButton(label, cmd);
+        
+        // HTML Formatting to match RailCard text style if needed
+        if (!label.toLowerCase().startsWith("<html>")) {
+            btn.setText("<html><center>" + label + "</center></html>");
+        } else {
+            btn.setText(label); 
+        }
+
+        btn.setPossibleAction(action);
+        btn.setEnabled(true);
+        btn.setAlignmentX(Component.CENTER_ALIGNMENT);
+        // Allow button to be taller to fit the HTML content
+        btn.setMaximumSize(new Dimension(SIDEBAR_WIDTH - 20, 60)); 
+bindActionHotkey(btn, action);
+
+        // 3. APPLY "RAILCARD" STYLING (Flattened)
+        
+        // A. Background & Text
+        btn.setBackground(bgColor);
+        btn.setForeground(textColor);
+        
+        // B. Border (Thick Line Border to match GameStatus Card)
+        // Outer: The colored line (3px)
+        // Inner: Padding (5px)
+        btn.setBorder(BorderFactory.createCompoundBorder(
+                BorderFactory.createLineBorder(borderColor, 3),
+                BorderFactory.createEmptyBorder(2, 5, 2, 5)));
+
+        // C. Technical overrides to ensure "Flat" look
+        btn.setOpaque(true);
+        btn.setContentAreaFilled(true);
+        btn.setFocusPainted(false); // Remove dotted focus line
+        // Force the font to match RailCard
+        btn.setFont(new Font("SansSerif", Font.BOLD, 12));
+   
+
+        specialPanel.add(btn);
+        specialPanel.add(Box.createVerticalStrut(8));
+    }
+// ... (lines of unchanged context code) ...
+
+    /**
+     * Replaces the tooltip logic with a formatted log entry.
+     * Cleans up UI tooltips and dumps a readable text table to the console.
+     */
+    private void logFormattedActions(List<PossibleAction> actions) {
+        // 1. Revert UI Tooltips (Clean up)
+        this.setToolTipText(null);
+        if (lblPhaseInstruction != null)
+            lblPhaseInstruction.setToolTipText(null);
+        if (lblCompanyInfo != null)
+            lblCompanyInfo.setToolTipText(null);
+        if (phase1Panel != null)
+            phase1Panel.setToolTipText(null);
+        if (phase2Panel != null)
+            phase2Panel.setToolTipText(null);
+        if (phase3Panel != null)
+            phase3Panel.setToolTipText(null);
+        if (phase4Panel != null)
+            phase4Panel.setToolTipText(null);
+        if (footerPanel != null)
+            footerPanel.setToolTipText(null);
+
+        if (actions == null || actions.isEmpty())
+            return;
+
+        // 2. Build Readable Log Table
+        int moveCount = 0;
+        if (orUIManager != null && orUIManager.getGameUIManager().getGameManager() != null) {
+            moveCount = orUIManager.getGameUIManager().getGameManager().getCurrentActionCount();
+        }
+
+        StringBuilder sb = new StringBuilder();
+        sb.append("\n=== ENGINE ACTION BUFFER (Move #").append(moveCount).append(") ===\n");
+        sb.append(String.format("%-20s | %s%n", "TYPE", "DETAILS / INTERNAL STATE"));
+        sb.append("---------------------+--------------------------------------------------\n");
+
+        for (PossibleAction pa : actions) {
+            // Use full package name to avoid import errors
+            if (pa.isCorrection() || pa instanceof rails.game.correct.CorrectionModeAction)
+                continue;
+
+            String className = pa.getClass().getSimpleName();
+            String rawData = pa.toString();
+            String formattedData;
+
+            if (pa instanceof NullAction) {
+                formattedData = "Logical " + ((NullAction) pa).getMode() + " (Stopper/Pass)";
+            } else if (rawData.contains(",")) {
+                // Format comma-separated lists (like BuyTrain) into a vertical list
+                formattedData = "- " + rawData.replace(", ", "\n                     | - ");
+            } else {
+                formattedData = rawData;
+            }
+
+            sb.append(String.format("%-20s | %s%n", className, formattedData));
+        }
+        sb.append("======================================================================\n");
+
+        log.info(sb.toString());
+    }
+
 
 
     public void updateDynamicActions(List<PossibleAction> actions) {
@@ -1967,165 +2057,26 @@ if (btnTrainSkip != null) btnTrainSkip.setEnabled(true);
 
 
 
-// ... (lines of unchanged context code) ...
-    private void addSpecialActionButton(PossibleAction action) {
-        String label = action.getButtonLabel();
-        
-
-        // Defaults
-        Color bgColor = Color.LIGHT_GRAY;
-        Color borderColor = Color.GRAY;
-        Color textColor = Color.BLACK;
-        String cmd = "SpecialAction";
-
-        // 1. Extract Visual Signature via Interface
-        if (action instanceof GuiTargetedAction) {
-            GuiTargetedAction gta = (GuiTargetedAction) action;
-            label = gta.getButtonLabel(); 
-            
-            // CONSUME THE SIGNATURE
-            bgColor = gta.getHighlightBackgroundColor();
-            borderColor = gta.getHighlightBorderColor();
-            textColor = gta.getHighlightTextColor();
-        } 
-        else if (action instanceof NullAction) {
-            label = ((NullAction) action).getMode() == NullAction.Mode.PASS ? "Decline" : "Done";
-            bgColor = UITheme.ACTION_SKIP;
-            borderColor = bgColor.darker();
-            textColor = Color.WHITE;
-        }
-
-        // 2. Create Button
-        ActionButton btn = createSidebarButton(label, cmd);
-        
-        // HTML Formatting to match RailCard text style if needed
-        if (!label.toLowerCase().startsWith("<html>")) {
-            btn.setText("<html><center>" + label + "</center></html>");
-        } else {
-            btn.setText(label); 
-        }
-
-        btn.setPossibleAction(action);
-        btn.setEnabled(true);
-        btn.setAlignmentX(Component.CENTER_ALIGNMENT);
-        // Allow button to be taller to fit the HTML content
-        btn.setMaximumSize(new Dimension(SIDEBAR_WIDTH - 20, 60)); 
-bindActionHotkey(btn, action);
-
-        // 3. APPLY "RAILCARD" STYLING (Flattened)
-        
-        // A. Background & Text
-        btn.setBackground(bgColor);
-        btn.setForeground(textColor);
-        
-        // B. Border (Thick Line Border to match GameStatus Card)
-        // Outer: The colored line (3px)
-        // Inner: Padding (5px)
-        btn.setBorder(BorderFactory.createCompoundBorder(
-                BorderFactory.createLineBorder(borderColor, 3),
-                BorderFactory.createEmptyBorder(2, 5, 2, 5)));
-
-        // C. Technical overrides to ensure "Flat" look
-        btn.setOpaque(true);
-        btn.setContentAreaFilled(true);
-        btn.setFocusPainted(false); // Remove dotted focus line
-        // Force the font to match RailCard
-        btn.setFont(new Font("SansSerif", Font.BOLD, 12));
-   
-
-        specialPanel.add(btn);
-        specialPanel.add(Box.createVerticalStrut(8));
-    }
-// ... (lines of unchanged context code) ...
-
-    /**
-     * Replaces the tooltip logic with a formatted log entry.
-     * Cleans up UI tooltips and dumps a readable text table to the console.
-     */
-    private void logFormattedActions(List<PossibleAction> actions) {
-        // 1. Revert UI Tooltips (Clean up)
-        this.setToolTipText(null);
-        if (lblPhaseInstruction != null)
-            lblPhaseInstruction.setToolTipText(null);
-        if (lblCompanyInfo != null)
-            lblCompanyInfo.setToolTipText(null);
-        if (phase1Panel != null)
-            phase1Panel.setToolTipText(null);
-        if (phase2Panel != null)
-            phase2Panel.setToolTipText(null);
-        if (phase3Panel != null)
-            phase3Panel.setToolTipText(null);
-        if (phase4Panel != null)
-            phase4Panel.setToolTipText(null);
-        if (footerPanel != null)
-            footerPanel.setToolTipText(null);
-
-        if (actions == null || actions.isEmpty())
-            return;
-
-        // 2. Build Readable Log Table
-        int moveCount = 0;
-        if (orUIManager != null && orUIManager.getGameUIManager().getGameManager() != null) {
-            moveCount = orUIManager.getGameUIManager().getGameManager().getCurrentActionCount();
-        }
-
-        StringBuilder sb = new StringBuilder();
-        sb.append("\n=== ENGINE ACTION BUFFER (Move #").append(moveCount).append(") ===\n");
-        sb.append(String.format("%-20s | %s%n", "TYPE", "DETAILS / INTERNAL STATE"));
-        sb.append("---------------------+--------------------------------------------------\n");
-
-        for (PossibleAction pa : actions) {
-            // Use full package name to avoid import errors
-            if (pa.isCorrection() || pa instanceof rails.game.correct.CorrectionModeAction)
-                continue;
-
-            String className = pa.getClass().getSimpleName();
-            String rawData = pa.toString();
-            String formattedData;
-
-            if (pa instanceof NullAction) {
-                formattedData = "Logical " + ((NullAction) pa).getMode() + " (Stopper/Pass)";
-            } else if (rawData.contains(",")) {
-                // Format comma-separated lists (like BuyTrain) into a vertical list
-                formattedData = "- " + rawData.replace(", ", "\n                     | - ");
-            } else {
-                formattedData = rawData;
-            }
-
-            sb.append(String.format("%-20s | %s%n", className, formattedData));
-        }
-        sb.append("======================================================================\n");
-
-        log.info(sb.toString());
-    }
-
-
-
-
-
 private void bindActionHotkey(ActionButton btn, PossibleAction action) {
         int key = 0;
         String actionName = action.getClass().getSimpleName();
-        
-        // 0. Capture the button reference for the Global Manager
-        if (action instanceof NullAction) {
-             this.directPassButton = btn;
-        }
-        
-        // LOG 1: Verify this method is called for the NullAction
-        if (action instanceof NullAction) {
-             log.info("DEBUG: bindActionHotkey called for NullAction. Button Text: " + btn.getText());
-        }
 
         // 1. Check if the Action defines a hotkey (via Interface)
         if (action instanceof GuiTargetedAction) {
             key = ((GuiTargetedAction) action).getHotkey();
         }
 
-        // 2. FORCE 'ENTER' FOR DONE/PASS (NullAction)
+        // --- START FIX ---
+        // 1. Capture the Pass button for external access (GlobalHotkeyManager)
         if (action instanceof NullAction) {
-            key = KeyEvent.VK_ENTER;
-            log.info("DEBUG: Forcing VK_ENTER for NullAction.");
+             this.directPassButton = btn;
+        }
+
+// 2. RESTORE 'ENTER' MAPPING FOR PASS
+        // We strictly bind ENTER to the Pass button (NullAction).
+        if (action instanceof NullAction) {
+             this.directPassButton = btn; // Keep reference for Global Manager
+             key = KeyEvent.VK_ENTER;
         }
 
         if (key != 0) {
@@ -2137,7 +2088,7 @@ private void bindActionHotkey(ActionButton btn, PossibleAction action) {
             
             im.put(KeyStroke.getKeyStroke(key, 0), commandKey);
             
-            log.info("DEBUG: Mapped KeyCode " + key + " to command " + commandKey);
+            // log.info("DEBUG: Mapped KeyCode " + key + " to command " + commandKey);
 
             am.put(commandKey, new AbstractAction() {
                 @Override
@@ -2156,7 +2107,146 @@ private void bindActionHotkey(ActionButton btn, PossibleAction action) {
         
     }
 
+    /**
+     * Helper to safely click the Pass/Done button from the Global Manager.
+     * Returns true if the button was clicked, false otherwise.
+     */
+    public boolean clickPassButton() {
+        if (directPassButton != null && directPassButton.isShowing() && directPassButton.isEnabled()) {
+            // log.info("DEBUG ORPANEL: directPassButton clicked via Global Manager");
+            directPassButton.doClick();
+            return true; 
+        }
+        return false; 
+    }
 
+
+// We are modifying ORPanel.java to ensure the scanner is robust.
+
+// ... (lines of unchanged context code) ...
+
+    // --- START FIX ---
+    public void handleEnterPress() {
+        log.info("ORPANEL: handleEnterPress() called.");
+
+        // 1. Check Special Panel (Discards, etc)
+        if (specialContainer != null && specialContainer.isVisible()) {
+            if (scanAndClickBestButton(specialPanel)) return;
+        }
+
+        // 2. Check Active Phase Panel
+        JPanel activePanel = null;
+        if (activePhase == 1) activePanel = phase1Panel;       
+        else if (activePhase == 2) activePanel = phase2Panel;  
+        else if (activePhase == 3) activePanel = phase3Panel;  
+        else if (activePhase == 4) activePanel = phase4Panel;  
+
+        if (activePanel != null && activePanel.isVisible()) {
+             if (scanAndClickBestButton(activePanel)) return;
+        }
+
+        // 3. Check Sidebar (Fallback)
+        if (sidebarPanel != null && sidebarPanel.isVisible()) {
+             // scanAndClickBestButton(sidebarPanel); // Optional: Enable if sidebar has "Pay" buttons
+        }
+
+        // 4. Default Fallback
+        if (btnDone != null && btnDone.isVisible() && btnDone.isEnabled()) {
+            log.info("ORPANEL: Clicking Default 'Done' Button.");
+            btnDone.doClick();
+        } else {
+            log.info("ORPANEL: No valid button found to click.");
+        }
+    }
+
+// We are modifying ORPanel.java
+// Fix: Add 'decline' to the scoring logic to catch the Prussian Pass action.
+
+// ... (existing imports) ...
+
+    private boolean scanAndClickBestButton(Container container) {
+        if (container == null) return false;
+        
+        AbstractButton bestCandidate = null;
+        int bestScore = 0;
+
+        Component[] comps = container.getComponents();
+        for (Component comp : comps) {
+            // Recursive dive
+            if (comp instanceof Container && !(comp instanceof AbstractButton)) {
+                if (scanAndClickBestButton((Container) comp)) return true;
+                continue;
+            }
+
+            if (comp instanceof AbstractButton) {
+                AbstractButton btn = (AbstractButton) comp;
+                if (!btn.isEnabled() || !btn.isVisible()) continue;
+
+                String text = btn.getText();
+                // Strip HTML tags for cleaner logging/matching if needed, 
+                // but .contains() usually works fine on the raw string.
+                String lowerText = (text != null) ? text.toLowerCase() : "";
+                String cmd = (btn.getActionCommand() != null) ? btn.getActionCommand() : "";
+                int score = 0;
+
+                // --- SCORING LOGIC ---
+
+                // 1. CRITICAL FLOW (Score 10)
+                if (cmd.equals(PAYOUT_CMD) || 
+                    lowerText.contains("pay") || 
+                    lowerText.contains("confirm") || 
+                    lowerText.contains("yes")) {
+                    score = 10;
+                }
+                
+                // 2. EXPLICIT SKIP / REFUSAL (Score 8)
+                // ADDED "decline" HERE
+                else if (lowerText.contains("skip") || 
+                         lowerText.contains("decline")) { 
+                    score = 8;
+                }
+
+                // 3. GENERIC COMPLETION (Score 5)
+                else if (cmd.equals(DONE_CMD) || 
+                         lowerText.contains("done") || 
+                         lowerText.contains("end turn") || 
+                         lowerText.contains("pass")) {
+                    score = 5;
+                }
+
+                // 4. SECONDARY OPTIONS (Score 3)
+                else if (cmd.equals(WITHHOLD_CMD) || cmd.equals(SPLIT_CMD) || 
+                         lowerText.contains("hold") || lowerText.contains("withhold") || 
+                         lowerText.contains("split")) {
+                    score = 3;
+                }
+
+                // 5. EXPLICITLY IGNORE (Score -1)
+                // "Start" is ignored, which correctly handles "Start (Fold M2)"
+                else if (lowerText.contains("buy") || 
+                         lowerText.contains("undo") || 
+                         lowerText.contains("redo") || 
+                         lowerText.contains("start")) {
+                    score = -1;
+                }
+
+                // LOGGING
+                // log.info("ORPANEL SCANNER: Saw '" + text + "' -> Score: " + score);
+
+                if (score > bestScore) {
+                    bestScore = score;
+                    bestCandidate = btn;
+                }
+            }
+        }
+
+        if (bestCandidate != null) {
+            log.info("ORPANEL: Auto-Clicking '" + bestCandidate.getText() + "' (Score: " + bestScore + ")");
+            bestCandidate.doClick();
+            return true;
+        }
+        return false;
+    }
 
 @Override
     protected boolean processKeyBinding(KeyStroke ks, KeyEvent e, int condition, boolean pressed) {

@@ -2,6 +2,7 @@ package net.sf.rails.game.specific._1837;
 
 import java.awt.Color;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
 import java.util.Set;
 import java.util.HashSet;
@@ -274,47 +275,121 @@ public class CoalExchangeRound extends StockRound_1837 {
         boolean result = mergeCompanies(minor, major, false, autoMerge);
         
         major.checkPresidency();
+
+
+
+
+
         log.info("CER_DEBUG: Merge complete. Minor {} closed.", minor.getId());
 
+// Verify train limit immediately after merger to trigger discard logic if needed
+        int count = major.getNumberOfTrains();
+        int limit = major.getCurrentTrainLimit();
+
+        log.info("CER_DEBUG: Post-Merge Check for " + major.getId() + " Trains: " + count + "/" + limit);
+
+        if (count > limit) {
+            int excess = count - limit;
+            numberOfExcessTrains.set(excess);
+            
+            String warning = "WARNING: " + major.getId() + " exceeds train limit (" + count + "/" + limit + "). Excess: " + excess;
+            ReportBuffer.add(this, warning);
+            log.info(warning);
+        }
+
+
+
         return result;
     }
 
+
+
+
+
+
+
+
+    // ... (lines of unchanged context code) ...
     @Override
     public boolean discardTrain(DiscardTrain action) {
-        boolean result = super.discardTrain(action);
-
-        if (action.getDiscardedTrain() != null) {
-            discardableTrains.remove(action.getDiscardedTrain().getType(),
-                    action.getDiscardedTrain());
-            numberOfExcessTrains.add(-1);
-        }
-
-        if (numberOfExcessTrains.value() <= 0) {
-            clearDiscardableTrains(); 
-            step.set(MERGE);
-            setPossibleActions();
-        } else {
-             setPossibleActions();
-        }
-        return result;
-    }
-
-    protected boolean setTrainDiscardActions() {
+        // --- START FIX ---
         PublicCompany major = currentMajor.value();
-        Set<Train> trains = new HashSet<>(); 
-        
-        // HashMultimapState usually has keySet().
-        if (discardableTrains != null && !discardableTrains.isEmpty()) {
-             // Safe copying to avoid CME. Explicit Generic Type added.
-             for (TrainType type : new ArrayList<TrainType>(discardableTrains.keySet())) {
-                trains.addAll(discardableTrains.get(type));
-             }
+        Train trainToMove = action.getSelectedTrain();
+
+        if (trainToMove == null) {
+            log.error("CER_ERROR: No train found in discard action!");
+            return false;
         }
+
+        log.info("CER_DEBUG: Discarding " + trainToMove.getId() + " from " + major.getId());
+        log.info("CER_DEBUG: Portfolio size BEFORE: " + major.getPortfolioModel().getTrainsModel().getPortfolio().items().size());
+
+        // Perform the move using the Card (Standard Rails requirement for Portfolio updates)
+        if (trainToMove.getCard() != null) {
+            Bank bank = Bank.get(major.getRoot());
+            trainToMove.getCard().moveTo(bank.getPool());
+            trainToMove.getCard().discard();
+            log.info("CER_DEBUG: TrainCard moved to Bank Pool.");
+        } else {
+            // Fallback for cardless trains
+            trainToMove.moveTo(Bank.get(major.getRoot()).getPool());
+            log.warn("CER_DEBUG: No TrainCard found, moved Train object directly.");
+        }
+
+        log.info("CER_DEBUG: Portfolio size AFTER: " + major.getPortfolioModel().getTrainsModel().getPortfolio().items().size());
+
+        // Decrement the excess count
+        int excess = numberOfExcessTrains.value();
+        if (excess > 0) {
+            numberOfExcessTrains.set(excess - 1);
+        }
+        // --- END FIX ---
+
+        // 3. If no more excess, clear the state to allow next actions
+
+        // ... (rest of the method) ...
+        // 3. If no more excess, clear the state to allow next actions
+        if (numberOfExcessTrains.value() <= 0) {
+            discardingTrains.set(false);
+            clearDiscardableTrains();
+            // Proceed to next player/action logic
+            setPossibleActions();
+        }
+return true;
+    }
+    
+    
+protected boolean setTrainDiscardActions() {
+        PublicCompany major = currentMajor.value();
         
+        // --- START FIX ---
+        // 1. Fix Type Mismatch: Wrap in ArrayList to handle both Set and List returns.
+        List<Train> currentTrains = new ArrayList<>(major.getPortfolioModel().getTrainList());
+        Set<String> addedTypes = new HashSet<>();
+
         setCurrentPlayer(major.getPresident());
+
+        // 2. Logic Fix: Use getCurrentTrainLimit()
+        int limit = major.getCurrentTrainLimit();
         
-        DiscardTrain dt = new DiscardTrain(major, trains, true);
-        possibleActions.add(dt);
+        log.info("CER_DEBUG: Generating Discard Actions for " + major.getId() 
+                + ". Trains: " + currentTrains.size() 
+                + " Limit: " + limit);
+
+        for (Train train : currentTrains) {
+            if (!addedTypes.contains(train.getName())) {
+                // Wrap specific train for the constructor
+                Set<Train> trainOption = new HashSet<>();
+                trainOption.add(train);
+                
+                DiscardTrain action = new DiscardTrain(major, trainOption);
+                possibleActions.add(action);
+                
+                addedTypes.add(train.getName());
+                
+                log.info("CER_DEBUG: Added Action -> " + action.toString());
+            }
+        }
 
         discardingTrains.set(true);
         if (discardingCompanies == null) discardingCompanies = new PublicCompany[4];
@@ -322,7 +397,7 @@ public class CoalExchangeRound extends StockRound_1837 {
         
         return true;
     }
-    
+
     private void clearDiscardableTrains() {
         // HashMultimapState usually has keySet()
         if (discardableTrains != null && !discardableTrains.isEmpty()) {
@@ -352,4 +427,9 @@ public class CoalExchangeRound extends StockRound_1837 {
     public String toString() {
         return getId();
     }
+
+    public PublicCompany getOperatingCompany() {
+        return currentMajor.value();
+    }
+
 }

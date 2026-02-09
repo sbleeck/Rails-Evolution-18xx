@@ -13,6 +13,8 @@ import net.sf.rails.game.state.AbstractItem;
 import net.sf.rails.game.state.Owner;
 import net.sf.rails.game.state.Purse;
 import net.sf.rails.game.financial.Bank;
+import net.sf.rails.game.model.PortfolioOwner;
+import net.sf.rails.game.round.RoundFacade;
 
 import org.jetbrains.annotations.NotNull;
 import com.google.common.base.Objects;
@@ -61,14 +63,7 @@ public class DiscardTrain extends PossibleORAction implements GuiTargetedAction 
         }
     }
 
-    @Override
-    public String getButtonLabel() {
-        // return "Discard " + (discardedTrain != null ? discardedTrain.getName() :
-        // "?");
-        if (label != null) return label;
-        return "Discard " + (discardedTrain != null ? discardedTrain.toText() : "?");
 
-    }
 
     @Override
     public Owner getActor() {
@@ -79,8 +74,27 @@ public class DiscardTrain extends PossibleORAction implements GuiTargetedAction 
     public Object getTarget() {
         return discardedTrain;
     }
+@Override
+    public String getButtonLabel() {
+        if (ownedTrains != null && !ownedTrains.isEmpty()) {
+            // Return the name of the first (and usually only) train in this option
+            return "Discard " + ownedTrains.first().getName();
+        }
+        return "Discard ?";
+    }
 
-    // --- START FIX ---
+@Override
+    public String toString() {
+        if (ownedTrains != null && !ownedTrains.isEmpty()) {
+            StringBuilder sb = new StringBuilder("Discard ");
+            for (Train t : ownedTrains) {
+                sb.append(t.getName()).append(" ");
+            }
+            return sb.toString().trim();
+        }
+        return "Discard Train (?)";
+    }
+
     // UNIFIED "DISCARD" SIGNATURE (Light Coral / Firebrick)
 
     @Override
@@ -106,7 +120,7 @@ public class DiscardTrain extends PossibleORAction implements GuiTargetedAction 
     public Color getHighlightTextColor() {
         return Color.BLACK;
     }
-    // --- END FIX ---
+   
 
     // ... (Serialization methods omitted) ...
     // NOTE: Ensure all other methods from the uploaded file are preserved.
@@ -160,20 +174,14 @@ public class DiscardTrain extends PossibleORAction implements GuiTargetedAction 
         }
         if ( discardedTrainUniqueId != null ) discardedTrain = trainManager.getTrainByUniqueId(discardedTrainUniqueId);
     }
+
     @Override
     public String getGroupLabel() {
-        return "Discard Train";
+        return "Must Discard Train";
     }
 
     public boolean execute(OperatingRound round) {
         
-        // ... (Train selection logic remains) ...
-
-        // --- START FIX ---
-        // REMOVED: Cost calculation and payment logic. 
-        // This class is now strictly for FORCED discards (Limit Checks).
-        // Standard forced discards do not cost money.
-        // --- END FIX ---
 
         // Move the train to the scrap heap or pool (Standard Logic)
         Bank bank = Bank.get(round);
@@ -187,4 +195,81 @@ public class DiscardTrain extends PossibleORAction implements GuiTargetedAction 
         discardedTrain.getCard().discard();
         return true;
     }
+
+
+
+    /**
+     * Overridden to support execution in both Operating Rounds and Stock Rounds (CER).
+     */
+    public boolean process(RoundFacade round) {
+       
+        log.info("DISCARD_DEBUG: 111");
+        if (round instanceof OperatingRound) {
+            return execute((OperatingRound) round);
+        }
+                log.info("DISCARD_DEBUG: 222");
+
+        // Manual execution for non-OR rounds (like CoalExchangeRound)
+        return executeManual(round);
+    }
+
+    /**
+     * Public accessor to retrieve the single train associated with this discard action.
+     */
+    public Train getSelectedTrain() {
+        if (discardedTrain != null) return discardedTrain;
+        if (ownedTrains != null && !ownedTrains.isEmpty()) return ownedTrains.first();
+        return null;
+    }
+
+
+// ... (lines of unchanged context code) ...
+    private boolean executeManual(RoundFacade round) {
+        // Auto-select if only one train is available
+        if (discardedTrain == null && ownedTrains != null && !ownedTrains.isEmpty()) {
+            discardedTrain = ownedTrains.first();
+        }
+
+        if (discardedTrain == null) {
+            log.error("DISCARD_DEBUG: No train selected for discard in " + round.getId());
+            return false;
+        }
+
+        // --- START FIX ---
+        log.info("DISCARD_DEBUG: Attempting to move " + discardedTrain.getId() + " from " + company.getId());
+        log.info("DISCARD_DEBUG: Current Train Owner: " + discardedTrain.getOwner().getId());
+        
+        Bank bank = Bank.get(company.getRoot());
+        PortfolioOwner pool = bank.getPool();
+
+        // 1. Move the Train state object
+        discardedTrain.moveTo(pool);
+
+        // 2. Move the TrainCard (The actual item in the PortfolioModel)
+        if (discardedTrain.getCard() != null) {
+            log.info("DISCARD_DEBUG: Found TrainCard for " + discardedTrain.getId() + ". Moving to Pool.");
+            discardedTrain.getCard().moveTo(pool);
+            discardedTrain.getCard().discard();
+        } else {
+            log.warn("DISCARD_DEBUG: No TrainCard found for " + discardedTrain.getId() + "!");
+        }
+
+        log.info("DISCARD_DEBUG: New Train Owner: " + discardedTrain.getOwner().getId());
+        
+        ReportBuffer.add(round, company.getId() + " discards train " + discardedTrain.getName());
+        // --- END FIX ---
+        
+        return true;
+    }
+// ... (rest of the method) ...
+
+
+
+
+
+
+
+
+
+
 }

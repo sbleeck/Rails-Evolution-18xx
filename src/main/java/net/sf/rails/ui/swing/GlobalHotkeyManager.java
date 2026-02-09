@@ -88,21 +88,6 @@ private static final Logger log = LoggerFactory.getLogger(GlobalHotkeyManager.cl
         }
 
 
-
-if (e.getID() == KeyEvent.KEY_PRESSED && e.getKeyCode() == KeyEvent.VK_ENTER) {
-            if (gameUIManager.orWindow != null && gameUIManager.orWindow.isVisible()) {
-                // Try to click the Pass button. 
-                // IF it works, return true (consume key).
-                // IF it fails (no pass button), return false (let key propagate to other buttons).
-                if (gameUIManager.orWindow.getORPanel().clickPassButton()) {
-                    log.info("DEBUG GLOBAL: ENTER consumed by ORPanel Pass button.");
-                    return true; 
-                }
-                log.info("DEBUG GLOBAL: ENTER not handled by Pass button. Propagating to focus owner...");
-            }
-        }
-
-
         // 7. L ('Buy IPO Train') - SINGLE SHOT MODE
         // We only trigger if the key was previously released. 
         // This strictly blocks OS key-repeat events from firing multiple buys.
@@ -183,40 +168,6 @@ if (e.getID() == KeyEvent.KEY_PRESSED && e.getKeyCode() == KeyEvent.VK_ENTER) {
         }
     }
 
-   private void triggerEnter() {
-//    log.info("GlobalHotkeyManager: ENTER pressed. Checking context...");
-        RoundFacade round = gameUIManager.getCurrentRound();
-
-        // --- CASE 1: OPERATING ROUND ---
-        if (round instanceof OperatingRound) {
-            ORWindow orWindow = gameUIManager.orWindow;
-            
-            if (orWindow != null && orWindow.isVisible()) {
-                ORPanel panel = orWindow.getORPanel();
-                
-                if (panel != null) {
-                    // log.info("GlobalHotkeyManager: Delegating ENTER to ORPanel.handleEnterPress()");
-                    // 1. Delegate completely to ORPanel's centralized handler logic.
-                    panel.handleEnterPress(); 
-                    return; 
-                } else {
-                    // log.warn("GlobalHotkeyManager: ORPanel is NULL");
-                }
-            } else {
-                // log.info("GlobalHotkeyManager: ORWindow not visible or null");
-            }
-        }
-        // CASE 2: STOCK ROUND
-        else if (round instanceof StockRound) {
-            // log.info("GlobalHotkeyManager: StockRound detected. Clicking Pass button.");
-            if (gameUIManager.getStatusWindow() != null) {
-                clickIfEnabled(gameUIManager.getStatusWindow().passButton);
-            }
-        } else {
-            // log.info("GlobalHotkeyManager: Round type ignored: {}", (round != null ? round.getClass().getSimpleName() : "null"));
-        }
-
-    }
 
     private boolean clickIfEnabled(AbstractButton btn) {
         if (btn != null && btn.isEnabled() && btn.isVisible()) {

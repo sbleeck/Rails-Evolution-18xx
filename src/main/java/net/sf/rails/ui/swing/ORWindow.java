@@ -16,7 +16,7 @@ import javax.swing.JComponent;
 import javax.swing.KeyStroke;
 import java.awt.Toolkit;
 import net.sf.rails.game.financial.StockRound;
-
+import java.awt.KeyboardFocusManager;
 import net.sf.rails.common.Config;
 import net.sf.rails.common.GuiDef;
 import net.sf.rails.common.LocalText;
@@ -306,24 +306,50 @@ sidebarWrapper.setPreferredSize(new Dimension(ORPanel.SIDEBAR_WIDTH, 0));
         return getClass().getSimpleName() + "_" + gameUIManager.getRoot().getGameName();
     }
 
-    // We consolidate ALL hotkeys here.
-    // This ensures they work regardless of which panel (Map vs Sidebar) has focus.
-    private void setupGlobalHotkeys() {
+
+
+private void setupGlobalHotkeys() {
         JComponent rootPane = this.getRootPane();
+
         InputMap inputMap = rootPane.getInputMap(JComponent.WHEN_IN_FOCUSED_WINDOW);
         ActionMap actionMap = rootPane.getActionMap();
-        int MASK = Toolkit.getDefaultToolkit().getMenuShortcutKeyMaskEx();
+        
+        String CONFIRM_KEY = "smartConfirmAction";
 
-        // --- 1. GENERAL/DEFAULT ACTIONS ---
-
-       
-// Return (Enter): Done and Accept/Confirm
-
-String CONFIRM_KEY = "confirmAction";
         inputMap.put(KeyStroke.getKeyStroke(KeyEvent.VK_ENTER, 0), CONFIRM_KEY);
+
         actionMap.put(CONFIRM_KEY, new AbstractAction() {
             public void actionPerformed(ActionEvent e) {
-                // Delegate completely to ORPanel's centralized handler
+                // 1. FOCUS GUARD
+                Component focusOwner = KeyboardFocusManager.getCurrentKeyboardFocusManager().getFocusOwner();
+                
+                // --- START FIX ---
+                // REFINED GUARD LOGIC
+                boolean shouldDelegate = false;
+
+                if (focusOwner != null) {
+                    // A. Always yield to Text Fields (Chat, Input)
+                    if (focusOwner instanceof javax.swing.text.JTextComponent) {
+                        shouldDelegate = true;
+                    }
+                    // B. Only yield to Buttons if they are ALIVE (Enabled & Visible)
+                    else if (focusOwner instanceof javax.swing.AbstractButton) {
+                        if (focusOwner.isEnabled() && focusOwner.isVisible()) {
+                            shouldDelegate = true;
+                            log.info("ORWINDOW: Delegating Enter to ENABLED button: " + ((javax.swing.AbstractButton)focusOwner).getText());
+                        } else {
+                            log.info("ORWINDOW: Ignoring focus on DISABLED/INVISIBLE button. Taking over.");
+                            shouldDelegate = false;
+                        }
+                    }
+                }
+
+                if (shouldDelegate) {
+                    return; // Let Swing handle it
+                }
+                // --- END FIX ---
+
+                // 2. EXECUTE ORPANEL LOGIC
                 if (orPanel != null) {
                     orPanel.handleEnterPress();
                 }

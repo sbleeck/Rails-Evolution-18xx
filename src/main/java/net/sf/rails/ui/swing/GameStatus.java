@@ -72,7 +72,7 @@ public class GameStatus extends GridPanel {
     private final Dimension DIM_TRAIN = new Dimension(40, 20);
 
     public static final Color BG_BUY_ACTIVE = new Color(144, 238, 144); // Light Green (#90EE90) - Standard "Buy"\
-    // public static final Color BG_SPECIAL_ACTIVE = Color.CYAN; // Global constant
+public static final Color BG_DISCARD_VOLUNTARY = Color.CYAN; // Light Blue (#ADD8E6)
     // for Special Actions
     private final Color BG_SELL_ALERT = new Color(250, 128, 114); // Salmon Pink (#FA8072) - Shares Sell
     public static final Color BG_CARD_PASSIVE = new Color(255, 255, 240); // Beige (Must be static for static method
@@ -3457,7 +3457,6 @@ public class GameStatus extends GridPanel {
 
                     if (srcIsIPO) {
                         if (targetTrain != null) {
-                            // --- START FIX ---
                             // Normalize Name ("4_0" -> "4")
                             String tName = targetTrain.getName().replaceAll("_\\d+$", "");
                             boolean matched = false;
@@ -3492,7 +3491,6 @@ public class GameStatus extends GridPanel {
         repaint();
     }
 
-    // ... (lines of unchanged context code) ...
     // Helper to create uniform Train Buttons using RailCard
     // Replaces the old configureTrainButton static method
     private RailCard createTrainButton() {

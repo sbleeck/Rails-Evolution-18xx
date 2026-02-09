@@ -59,4 +59,10 @@ return 0;
         boolean success = super.execute(round);
         return success;
     }
+
+        
+    @Override
+    public String getGroupLabel() {
+        return "May discard Train";
+    }
 }

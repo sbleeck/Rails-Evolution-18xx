@@ -2398,10 +2398,9 @@ public class StatusWindow extends JFrame implements ActionListener, ActionPerfor
             setSize(600, 500);
         }
 
-        public void refresh() {
+public void refresh() {
             GameManager gm = gui.getGameManager();
-            if (gm == null)
-                return;
+            if (gm == null) return;
 
             StringBuilder sb = new StringBuilder();
             int move = gm.getActionCountModel().value();
@@ -2410,29 +2409,63 @@ public class StatusWindow extends JFrame implements ActionListener, ActionPerfor
 
             sb.append("==================================================\n");
             sb.append(String.format(" MOVE: #%-5d | PLAYER: %s\n", move, (p != null ? p.getName() : "None")));
-            sb.append(String.format(" ROUND: %-13s\n", (r != null ? r.getId() : "None")));
+            sb.append(String.format(" ROUND: %-13s | CLASS: %s\n", 
+                (r != null ? r.getId() : "None"), 
+                (r != null ? r.getClass().getSimpleName() : "N/A")));
 
-            if (r instanceof OperatingRound) {
-                PublicCompany c = ((OperatingRound) r).getOperatingCompany();
-                sb.append(String.format(" COMPANY: %s\n", (c != null ? c.getId() : "None")));
+            // --- START FIX: DETECT COMPANY VIA REFLECTION ---
+            // Previously: only checked (r instanceof OperatingRound)
+            // Now: Checks any round for "getOperatingCompany" method
+            String companyId = "None";
+            if (r != null) {
+                try {
+                    // Try to find the method on whatever round class this is (CER, OR, etc.)
+                    java.lang.reflect.Method method = r.getClass().getMethod("getOperatingCompany");
+                    Object result = method.invoke(r);
+                    if (result instanceof PublicCompany) {
+                        companyId = ((PublicCompany) result).getId();
+                    }
+                } catch (Exception e) {
+                    // Method not found or accessible, ignore
+                }
             }
+            sb.append(String.format(" ACTIVE COMPANY (Reflect): %s\n", companyId));
             sb.append("==================================================\n\n");
-            sb.append(String.format(" %-22s | %s\n", "ACTION TYPE", "DETAILS"));
-            sb.append(" -----------------------+--------------------------\n");
+            
+            sb.append(String.format(" %-20s | %-10s | %s\n", "ACTION TYPE", "OWNER", "DETAILS"));
+            sb.append(" ---------------------+------------+----------------------\n");
 
             List<PossibleAction> actions = gm.getPossibleActions().getList();
             if (actions != null) {
                 for (PossibleAction pa : actions) {
-                    // Filter out correction and internal game actions
                     if (pa instanceof GameAction || pa instanceof CorrectionModeAction || pa.isCorrection()) {
                         continue;
                     }
-                    sb.append(String.format(" %-22s | %s\n", pa.getClass().getSimpleName(), pa.toString()));
+                    
+                    // --- START FIX: SHOW ACTION OWNER ---
+                    String owner = "-";
+                    // Try standard "company" field if available (PossibleORAction)
+                    if (pa instanceof rails.game.action.PossibleORAction) {
+                        PublicCompany c = ((rails.game.action.PossibleORAction) pa).getCompany();
+                        if (c != null) owner = c.getId();
+                    }
+                    // Fallback: Check for getPlayer()
+                    else if (pa instanceof rails.game.action.PossibleAction) {
+                         Player pl = pa.getPlayer();
+                         if (pl != null) owner = pl.getName();
+                    }
+                    
+                    sb.append(String.format(" %-20s | %-10s | %s\n", 
+                        pa.getClass().getSimpleName(), 
+                        owner,
+                        pa.toString()));
                 }
             }
             area.setText(sb.toString());
             area.setCaretPosition(0);
         }
+   
+   
     }
 
     private void showActionRunner() {
