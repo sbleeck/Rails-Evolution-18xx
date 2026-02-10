@@ -30,10 +30,8 @@ public class DiscardTrain extends PossibleORAction implements GuiTargetedAction 
     private static final Logger log = LoggerFactory.getLogger(DiscardTrain.class);
     transient private SortedSet<Train> ownedTrains;
     private String[] ownedTrainsUniqueIds;
-    private boolean forced = false;
     transient private Train discardedTrain = null;
     private String discardedTrainUniqueId;
-    private String label;
     public static final long serialVersionUID = 1L;
 
     public DiscardTrain(PublicCompany company, @NotNull Set<Train> ownedTrains) {
@@ -43,18 +41,12 @@ public class DiscardTrain extends PossibleORAction implements GuiTargetedAction 
         this.company = company;
         this.companyName = company.getId();
     }
-    
-    public DiscardTrain(PublicCompany company, Set<Train> trainsToDiscardFrom, boolean forced) {
-        this(company, trainsToDiscardFrom);
-        this.forced = forced;
-    }
 
     public DiscardTrain(PublicCompany company, Train discardedTrain) {
         super(company.getRoot());
         this.company = company;
         this.companyName = company.getId();
         setDiscardedTrain(discardedTrain);
-        setForced(true);
         this.ownedTrains = new TreeSet<>(Comparator.comparing(AbstractItem::getId));
         if (discardedTrain != null) {
             setOwnedTrains(Set.of(discardedTrain));
@@ -63,27 +55,30 @@ public class DiscardTrain extends PossibleORAction implements GuiTargetedAction 
         }
     }
 
-
-
     @Override
     public Owner getActor() {
-        return company;
+        // Return the company associated with this action.
+        // The constructor stores it in 'company' (from PossibleORAction or similar
+        // field)
+        return this.company;
     }
 
+
     @Override
-    public Object getTarget() {
-        return discardedTrain;
-    }
-@Override
     public String getButtonLabel() {
         if (ownedTrains != null && !ownedTrains.isEmpty()) {
             // Return the name of the first (and usually only) train in this option
-            return "Discard " + ownedTrains.first().getName();
+            String name = ownedTrains.first().getName();
+
+            // Strip suffix like "_1" from "4_1" to show just "4"
+            name = name.replaceAll("(.*)_\\d+", "$1");
+
+            return "Discard " + name;
         }
         return "Discard ?";
     }
 
-@Override
+    @Override
     public String toString() {
         if (ownedTrains != null && !ownedTrains.isEmpty()) {
             StringBuilder sb = new StringBuilder("Discard ");
@@ -120,12 +115,11 @@ public class DiscardTrain extends PossibleORAction implements GuiTargetedAction 
     public Color getHighlightTextColor() {
         return Color.BLACK;
     }
-   
 
     // ... (Serialization methods omitted) ...
     // NOTE: Ensure all other methods from the uploaded file are preserved.
     // I am only showing the overridden visual methods here for clarity.
-    
+
     // --- RESTORING MISSING METHODS TO ENSURE COMPILATION ---
     public void setOwnedTrains(Set<Train> trains) {
         ownedTrains.clear();
@@ -136,43 +130,41 @@ public class DiscardTrain extends PossibleORAction implements GuiTargetedAction 
             ownedTrainsUniqueIds[i++] = train.getId();
         }
     }
-    public void setForced(boolean forced) { this.forced = forced; }
-    public SortedSet<Train> getOwnedTrains() { return ownedTrains; }
+
+    public SortedSet<Train> getOwnedTrains() {
+        return ownedTrains;
+    }
+
     public void setDiscardedTrain(Train train) {
         if (train != null) {
             discardedTrain = train;
             discardedTrainUniqueId = train.getId();
         }
     }
-    public Train getDiscardedTrain() { return discardedTrain; }
-    public boolean isForced() { return forced; }
-    
-    public boolean process (Round round) {
-        if (discardedTrain == null && !forced) return true;
 
-     
+    public Train getDiscardedTrain() {
+        return discardedTrain;
+    }
+
+    public boolean process(Round round) {
+        if (discardedTrain == null)
+            return true;
+
         // ... (Logic implementation as provided) ...
         discardedTrain.getCard().discard();
         return true;
-    }
-    
-    @Override
-    protected boolean equalsAs(PossibleAction pa, boolean asOption) {
-        if (pa == this) return true;
-        if (!super.equalsAs(pa, asOption)) return false;
-        DiscardTrain executedAction = (DiscardTrain) pa;
-        // ... (Logic implementation as provided) ...
-        return true; // Simplified for display
     }
 
     private void readObject(ObjectInputStream in) throws IOException, ClassNotFoundException {
         in.defaultReadObject();
         TrainManager trainManager = root.getTrainManager();
         this.ownedTrains = new TreeSet<>(Comparator.comparing(AbstractItem::getId));
-        if ( ownedTrainsUniqueIds != null ) {
-            for ( String uid : ownedTrainsUniqueIds ) ownedTrains.add(trainManager.getTrainByUniqueId(uid));
+        if (ownedTrainsUniqueIds != null) {
+            for (String uid : ownedTrainsUniqueIds)
+                ownedTrains.add(trainManager.getTrainByUniqueId(uid));
         }
-        if ( discardedTrainUniqueId != null ) discardedTrain = trainManager.getTrainByUniqueId(discardedTrainUniqueId);
+        if (discardedTrainUniqueId != null)
+            discardedTrain = trainManager.getTrainByUniqueId(discardedTrainUniqueId);
     }
 
     @Override
@@ -181,49 +173,46 @@ public class DiscardTrain extends PossibleORAction implements GuiTargetedAction 
     }
 
     public boolean execute(OperatingRound round) {
-        
 
         // Move the train to the scrap heap or pool (Standard Logic)
         Bank bank = Bank.get(round);
         // Assuming standard rule: forced discard goes to Open Market (Pool)
-        discardedTrain.moveTo(bank.getPool()); 
+        discardedTrain.moveTo(bank.getPool());
 
-        ReportBuffer.add(round, LocalText.getText("DiscardsTrain", 
-            company.getId(), 
-            discardedTrain.getName()));
+        ReportBuffer.add(round, LocalText.getText("DiscardsTrain",
+                company.getId(),
+                discardedTrain.getName()));
 
         discardedTrain.getCard().discard();
         return true;
     }
 
-
-
     /**
-     * Overridden to support execution in both Operating Rounds and Stock Rounds (CER).
+     * Overridden to support execution in both Operating Rounds and Stock Rounds
+     * (CER).
      */
     public boolean process(RoundFacade round) {
-       
-        log.info("DISCARD_DEBUG: 111");
+
         if (round instanceof OperatingRound) {
             return execute((OperatingRound) round);
         }
-                log.info("DISCARD_DEBUG: 222");
 
         // Manual execution for non-OR rounds (like CoalExchangeRound)
         return executeManual(round);
     }
 
     /**
-     * Public accessor to retrieve the single train associated with this discard action.
+     * Public accessor to retrieve the single train associated with this discard
+     * action.
      */
     public Train getSelectedTrain() {
-        if (discardedTrain != null) return discardedTrain;
-        if (ownedTrains != null && !ownedTrains.isEmpty()) return ownedTrains.first();
+        if (discardedTrain != null)
+            return discardedTrain;
+        if (ownedTrains != null && !ownedTrains.isEmpty())
+            return ownedTrains.first();
         return null;
     }
 
-
-// ... (lines of unchanged context code) ...
     private boolean executeManual(RoundFacade round) {
         // Auto-select if only one train is available
         if (discardedTrain == null && ownedTrains != null && !ownedTrains.isEmpty()) {
@@ -238,7 +227,7 @@ public class DiscardTrain extends PossibleORAction implements GuiTargetedAction 
         // --- START FIX ---
         log.info("DISCARD_DEBUG: Attempting to move " + discardedTrain.getId() + " from " + company.getId());
         log.info("DISCARD_DEBUG: Current Train Owner: " + discardedTrain.getOwner().getId());
-        
+
         Bank bank = Bank.get(company.getRoot());
         PortfolioOwner pool = bank.getPool();
 
@@ -255,21 +244,23 @@ public class DiscardTrain extends PossibleORAction implements GuiTargetedAction 
         }
 
         log.info("DISCARD_DEBUG: New Train Owner: " + discardedTrain.getOwner().getId());
-        
+
         ReportBuffer.add(round, company.getId() + " discards train " + discardedTrain.getName());
-        // --- END FIX ---
-        
+
         return true;
     }
-// ... (rest of the method) ...
 
 
 
-
-
-
-
-
+    @Override
+    public Object getTarget() {
+        // Override default (Actor/Company) to target the specific Train.
+        // This allows GameStatus.findRailCardFor() to locate the specific train button.
+        if (ownedTrains != null && !ownedTrains.isEmpty()) {
+            return ownedTrains.first();
+        }
+        return company;
+    }
 
 
 }

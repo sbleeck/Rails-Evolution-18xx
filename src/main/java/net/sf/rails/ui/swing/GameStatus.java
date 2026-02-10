@@ -4443,9 +4443,8 @@ public static final Color BG_DISCARD_VOLUNTARY = Color.CYAN; // Light Blue (#ADD
         playerPrivatesPanel = new JPanel[np];
         for (int i = 0; i < np; i++) {
             if (playerPrivatesPanel[i] == null) {
-                    continue; 
+                  playerPrivatesPanel[i] = new JPanel();
                 }
-            playerPrivatesPanel[i] = new JPanel();
             playerPrivatesPanel[i].setLayout(new BoxLayout(playerPrivatesPanel[i], BoxLayout.Y_AXIS));
             playerPrivatesPanel[i].setBorder(BORDER_THIN);
             gbc.weightx = 1.0;
@@ -4847,6 +4846,7 @@ public static final Color BG_DISCARD_VOLUNTARY = Color.CYAN; // Light Blue (#ADD
         for (rails.game.action.PossibleAction pa : list) {
 
             if (pa instanceof GuiTargetedAction) {
+
                 GuiTargetedAction gta = (GuiTargetedAction) pa;
                 Object target = gta.getTarget();
 
@@ -4857,7 +4857,7 @@ public static final Color BG_DISCARD_VOLUNTARY = Color.CYAN; // Light Blue (#ADD
                 if (card != null) {
                     card.addPossibleAction(pa);
 
-                    // --- START FIX ---
+       
                     // CONSUME THE SIGNATURE
                     // A. Background
                     card.setBackground(gta.getHighlightBackgroundColor());
@@ -4867,7 +4867,7 @@ public static final Color BG_DISCARD_VOLUNTARY = Color.CYAN; // Light Blue (#ADD
 
                     // C. Text
                     card.setForeground(gta.getHighlightTextColor());
-                    // --- END FIX ---
+ 
 
                     card.setEnabled(true);
                     card.setVisible(true);

@@ -1266,7 +1266,15 @@ private void updateCompanyHighlights() {
             return;
         }
 
-        Player currentOwner = currentComp.getPresident();
+
+Player currentOwner = currentComp.getPresident();
+        // --- START FIX ---
+        // Fix: In steps like MERGE, a company might momentarily lack a president.
+        if (currentOwner == null) {
+            map.setOwnerHighlight(null, null);
+            return;
+        }
+        
         List<GUIHex> hexesToHighlight = new ArrayList<>();
         // Store specific labels for each hex
         Map<GUIHex, String> specificLabels = new HashMap<>();

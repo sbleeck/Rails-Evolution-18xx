@@ -212,7 +212,7 @@ public class NationalFormationRound extends StockRound_1837 {
                 log.debug("+++ National {} has {}, limit is {}", national.getLongName(),
                         national.getNumberOfTrains(), national.getCurrentTrainLimit());
                 possibleActions.add(new DiscardTrain(national,
-                        national.getPortfolioModel().getUniqueTrains(), true));
+                        national.getPortfolioModel().getUniqueTrains()));
             }
         }
         return true;

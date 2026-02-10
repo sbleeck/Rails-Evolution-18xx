@@ -79,6 +79,7 @@ public class ORPanel extends GridPanel
 
     // Decoupled Header Components (Replaces single companyLogo)
     private JLabel lblCompanyInfo;
+    private JLabel lblPlayerInfo;
     private JLabel lblPhaseInstruction;
 
     // Legacy/Standard Buttons
@@ -128,6 +129,7 @@ private AbstractButton directPassButton;
     private JLabel companyLogo;
     private JLabel lblCash;
     private JLabel lblRevenue;
+    
     private TokenDisplayPanel tokenDisplay;
     private TrainDisplayPanel trainDisplay;
     private JPanel legendPanel;
@@ -346,56 +348,77 @@ PossibleAction donePa = null;
     }
 
 
+
+
     private void updateSpecialHeader(GuiTargetedAction context) {
-        // Update special header to use the new separated labels
-        if (lblCompanyInfo == null || context == null)
-            return;
+        if (lblCompanyInfo == null || context == null) return;
 
+        // 1. Extract Data correctly
         Owner actor = context.getActor();
-        String title = context.getGroupLabel();
+        
 
-        // Infer the Player if the actor is a Company
-        String name = (actor != null) ? actor.getId() : "Game";
-
-        // 1. Resolve Player Name from Company Actor
-        if (actor instanceof PublicCompany) {
-            PublicCompany pc = (PublicCompany) actor;
-            if (pc.getPresident() != null) {
-                name = pc.getPresident().getName();
-            }
-        } else if (actor instanceof Player) {
-            name = actor.getId();
+        // Diagnostic Logging
+        if (actor != null) {
+            log.error("ORPANEL_HEADER_DEBUG: Actor Type: " + actor.getClass().getName());
+            log.error("ORPANEL_HEADER_DEBUG: Actor ID: " + actor.getId());
+        } else {
+            log.error("ORPANEL_HEADER_DEBUG: Actor is NULL");
         }
 
+
+        // TOP: The Company Name (ID)
+        String companyName = (actor != null) ? actor.getId() : "Game"; 
+
+        log.error("ORPANEL_HEADER_DEBUG: Final companyName string: " + companyName);
+        log.error("ORPANEL_HEADER_DEBUG: context.getPlayerName(): " + context.getPlayerName());
+        log.error("ORPANEL_HEADER_DEBUG: context.getGroupLabel(): " + context.getGroupLabel());
+        
+        // MIDDLE: The Player Name (from our new interface method)
+        String playerName = context.getPlayerName(); 
+        
+        // BOTTOM: The Action Text
+        String actionTitle = context.getGroupLabel(); 
+
+        // 2. Determine Colors (Company Styling for ALL panels)
         Color bg = BG_SPECIAL_HEADER;
         Color fg = Color.BLACK;
 
-        // 2. Context-Specific Styling
-        // if (context instanceof ExchangeForPrussianShare) {
-        //     // Exchange Phase: White BG, Plain Text
-        //     bg = Color.WHITE;
-        //     fg = Color.BLACK;
-        //     // Clearer title for the phase
-        //     title = "Exchange Shares";
-        // } else 
-            if (actor instanceof PublicCompany) {
-            // Start Phase: Company Colors
+        if (actor instanceof PublicCompany) {
             bg = ((PublicCompany) actor).getBgColour();
             fg = ((PublicCompany) actor).getFgColour();
         }
 
-        // 1. Top Part: Actor Name
-        lblCompanyInfo.setText("<html><center><font size='6'><b>" + name + "</b></font></center></html>");
+        // 3. Update Components
+
+        // TOP: Company Name
+        lblCompanyInfo.setText("<html><center><font size='6'><b>" + companyName + "</b></font></center></html>");
         lblCompanyInfo.setBackground(bg);
         lblCompanyInfo.setForeground(fg);
         lblCompanyInfo.setVisible(true);
 
-        // 2. Bottom Part: Action Title
-        lblPhaseInstruction.setText("<html><center><font size='4'><b>" + title + "</b></font></center></html>");
-        lblPhaseInstruction.setBackground(BG_SPECIAL_HEADER); // Keep header distinctive for special
-        lblPhaseInstruction.setForeground(Color.BLACK);
-        lblPhaseInstruction.setVisible(true);
+        // MIDDLE: Player Name
+        // FIX: Increased font size from '3' to '6' and added bold
+        if (lblPlayerInfo != null) {
+            lblPlayerInfo.setText("<html><center><font size='6'><b>" + playerName + "</b></font></center></html>");
+            lblPlayerInfo.setBackground(bg); // Applied Company BG
+            lblPlayerInfo.setForeground(fg); // Applied Company FG
+            lblPlayerInfo.setVisible(true);
+        }
+
+        // BOTTOM: Action Title
+        // FIX: Applied Company Colors here as well
+        if (lblPhaseInstruction != null) {
+            lblPhaseInstruction.setText("<html><center><font size='4'><b>" + actionTitle + "</b></font></center></html>");
+            lblPhaseInstruction.setBackground(bg); 
+            lblPhaseInstruction.setForeground(fg); 
+            lblPhaseInstruction.setVisible(true);
+        }
     }
+
+
+
+
+
 
     private void setStandardPanelsVisible(boolean visible) {
         if (phase1Panel != null)
@@ -759,8 +782,18 @@ if (btnTrainSkip != null) btnTrainSkip.setEnabled(true);
         lblPhaseInstruction.setAlignmentX(Component.CENTER_ALIGNMENT);
         lblPhaseInstruction.setPreferredSize(new Dimension(SIDEBAR_WIDTH, HEADER_PHASE_HEIGHT));
         lblPhaseInstruction.setMaximumSize(new Dimension(SIDEBAR_WIDTH, HEADER_PHASE_HEIGHT));
-
         sidebarPanel.add(lblCompanyInfo);
+
+
+       lblPlayerInfo = new JLabel("Player", SwingConstants.CENTER); 
+lblPlayerInfo = new JLabel("", SwingConstants.CENTER);
+lblPlayerInfo.setOpaque(true);
+lblPlayerInfo.setBackground(Color.LIGHT_GRAY); 
+lblPlayerInfo.setAlignmentX(Component.CENTER_ALIGNMENT);
+lblPlayerInfo.setPreferredSize(new Dimension(SIDEBAR_WIDTH, 20)); // Smaller height for player
+lblPlayerInfo.setMaximumSize(new Dimension(SIDEBAR_WIDTH, 20));
+sidebarPanel.add(lblPlayerInfo);
+
         sidebarPanel.add(lblPhaseInstruction);
 
         sidebarPanel.add(Box.createVerticalStrut(5));
@@ -776,7 +809,7 @@ if (btnTrainSkip != null) btnTrainSkip.setEnabled(true);
         specialContainer.setOpaque(false);
         specialContainer.setVisible(false);
         specialContainer.setBorder(BorderFactory.createTitledBorder(
-                BorderFactory.createLineBorder(Color.RED), "Decision",
+                BorderFactory.createLineBorder(BG_DETAILS), "",
                 TitledBorder.LEFT, TitledBorder.TOP, FONT_HEADER));
 
         specialPanel = new JPanel();
@@ -1892,51 +1925,7 @@ bindActionHotkey(btn, action);
 
     public void updateDynamicActions(List<PossibleAction> actions) {
 
-        // // --- 1. OPTIMAL LOGGING START ---
-        // // Trace the incoming package from the Engine
-        // StringBuilder sb = new StringBuilder();
-        // sb.append("\n=== ORPanel.updateDynamicActions Trace ===\n");
-        // sb.append("Current ORPanel Company: ").append(this.orComp != null ? this.orComp.getId() : "NULL").append("\n");
-        // sb.append("Current Engine Company:  ").append(currentOperatingComp != null ? currentOperatingComp.getId() : "NULL").append("\n");
-        
-        // if (actions == null || actions.isEmpty()) {
-        //      sb.append("Status: NO ACTIONS received.\n");
-        //      log.info(sb.toString());
-             
-        //      updateSidebarData(); 
-        //      if (sidebarPanel != null) sidebarPanel.repaint();
-        //      return;
-        // }
-
-        // sb.append("Received ").append(actions.size()).append(" actions:\n");
-        // for (PossibleAction pa : actions) {
-        //     sb.append(" - [").append(pa.getClass().getSimpleName()).append("] ")
-        //       .append(pa.toString())
-        //       .append(" (Target: ").append(pa instanceof GuiTargetedAction ? "YES" : "NO").append(")\n");
-        // }
-        // log.info(sb.toString());
-        // // --- 1. OPTIMAL LOGGING END ---
-
-
-        // Deduplicate incoming actions using their String representation (Visual Identity).
-        // This filters out "logical" duplicates that are distinct objects in memory.
-        if (actions != null && !actions.isEmpty()) {
-            List<PossibleAction> uniqueActions = new ArrayList<>();
-            java.util.Set<String> signatures = new java.util.HashSet<>();
-
-            for (PossibleAction action : actions) {
-                // We use toString() as the signature because it typically contains
-                // the label, parameters, and mode - everything the user sees.
-                String signature = action.toString();
-
-                // add() returns true only if the set did not already contain the element
-                if (signatures.add(signature)) {
-                    uniqueActions.add(action);
-                }
-            }
-            actions = uniqueActions;
-        }
-
+     
 
         try {
 

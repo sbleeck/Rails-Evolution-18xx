@@ -954,22 +954,123 @@ public class OperatingRound extends Round implements Observer {
         return true; // <--- The normal "Done" ALREADY returns true!
     }
 
-    /*
-     * =======================================
-     * 3.2. DISCARDING TRAINS
-     * =======================================
-     */
-    public boolean discardTrain(DiscardTrain action) {
 
-        // Process the discard
-        if (!action.process(this))
-            return false;
+    // In OperatingRound.java
 
-        // Check if other companies still need to discard.
-        boolean moreDiscards = checkForExcessTrains(); // This method now has logs
+public boolean discardTrain(DiscardTrain action) {
+    
+    // 1. Setup Context
+    PublicCompany currentOp = operatingCompany.value();
+    Player currentPlayer = playerManager.getCurrentPlayer();
+    
+    PublicCompany actionComp = action.getCompany();
+    Player actionPlayer = (actionComp != null) ? actionComp.getPresident() : null;
 
+    if (actionComp != null) {
+        log.info("Portfolio Inspection [{}]: {}", actionComp.getId(),
+                actionComp.getPortfolioModel().getTrainList());
+    }
+
+    // 2. The "Dirty Fix" (Make available to all games)
+    // Ensures the engine validates the action even if the map wasn't updated yet.
+    if (excessTrainCompanies == null) {
+        excessTrainCompanies = new HashMap<>();
+    }
+    if (actionPlayer != null) {
+        List<PublicCompany> comps = excessTrainCompanies.get(actionPlayer);
+        if (comps == null) {
+            comps = new ArrayList<>();
+            excessTrainCompanies.put(actionPlayer, comps);
+        }
+        if (!comps.contains(actionComp)) {
+            comps.add(actionComp);
+        }
+    }
+
+    // 3. Context Swap (Handle Interjections)
+    boolean isInterjection = (actionComp != null && currentOp != null && actionComp != currentOp);
+
+    if (isInterjection) {
+        operatingCompany.set(actionComp);
+        if (actionPlayer != null) {
+            playerManager.setCurrentPlayer(actionPlayer);
+        }
+    }
+
+    // 4. Execute Action (With Safety Wrapper)
+    boolean processed = false;
+    try {
+        processed = action.process(this);
+    } catch (Exception e) {
+        log.error(">>> FORENSIC ERROR: Exception during action.process()", e);
+    }
+
+    // 5. Restore Context
+    if (isInterjection) {
+        operatingCompany.set(currentOp);
+        if (currentPlayer != null) {
+            playerManager.setCurrentPlayer(currentPlayer);
+        }
+    }
+
+    if (!processed) {
+        return false;
+    }
+
+    // 6. Check for remaining discards
+    boolean moreDiscards = checkForExcessTrains();
+
+    // --- HOOK: Allow Subclasses to intervene (e.g., 1835 Prussian Formation) ---
+    // If the hook returns TRUE, it means the subclass handled the flow, so we return.
+    if (processGameSpecificDiscard(action, moreDiscards)) {
         return true;
     }
+
+    // 7. Standard Post-Discard Logic (Now improved for all games)
+    if (!moreDiscards) {
+        newPhaseChecks();
+        
+        // If phase change caused an interrupt (e.g. limit drop), pause here.
+        if (gameManager.getInterruptedRound() != null) {
+            return true;
+        }
+
+        boolean companySwitched = handleClosedOperatingCompany();
+
+        if (!companySwitched) {
+            playerManager.setCurrentPlayer(operatingCompany.value().getPresident());
+            
+            // Logic to determine if we reset to INITIAL or continue BUY_TRAIN
+            // This fixes the "lost turn" bug for other games too.
+            if (trainsBoughtThisTurn.isEmpty()) {
+                setStep(GameDef.OrStep.INITIAL);
+            } else {
+                stepObject.set(GameDef.OrStep.BUY_TRAIN);
+            }
+        }
+    }
+
+    return true;
+}
+
+/**
+ * Hook for subclasses (like 1835) to handle cases where the operating company 
+ * closes immediately after an action (e.g., Discard triggers Formation).
+ * * @return true if the company was switched and the step was reset.
+ */
+protected boolean handleClosedOperatingCompany() {
+    return false; // Standard games do not switch companies inside discardTrain
+}
+
+
+/**
+ * Hook for subclasses to add specific logic after a discard.
+ * @return true if the subclass handled the flow and no further processing is needed.
+ */
+protected boolean processGameSpecificDiscard(DiscardTrain action, boolean moreDiscards) {
+    return false; // Default: do nothing, proceed to standard logic
+}
+
 
     public boolean checkForExcessTrains() {
         excessTrainCompanies = new HashMap<>();
@@ -995,40 +1096,49 @@ public class OperatingRound extends Round implements Observer {
         return !excessTrainCompanies.isEmpty();
     }
 
+
     protected void setTrainsToDiscard() {
-        // Override generic logic to show ONLY the train name (e.g. "3_4").
-        // Forced discards in 1837 provide 0 refund, so we display no cost/value.
-        
+        // 1. Lock the turn: Player cannot pass/done while discards are pending.
         doneAllowed.set(false);
 
-        // Scan the players in SR sequence
+        // 2. Determine Order: Use SR sequence to decide which player acts first.
+        // (This prevents random HashMap ordering issues)
         List<Player> nextPlayers = getRoot().getPlayerManager().getNextPlayers(true);
 
         for (Player player : nextPlayers) {
+            
+            // Check if this player has any companies with excess trains
             if (excessTrainCompanies.containsKey(player)) {
 
+                // 3. Context Switch: Visually indicate it is this player's responsibility
                 getRoot().getPlayerManager().setCurrentPlayer(player);
-                List<PublicCompany> list = excessTrainCompanies.get(player);
-                for (PublicCompany comp : list) {
-                    Set<Train> trainsToDiscardFrom = comp.getPortfolioModel().getUniqueTrains();
+                
+                List<PublicCompany> comps = excessTrainCompanies.get(player);
+                
 
-                    if (trainsToDiscardFrom.isEmpty())
+                // 4. Find the FIRST company that needs to discard
+                for (PublicCompany comp : comps) {
+                   // Use centralized deduplication logic from Round.java.
+                    // Pass the internal list using .getList() to match the signature.
+                    if (comp.getPortfolioModel().getNumberOfTrains() == 0) {
                         continue;
-
-                    for (Train train : trainsToDiscardFrom) {
-                        DiscardTrain action = new DiscardTrain(comp, train);
-                        
-                        // Set label to the train name only (e.g., "3_4")
-                        action.setButtonLabel(train.getName());
-                        
-                        possibleActions.add(action);
                     }
+                    generateGroupedDiscardActions(comp, possibleActions);
+                    // --- END FIX ---
+
+                    // --- CRITICAL: STOP HERE ---
+                    // Return immediately so the UI only shows buttons for 'comp'.
+                    // After the user clicks one, the engine will loop back,
+                    // 'checkForExcessTrains' will run again, and we will catch the next company.
                     return;
                 }
             }
         }
     }
 
+
+
+    
     /*
      * =======================================
      * 3.3. PRIVATES (BUYING, SELLING, CLOSING)

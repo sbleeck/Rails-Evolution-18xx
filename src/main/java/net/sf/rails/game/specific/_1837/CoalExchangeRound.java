@@ -362,34 +362,9 @@ return true;
 protected boolean setTrainDiscardActions() {
         PublicCompany major = currentMajor.value();
         
-        // --- START FIX ---
-        // 1. Fix Type Mismatch: Wrap in ArrayList to handle both Set and List returns.
-        List<Train> currentTrains = new ArrayList<>(major.getPortfolioModel().getTrainList());
-        Set<String> addedTypes = new HashSet<>();
-
-        setCurrentPlayer(major.getPresident());
-
-        // 2. Logic Fix: Use getCurrentTrainLimit()
-        int limit = major.getCurrentTrainLimit();
-        
-        log.info("CER_DEBUG: Generating Discard Actions for " + major.getId() 
-                + ". Trains: " + currentTrains.size() 
-                + " Limit: " + limit);
-
-        for (Train train : currentTrains) {
-            if (!addedTypes.contains(train.getName())) {
-                // Wrap specific train for the constructor
-                Set<Train> trainOption = new HashSet<>();
-                trainOption.add(train);
-                
-                DiscardTrain action = new DiscardTrain(major, trainOption);
-                possibleActions.add(action);
-                
-                addedTypes.add(train.getName());
-                
-                log.info("CER_DEBUG: Added Action -> " + action.toString());
-            }
-        }
+// Utilize the centralized grouping logic from the Round superclass
+        // to ensure train discard buttons are deduplicated and consistent.
+        generateGroupedDiscardActions(major, possibleActions);
 
         discardingTrains.set(true);
         if (discardingCompanies == null) discardingCompanies = new PublicCompany[4];

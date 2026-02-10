@@ -1,8 +1,11 @@
 package net.sf.rails.game;
 
 import java.util.ArrayList;
+import java.util.Collection;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.TreeMap;
 
 import net.sf.rails.common.*;
@@ -346,6 +349,44 @@ public /*abstract*/ class Round extends RailsAbstractItem implements RoundFacade
     }
         public List<PossibleAction> getPossibleActionsList() {
         return possibleActions.getList();
+    }// File: Round.java
+
+// --- START FIX ---
+/**
+ * Centralized logic to generate deduplicated discard actions.
+ * @param company The company needing to discard.
+ * @param possibleActions The action container (PossibleActions), not the list.
+ */
+// File: Round.java
+
+public void generateGroupedDiscardActions(PublicCompany company, PossibleActions possibleActions) {
+    // --- START FIX ---
+    // 1. Clear existing actions to prevent duplicate buttons in the UI
+    possibleActions.clear();
+
+    Collection<Train> trains = company.getPortfolioModel().getTrainList();
+    Set<String> addedTypes = new HashSet<>();
+
+    for (Train train : trains) {
+        if (train == null) continue;
+
+        // 2. Extract base name (e.g., "1G_5" -> "1G") for the grouping check
+        String baseName = train.getName().replaceAll("(.*)_\\d+", "$1");
+        
+        // 3. Use the baseName for the 'addedTypes' check to ensure deduplication
+        if (!addedTypes.contains(baseName)) {
+            Set<Train> trainOption = new HashSet<>();
+            trainOption.add(train);
+            
+            DiscardTrain action = new DiscardTrain(company, trainOption);
+            action.setButtonLabel(baseName);
+            
+            possibleActions.add(action);
+            addedTypes.add(baseName);
+        }
     }
+    // --- END FIX ---
+}
+
 
 }

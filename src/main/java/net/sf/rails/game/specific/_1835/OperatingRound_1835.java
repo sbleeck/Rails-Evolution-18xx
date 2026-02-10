@@ -398,118 +398,155 @@ private final StringState pfrTriggerId = StringState.create(this, "PfrTriggerId"
         return !excessTrainCompanies.isEmpty();
     }
 
-    @Override
-    public boolean discardTrain(DiscardTrain action) {
 
-        PublicCompany currentOp = operatingCompany.value();
-        Player currentPlayer = playerManager.getCurrentPlayer();
+    // In OperatingRound_1835.java
 
-        PublicCompany actionComp = action.getCompany();
-        Player actionPlayer = (actionComp != null) ? actionComp.getPresident() : null;
-
-        if (actionComp != null) {
-            log.info("    Portfolio Inspection [{}]: {}", actionComp.getId(),
-                    actionComp.getPortfolioModel().getTrainList());
-        }
-
-        // --- CRITICAL FIX: ALWAYS patch the Excess List for DiscardTrain actions ---
-        // Whether we swapped context or not, if we are processing a DiscardTrain
-        // action,
-        // the engine MUST allow it. The standard validation checks
-        // 'excessTrainCompanies'.
-        // We force the company into this list to bypass false-negative validation
-        // failures.
-        if (excessTrainCompanies == null) {
-            excessTrainCompanies = new HashMap<>();
-        }
-        if (actionPlayer != null) {
-            List<PublicCompany> comps = excessTrainCompanies.get(actionPlayer);
-            if (comps == null) {
-                comps = new ArrayList<>();
-                excessTrainCompanies.put(actionPlayer, comps);
-            }
-            if (!comps.contains(actionComp)) {
-                comps.add(actionComp);
-            }
-        }
-        // --------------------------------------------------------------------------
-
-        boolean isInterjection = (actionComp != null && currentOp != null && actionComp != currentOp);
-
-        // Context Swap Logic
-        if (isInterjection) {
-            operatingCompany.set(actionComp);
-            if (actionPlayer != null) {
-                playerManager.setCurrentPlayer(actionPlayer);
-            }
-        }
-
-        // Execute Action
-        boolean processed = false;
-        try {
-            processed = action.process(this);
-        } catch (Exception e) {
-            log.error(">>> FORENSIC ERROR: Exception during action.process()", e);
-        }
-
-        // Restore Context
-        if (isInterjection) {
-            operatingCompany.set(currentOp);
-            if (currentPlayer != null) {
-                playerManager.setCurrentPlayer(currentPlayer);
-            }
-        }
-
-        if (!processed) {
-            return false;
-        }
-
-        boolean moreDiscards = super.checkForExcessTrains();
-
-        if (this.needPrussianFormationCall.value()) {
-            if (!moreDiscards) {
-                PublicCompany prussian = companyManager.getPublicCompany(GameDef_1835.PR_ID);
-                if (prussian.hasStarted()) {
-                    if (operatingCompany.value().isClosed()) {
-                        operatingCompany.set(prussian);
-                        stepObject.set(GameDef.OrStep.INITIAL);
-                    } else {
-                        stepObject.set(GameDef.OrStep.BUY_TRAIN);
-                    }
-                    playerManager.setCurrentPlayer(operatingCompany.value().getPresident());
+@Override
+protected boolean processGameSpecificDiscard(DiscardTrain action, boolean moreDiscards) {
+    
+    // Check the 1835-specific Prussian Flag
+    if (this.needPrussianFormationCall.value()) {
+        
+        if (!moreDiscards) {
+            PublicCompany prussian = companyManager.getPublicCompany(GameDef_1835.PR_ID);
+            
+            if (prussian.hasStarted()) {
+                if (operatingCompany.value().isClosed()) {
+                    operatingCompany.set(prussian);
+                    stepObject.set(GameDef.OrStep.INITIAL);
                 } else {
-                    ((GameManager_1835) gameManager).startPrussianFormationRound(this);
+                    stepObject.set(GameDef.OrStep.BUY_TRAIN);
                 }
-                // After PFR returns, the company that bought the train (e.g., M5)
-                // might be closed. We must switch context now.
-                handleClosedOperatingCompany();
+                playerManager.setCurrentPlayer(operatingCompany.value().getPresident());
+            } else {
+                ((GameManager_1835) gameManager).startPrussianFormationRound(this);
             }
-        } else {
-            if (!moreDiscards) {
-                newPhaseChecks();
-                if (gameManager.getInterruptedRound() != null) {
-                    return true;
-                }
-
-                boolean companySwitched = handleClosedOperatingCompany();
-
-                if (!companySwitched) {
-                    playerManager.setCurrentPlayer(operatingCompany.value().getPresident());
-                    // If the current company hasn't bought trains yet, this discard
-                    // was likely an interrupt triggered by the PREVIOUS player (e.g. limit drop).
-                    // We must let the current company start their turn from the beginning.
-                    if (trainsBoughtThisTurn.isEmpty()) {
-                        setStep(GameDef.OrStep.INITIAL);
-                    } else {
-                        // Otherwise, we are in the middle of a buy phase, so continue buying.
-                        stepObject.set(GameDef.OrStep.BUY_TRAIN);
-                    }
-
-                }
-            }
+            
+            // After PFR returns, the company that bought the train might be closed.
+            handleClosedOperatingCompany();
         }
-        return true;
+        
+        // We return TRUE to tell the superclass "We handled it, don't run standard logic"
+        return true; 
     }
+
+    // If not a Prussian event, return FALSE to let the Superclass run standard logic.
+    return false; 
+}
+
+
+    // @Override
+    // public boolean discardTrain(DiscardTrain action) {
+
+    //     PublicCompany currentOp = operatingCompany.value();
+    //     Player currentPlayer = playerManager.getCurrentPlayer();
+
+    //     PublicCompany actionComp = action.getCompany();
+    //     Player actionPlayer = (actionComp != null) ? actionComp.getPresident() : null;
+
+    //     if (actionComp != null) {
+    //         log.info("    Portfolio Inspection [{}]: {}", actionComp.getId(),
+    //                 actionComp.getPortfolioModel().getTrainList());
+    //     }
+
+    //     // --- CRITICAL FIX: ALWAYS patch the Excess List for DiscardTrain actions ---
+    //     // Whether we swapped context or not, if we are processing a DiscardTrain
+    //     // action,
+    //     // the engine MUST allow it. The standard validation checks
+    //     // 'excessTrainCompanies'.
+    //     // We force the company into this list to bypass false-negative validation
+    //     // failures.
+    //     if (excessTrainCompanies == null) {
+    //         excessTrainCompanies = new HashMap<>();
+    //     }
+    //     if (actionPlayer != null) {
+    //         List<PublicCompany> comps = excessTrainCompanies.get(actionPlayer);
+    //         if (comps == null) {
+    //             comps = new ArrayList<>();
+    //             excessTrainCompanies.put(actionPlayer, comps);
+    //         }
+    //         if (!comps.contains(actionComp)) {
+    //             comps.add(actionComp);
+    //         }
+    //     }
+    //     // --------------------------------------------------------------------------
+
+    //     boolean isInterjection = (actionComp != null && currentOp != null && actionComp != currentOp);
+
+    //     // Context Swap Logic
+    //     if (isInterjection) {
+    //         operatingCompany.set(actionComp);
+    //         if (actionPlayer != null) {
+    //             playerManager.setCurrentPlayer(actionPlayer);
+    //         }
+    //     }
+
+    //     // Execute Action
+    //     boolean processed = false;
+    //     try {
+    //         processed = action.process(this);
+    //     } catch (Exception e) {
+    //         log.error(">>> FORENSIC ERROR: Exception during action.process()", e);
+    //     }
+
+    //     // Restore Context
+    //     if (isInterjection) {
+    //         operatingCompany.set(currentOp);
+    //         if (currentPlayer != null) {
+    //             playerManager.setCurrentPlayer(currentPlayer);
+    //         }
+    //     }
+
+    //     if (!processed) {
+    //         return false;
+    //     }
+
+    //     boolean moreDiscards = super.checkForExcessTrains();
+
+    //     if (this.needPrussianFormationCall.value()) {
+    //         if (!moreDiscards) {
+    //             PublicCompany prussian = companyManager.getPublicCompany(GameDef_1835.PR_ID);
+    //             if (prussian.hasStarted()) {
+    //                 if (operatingCompany.value().isClosed()) {
+    //                     operatingCompany.set(prussian);
+    //                     stepObject.set(GameDef.OrStep.INITIAL);
+    //                 } else {
+    //                     stepObject.set(GameDef.OrStep.BUY_TRAIN);
+    //                 }
+    //                 playerManager.setCurrentPlayer(operatingCompany.value().getPresident());
+    //             } else {
+    //                 ((GameManager_1835) gameManager).startPrussianFormationRound(this);
+    //             }
+    //             // After PFR returns, the company that bought the train (e.g., M5)
+    //             // might be closed. We must switch context now.
+    //             handleClosedOperatingCompany();
+    //         }
+    //     } else {
+    //         if (!moreDiscards) {
+    //             newPhaseChecks();
+    //             if (gameManager.getInterruptedRound() != null) {
+    //                 return true;
+    //             }
+
+    //             boolean companySwitched = handleClosedOperatingCompany();
+
+    //             if (!companySwitched) {
+    //                 playerManager.setCurrentPlayer(operatingCompany.value().getPresident());
+    //                 // If the current company hasn't bought trains yet, this discard
+    //                 // was likely an interrupt triggered by the PREVIOUS player (e.g. limit drop).
+    //                 // We must let the current company start their turn from the beginning.
+    //                 if (trainsBoughtThisTurn.isEmpty()) {
+    //                     setStep(GameDef.OrStep.INITIAL);
+    //                 } else {
+    //                     // Otherwise, we are in the middle of a buy phase, so continue buying.
+    //                     stepObject.set(GameDef.OrStep.BUY_TRAIN);
+    //                 }
+
+    //             }
+    //         }
+    //     }
+    //     return true;
+    // }
 
     public void clearPfrTriggerFlag_AI() {
         this.needPrussianFormationCall.set(false);
@@ -1154,7 +1191,7 @@ private final StringState pfrTriggerId = StringState.create(this, "PfrTriggerId"
      * 
      * @return true if the company was switched, false otherwise.
      */
-    private boolean handleClosedOperatingCompany() {
+    protected boolean handleClosedOperatingCompany() {
         if (operatingCompany.value() != null && operatingCompany.value().isClosed()) {
             List<PublicCompany> companies = getOperatingCompanies();
             PublicCompany current = operatingCompany.value();

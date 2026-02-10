@@ -812,69 +812,69 @@ public class GameUIManager implements DialogOwner {
     protected void updateStatus(ActionPerformer activeWindow) {
     }
 
-    public void discardTrains(DiscardTrain dt) {
-        PublicCompany c = dt.getCompany();
-        String playerName = dt.getPlayerName();
-        String companyDirector = dt.getCompany().getPresident().getId();
-        Set<Train> trains = dt.getOwnedTrains();
-        int size = trains.size() + (dt.isForced() ? 0 : 1);
-        List<String> trainOptions = new ArrayList<>(size);
-        String[] options = new String[size];
-        String prompt = null;
+    // public void discardTrains(DiscardTrain dt) {
+    //     PublicCompany c = dt.getCompany();
+    //     String playerName = dt.getPlayerName();
+    //     String companyDirector = dt.getCompany().getPresident().getId();
+    //     Set<Train> trains = dt.getOwnedTrains();
+    //     int size = trains.size() + (dt.isForced() ? 0 : 1);
+    //     List<String> trainOptions = new ArrayList<>(size);
+    //     String[] options = new String[size];
+    //     String prompt = null;
 
-        int j = 0;
-        if (!dt.isForced()) {
-            trainOptions.add(
-                    options[j++] = LocalText.getText("None"));
-            prompt = LocalText.getText("MayDiscardTrain", c.getId());
-        }
-        int offset = j;
-        for (int i = 0; i < trains.size(); i++) {
-            trainOptions.add(
-                    options[j++] = LocalText.getText("N_Train",
-                            Iterables.get(trains, i).toText()));
-        }
-        // Martin Brumm: 18.7.2017
-        // Need to Check that the player informed here is the director
-        // Underlying problem is that the director might not be the operating player in
-        // the
-        // moment and theres no quick way to change that behaviour..
-        // Only Chance would be to introduce a new Discard Train Round with complete
-        // separate
-        // Mechanics
+    //     int j = 0;
+    //     if (!dt.isForced()) {
+    //         trainOptions.add(
+    //                 options[j++] = LocalText.getText("None"));
+    //         prompt = LocalText.getText("MayDiscardTrain", c.getId());
+    //     }
+    //     int offset = j;
+    //     for (int i = 0; i < trains.size(); i++) {
+    //         trainOptions.add(
+    //                 options[j++] = LocalText.getText("N_Train",
+    //                         Iterables.get(trains, i).toText()));
+    //     }
+    //     // Martin Brumm: 18.7.2017
+    //     // Need to Check that the player informed here is the director
+    //     // Underlying problem is that the director might not be the operating player in
+    //     // the
+    //     // moment and theres no quick way to change that behaviour..
+    //     // Only Chance would be to introduce a new Discard Train Round with complete
+    //     // separate
+    //     // Mechanics
 
-        if (prompt == null) {
-            if (playerName.equals(companyDirector)) {
-                prompt = LocalText.getText(
-                        "HAS_TOO_MANY_TRAINS",
-                        playerName,
-                        c.getId());
-            } else {
-                prompt = LocalText.getText(
-                        "HAS_TOO_MANY_TRAINS",
-                        playerName,
-                        c.getId());
-                prompt += "\n Please contact the director of the " + c.getId() + " : " + companyDirector
-                        + " for guidance.";
-            }
-        }
+    //     if (prompt == null) {
+    //         if (playerName.equals(companyDirector)) {
+    //             prompt = LocalText.getText(
+    //                     "HAS_TOO_MANY_TRAINS",
+    //                     playerName,
+    //                     c.getId());
+    //         } else {
+    //             prompt = LocalText.getText(
+    //                     "HAS_TOO_MANY_TRAINS",
+    //                     playerName,
+    //                     c.getId());
+    //             prompt += "\n Please contact the director of the " + c.getId() + " : " + companyDirector
+    //                     + " for guidance.";
+    //         }
+    //     }
 
-        String discardedTrainName = (String) JOptionPane.showInputDialog(orWindow,
-                prompt,
-                LocalText.getText("WhichTrainToDiscard"),
-                JOptionPane.QUESTION_MESSAGE, null,
-                options, options[0]);
-        if (discardedTrainName != null) {
-            int index = trainOptions.indexOf(discardedTrainName);
-            // FIXME: Does this work with the new Set defined?
-            if (index >= offset) {
-                Train discardedTrain = Iterables.get(trains, trainOptions.indexOf(discardedTrainName) - offset);
-                dt.setDiscardedTrain(discardedTrain);
-            }
+    //     String discardedTrainName = (String) JOptionPane.showInputDialog(orWindow,
+    //             prompt,
+    //             LocalText.getText("WhichTrainToDiscard"),
+    //             JOptionPane.QUESTION_MESSAGE, null,
+    //             options, options[0]);
+    //     if (discardedTrainName != null) {
+    //         int index = trainOptions.indexOf(discardedTrainName);
+    //         // FIXME: Does this work with the new Set defined?
+    //         if (index >= offset) {
+    //             Train discardedTrain = Iterables.get(trains, trainOptions.indexOf(discardedTrainName) - offset);
+    //             dt.setDiscardedTrain(discardedTrain);
+    //         }
 
-            orWindow.process(dt);
-        }
-    }
+    //         orWindow.process(dt);
+    //     }
+    // }
 
     public void exchangeTokens(ExchangeTokens action) {
 
