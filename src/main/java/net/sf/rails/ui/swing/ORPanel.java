@@ -357,22 +357,11 @@ PossibleAction donePa = null;
         Owner actor = context.getActor();
         
 
-        // Diagnostic Logging
-        if (actor != null) {
-            log.error("ORPANEL_HEADER_DEBUG: Actor Type: " + actor.getClass().getName());
-            log.error("ORPANEL_HEADER_DEBUG: Actor ID: " + actor.getId());
-        } else {
-            log.error("ORPANEL_HEADER_DEBUG: Actor is NULL");
-        }
 
 
         // TOP: The Company Name (ID)
         String companyName = (actor != null) ? actor.getId() : "Game"; 
 
-        log.error("ORPANEL_HEADER_DEBUG: Final companyName string: " + companyName);
-        log.error("ORPANEL_HEADER_DEBUG: context.getPlayerName(): " + context.getPlayerName());
-        log.error("ORPANEL_HEADER_DEBUG: context.getGroupLabel(): " + context.getGroupLabel());
-        
         // MIDDLE: The Player Name (from our new interface method)
         String playerName = context.getPlayerName(); 
         

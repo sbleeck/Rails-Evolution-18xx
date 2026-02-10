@@ -1245,12 +1245,12 @@ public static final Color BG_DISCARD_VOLUNTARY = Color.CYAN; // Light Blue (#ADD
                 } else {
                     chosenAction = buyActions.get(index);
                     ((BuyCertificate) chosenAction).setNumberBought(buyAmounts.get(index));
-                    // "Un-set" the share size for Pool buys to force StockRound to detect ambiguity.
-                // If we leave the default (e.g. 10), StockRound assumes it's a deliberate choice (Replay) and skips the dialog.
-                // By setting it to 0, validSizes.contains(0) fails, triggering the StockRound dialog.
-                if (((BuyCertificate) chosenAction).getFromPortfolio() == pool) {
-                    ((BuyCertificate) chosenAction).setSharePerCertificate(0);
-                }
+                //     // "Un-set" the share size for Pool buys to force StockRound to detect ambiguity.
+                // // If we leave the default (e.g. 10), StockRound assumes it's a deliberate choice (Replay) and skips the dialog.
+                // // By setting it to 0, validSizes.contains(0) fails, triggering the StockRound dialog.
+                // if (((BuyCertificate) chosenAction).getFromPortfolio() == pool) {
+                //     ((BuyCertificate) chosenAction).setSharePerCertificate(0);
+                // }
                 }
             } else if (actions.get(0) instanceof CashCorrectionAction) {
                 // Delegate to GameUIManagers

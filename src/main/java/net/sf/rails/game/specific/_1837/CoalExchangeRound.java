@@ -20,8 +20,10 @@ import rails.game.action.*;
 /**
  * Coal Exchange Round for 1837.
  * Logic Refactored:
- * Uses a Search-Based State Machine rather than maintaining fragile player queues.
- * Iterates Majors (Operating Order) -> Players (President clockwise) -> Available Coal Companies.
+ * Uses a Search-Based State Machine rather than maintaining fragile player
+ * queues.
+ * Iterates Majors (Operating Order) -> Players (President clockwise) ->
+ * Available Coal Companies.
  */
 public class CoalExchangeRound extends StockRound_1837 {
 
@@ -30,24 +32,26 @@ public class CoalExchangeRound extends StockRound_1837 {
     private String cerNumber;
     private boolean reachedPhase5;
 
-    // Tracks which Coal Companies have been "Passed" by the player for this specific round instance.
-    protected final HashMapState<String, String> skippedCoalCompanies = HashMapState.create(this, "skippedCoalCompanies", new HashMap<String, String>());
+    // Tracks which Coal Companies have been "Passed" by the player for this
+    // specific round instance.
+    protected final HashMapState<String, String> skippedCoalCompanies = HashMapState.create(this,
+            "skippedCoalCompanies", new HashMap<String, String>());
 
-    // Maps Major Companies to the list of Coal Companies that want to merge into them.
+    // Maps Major Companies to the list of Coal Companies that want to merge into
+    // them.
     // NOTE: ArrayListMultimapState has NO keySet() or view() methods.
     private ArrayListMultimapState<PublicCompany, PublicCompany> coalCompsPerMajor;
-    
+
     // The fixed operating order of majors involved in this round.
-    private ArrayListState<PublicCompany> majorOrder; 
-    
+    private ArrayListState<PublicCompany> majorOrder;
+
     // The Major currently being processed.
     private GenericState<PublicCompany> currentMajor;
 
     // Discard Handling States
     // HashMultimapState extends MultimapState, so it HAS keySet().
     private HashMultimapState<TrainType, Train> discardableTrains;
-    private IntegerState numberOfExcessTrains;
-    
+
     // Internal Step Tracking
     private IntegerState step;
     private static final int MERGE = 1;
@@ -59,7 +63,7 @@ public class CoalExchangeRound extends StockRound_1837 {
         raiseIfSoldOut = false;
     }
 
-    public static CoalExchangeRound create(GameManager parent, String id){
+    public static CoalExchangeRound create(GameManager parent, String id) {
         return new CoalExchangeRound(parent, id);
     }
 
@@ -75,15 +79,14 @@ public class CoalExchangeRound extends StockRound_1837 {
         currentMajor = new GenericState<>(this, "CurrentMajor_" + getId());
 
         discardableTrains = HashMultimapState.create(this, "NewTrainsPerMajor_" + getId());
-        numberOfExcessTrains = IntegerState.create(this, "NumberOfExcessTrains");
         step = IntegerState.create(this, "CERstep");
 
         reachedPhase5 = getRoot().getPhaseManager().hasReachedPhase("5");
-        
+
         ReportBuffer.add(this, "Start of Coal Exchange Round " + cerNumber);
-        
+
         init();
-        
+
         // If no majors are involved (no coal companies exist/mapped), end immediately
         if (majorOrder.isEmpty()) {
             log.info("CER_DEBUG: No majors found in init(), finishing round immediately.");
@@ -97,12 +100,14 @@ public class CoalExchangeRound extends StockRound_1837 {
     private void init() {
         log.info("CER_DEBUG: Executing init()...");
         step.set(MERGE);
-        
+
         // 1. Clear previous state manually.
         // ArrayListMultimapState does NOT have keySet(). We must scan possible keys.
-        // Since the keys are always Major companies, we iterate over all Majors in the game.
+        // Since the keys are always Major companies, we iterate over all Majors in the
+        // game.
         if (coalCompsPerMajor != null) {
-            // FIX: Use getPublicCompaniesByType("Major") because getPublicCompanies() does not exist.
+            // FIX: Use getPublicCompaniesByType("Major") because getPublicCompanies() does
+            // not exist.
             for (PublicCompany major : companyManager.getPublicCompaniesByType("Major")) {
                 if (coalCompsPerMajor.containsKey(major)) {
                     // We must copy the list to avoid ConcurrentModificationException while removing
@@ -113,18 +118,20 @@ public class CoalExchangeRound extends StockRound_1837 {
                 }
             }
         }
-        
-        majorOrder.clear(); 
+
+        majorOrder.clear();
 
         // 2. Identify all active Coal Companies and map them to their Majors
         List<PublicCompany> coalComps = companyManager.getPublicCompaniesByType("Coal");
         for (PublicCompany comp : coalComps) {
-            
-            if (comp.isClosed()) continue;
-           
+
+            if (comp.isClosed())
+                continue;
+
             String majorName = comp.getRelatedPublicCompanyName();
-            if (majorName == null) continue;
-            
+            if (majorName == null)
+                continue;
+
             PublicCompany major = companyManager.getPublicCompany(majorName);
 
             if (major != null && major.hasFloated()) {
@@ -135,7 +142,7 @@ public class CoalExchangeRound extends StockRound_1837 {
                         alreadyMapped = true;
                     }
                 }
-                
+
                 if (!alreadyMapped) {
                     coalCompsPerMajor.put(major, comp);
                     log.debug("CER_DEBUG: Mapped Coal {} to Major {}", comp.getId(), major.getId());
@@ -152,7 +159,7 @@ public class CoalExchangeRound extends StockRound_1837 {
                 }
             }
         }
-        
+
         log.info("CER_DEBUG: Init complete. Major Order Size: {}", majorOrder.size());
     }
 
@@ -161,79 +168,116 @@ public class CoalExchangeRound extends StockRound_1837 {
         return "Coal Exchange Round " + cerNumber;
     }
 
+
+
+
     @Override
     public boolean process(PossibleAction action) {
         log.info("CER_DEBUG: Processing Action: {}", action.getClass().getSimpleName());
 
         if (action instanceof ExchangeMinorAction) {
             ExchangeMinorAction exc = (ExchangeMinorAction) action;
-            log.info("CER_DEBUG: Exchanging {} into {}", exc.getMinor().getId(), exc.getTargetMajor().getId());
-            
             executeMerge(exc.getMinor(), exc.getTargetMajor(), false);
-            setPossibleActions(); 
             return true;
         }
 
-        else if (action instanceof NullAction && ((NullAction)action).getMode() == NullAction.Mode.DONE) {
-            
+        else if (action instanceof NullAction && ((NullAction) action).getMode() == NullAction.Mode.DONE) {
+
             Player p = action.getPlayer();
             PublicCompany major = currentMajor.value();
             
-            log.info("CER_DEBUG: Player {} clicked Done for Major {}", p != null ? p.getName() : "null", major != null ? major.getId() : "null");
-
+            log.info("CER_DEBUG: Player {} clicked Done", p != null ? p.getName() : "null");
+             
+            // --- START FIX ---
             if (major != null && p != null) {
-                List<PublicCompany> potentials = coalCompsPerMajor.get(major);
-                if (potentials != null) {
-                    for (PublicCompany coal : potentials) {
+                // We must find which coal companies were just declined and mark them as skipped.
+                // We replicate the logic from setPossibleActions to identify the targets.
+                List<PublicCompany> candidates = coalCompsPerMajor.get(major);
+
+                if (candidates != null) {
+                    for (PublicCompany coal : candidates) {
+                        // If this coal company is owned by the current player and not closed...
                         if (coal.getPresident() == p && !coal.isClosed()) {
-                            log.info("CER_DEBUG: Marking {} as skipped for this round.", coal.getId());
-                            skippedCoalCompanies.put(coal.getId(), getId());
+                            // ...and wasn't already skipped...
+                            if (!getId().equals(skippedCoalCompanies.get(coal.getId()))) {
+                                log.info("CER_DEBUG: Marking Coal Company {} as skipped for this round.", coal.getId());
+                                // Mark it as skipped so setPossibleActions() ignores it next time.
+                                skippedCoalCompanies.put(coal.getId(), getId());
+                            }
                         }
                     }
                 }
             }
+
             
-            setPossibleActions();
             return true;
         }
+
+
+else if (action instanceof DiscardTrain) {
+
+        // DELEGATE: Use the centralized method in Round.java
+        // This works because CoalExchangeRound extends Round
+        executeDiscardTrain((DiscardTrain) action);
         
-        else if (action instanceof DiscardTrain) {
-            return discardTrain((DiscardTrain) action);
-        } 
-        
+        // Return true to refresh the game state (checking limits again)
+        return true;
+
+    }
+
         else {
             return super.process(action);
         }
     }
-    
+
+
+
+
+
     @Override
     public boolean setPossibleActions() {
-        possibleActions.clear(); 
-        
-        if (step.value() == DISCARD || numberOfExcessTrains.value() > 0) {
-            return setTrainDiscardActions();
+        possibleActions.clear();
+
+        // 1. Check if the current major company (or the one processing) is over the
+        // limit.
+        // enforceTrainLimit checks the count, generates buttons if needed, and returns
+        // true.
+        // If it returns true, we strictly RETURN to stop the flow.
+        if (currentMajor != null && currentMajor.value() != null) {
+            if (enforceTrainLimit(currentMajor.value())) {
+                return true;
+            }
+        }
+
+        // 2. Normal Coal Round Logic (Step check)
+        // We removed the "|| numberOfExcessTrains.value() > 0" check.
+        if (step.value() == DISCARD) {
+            // If we are in a dedicated discard step (unlikely if enforceTrainLimit works,
+            // but keep if needed for state machine)
+            return true;
         }
 
         for (PublicCompany major : majorOrder) {
-            
+
             List<Player> players = gameManager.getPlayers();
             Player president = major.getPresident();
-            
-            if (president == null) continue;
+
+            if (president == null)
+                continue;
 
             int presIndex = players.indexOf(president);
             int totalPlayers = players.size();
-            
+
             for (int i = 0; i < totalPlayers; i++) {
                 Player p = players.get((presIndex + i) % totalPlayers);
-                
+
                 List<PublicCompany> exchangeableCoals = new ArrayList<>();
                 List<PublicCompany> candidates = coalCompsPerMajor.get(major);
-                
+
                 if (candidates != null) {
                     for (PublicCompany coal : candidates) {
                         boolean isSkipped = getId().equals(skippedCoalCompanies.get(coal.getId()));
-                        
+
                         if (coal.getPresident() == p && !coal.isClosed() && !isSkipped) {
                             exchangeableCoals.add(coal);
                         }
@@ -244,18 +288,18 @@ public class CoalExchangeRound extends StockRound_1837 {
                     currentMajor.set(major);
                     this.currentPlayer = p;
                     getRoot().getPlayerManager().setCurrentPlayer(p);
-                    
-                    log.info("CER_DEBUG: Found Action. Major={}, Player={}, Coals={}", 
+
+                    log.info("CER_DEBUG: Found Action. Major={}, Player={}, Coals={}",
                             major.getId(), p.getName(), exchangeableCoals.size());
 
                     for (PublicCompany c : exchangeableCoals) {
-                        possibleActions.add(new ExchangeMinorAction(c, major,false));
+                        possibleActions.add(new ExchangeMinorAction(c, major, false));
                     }
-                    
+
                     NullAction pass = new NullAction(getRoot(), NullAction.Mode.DONE);
                     pass.setLabel("Done / Pass");
                     possibleActions.add(pass);
-                    
+
                     return true;
                 }
             }
@@ -266,128 +310,39 @@ public class CoalExchangeRound extends StockRound_1837 {
         return true;
     }
 
+
     public boolean executeMerge(PublicCompany minor, PublicCompany major, boolean autoMerge) {
-        
-        for (Train train : minor.getPortfolioModel().getTrainList()) {
-            discardableTrains.put(train.getType(), train);
-        }
 
+        // 1. Perform the actual merge 
+        // This automatically moves assets (including trains) from Minor to Major.
         boolean result = mergeCompanies(minor, major, false, autoMerge);
-        
+
+        // 2. Validate Presidency (Standard post-merge safety)
         major.checkPresidency();
-
-
-
-
 
         log.info("CER_DEBUG: Merge complete. Minor {} closed.", minor.getId());
 
-// Verify train limit immediately after merger to trigger discard logic if needed
+        // 3. Report Status (Optional but helpful)
+        // We DO NOT set any state here. We just inform the user.
+        // The actual "blocking" happens automatically in setPossibleActions().
         int count = major.getNumberOfTrains();
         int limit = major.getCurrentTrainLimit();
 
-        log.info("CER_DEBUG: Post-Merge Check for " + major.getId() + " Trains: " + count + "/" + limit);
-
         if (count > limit) {
-            int excess = count - limit;
-            numberOfExcessTrains.set(excess);
-            
-            String warning = "WARNING: " + major.getId() + " exceeds train limit (" + count + "/" + limit + "). Excess: " + excess;
+            String warning = "WARNING: " + major.getId() + " exceeds train limit (" + count + "/" + limit + ").";
+            // Add to the on-screen game log
             ReportBuffer.add(this, warning);
+            // Add to the system log
             log.info(warning);
         }
-
-
 
         return result;
     }
 
 
 
-
-
-
-
-
-    // ... (lines of unchanged context code) ...
     @Override
-    public boolean discardTrain(DiscardTrain action) {
-        // --- START FIX ---
-        PublicCompany major = currentMajor.value();
-        Train trainToMove = action.getSelectedTrain();
-
-        if (trainToMove == null) {
-            log.error("CER_ERROR: No train found in discard action!");
-            return false;
-        }
-
-        log.info("CER_DEBUG: Discarding " + trainToMove.getId() + " from " + major.getId());
-        log.info("CER_DEBUG: Portfolio size BEFORE: " + major.getPortfolioModel().getTrainsModel().getPortfolio().items().size());
-
-        // Perform the move using the Card (Standard Rails requirement for Portfolio updates)
-        if (trainToMove.getCard() != null) {
-            Bank bank = Bank.get(major.getRoot());
-            trainToMove.getCard().moveTo(bank.getPool());
-            trainToMove.getCard().discard();
-            log.info("CER_DEBUG: TrainCard moved to Bank Pool.");
-        } else {
-            // Fallback for cardless trains
-            trainToMove.moveTo(Bank.get(major.getRoot()).getPool());
-            log.warn("CER_DEBUG: No TrainCard found, moved Train object directly.");
-        }
-
-        log.info("CER_DEBUG: Portfolio size AFTER: " + major.getPortfolioModel().getTrainsModel().getPortfolio().items().size());
-
-        // Decrement the excess count
-        int excess = numberOfExcessTrains.value();
-        if (excess > 0) {
-            numberOfExcessTrains.set(excess - 1);
-        }
-        // --- END FIX ---
-
-        // 3. If no more excess, clear the state to allow next actions
-
-        // ... (rest of the method) ...
-        // 3. If no more excess, clear the state to allow next actions
-        if (numberOfExcessTrains.value() <= 0) {
-            discardingTrains.set(false);
-            clearDiscardableTrains();
-            // Proceed to next player/action logic
-            setPossibleActions();
-        }
-return true;
-    }
-    
-    
-protected boolean setTrainDiscardActions() {
-        PublicCompany major = currentMajor.value();
-        
-// Utilize the centralized grouping logic from the Round superclass
-        // to ensure train discard buttons are deduplicated and consistent.
-        generateGroupedDiscardActions(major, possibleActions);
-
-        discardingTrains.set(true);
-        if (discardingCompanies == null) discardingCompanies = new PublicCompany[4];
-        discardingCompanies[discardingCompanyIndex.value()] = major;
-        
-        return true;
-    }
-
-    private void clearDiscardableTrains() {
-        // HashMultimapState usually has keySet()
-        if (discardableTrains != null && !discardableTrains.isEmpty()) {
-            // Explicit Generic Types added
-            for (TrainType key : new ArrayList<TrainType>(discardableTrains.keySet())) {
-                for (Train val : new ArrayList<Train>(discardableTrains.get(key))) {
-                    discardableTrains.remove(key, val);
-                }
-            }
-        }
-        discardingTrains.set(false);
-    }
-
-    @Override
-    protected void initPlayer() {  
+    protected void initPlayer() {
         // Managed manually
     }
 

@@ -394,8 +394,7 @@ CHECK:  while (true) {
 
         return true;
     }
-
-    @Override
+@Override
     protected void finishRound() {
         RoundFacade interruptedRound = gameManager.getInterruptedRound();
         ReportBuffer.add(this, " ");
@@ -408,10 +407,19 @@ CHECK:  while (true) {
         }
 
         if (national.hasStarted()) national.checkPresidency();
-        //national.setOperated(); // was a duplicate
 
-        // Inform GameManager
+        // --- START FIX ---
+        // Force return to interrupted round (OR) if it exists
+        if (interruptedRound != null) {
+            gameManager.setRound(interruptedRound);
+            gameManager.setInterruptedRound(null);
+            // Crucial: ensure the OR knows we are done with this specific national
+            return;
+        }
+
+        // Fallback if no interrupted round (shouldn't happen in this flow, but safety net)
         gameManager.nextRound(this);
+        // --- END FIX ---
     }
 
     public PublicCompany_1837 getNational() {

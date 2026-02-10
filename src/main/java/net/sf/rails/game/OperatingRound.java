@@ -375,7 +375,13 @@ public class OperatingRound extends Round implements Observer {
         } else if (selectedAction instanceof BuyTrain) {
             result = buyTrain((BuyTrain) selectedAction);
         } else if (selectedAction instanceof DiscardTrain) {
-            result = discardTrain((DiscardTrain) selectedAction);
+
+            executeDiscardTrain((DiscardTrain) action);
+            
+            // Return true to signal the action is complete. 
+            // The engine will refresh and re-check the train limit automatically.
+            return true;
+
         } else if (selectedAction instanceof BuyPrivate) {
             result = buyPrivate((BuyPrivate) selectedAction);
         } else if (selectedAction instanceof ReachDestinations) {
@@ -1035,20 +1041,28 @@ public boolean discardTrain(DiscardTrain action) {
             return true;
         }
 
-        boolean companySwitched = handleClosedOperatingCompany();
+boolean companySwitched = handleClosedOperatingCompany();
+            if (!companySwitched) {
+                playerManager.setCurrentPlayer(operatingCompany.value().getPresident());
 
-        if (!companySwitched) {
-            playerManager.setCurrentPlayer(operatingCompany.value().getPresident());
-            
-            // Logic to determine if we reset to INITIAL or continue BUY_TRAIN
-            // This fixes the "lost turn" bug for other games too.
-            if (trainsBoughtThisTurn.isEmpty()) {
-                setStep(GameDef.OrStep.INITIAL);
-            } else {
+                // --- START FIX ---
+                // Previously, this logic reset to INITIAL if no trains were bought.
+                // This broke Voluntary Discards (1837) where a player discards TO buy a train.
+                // We must ensure we stay in the BUY_TRAIN step.
                 stepObject.set(GameDef.OrStep.BUY_TRAIN);
+                
+                // Original problematic code for reference:
+                // if (trainsBoughtThisTurn.isEmpty()) {
+                //    setStep(GameDef.OrStep.INITIAL);
+                // } else {
+                //    stepObject.set(GameDef.OrStep.BUY_TRAIN);
+                // }
+                // --- END FIX ---
             }
+        } else {
+             // If more discards are needed, ensure we stay/enter the correct step
+             setStep(GameDef.OrStep.DISCARD_TRAINS);
         }
-    }
 
     return true;
 }
@@ -1072,7 +1086,11 @@ protected boolean processGameSpecificDiscard(DiscardTrain action, boolean moreDi
 }
 
 
+// ... (lines of unchanged context code) ...
+
     public boolean checkForExcessTrains() {
+        // --- START FIX ---
+        // System.out.println(">>> DEBUG: checkForExcessTrains() STARTED");
         excessTrainCompanies = new HashMap<>();
         Player player;
 
@@ -1080,9 +1098,12 @@ protected boolean processGameSpecificDiscard(DiscardTrain action, boolean moreDi
             int numTrains = comp.getPortfolioModel().getNumberOfTrains();
             int trainLimit = comp.getCurrentTrainLimit();
 
+            // System.out.println(">>> DEBUG: Checking " + comp.getId() + ": Trains=" + numTrains + " Limit=" + trainLimit);
+
             if (numTrains > trainLimit) {
                 player = comp.getPresident();
                 if (player == null) {
+                    // System.out.println(">>> DEBUG: " + comp.getId() + " has excess but no President!");
                     continue;
                 }
 
@@ -1090,53 +1111,68 @@ protected boolean processGameSpecificDiscard(DiscardTrain action, boolean moreDi
                     excessTrainCompanies.put(player, new ArrayList<>(2));
                 }
                 excessTrainCompanies.get(player).add(comp);
+                // System.out.println(">>> DEBUG: EXCESS FOUND for " + comp.getId());
             }
         }
 
-        return !excessTrainCompanies.isEmpty();
+        boolean result = !excessTrainCompanies.isEmpty();
+        // System.out.println(">>> DEBUG: checkForExcessTrains() RESULT: " + result);
+        return result;
+        // --- END FIX ---
     }
 
 
     protected void setTrainsToDiscard() {
-        // 1. Lock the turn: Player cannot pass/done while discards are pending.
+        // --- START FIX ---
+
+                // System.out.println(">>> DEBUG: setTrainsToDiscard() STARTED");
+// 1. CRITICAL: Refresh the excess map immediately.
+        // The logs showed this method running with stale data (SB=4) after a discard.
+        // By calling this first, we ensure 'excessTrainCompanies' reflects the current state (SB=3).
+        if (!checkForExcessTrains()) {
+            possibleActions.clear();
+            // If the map is empty, we stop generating discard buttons entirely.
+            return;
+        }
+
+        // 2. Clear previous buttons (standard cleanup)
+        possibleActions.clear();
+
+// System.out.println(">>> still here");
+
+        // 1. Lock the turn
         doneAllowed.set(false);
 
-        // 2. Determine Order: Use SR sequence to decide which player acts first.
-        // (This prevents random HashMap ordering issues)
+        // 2. Clear previous buttons to prevent UI ghosting
+        possibleActions.clear();
+        // System.out.println(">>> DEBUG: possibleActions cleared.");
+
         List<Player> nextPlayers = getRoot().getPlayerManager().getNextPlayers(true);
 
         for (Player player : nextPlayers) {
-            
-            // Check if this player has any companies with excess trains
             if (excessTrainCompanies.containsKey(player)) {
+                System.out.println(">>> DEBUG: Player " + player.getName() + " must discard.");
 
-                // 3. Context Switch: Visually indicate it is this player's responsibility
                 getRoot().getPlayerManager().setCurrentPlayer(player);
-                
                 List<PublicCompany> comps = excessTrainCompanies.get(player);
-                
 
-                // 4. Find the FIRST company that needs to discard
                 for (PublicCompany comp : comps) {
-                   // Use centralized deduplication logic from Round.java.
-                    // Pass the internal list using .getList() to match the signature.
-                    if (comp.getPortfolioModel().getNumberOfTrains() == 0) {
-                        continue;
-                    }
-                    generateGroupedDiscardActions(comp, possibleActions);
-                    // --- END FIX ---
+                    if (comp.getPortfolioModel().getNumberOfTrains() == 0) continue;
 
-                    // --- CRITICAL: STOP HERE ---
-                    // Return immediately so the UI only shows buttons for 'comp'.
-                    // After the user clicks one, the engine will loop back,
-                    // 'checkForExcessTrains' will run again, and we will catch the next company.
+                    System.out.println(">>> DEBUG: Creating discard buttons for " + comp.getId());
+                    
+                    // Use the helper in Round.java (ensure visibility is protected/public)
+                    generateGroupedDiscardActions(comp); 
+                    
                     return;
                 }
             }
         }
+        // System.out.println(">>> DEBUG: setTrainsToDiscard() FINISHED (No actions created)");
+        // --- END FIX ---
     }
 
-
+// ... (rest of the class) ...
 
     
     /*
@@ -4991,34 +5027,8 @@ protected boolean processGameSpecificDiscard(DiscardTrain action, boolean moreDi
      
      // (Reminder of the correct helper in OperatingRound.java)
     public boolean checkAndGenerateDiscardActions(PublicCompany company) {
-        int count = company.getNumberOfTrains();
-        int limit = company.getCurrentTrainLimit();
-
-        if (count > limit) {
-            log.info("LIMIT CHECK FAILED: " + company.getId() + " has " + count + "/" + limit + " trains.");
-            
-            // Fix: Handle Set vs List by wrapping in ArrayList
-            Collection<Train> trains = company.getPortfolioModel().getTrainList();
-            List<Train> trainList = new ArrayList<>(trains);
-            Set<String> addedTypes = new HashSet<>();
-            
-            if (company.getPresident() != null) {
-                playerManager.setCurrentPlayer(company.getPresident());
-            }
-
-            for (Train train : trainList) {
-                if (!addedTypes.contains(train.getName())) {
-                    Set<Train> trainOption = new HashSet<>();
-                    trainOption.add(train);
-                    DiscardTrain action = new DiscardTrain(company, trainOption);
-                    // The DiscardTrain logic now handles the rest via getButtonLabel()
-                    possibleActions.add(action);
-                    addedTypes.add(train.getName());
-                }
-            }
-            return true;
-        }
-        return false;
+       // use the master function in Round.java
+        return enforceTrainLimit(company);
     }
      
 

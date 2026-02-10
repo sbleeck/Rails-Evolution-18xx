@@ -31,6 +31,7 @@ import net.sf.rails.game.financial.Bank;
  */
 public class OperatingRound_1837 extends OperatingRound {
     private static final Logger log = LoggerFactory.getLogger(OperatingRound_1837.class);
+protected final ArrayListState<String> triggeredNationals = new ArrayListState<>(this, "triggeredNationals");
     protected final BooleanState specialActionPhase = new BooleanState(this, "specialActionPhase", false);
     protected final IntegerState specialActionPlayerCount = IntegerState.create(this, "specialActionPlayerCount", 0);
     protected final IntegerState specialActionCurrentIndex = IntegerState.create(this, "specialActionCurrentIndex", 0);
@@ -49,9 +50,9 @@ public class OperatingRound_1837 extends OperatingRound {
     // FIX 1: Use primitive types to bypass State constructor visibility issues for
     // now
 
-// The constructor is private; we must use the static factory method .create() 
-protected final IntegerState kkFormationState = IntegerState.create(this, "kkFormationState", 0);
-     private boolean kkFormedThisTurn = false;
+    // The constructor is private; we must use the static factory method .create()
+    protected final IntegerState kkFormationState = IntegerState.create(this, "kkFormationState", 0);
+    private boolean kkFormedThisTurn = false;
 
     // Use 'new' with 2 arguments for ArrayListState
     protected final ArrayListState<String> skippedMinors = new ArrayListState<>(this, "skippedMinors");
@@ -74,17 +75,14 @@ protected final IntegerState kkFormationState = IntegerState.create(this, "kkFor
             }
         }
 
-
-
-    // 1. Execute Ug Sequence if active
-    if (ugFormationState.value() > 0) {
-        possibleActions.clear();
-        checkUgFormation();
-        if (!possibleActions.isEmpty()) {
-            return true;
+        // 1. Execute Ug Sequence if active
+        if (ugFormationState.value() > 0) {
+            possibleActions.clear();
+            checkUgFormation();
+            if (!possibleActions.isEmpty()) {
+                return true;
+            }
         }
-    }
-
 
         if (specialActionPhase.value() && gameManager.isReloading()) {
             PossibleAction next = gameManager.getNextActionFromLog();
@@ -183,14 +181,16 @@ protected final IntegerState kkFormationState = IntegerState.create(this, "kkFor
                         || !company.hasLaidHomeBaseTokens())) {
 
             // RELOAD RECOVERY: Fixes "Action not in PossibleActions" crash for S5.
-            // If the log contains a LayTile action next, but S5 has no home token (due to Undo bug),
-            // we infer the home was successfully chosen and manually inject it to allow the reload to proceed.
+            // If the log contains a LayTile action next, but S5 has no home token (due to
+            // Undo bug),
+            // we infer the home was successfully chosen and manually inject it to allow the
+            // reload to proceed.
             if (gameManager.isReloading()) {
                 PossibleAction next = gameManager.getNextActionFromLog();
                 if (next instanceof LayTile) {
                     LayTile lay = (LayTile) next;
                     MapHex target = lay.getChosenHex();
-                    
+
                     // If laying on L8 or L2, assume that is the home.
                     // (S5 starts unconnected, so the first tile MUST be on the home hex).
                     if (target != null && (target.getId().equals("L8") || target.getId().equals("L2"))) {
@@ -200,8 +200,9 @@ protected final IntegerState kkFormationState = IntegerState.create(this, "kkFor
                     }
                 }
             }
-            
-            // Re-check: If recovery worked, this block is now false and we skip to standard actions.
+
+            // Re-check: If recovery worked, this block is now false and we skip to standard
+            // actions.
             if (company.getHomeHexes().isEmpty() || !company.hasLaidHomeBaseTokens()) {
                 initTurn();
                 possibleActions.clear();
@@ -210,7 +211,8 @@ protected final IntegerState kkFormationState = IntegerState.create(this, "kkFor
                 return true;
             }
             // If we reach here, the recovery logic worked (Home Token is set).
-            // We must regenerate standard actions (like LayTile) because the initial check saw no token.
+            // We must regenerate standard actions (like LayTile) because the initial check
+            // saw no token.
             possibleActions.clear();
             return super.setPossibleActions();
 
@@ -905,6 +907,21 @@ protected final IntegerState kkFormationState = IntegerState.create(this, "kkFor
 
     @Override
     public boolean buyTrain(BuyTrain action) {
+
+        // 1. Logging: Global Train Audit to diagnose "NO TRAINS" bug
+
+    
+
+        // 2. Intercept: If buying a '4' train, force Phase 4 logic (Merger) NOW.
+        // This moves the '3' trains to Sd/KK *before* the Phase change/Rusting/Cleanup
+        // can strip them.
+        if (action.getTrain() != null && action.getTrain().getType().getName().equals("4")) {
+            log.info("1837_FIX: '4' train detected. Forcing Phase 4 Merger Sequence (Sd/KK) IMMEDIATE execution.");
+            if (!phase4Triggered.value()) {
+                phase4Triggered.set(true);
+                handlePhase4Trigger(); // This must transfer S1-S5 trains to Sd, and K1-K3 to KK
+            }
+        }
         boolean result = super.buyTrain(action);
 
         if (result && action.getTrain() != null) {
@@ -917,22 +934,18 @@ protected final IntegerState kkFormationState = IntegerState.create(this, "kkFor
                 }
             }
             // Trigger 2: "5" bought -> Phase 5 Start -> Immediate Coal Exchange
-                if ("5".equals(trainName)) {
-                    log.info("Phase 5 triggered by purchase of 5-train. Executing mandatory coal exchanges.");
-                    processMandatoryExchanges();
-                }
+            if ("5".equals(trainName)) {
+                log.info("Phase 5 triggered by purchase of 5-train. Executing mandatory coal exchanges.");
+                processMandatoryExchanges();
+            }
         }
         return result;
     }
-
-
-
 
     @Override
     public void start() {
         // --- START FIX ---
         // Rule 2 & 3: Mandatory Coal Exchanges
-        log.info("1837 DEBUG: Entering start(). Checking Mandatory Exchanges.");
         processMandatoryExchanges();
 
         // 1837 Rule: K2/K3 can merge at the start of any OR if KK exists.
@@ -941,8 +954,8 @@ protected final IntegerState kkFormationState = IntegerState.create(this, "kkFor
         if (kk != null && kk.hasFloated() && !kk.isClosed()) {
             // Note: We skip State 1 (K1) because KK is already formed.
             kkFormationState.set(2);
-            
-            // This will check K2. If K2 is closed/missing, it auto-skips to K3. 
+
+            // This will check K2. If K2 is closed/missing, it auto-skips to K3.
             // If K3 is closed/missing, it resets to 0.
             checkKKFormation();
         }
@@ -955,7 +968,6 @@ protected final IntegerState kkFormationState = IntegerState.create(this, "kkFor
         nextSpecialActionPlayer();
     }
 
-    // ... (lines of unchanged context code) ...
     private void processMandatoryExchanges() {
         boolean isPhase5 = getRoot().getPhaseManager().hasReachedPhase("5");
         // Create a copy to avoid ConcurrentModificationException during merges
@@ -971,13 +983,13 @@ protected final IntegerState kkFormationState = IntegerState.create(this, "kkFor
                 continue;
 
             PublicCompany major = getMergeTarget(coal);
-if (major == null) continue;
+            if (major == null)
+                continue;
 
-
-// Trigger Logic:
+            // Trigger Logic:
             // 1. Phase 5: Mandatory Immediate Merge (Even if Major is NOT floated).
             // 2. Sold Out: Mandatory Next-OR Merge (Major MUST be floated).
-            
+
             boolean triggerMerge = false;
             String reason = "";
 
@@ -1002,52 +1014,51 @@ if (major == null) continue;
                 }
             }
 
-            if (!triggerMerge) continue;
+            if (!triggerMerge)
+                continue;
 
             // Execute Merge
-            // We pass false/false for forced/close because we handle assets manually if needed
+            // We pass false/false for forced/close because we handle assets manually if
+            // needed
             // but the Rails Mergers generic usually handles standard asset transfer.
             Mergers.mergeCompanies(gameManager, coal, major, false, false);
-            
+
             // Fix for missing LocalText key: Use direct string construction
             ReportBuffer.add(this, "Company " + coal.getId() + " merged into " + major.getId() + " (" + reason + ")");
-       
-            // Debug logging to verify values
-            log.info("DEBUG MANDATORY MERGE: " + major.getId() + " Train Count: " + major.getNumberOfTrains() + " Limit: " + major.getCurrentTrainLimit());
 
-// Use shared helper to check limits and generate discard actions if needed
+            // Use shared helper to check limits and generate discard actions if needed
             if (checkAndGenerateDiscardActions(major)) {
                 String warning = "WARNING: " + major.getId() + " exceeds train limit after mandatory merger.";
                 ReportBuffer.add(this, warning);
             }
-       
-       
+
         }
     }
 
-    
     public void nextSpecialActionPlayer() {
-        // RELOAD FIX: If the next action in the log is a standard OR action (like LayTile),
-    // we must strictly skip the Special Action Phase and initialize the standard OR.
-    if (gameManager.isReloading()) {
-        PossibleAction next = gameManager.getNextActionFromLog();
-        if (next != null) {
-            boolean isSpecial = (next instanceof ExchangeMinorAction);
-            // NullAction can be DONE (Special) or PASS (Standard).
-            // If it is PASS, we assume Standard to be safe (or check strictly for DONE).
-            if (next instanceof NullAction && ((NullAction) next).getMode() == NullAction.Mode.DONE) {
-                isSpecial = true;
-            }
-            
-            if (!isSpecial && !(next instanceof NullAction)) {
-                log.info("Reloading: Skipping Special Action Phase due to standard action: " + next.getClass().getSimpleName());
-                specialActionPhase.set(false);
-                specialActionPhaseFinished.set(true);
-                super.start();
-                return;
+        // RELOAD FIX: If the next action in the log is a standard OR action (like
+        // LayTile),
+        // we must strictly skip the Special Action Phase and initialize the standard
+        // OR.
+        if (gameManager.isReloading()) {
+            PossibleAction next = gameManager.getNextActionFromLog();
+            if (next != null) {
+                boolean isSpecial = (next instanceof ExchangeMinorAction);
+                // NullAction can be DONE (Special) or PASS (Standard).
+                // If it is PASS, we assume Standard to be safe (or check strictly for DONE).
+                if (next instanceof NullAction && ((NullAction) next).getMode() == NullAction.Mode.DONE) {
+                    isSpecial = true;
+                }
+
+                if (!isSpecial && !(next instanceof NullAction)) {
+
+                    specialActionPhase.set(false);
+                    specialActionPhaseFinished.set(true);
+                    super.start();
+                    return;
+                }
             }
         }
-    }
         List<PublicCompany> majors = getOperatingCompanies();
 
         for (PublicCompany major : majors) {
@@ -1094,11 +1105,12 @@ if (major == null) continue;
             return processExchangeMinor((ExchangeMinorAction) action);
         }
 
-      // 1. Intercept "Pass" (NullAction) during Formation
-        // Logic: If the first company (State 1) passes, the formation is ABORTED (State -> 0).
+        // 1. Intercept "Pass" (NullAction) during Formation
+        // Logic: If the first company (State 1) passes, the formation is ABORTED (State
+        // -> 0).
         // If subsequent companies pass, we just move to the next step.
         if (action instanceof NullAction) {
-            
+
             // KK Formation Pass Logic
             if (kkFormationState.value() > 0) {
                 log.info("Player passed on KK exchange. State: " + kkFormationState.value());
@@ -1129,27 +1141,27 @@ if (major == null) continue;
             }
         }
 
-        // DEBUG: Intercept LayTile on G17 to debug duplicate URI error
-        if (action instanceof LayTile) {
-            LayTile lay = (LayTile) action;
-            MapHex hex = lay.getChosenHex();
+        // // DEBUG: Intercept LayTile on G17 to debug duplicate URI error
+        // if (action instanceof LayTile) {
+        //     LayTile lay = (LayTile) action;
+        //     MapHex hex = lay.getChosenHex();
 
-            if (hex != null && "G17".equals(hex.getId())) {
-                log.info(">>> DEBUG G17 CRASH INVESTIGATION <<<");
-                log.info("Attempting to lay Tile: " + lay.getLaidTile().getId() + " on Hex: " + hex.getId());
-                log.info("Current Hex Tile: " + hex.getCurrentTile().getId());
+        //     if (hex != null && "G17".equals(hex.getId())) {
+        //         log.info(">>> DEBUG G17 CRASH INVESTIGATION <<<");
+        //         log.info("Attempting to lay Tile: " + lay.getLaidTile().getId() + " on Hex: " + hex.getId());
+        //         log.info("Current Hex Tile: " + hex.getCurrentTile().getId());
 
-                if (hex.getStops() != null) {
-                    for (Stop s : hex.getStops()) {
-                        log.info("EXISTING STOP: ID=" + s.getId() + " | URI=" + s.getFullURI() + " | Tokens: "
-                                + s.getTokens().size());
-                    }
-                } else {
-                    log.info("Hex has NO stops.");
-                }
-                log.info(">>> END DEBUG <<<");
-            }
-        }
+        //         if (hex.getStops() != null) {
+        //             for (Stop s : hex.getStops()) {
+        //                 log.info("EXISTING STOP: ID=" + s.getId() + " | URI=" + s.getFullURI() + " | Tokens: "
+        //                         + s.getTokens().size());
+        //             }
+        //         } else {
+        //             log.info("Hex has NO stops.");
+        //         }
+        //         log.info(">>> END DEBUG <<<");
+        //     }
+        // }
 
         if (specialActionPhase.value() && action instanceof NullAction) {
             skippedMinors.add(currentSpecialCompanyId.value());
@@ -1195,20 +1207,12 @@ if (major == null) continue;
                 }
             }
 
-
         } else if (currentPhase.getId().equals("5")) {
             // --- PHASE 5 LOGIC ---
             // Compilable version using standard getters
-            for (MapHex h : getRoot().getMapManager().getHexes()) {
-                if (h.getId().equals("CoalMine")) {
-                    log.info("Logic would close CoalMine at " + h.getId());
-                    // h.close(); // Commented out as method does not exist
-                }
-            }
+
         }
     }
-
-
 
     private void checkKKFormation() {
         PublicCompany kk = getRoot().getCompanyManager().getPublicCompany("KK");
@@ -1244,9 +1248,6 @@ if (major == null) continue;
             }
         }
     }
- 
-
-
 
     private boolean processExchangeMinor(ExchangeMinorAction action) {
         PublicCompany minor = action.getMinor();
@@ -1258,30 +1259,36 @@ if (major == null) continue;
         boolean isU1Formation = action.isFormation() || "U1".equals(minorId);
 
         if ((isK1Formation || isU1Formation) && !major.hasFloated()) {
-            log.info("1837_FIX: Formation detected for " + major.getId());
-            
+
             StockMarket market = getRoot().getStockMarket();
             net.sf.rails.game.financial.StockSpace parSpace = null;
-            int targetPar = isK1Formation ? 120 : 175; 
+            int targetPar = isK1Formation ? 120 : 175;
 
             for (net.sf.rails.game.financial.StockSpace ss : market.getStartSpaces()) {
-                if (ss.getPrice() == targetPar) { parSpace = ss; break; }
+                if (ss.getPrice() == targetPar) {
+                    parSpace = ss;
+                    break;
+                }
             }
             if (parSpace == null) {
                 for (int r = 0; r < 50; r++) {
                     for (int c = 0; c < 50; c++) {
                         net.sf.rails.game.financial.StockSpace ss = market.getStockSpace(r, c);
-                        if (ss != null && ss.getPrice() == targetPar) { parSpace = ss; break; }
+                        if (ss != null && ss.getPrice() == targetPar) {
+                            parSpace = ss;
+                            break;
+                        }
                     }
-                    if (parSpace != null) break;
+                    if (parSpace != null)
+                        break;
                 }
             }
-            if (parSpace != null) major.setCurrentSpace(parSpace);
-            Currency.fromBank(isK1Formation ? 840 : 875, major); 
-            
+            if (parSpace != null)
+                major.setCurrentSpace(parSpace);
+            Currency.fromBank(isK1Formation ? 840 : 875, major);
+
             if (!major.hasFloated()) {
                 major.setFloated();
-                log.info("1837_FIX: Floated " + major.getId() + ". Shares should be in Reserve/Unavailable.");
             }
             // STOP! Do not flush shares here. Leave them in Reserve.
             // We will fetch them one-by-one as needed below.
@@ -1291,7 +1298,7 @@ if (major == null) continue;
         // U1/U3 force all shareholders to exchange. Others (K1-K3) are individual.
         // We scan for anyone holding the minor's paper.
         Set<Player> playersToProcess = new HashSet<>();
-        
+
         // Use generic Owner check to be safe
         for (Player p : gameManager.getPlayers()) {
             if (p instanceof PortfolioOwner) {
@@ -1306,11 +1313,11 @@ if (major == null) continue;
                 }
             }
         }
-        
+
         // Fallback for Director weirdness
         if (playersToProcess.isEmpty()) {
-             log.warn("1837_FIX: No shareholders found for " + minorId + ". Defaulting to actor " + action.getPlayer().getName());
-             playersToProcess.add(action.getPlayer());
+
+            playersToProcess.add(action.getPlayer());
         }
 
         net.sf.rails.game.financial.BankPortfolio ipo = net.sf.rails.game.financial.Bank.getIpo(gameManager);
@@ -1318,7 +1325,7 @@ if (major == null) continue;
         // 3. Execute Exchange (Just-In-Time Fetch)
         for (Player p : playersToProcess) {
             PortfolioModel pm = ((PortfolioOwner) p).getPortfolioModel();
-            
+
             // Collect minor shares to swap
             List<PublicCertificate> toSwap = new ArrayList<>();
             for (Object obj : pm.getCertificates()) {
@@ -1339,7 +1346,6 @@ if (major == null) continue;
                     targetPresidentShare = true;
                 }
 
-                log.info("1837_FIX: Exchanging " + minorId + " for " + p.getName() + " (Target Pres=" + targetPresidentShare + ")");
 
                 // A. Surrender Minor Share to IPO
                 minorCert.moveTo(ipo);
@@ -1347,7 +1353,7 @@ if (major == null) continue;
                 // B. Find Available Major Share (Anywhere except Player hands)
                 PublicCertificate newShare = null;
                 List<PublicCertificate> allMajorCerts = major.getCertificates();
-                
+
                 // 1. Try to find exact match that is NOT owned by a player
                 for (PublicCertificate pc : allMajorCerts) {
                     if (pc.isPresidentShare() == targetPresidentShare) {
@@ -1357,68 +1363,70 @@ if (major == null) continue;
                         }
                     }
                 }
-                
+
                 // 2. Fallback: Try to find ANY share not owned by a player
                 if (newShare == null) {
                     for (PublicCertificate pc : allMajorCerts) {
                         if (!(pc.getOwner() instanceof Player)) {
                             newShare = pc;
-                            log.warn("1837_FIX: Precise match failed. Grabbing fallback share: " + pc.getUniqueId());
                             break;
                         }
                     }
                 }
 
                 if (newShare != null) {
-                    String origin = (newShare.getOwner() != null) ? newShare.getOwner().toString() : "NULL";
-                    log.info("1837_FIX: Fetching share [" + newShare.getUniqueId() + "] from " + origin + " to " + p.getName());
+
                     newShare.moveTo(p);
-                } else {
-                     log.error("1837_FIX: FATAL - No available shares found for " + major.getId() + " (All held by players?)");
-                }
+                } 
             }
         }
 
         // 4. Cleanup
+
+        // // Rule: Trains must be transferred to the new Major (KK, Ug, etc.) before
+        // the minor is closed.
+        // if (minor.hasTrains()) {
+        // List<Train> trains = new ArrayList<>(minor.getTrains());
+        // for (Train t : trains) {
+        // t.moveTo(major.getPortfolioModel());
+        // log.info("Transferred train " + t.getName() + " from " + minor.getId() + " to
+        // " + major.getId());
+        // }
+        // }
+
         Merger1837.mergeMinor(gameManager, minor, major);
         Merger1837.fixDirectorship(gameManager, major);
 
-
-        // Debug logging to verify values
-        log.info("DEBUG VOLUNTARY MERGE: " + major.getId() + " Train Count: " + major.getNumberOfTrains() + " Limit: " + major.getCurrentTrainLimit());
-
-// Use shared helper to check limits and generate discard actions if needed
+        // Use shared helper to check limits and generate discard actions if needed
         if (checkAndGenerateDiscardActions(major)) {
             String warning = "WARNING: " + major.getId() + " exceeds train limit after voluntary merger.";
             ReportBuffer.add(this, warning);
         }
 
-
-
         // 5. Update State
-        if ("K1".equals(minorId)) kkFormationState.set(2);
-        else if ("K2".equals(minorId)) kkFormationState.set(3);
-        else if ("K3".equals(minorId)) { kkFormationState.set(0); kkFormedThisTurn = true; }
-        
-        else if ("U1".equals(minorId)) ugFormationState.set(2);
-        else if ("U2".equals(minorId)) ugFormationState.set(3);
-        else if ("U3".equals(minorId)) ugFormationState.set(0);
+        if ("K1".equals(minorId))
+            kkFormationState.set(2);
+        else if ("K2".equals(minorId))
+            kkFormationState.set(3);
+        else if ("K3".equals(minorId)) {
+            kkFormationState.set(0);
+            kkFormedThisTurn = true;
+        }
+
+        else if ("U1".equals(minorId))
+            ugFormationState.set(2);
+        else if ("U2".equals(minorId))
+            ugFormationState.set(3);
+        else if ("U3".equals(minorId))
+            ugFormationState.set(0);
         // --- END FIX ---
 
         checkKKFormation();
-// ... (rest of the method) ...
-    
-
-
-
-
-
-
+        // ... (rest of the method) ...
 
         checkUgFormation();
         return true;
     }
-
 
     private void handlePhase4Trigger() {
         log.info("--- STARTING PHASE 4 LOGIC ---");
@@ -1509,58 +1517,60 @@ if (major == null) continue;
         log.info("--- PHASE 4 LOGIC COMPLETE ---");
     }
 
-
-
-
-// --- START FIX ---
+    // --- START FIX ---
     private void checkUgFormation() {
         // // 1. Trigger Check (Fallback for Saved Games)
-        // // Only run this expensive check if state is 0. If buyTrain() set it to 1, we skip this.
+        // // Only run this expensive check if state is 0. If buyTrain() set it to 1, we
+        // skip this.
         // if (ugFormationState.value() == 0) {
-        //     boolean is4ESold = false;
-        //     boolean is5Sold = false;
+        // boolean is4ESold = false;
+        // boolean is5Sold = false;
 
-        //     net.sf.rails.game.TrainManager tm = getRoot().getTrainManager();
-        //     net.sf.rails.game.financial.BankPortfolio ipo = net.sf.rails.game.financial.Bank.getIpo(gameManager);
-            
-        //     // Safe robust check for 4E
-        //     net.sf.rails.game.TrainCardType tct4E = tm.getCardTypeByName("4E");
-        //     if (tct4E != null) {
-        //         int count = 0;
-        //         // Use generic loop to avoid compilation issues
-        //         for (Object obj : ipo.getPortfolioModel().getTrainsModel().getPortfolio().items()) {
-        //             if (obj instanceof net.sf.rails.game.TrainCard) {
-        //                 if (((net.sf.rails.game.TrainCard) obj).getType().equals(tct4E)) count++;
-        //             }
-        //         }
-        //         if (count < tct4E.getQuantity()) is4ESold = true;
-        //     }
+        // net.sf.rails.game.TrainManager tm = getRoot().getTrainManager();
+        // net.sf.rails.game.financial.BankPortfolio ipo =
+        // net.sf.rails.game.financial.Bank.getIpo(gameManager);
 
-        //     // Safe robust check for 5
-        //     net.sf.rails.game.TrainCardType tct5 = tm.getCardTypeByName("5");
-        //     if (tct5 != null) {
-        //         int count = 0;
-        //         for (Object obj : ipo.getPortfolioModel().getTrainsModel().getPortfolio().items()) {
-        //             if (obj instanceof net.sf.rails.game.TrainCard) {
-        //                 if (((net.sf.rails.game.TrainCard) obj).getType().equals(tct5)) count++;
-        //             }
-        //         }
-        //         if (count < tct5.getQuantity()) is5Sold = true;
-        //     }
+        // // Safe robust check for 4E
+        // net.sf.rails.game.TrainCardType tct4E = tm.getCardTypeByName("4E");
+        // if (tct4E != null) {
+        // int count = 0;
+        // // Use generic loop to avoid compilation issues
+        // for (Object obj :
+        // ipo.getPortfolioModel().getTrainsModel().getPortfolio().items()) {
+        // if (obj instanceof net.sf.rails.game.TrainCard) {
+        // if (((net.sf.rails.game.TrainCard) obj).getType().equals(tct4E)) count++;
+        // }
+        // }
+        // if (count < tct4E.getQuantity()) is4ESold = true;
+        // }
 
-        //     if (is4ESold || is5Sold) {
-        //         ugFormationState.set(1);
-        //     } else {
-        //         return; // Nothing to do
-        //     }
+        // // Safe robust check for 5
+        // net.sf.rails.game.TrainCardType tct5 = tm.getCardTypeByName("5");
+        // if (tct5 != null) {
+        // int count = 0;
+        // for (Object obj :
+        // ipo.getPortfolioModel().getTrainsModel().getPortfolio().items()) {
+        // if (obj instanceof net.sf.rails.game.TrainCard) {
+        // if (((net.sf.rails.game.TrainCard) obj).getType().equals(tct5)) count++;
+        // }
+        // }
+        // if (count < tct5.getQuantity()) is5Sold = true;
+        // }
+
+        // if (is4ESold || is5Sold) {
+        // ugFormationState.set(1);
+        // } else {
+        // return; // Nothing to do
+        // }
         // }
 
         // 2. Execute State Machine
         PublicCompany ug = getRoot().getCompanyManager().getPublicCompany("Ug");
-        boolean isMandatory = false; 
-        // Note: Strict rule says "When first 5 is purchased it MUST be formed". 
-        // We can re-check 5 availability here if strictly needed, but for now we focus on flow.
-        
+        boolean isMandatory = false;
+        // Note: Strict rule says "When first 5 is purchased it MUST be formed".
+        // We can re-check 5 availability here if strictly needed, but for now we focus
+        // on flow.
+
         // State 1: U1
         if (ugFormationState.value() == 1) {
             PublicCompany u1 = getRoot().getCompanyManager().getPublicCompany("U1");
@@ -1604,16 +1614,46 @@ if (major == null) continue;
         }
     }
 
+@Override
+    public void finishRound() {
+        // --- START FIX ---
+        // Only trigger if we haven't already done so for all potential nationals
+        if (triggerNationalFormation()) return;
+        
+        // Clear the triggered list only when we are genuinely finished with the OR
+        triggeredNationals.clear();
+        super.finishRound();
+        // --- END FIX ---
+    }
 
-    
+    private boolean triggerNationalFormation() {
+        for (PublicCompany company : gameManager.getAllPublicCompanies()) {
+            if (company instanceof PublicCompany_1837) {
+                PublicCompany_1837 national = (PublicCompany_1837) company;
+                if (!"National".equals(national.getType().getId())) continue;
 
+                // Check persistent state to see if we already triggered this national
+                if (triggeredNationals.contains(national.getId())) continue;
 
+                net.sf.rails.game.PhaseManager pm = getRoot().getPhaseManager();
+                boolean start = !national.hasStarted() && pm.hasReachedPhase(national.getFormationStartPhase());
+                boolean forcedStart = !national.hasStarted() && pm.hasReachedPhase(national.getForcedStartPhase());
+                boolean forcedMerge = !national.isComplete() && pm.hasReachedPhase(national.getForcedMergePhase());
 
+                if (start || forcedStart || forcedMerge) {
+                    NationalFormationRound nfr = new NationalFormationRound(gameManager, "NFR");
+                    
+                    // Mark as triggered in persistent state
+                    triggeredNationals.add(national.getId());
 
-
-
-
-
-    
+                    gameManager.setInterruptedRound(this);
+                    gameManager.setRound(nfr);
+                    nfr.start(national, true, "Triggered after OR");
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
 
 }

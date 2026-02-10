@@ -17,6 +17,7 @@ import net.sf.rails.game.round.RoundFacade;
 import net.sf.rails.game.state.BooleanState;
 import net.sf.rails.game.state.Currency;
 import net.sf.rails.game.state.Portfolio;
+import net.sf.rails.game.financial.Bank;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -388,5 +389,105 @@ public void generateGroupedDiscardActions(PublicCompany company, PossibleActions
     // --- END FIX ---
 }
 
+
+// ... inside Round.java ...
+
+
+    /**
+     * CENTRALIZED HELPER: Executes the physical move of a train to the Bank Pool.
+     * Uses 'this.pool' which is the correct PortfolioModel required by the UI.
+     */
+    protected void executeDiscardTrain(DiscardTrain action) {
+        Train train = action.getSelectedTrain();
+        if (train == null) {
+            log.warn("DiscardTrain action has no train selected.");
+            return;
+        }
+
+        // FIX: Use the 'pool' field directly defined in Round.java.
+        // It is already a 'PortfolioModel', so no type mismatch occurs.
+        PortfolioModel targetPool = this.pool; 
+
+        // 2. Move the train
+        if (train.getCard() != null) {
+            // Move the card (Certificate) to the pool
+            train.getCard().moveTo(targetPool);
+        } else {
+            // Move the train object directly to the pool
+            train.moveTo(targetPool);
+        }
+        
+        // 3. Log/Report
+        String companyName = action.getPlayer() != null ? action.getPlayer().getName() : "Company";
+        if (action.getCompany() != null) companyName = action.getCompany().getId();
+        
+        String msg = companyName + " discards " + train.getName();
+        ReportBuffer.add(this, msg);
+        log.info(msg);
+    }
+
+
+
+    // --- START FIX ---
+    /**
+     * MASTER FUNCTION: Checks train limit and generates discard actions if necessary.
+     * Returns TRUE if the company is over the limit (blocking normal play).
+     */
+    public boolean enforceTrainLimit(PublicCompany company) {
+        if (company == null) return false;
+
+        int count = company.getNumberOfTrains();
+        int limit = company.getCurrentTrainLimit();
+
+        if (count > limit) {
+            log.info("LIMIT ENFORCEMENT: " + company.getId() + " has " + count + "/" + limit + " trains.");
+
+            // CRITICAL: We clear actions HERE because it is a MANDATORY state.
+            possibleActions.clear();
+
+            // Generate buttons (without clearing internally)
+            generateGroupedDiscardActions(company);
+            
+            return true; // Blocking
+        }
+        return false; // Not blocking
+    }
+
+    /**
+     * Helper: Generates the actual buttons.
+     * REMOVED possibleActions.clear() so it can be used for Voluntary discards too.
+     */
+    protected void generateGroupedDiscardActions(PublicCompany company) {
+        // --- DELETE ---
+        // possibleActions.clear(); // DO NOT CLEAR HERE! 
+        // --- END DELETE ---
+
+        Collection<Train> trains = company.getPortfolioModel().getTrainList();
+        Set<String> addedTypes = new HashSet<>();
+
+        for (Train train : trains) {
+            if (train == null) continue;
+
+            // Regex to group "2_1" and "2_2" into just "2"
+            String baseName = train.getName().replaceAll("(.*)_\\d+", "$1");
+            
+            if (!addedTypes.contains(baseName)) {
+                Set<Train> trainOption = new HashSet<>();
+                // Find all trains that match this base name
+                for (Train t : trains) {
+                     if (t.getName().startsWith(baseName)) {
+                         trainOption.add(t);
+                     }
+                }
+
+                DiscardTrain action = new DiscardTrain(company, trainOption);
+                action.setButtonLabel(baseName); 
+                
+                possibleActions.add(action);
+                addedTypes.add(baseName);
+            }
+        }
+    }
+    // --- END FIX ---
 
 }
