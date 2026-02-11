@@ -964,6 +964,7 @@ protected final ArrayListState<String> triggeredNationals = new ArrayListState<>
         if (!specialActionPhase.value()) {
             skippedMinors.clear();
         }
+        triggeredNationals.clear();
 
         nextSpecialActionPlayer();
     }
@@ -1620,8 +1621,6 @@ protected final ArrayListState<String> triggeredNationals = new ArrayListState<>
         // Only trigger if we haven't already done so for all potential nationals
         if (triggerNationalFormation()) return;
         
-        // Clear the triggered list only when we are genuinely finished with the OR
-        triggeredNationals.clear();
         super.finishRound();
         // --- END FIX ---
     }

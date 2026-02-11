@@ -19,7 +19,7 @@ import net.sf.rails.game.round.RoundFacade;
 
 import org.jetbrains.annotations.NotNull;
 import com.google.common.base.Objects;
-
+import net.sf.rails.game.specific._1837.NationalFormationRound;
 import net.sf.rails.util.RailsObjects;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -204,6 +204,16 @@ public class DiscardTrain extends PossibleORAction implements GuiTargetedAction 
             return execute((OperatingRound) round);
         }
 
+        // 2. National Formation Round
+        // NFR is not an OperatingRound, but we must allow discarding.
+        // We use the standard card discard logic (moves train to pool/scrap).
+        if (round instanceof NationalFormationRound) {
+            if (discardedTrain != null) {
+                discardedTrain.getCard().discard();
+                return true;
+            }
+        }
+        
         // 2. Your Special Coal Round
         // Return FALSE. This tells the system "I didn't handle this".
         // This allows your CoalExchangeRound.process() method to step in 
