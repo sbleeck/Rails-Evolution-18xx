@@ -352,13 +352,11 @@ public /*abstract*/ class Round extends RailsAbstractItem implements RoundFacade
         return possibleActions.getList();
     }// File: Round.java
 
-// --- START FIX ---
 /**
  * Centralized logic to generate deduplicated discard actions.
  * @param company The company needing to discard.
  * @param possibleActions The action container (PossibleActions), not the list.
  */
-// File: Round.java
 
 public void generateGroupedDiscardActions(PublicCompany company, PossibleActions possibleActions) {
     // --- START FIX ---
@@ -388,9 +386,6 @@ public void generateGroupedDiscardActions(PublicCompany company, PossibleActions
     }
     // --- END FIX ---
 }
-
-
-// ... inside Round.java ...
 
 
     /**
@@ -427,8 +422,6 @@ public void generateGroupedDiscardActions(PublicCompany company, PossibleActions
     }
 
 
-
-    // --- START FIX ---
     /**
      * MASTER FUNCTION: Checks train limit and generates discard actions if necessary.
      * Returns TRUE if the company is over the limit (blocking normal play).
@@ -488,6 +481,22 @@ public void generateGroupedDiscardActions(PublicCompany company, PossibleActions
             }
         }
     }
-    // --- END FIX ---
+
+
+    /**
+     * Checks if a "Pass" action should terminate an interrupted round (e.g., Formation Round).
+     * Returns true if the pass was handled and the round finished.
+     */
+    protected boolean handleInterruptedPass(PossibleAction action) {
+        if (action instanceof NullAction && ((NullAction) action).getMode() == NullAction.Mode.PASS) {
+            // Only force-finish if this round actually interrupted another round (e.g. OR)
+            if (gameManager.getInterruptedRound() != null) {
+                log.info("1837_FIX: Interrupted round " + getRoundName() + " received PASS. Force-finishing.");
+                finishRound();
+                return true;
+            }
+        }
+        return false;
+    }
 
 }

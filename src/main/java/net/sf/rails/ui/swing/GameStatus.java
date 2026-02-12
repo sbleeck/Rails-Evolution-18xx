@@ -2697,8 +2697,13 @@ public static final Color BG_DISCARD_VOLUNTARY = Color.CYAN; // Light Blue (#ADD
                 // VISIBILITY: Only show price if shares are actually in the IPO
                 boolean hasSharesInIPO = ipo.getShare(c) > 0;
 
-                if (hasParPrices && c.getStartSpace() != null && hasSharesInIPO) {
-                    ipoParLabels[i].setText(gameUIManager.format(c.getStartSpace().getPrice()));
+                int price = c.getParPrice();
+
+                // Display if we have a valid price (>0) and shares are available.
+                // We intentionally ignore the global 'hasParPrices' flag here because 1837 sets it to false,
+                // effectively hiding these valid fixed prices otherwise.
+                if (price > 0 && hasSharesInIPO) {
+                    ipoParLabels[i].setText(gameUIManager.format(price));
                     ipoParLabels[i].setForeground(new Color(0, 0, 128)); // Navy Blue
 
                     // FORMATTING: Right Align + Bigger Font

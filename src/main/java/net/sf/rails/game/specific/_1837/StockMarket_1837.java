@@ -24,6 +24,8 @@ public class StockMarket_1837 extends StockMarket {
 
     public StockMarket_1837(RailsRoot parent, String id) {
         super(parent, id);
+        // Explicitly set the chart type for the 1837 hexagonal market
+        this.stockChartType = ChartType.HEXAGONAL;
     }
 
     /**

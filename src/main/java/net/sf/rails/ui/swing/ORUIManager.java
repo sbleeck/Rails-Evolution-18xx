@@ -160,8 +160,8 @@ public class ORUIManager implements DialogOwner {
     public void updateStatus(PossibleAction actionToComplete, boolean myTurn) {
 
 
-        // Inject the highlight update here
-        updateCompanyHighlights();
+        // // Inject the highlight update here
+        // updateCompanyHighlights();
 
 
         if (map != null && getRoot() != null && getRoot().getMapManager() != null) {
@@ -459,6 +459,10 @@ public class ORUIManager implements DialogOwner {
 
         orPanel.enableUndo(undoAction);
         orPanel.enableRedo(redoAction);
+
+                // Inject the highlight update here
+        updateCompanyHighlights();
+
         orPanel.redisplay();
     }
 

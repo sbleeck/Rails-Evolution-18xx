@@ -760,7 +760,10 @@ cardWrappers = new JPanel[ni];
 
         gameUIManager.packAndApplySizing(this);
     }
-private void setupHotkeys() {
+
+
+    // ... (lines of unchanged context code) ...
+    private void setupHotkeys() {
         // --- START FIX ---
         // Bind Command/Ctrl + and - to font size adjustment
         InputMap inputMap = statusPanel.getInputMap(JComponent.WHEN_IN_FOCUSED_WINDOW);
@@ -787,10 +790,22 @@ private void setupHotkeys() {
                 updateFonts(currentFontSize - 2);
             }
         });
+
+        // Bind Enter Key to Pass Button
+        inputMap.put(KeyStroke.getKeyStroke(KeyEvent.VK_ENTER, 0), "triggerPass");
+        actionMap.put("triggerPass", new AbstractAction() {
+            private static final long serialVersionUID = 1L;
+            public void actionPerformed(ActionEvent e) {
+                if (passButton != null && passButton.isEnabled()) {
+                    passButton.doClick();
+                }
+            }
+        });
         // --- END FIX ---
     }
 
 
+ 
     @Override
     public void updateStatus(boolean myTurn) {
         log.info("SRW: updateStatus STARTED. MyTurn={}", myTurn);
@@ -1078,4 +1093,6 @@ if (status == StartItem.SOLD) {
         }
     }
 
+
+    
 }

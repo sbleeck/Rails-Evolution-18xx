@@ -1,20 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- Supported games -->
+
+
 <GamesList>
-	<Game name="1830">
-    <Note>Fully playable</Note>
-    <Description>1830 - The Game of Railroads and Robber Barons
-(c) 1986 The Avalon Hill Game Company
-Designed by Francis Tresham and Bruce Shelley
-Pere Marquette variant by Federico Vellani
-Coalfields variant by Alan R. Moon
-			
-Limitations: 
-- The M&amp;H/NYC share swap can only be executed in the SR, in the owning player's turn.
-- Privates cannot be traded between players.
-		</Description>
-		<Players minimum="2" maximum="6"/>
-	</Game>
+
 
 	<Game name="1835">
 		<Note>Fully playable</Note>
@@ -50,19 +39,40 @@ available *immediately* after any second (or third, etc.) sale of shares of one 
 		<Players minimum="3" maximum="7"/>
 	</Game>
 
-	<Game name="1851">
-		<Note>Fully playable</Note>
-		<Description>1851 - The Railroads come to Kentucky &amp; Tennessee
-(c) Mark Derrick and Chris Lawson
 
-Limitation:
-- No random assignment of private companies (players should do this off-line and enter the result)
+
+
+
+<Game name="1837">
+		<Note>under costruction</Note>
+		<Description> 1837 - Austria
+			(c) 1994 Leonhard Orgler (self-published)
+
+			Variants:
+			- v1 ("Basegame", as described by JD Galt and clarified by Steve Thomas),
+			- Romoth (v1, with some different prices),
+			- v2 (as described by Lonny Orgler, 2015).
+
+			Mid-game player worth is calculated as follows:
+			- Major and National shares as usual,
+			- Coal and Minor shares as the price of the related
+			Major (if started) or National company,
+			- Privates (mountain railways) worth is zero.
+
+			Known limitations:
+			- Token laying involving backtracking must be done in Correction mode.
+			- If the U3 president rejects folding into Ug, the other U3 share
+			owner cannot fold that second share.
 		</Description>
-		<Players minimum="2" maximum="5"/>
+		<Players minimum = "3" maximum = "7" />
 	</Game>
 
-	<Game name="1856">
-		<Note>Fully playable</Note>
+
+
+
+
+<Game name="1856">
+		<Note>under construction</Note>
 		<Description>1856 - Railroading in Upper Canada
 (c) 1992, 1995 Mayfair Games, Inc.
 Designed by Bill Dixon
@@ -74,8 +84,43 @@ Limitation:
        	<Players minimum="2" maximum="6"/>
 	</Game>
 
+
+
+
+
+
+
+	<Game name="1830">
+    <Note>Fully playable</Note>
+    <Description>1830 - The Game of Railroads and Robber Barons
+(c) 1986 The Avalon Hill Game Company
+Designed by Francis Tresham and Bruce Shelley
+Pere Marquette variant by Federico Vellani
+Coalfields variant by Alan R. Moon
+			
+Limitations: 
+- The M&amp;H/NYC share swap can only be executed in the SR, in the owning player's turn.
+- Privates cannot be traded between players.
+		</Description>
+		<Players minimum="2" maximum="6"/>
+	</Game>
+
+
+	<Game name="1851">
+		<Note>not yet playable</Note>
+		<Description>1851 - The Railroads come to Kentucky &amp; Tennessee
+(c) Mark Derrick and Chris Lawson
+
+Limitation:
+- No random assignment of private companies (players should do this off-line and enter the result)
+		</Description>
+		<Players minimum="2" maximum="5"/>
+	</Game>
+
+	
+
     <Game name="1880">
-        <Note>Fully Playable</Note>
+        <Note>not yet Playable</Note>
         <Description>1880 - China
         (c) 2010 Double O Games  Mayfair Games, Inc.
         Designed by Leonhard Orgler and Helmut Ohley
@@ -84,7 +129,7 @@ Limitation:
     </Game>
 
 	<Game name="1889">
-		<Note>Fully playable</Note>
+		<Note>not yet playable</Note>
 		<Description>1889 - History of Shikoku Railways
 (c) 2003-2006 Yasutaka Ikeda
 Published by Wild Heaven Productions and Deep Thought Games
@@ -96,7 +141,7 @@ Limitation:
 	</Game>
 	
 	<Game name="18AL">
-		<Note>Fully playable</Note>
+		<Note>not yet playable</Note>
 		<Description>18AL  - The Railroads come to Alabama
 (c) 2000, 2004 Mark Derrick and John David Galt
 Designed by Mark Derrick
@@ -110,7 +155,7 @@ Limitation:
 	</Game>
 
 	<Game name="18EU">
-		<Note>Fully playable</Note>
+		<Note>not yet playable</Note>
 		<Description>18EU - A century of railroading in Europe
 (c) 1997-2004 David G.D. Hecht
 Published 2004 by Deep Thought Games, LLC
@@ -123,14 +168,14 @@ Game variants:
 	</Game>
 
      <Game name="18GA">
-        <Note>Fully playable</Note>
+        <Note>not yet playable</Note>
         <Description>18GA - The Railroads Come to Georgia
         Copyright 2000, 2007, Mark Derrick and John David Galt</Description>
         <Players minimum="2" maximum="5"/>
     </Game>
 
 	<Game name="18Kaas">
-		<Note>Fully playable</Note>
+		<Note>not yet playable</Note>
 		<Description>18Kaas (Netherlands)
 		Same restrictions as 1830
 		(c) 1992 ERJO GAMES
@@ -139,7 +184,7 @@ Game variants:
 	</Game>
 
 	<Game name="18NL">
-		<Note>Fully playable</Note>
+		<Note>not yet playable</Note>
 		<Description>18NL Niederland (Netherlands)
 		Same restrictions as 1830
 		Copyright 1999 Helmut Ohley
@@ -148,7 +193,7 @@ Game variants:
 	</Game>
     
 	 <Game name="18TN">
-        <Note>Fully playable</Note>
+        <Note>not yet playable</Note>
         <Description>18TN - The Railroads Come to Tennessee
         Copyright 1996, 2006, Mark Derrick
         Published by Deep Thought Games, LLC
@@ -158,7 +203,7 @@ Game variants:
     </Game>
 
 	<Game name="18Lummer">
-        <Note>Fully playable</Note>
+        <Note>not yet playable</Note>
         <Description>18Lummer - Lummerland
         Copyright Kay-Viktor Stegemann
         Limitations:
@@ -169,7 +214,7 @@ Game variants:
     </Game>
 
 	<Game name="18Scan">
-		<Note>Fully Playable</Note>
+		<Note>not yet Playable</Note>
 		<Description>18Scan - Railroading under the Northern Lights
 		(c) 2004-2005 David G.D. Hecht
 		Published 2005 by Deep Thought Games, LLC
@@ -203,7 +248,7 @@ Game variants:
 	</Game>
 
 	<Game name="SOH">
-		<Note>Fully Playable</Note>
+		<Note>not yet Playable</Note>
 		<Description>Steam over Holland
 			(c) 2007 Bart van Dijk
 			Published 2007 by Vendetta Games
@@ -227,38 +272,16 @@ Game variants:
 	</Game>
 
 	<Game name="18Chesapeake">
-		<Note>Fully playable - Tests needed</Note>
+		<Note>not yet playable - Tests needed</Note>
 		<Description> 18Chesapeake - North East USA
 			(c) 2019 Scott Pedersen    </Description>
 		<Players minimum = "2" maximum = "6" />
 	</Game>
 
-	<Game name="1837">
-		<Note>Playable (beta)</Note>
-		<Description> 1837 - Austria
-			(c) 1994 Leonhard Orgler (self-published)
-
-			Variants:
-			- v1 ("Basegame", as described by JD Galt and clarified by Steve Thomas),
-			- Romoth (v1, with some different prices),
-			- v2 (as described by Lonny Orgler, 2015).
-
-			Mid-game player worth is calculated as follows:
-			- Major and National shares as usual,
-			- Coal and Minor shares as the price of the related
-			Major (if started) or National company,
-			- Privates (mountain railways) worth is zero.
-
-			Known limitations:
-			- Token laying involving backtracking must be done in Correction mode.
-			- If the U3 president rejects folding into Ug, the other U3 share
-			owner cannot fold that second share.
-		</Description>
-		<Players minimum = "3" maximum = "7" />
-	</Game>
+	
 
 	<Game name="1826">
-		<Note>Playable (beta)</Note>
+		<Note>not yet Playable (beta)</Note>
 		<Description>1826 - Railroading in France and Belgium from 1826
 			(c) 1996, 2000 David G.D. Hecht (game designer)
 			Initially published by Chris Lawson (materials designer)

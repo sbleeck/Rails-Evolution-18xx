@@ -382,7 +382,12 @@ public class GameUIManager implements DialogOwner {
         stockChartWindow = new StockChartWindow(this);
         stockChartWindow.setName("StockChartWindow");
 
-        // --- FIX: Register Stock Window for Safe Storage ---
+        // Ensure the layout manager doesn't force a rectangular grid if we are in 1837
+        if (getGameManager().getRoot().getStockMarket().getStockChartType() == net.sf.rails.game.financial.StockMarket.ChartType.HEXAGONAL) {
+            stockChartWindow.setResizable(true);
+        }
+
+        // Register Stock Window for Safe Storage ---
         registerWindowStorage(stockChartWindow);
 
         if (newGame) {

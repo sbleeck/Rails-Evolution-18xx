@@ -18,6 +18,7 @@ import org.slf4j.LoggerFactory;
 import javafx.application.Platform;
 import javafx.embed.swing.JFXPanel;
 import javafx.scene.Scene;
+import net.sf.rails.javafx.stockchart.FXHexStockChart;
 import net.sf.rails.javafx.stockchart.FXStockChart;
 
 /**
@@ -57,7 +58,17 @@ public class StockChartWindow extends JFrame {
 
 
         Platform.runLater(() -> {
-            Scene scene = new Scene(new FXStockChart(gameUIManager));
+
+            javafx.scene.Parent chartRoot;
+            if (type == StockMarket.ChartType.HEXAGONAL) {
+                log.info("Initializing Hexagonal Stock Chart for 1837.");
+chartRoot = new net.sf.rails.javafx.stockchart.FXHexStockChart(gameUIManager);
+            } else {
+                chartRoot = new FXStockChart(gameUIManager);
+            }
+            Scene scene = new Scene(chartRoot);
+
+
             fxPanel.setScene(scene);
             
             // This is correct: Restore position after JavaFX is ready

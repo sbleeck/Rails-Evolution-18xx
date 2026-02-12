@@ -111,15 +111,16 @@ public class GUIHex implements Observer {
 
     public enum State {
 
-        NORMAL(1.0, Color.black),
+NORMAL(1.0, Color.black),
         // Phase 1: Build Track (Construction Brown)
         SELECTABLE(0.9, Color.RED),
         // Phase 2: Lay Token (Forest Green - Matching OR Panel)
         TOKEN_SELECTABLE(0.8,Color.RED),
         // Selected Hex (Construction red)
         SELECTED(0.8, Color.GREEN),
+        // Merged Purple Highlight (Active Owner)
+        HIGHLIGHT_PURPLE(0.8, new Color(128, 0, 128)), 
         INVALIDS(0.9, Color.pink);
-
         private final double scale;
         private final Color color;
 
@@ -550,78 +551,12 @@ public class GUIHex implements Observer {
             drawString(g, customOverlayText, 0, 0); // Zeichnet den Text zentriert
         }
 
-
-        // ... (inside paintTokensAndText) ...
-
-        // --- START FIX: Purple Pointy Hexagon Highlight ---
-        if (activeOwnerHighlight) {
-            Stroke originalStroke = g.getStroke();
-            Color originalColor = g.getColor();
-            java.awt.Font originalFont = g.getFont();
-
-            // 1. Setup PURPLE Style
-            Color purple = new Color(128, 0, 128);
-            g.setColor(purple);
-            g.setStroke(new BasicStroke(5.0f)); 
-
-            // 2. Calculate Pointy-Topped Hexagon Path
-            Rectangle r = dimensions.rectBound;
-            GeneralPath hexPath = new GeneralPath();
-            
-            float x = r.x; 
-            float y = r.y;
-            float w = r.width;
-            float h = r.height;
-
-            // Pointy-Topped Coordinates
-            // P1: Top Center
-            hexPath.moveTo(x + w * 0.5f, y);           
-            // P2: Top Right
-            hexPath.lineTo(x + w, y + h * 0.25f);      
-            // P3: Bottom Right
-            hexPath.lineTo(x + w, y + h * 0.75f);      
-            // P4: Bottom Center
-            hexPath.lineTo(x + w * 0.5f, y + h);       
-            // P5: Bottom Left
-            hexPath.lineTo(x, y + h * 0.75f);          
-            // P6: Top Left
-            hexPath.lineTo(x, y + h * 0.25f);          
-            
-            hexPath.closePath();
-            g.draw(hexPath);
-
-            // 3. Draw Label (Purple Text)
-            if (activeOwnerLabel != null) {
-                g.setFont(new java.awt.Font("SansSerif", java.awt.Font.BOLD, 20));
-                FontMetrics fm = g.getFontMetrics();
-                
-                int textW = fm.stringWidth(activeOwnerLabel);
-                int textH = fm.getAscent();
-                
-                // Center
-                int cx = (int)(x + w / 2);
-                int cy = (int)(y + h / 2);
-                int tx = cx - (textW / 2);
-                int ty = cy + (textH / 4);
-
-                // Outline (White)
-                g.setColor(Color.WHITE);
-                g.setStroke(new BasicStroke(3.0f));
-                g.drawString(activeOwnerLabel, tx-1, ty-1);
-                g.drawString(activeOwnerLabel, tx+1, ty+1);
-                g.drawString(activeOwnerLabel, tx-1, ty+1);
-                g.drawString(activeOwnerLabel, tx+1, ty-1);
-                
-                // Fill (Purple)
-                g.setColor(purple);
-                g.drawString(activeOwnerLabel, tx, ty);
-            }
-
-            g.setStroke(originalStroke);
-            g.setColor(originalColor);
-            g.setFont(originalFont); 
+        // If an active owner label is set, draw it using standard text 
+        // (The purple BORDER is handled by paintMarks via the State enum now)
+        if (activeOwnerLabel != null) {
+            drawString(g, activeOwnerLabel, 0, 0);
         }
-        // --- END FIX ---
+
     
     }
 
@@ -1043,66 +978,46 @@ public String getCustomOverlayText() {
             g.setColor(originalColor);
         }
     }
-    
+  // ... (inside GUIHex class) ...
+
     private boolean activeOwnerHighlight = false;
     private String activeOwnerLabel = null;
 
-    public void setActiveOwnerHighlight(boolean active, String label) {
-        this.activeOwnerHighlight = active;
-        this.activeOwnerLabel = label;
-    }
-
     /**
-     * Helper to draw the Meme-style text and border.
-     * Call this at the END of your paint/draw method.
+     * Bridges the UIManager call to the internal State system.
+     * @param active If true, sets state to HIGHLIGHT_PURPLE. If false, reverts to NORMAL.
+     * @param label The text to display (or null).
      */
-    private void drawActiveOwnerHighlight(Graphics2D g2, Rectangle bounds) {
-        if (!activeOwnerHighlight || bounds == null) return;
+    public void setActiveOwnerHighlight(boolean active, String label) {
+        // 1. Update Internal Fields
+        this.activeOwnerLabel = label;
+        this.activeOwnerHighlight = active;
 
-        Stroke originalStroke = g2.getStroke();
-        Color originalColor = g2.getColor();
-
-        // 1. Draw White Glow Border
-        g2.setColor(new Color(255, 255, 255, 180));
-        g2.setStroke(new BasicStroke(4f));
-        g2.drawRect(bounds.x + 2, bounds.y + 2, bounds.width - 4, bounds.height - 4);
-
-        // 2. Draw Meme Text
-        if (activeOwnerLabel != null && !activeOwnerLabel.isEmpty()) {
-            Font font = new Font("Impact", Font.BOLD, 20);
-            g2.setFont(font);
-
-            // Calculate Center
-            int cx = bounds.x + (bounds.width / 2);
-            int cy = bounds.y + (bounds.height / 2);
-
-            FontRenderContext frc = g2.getFontRenderContext();
-            GlyphVector gv = font.createGlyphVector(frc, activeOwnerLabel);
-            Shape textShape = gv.getOutline();
+        // 2. Handle the Highlight State
+        if (active) {
+            setState(State.HIGHLIGHT_PURPLE);
             
-            Rectangle textBounds = textShape.getBounds();
-            int x = cx - (textBounds.width / 2);
-            int y = cy + (textBounds.height / 2); 
+            // CRITICAL FIX: Force a repaint of the marks (border) layer.
+            // Even if the state was *already* HIGHLIGHT_PURPLE (no change), 
+            // we must ensure the map knows to redraw this area, specifically 
+            // if the map background was just cleared or redrawn.
+            hexMap.repaintMarks(getMarksDirtyBounds());
             
-            AffineTransform transform = AffineTransform.getTranslateInstance(x, y);
-            Shape centeredShape = transform.createTransformedShape(textShape);
-
-            // Draw Outline (White)
-            g2.setStroke(new BasicStroke(3.0f));
-            g2.setColor(Color.WHITE);
-            g2.draw(centeredShape);
-
-            // Draw Fill (Black)
-            g2.setColor(Color.BLACK);
-            g2.fill(centeredShape);
+        } else {
+            // Only revert to normal if we are currently purple. 
+            // We don't want to accidentally clear a 'SELECTED' or 'SELECTABLE' state 
+            // if the UI Logic overlaps.
+            if (getState() == State.HIGHLIGHT_PURPLE) {
+                setState(State.NORMAL);
+            }
         }
-
-        g2.setStroke(originalStroke);
-        g2.setColor(originalColor);
-
-
         
+        // 3. Trigger Token Layer Repaint (For the Label)
+        // We always do this because the label text might have changed 
+        // even if the active state remained true.
+        hexMap.repaintTokens(getBounds());
     }
 
+// ...
 
 }
