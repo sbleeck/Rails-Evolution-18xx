@@ -173,7 +173,7 @@ public class OperatingRound_1837 extends OperatingRound {
     /**
      * Helper duplicated from StockRound to avoid cross-round dependency issues.
      */
-    private PublicCompany getMergeTarget(PublicCompany source) {
+ private PublicCompany getMergeTarget(PublicCompany source) {
         String id = source.getId();
         String targetId = null;
 
@@ -184,17 +184,17 @@ public class OperatingRound_1837 extends OperatingRound {
         else if (id.equals("MLB"))
             targetId = "CL";
         else if (id.equals("ZKB") || id.equals("SPB"))
-            targetId = "TR";
+            targetId = "SB";
         else if (id.equals("LRB") || id.equals("EHS"))
-            targetId = "TI";
+            targetId = "TH"; // Corrected from TI to TH
         else if (id.equals("BB"))
             targetId = "BH";
 
-        else if (id.startsWith("Sd"))
+        else if (id.startsWith("S"))
             targetId = "Sd";
-        else if (id.startsWith("kk"))
-            targetId = "kk";
-        else if (id.startsWith("Ug"))
+        else if (id.startsWith("K"))
+            targetId = "KK";
+        else if (id.startsWith("U"))
             targetId = "Ug";
 
         if (targetId != null) {
@@ -399,7 +399,7 @@ public class OperatingRound_1837 extends OperatingRound {
         // check).
         // In 1837, exercising this right waives the terrain cost.
         if (isTileLayAllowed(company, hex, -1)) {
-            log.info("OR_1837: Waiving cost for hex " + hex.getId() + " due to Mountain Railway rights.");
+            log.debug("OR_1837: Waiving cost for hex " + hex.getId() + " due to Mountain Railway rights.");
             return 0;
         }
 
@@ -472,7 +472,7 @@ public class OperatingRound_1837 extends OperatingRound {
         PublicCompany company = operatingCompany.value();
 
         // DEBUG: Unconditional proof that the method is running
-        log.info("OR_1837 DEBUG: prepareRevenueAndDividendAction START for " + company.getId());
+        log.debug("OR_1837 DEBUG: prepareRevenueAndDividendAction START for " + company.getId());
 
         // There is only revenue if there are any trains
         if (companyHasRunningTrains(false)) {
@@ -489,7 +489,7 @@ public class OperatingRound_1837 extends OperatingRound {
                 for (Train t : company.getPortfolioModel().getTrainList()) {
                     if (t.getName().contains("G")) {
                         hasGTrains = true;
-                        log.info("OR_1837 DEBUG: G-Train detected: " + t.getName());
+                        log.debug("OR_1837 DEBUG: G-Train detected: " + t.getName());
                         break;
                     }
                 }
@@ -502,7 +502,7 @@ public class OperatingRound_1837 extends OperatingRound {
             int revenueToUse = company.getLastRevenue();
             int directIncomeToUse = company.getLastDirectIncome();
 
-            log.info(
+            log.debug(
                     "OR_1837 DEBUG: Initial Values -> Revenue=" + revenueToUse + ", Direct(Mine)=" + directIncomeToUse);
 
             // --- START FIX: Force Recalculation ---
@@ -510,7 +510,7 @@ public class OperatingRound_1837 extends OperatingRound {
             // We removed the checks for "== 0" to ensure we ALWAYS get the correct Mine
             // split.
             if (isMandatorySplit || hasGTrains) {
-                log.info("OR_1837 DEBUG: forcing RevenueAdapter calculation...");
+                log.debug("OR_1837 DEBUG: forcing RevenueAdapter calculation...");
                 try {
                     RevenueAdapter ra = RevenueAdapter.createRevenueAdapter(getRoot(), company,
                             getRoot().getPhaseManager().getCurrentPhase());
@@ -519,7 +519,7 @@ public class OperatingRound_1837 extends OperatingRound {
                         revenueToUse = ra.calculateRevenue();
                         directIncomeToUse = ra.getSpecialRevenue(); // Capture 1837 Mine Revenue logic
 
-                        log.info("OR_1837 DEBUG: Recalculation Result -> Total=" + revenueToUse + ", Mine="
+                        log.debug("OR_1837 DEBUG: Recalculation Result -> Total=" + revenueToUse + ", Mine="
                                 + directIncomeToUse);
                     } else {
                         log.warn("OR_1837 DEBUG: RevenueAdapter was NULL");
@@ -556,10 +556,10 @@ public class OperatingRound_1837 extends OperatingRound {
                     directIncomeToUse, // Fixed/Mine Revenue (goes to Treasury)
                     true, allowedRevenueActions, defaultAllocation));
 
-            log.info("OR_1837 DEBUG: Action Added. DirectIncome param = " + directIncomeToUse);
+            log.debug("OR_1837 DEBUG: Action Added. DirectIncome param = " + directIncomeToUse);
 
         } else {
-            log.info("OR_1837 DEBUG: No running trains for " + company.getId());
+            log.debug("OR_1837 DEBUG: No running trains for " + company.getId());
         }
     }
 
@@ -720,7 +720,7 @@ public class OperatingRound_1837 extends OperatingRound {
         } else if (currentPhase.getId().equals("4")) {
             // STRICT MEMORY CHECK: Redundant safety for Phase change logic.
             if (!phase4Triggered.value()) {
-                log.info("Phase 4 Transition Detected. Executing One-Time Triggers.");
+                log.debug("Phase 4 Transition Detected. Executing One-Time Triggers.");
                 phase4Triggered.set(true); // Mark memory: Undoable!
 
                 try {
@@ -878,13 +878,25 @@ public class OperatingRound_1837 extends OperatingRound {
         // List<Train> trains = new ArrayList<>(minor.getTrains());
         // for (Train t : trains) {
         // t.moveTo(major.getPortfolioModel());
-        // log.info("Transferred train " + t.getName() + " from " + minor.getId() + " to
+        // log.debug("Transferred train " + t.getName() + " from " + minor.getId() + " to
         // " + major.getId());
         // }
         // }
 
         Merger1837.mergeMinor(gameManager, minor, major);
         Merger1837.fixDirectorship(gameManager, major);
+
+if (major.getNumberOfTrains() > major.getCurrentTrainLimit()) {
+            log.warn("LIMIT ENFORCEMENT: " + major.getId() + " has " 
+                + major.getNumberOfTrains() + "/" + major.getCurrentTrainLimit() + " trains.");
+            
+            // Rails uses BUY_TRAIN step for discard resolution when over limit
+            setStep(GameDef.OrStep.BUY_TRAIN);
+            
+            operatingCompany.set(major);
+            setPossibleActions();
+        }
+
 
         // Use shared helper to check limits and generate discard actions if needed
         if (checkAndGenerateDiscardActions(major)) {
@@ -897,13 +909,13 @@ public class OperatingRound_1837 extends OperatingRound {
 
 
     private void handlePhase4Trigger() {
-        log.info("--- STARTING PHASE 4 LOGIC (Sd Formation) ---");
+        log.debug("--- STARTING PHASE 4 LOGIC (Sd Formation) ---");
 
         PublicCompany sd = getRoot().getCompanyManager().getPublicCompany("Sd");
 
         // ... (Keep existing Sd merger logic unchanged) ...
         if (sd != null && !sd.hasFloated()) {
-            log.info("Phase 4 Trigger: Forming Southern Railway (Sd)");
+            log.debug("Phase 4 Trigger: Forming Southern Railway (Sd)");
             net.sf.rails.game.financial.StockMarket market = getRoot().getStockMarket();
             net.sf.rails.game.financial.StockSpace parSpace = null;
             for (int r = 0; r < 50; r++) {
@@ -968,7 +980,7 @@ public class OperatingRound_1837 extends OperatingRound {
         // automatically.
         // --- END FIX ---
 
-        log.info("--- PHASE 4 LOGIC COMPLETE ---");
+        log.debug("--- PHASE 4 LOGIC COMPLETE ---");
     }
 
     @Override
@@ -976,7 +988,7 @@ public class OperatingRound_1837 extends OperatingRound {
         // 1. Intercept '4' train for Sd Merge logic (Strictly Mandatory Phase 4 Start)
         if (action.getTrain() != null && action.getTrain().getType().getName().equals("4")) {
             if (!phase4Triggered.value()) {
-                log.info("1837_FIX: First '4' train bought. Executing Sd Merge.");
+                log.debug("1837_FIX: First '4' train bought. Executing Sd Merge.");
                 phase4Triggered.set(true);
                 handlePhase4Trigger();
             }
@@ -991,7 +1003,7 @@ public class OperatingRound_1837 extends OperatingRound {
             // We restore '4' (KK) and '4E' (Ug) here.
             // The memory fix in finishRound() ensures we won't loop if you pass.
             if (trainName.equals("4") || trainName.equals("4E") || trainName.equals("5")) {
-                log.info("1837_FIX: Trigger Train (" + trainName + ") bought. Checking National Formation...");
+                log.debug("1837_FIX: Trigger Train (" + trainName + ") bought. Checking National Formation...");
                 triggerNationalFormation();
             }
 
@@ -1046,7 +1058,7 @@ public class OperatingRound_1837 extends OperatingRound {
 
                 // If valid trigger found:
                 if (start || forcedStart || forcedMerge) {
-                    log.info("1837_FIX: Triggering NFR for " + national.getId());
+                    log.debug("1837_FIX: Triggering NFR for " + national.getId());
 
                     triggeredNationals.add(national.getId());
                     tempTriggeredCache.add(national.getId());
@@ -1111,7 +1123,7 @@ public class OperatingRound_1837 extends OperatingRound {
 
                     // If result is not null/false, we actually removed something
                     if (result != null && !Boolean.FALSE.equals(result)) {
-                        log.info("Auto-Fix: Successfully removed zombie item: " + suspectUri);
+                        log.debug("Auto-Fix: Successfully removed zombie item: " + suspectUri);
                     }
                 } catch (Exception innerEx) {
                     // Ignore invocation errors (e.g. key missing)
@@ -1122,103 +1134,28 @@ public class OperatingRound_1837 extends OperatingRound {
         }
     }
 
-    public void nextSpecialActionPlayer() {
-        // RELOAD FIX: If we are reloading and the log shows we are done with special
-        // actions, exit.
-        if (gameManager.isReloading()) {
-            PossibleAction next = gameManager.getNextActionFromLog();
-            boolean stayInSpecial = false;
 
-            if (next != null) {
-                if (next instanceof ExchangeMinorAction) {
-                    stayInSpecial = true;
-                } else if (next instanceof NullAction && ((NullAction) next).getMode() == NullAction.Mode.DONE) {
-                    stayInSpecial = true;
-                }
-            }
-            if (!stayInSpecial) {
-                specialActionPhase.set(false);
-                specialActionPhaseFinished.set(true);
-                super.start();
-                return;
-            }
-        }
-
-        List<Player> players = gameManager.getPlayers();
-        int start = specialActionCurrentIndex.value();
-
-        // Loop through players.
-        // If start is -1 (fresh start), we begin at 0.
-        // If start is 0 (first player done), we begin at 1.
-
-        for (int i = 0; i < players.size(); i++) {
-            // FIX: If index is -1, check i. If index >= 0, check (start + 1 + i).
-            int checkIndex;
-            if (start == -1) {
-                checkIndex = i;
-            } else {
-                checkIndex = (start + 1 + i) % players.size();
-            }
-
-            Player p = players.get(checkIndex);
-            boolean hasAction = false;
-
-            if (p instanceof PortfolioOwner) {
-                PortfolioModel pm = ((PortfolioOwner) p).getPortfolioModel();
-                for (Object obj : pm.getCertificates()) {
-                    if (obj instanceof PublicCertificate) {
-                        PublicCertificate cert = (PublicCertificate) obj;
-                        PublicCompany comp = cert.getCompany();
-                        String type = comp.getType().getId();
-
-                        if ("Minor".equals(type) || "Coal".equals(type)) {
-                            PublicCompany target = getMergeTarget(comp);
-                            if (target != null && target.hasFloated() && comp.getPresident() == p) {
-                                // Check skipping using specific company ID
-                                if (!skippedMinors.contains(comp.getId())) {
-                                    hasAction = true;
-                                    break;
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-
-            if (hasAction) {
-                specialActionCurrentIndex.set(checkIndex);
-                specialActionPhase.set(true);
-                this.currentPlayer = p;
-                getRoot().getPlayerManager().setCurrentPlayer(p);
-                setPossibleActions();
-                return;
-            }
-        }
-
-        // No actions found
-        specialActionPhase.set(false);
-        specialActionPhaseFinished.set(true);
-        super.start();
-    }
-
-// ... (imports remain the same) ...
 
 @Override
     public boolean setPossibleActions() {
         
-        // 1. Special Action Phase (Player-based exchanges before companies run)
-        if (specialActionPhase.value() && gameManager.isReloading()) {
-            PossibleAction next = gameManager.getNextActionFromLog();
-            boolean stayInSpecial = false;
-            if (next != null) {
-                if (next instanceof ExchangeMinorAction) {
-                    stayInSpecial = true;
-                } else if (next instanceof NullAction && ((NullAction) next).getMode() == NullAction.Mode.DONE) {
-                    stayInSpecial = true;
+        // If we are in the train phase and over the limit, force discard actions
+if (getStep() == GameDef.OrStep.BUY_TRAIN) {
+            PublicCompany company = operatingCompany.value();
+            if (company != null && company.getNumberOfTrains() > company.getCurrentTrainLimit()) {
+                possibleActions.clear();
+                
+                // Create a separate action for each unique train owned by the company
+                for (Train train : company.getPortfolioModel().getUniqueTrains()) {
+                    Set<Train> singleTrainSet = new java.util.HashSet<>();
+                    singleTrainSet.add(train);
+                    
+                    DiscardTrain action = new DiscardTrain(company, singleTrainSet);
+                    // Optional: set a clear label for the UI button
+                    action.setLabel("Discard " + train.getName());
+                    possibleActions.add(action);
                 }
-            }
-            if (!stayInSpecial) {
-                specialActionPhase.set(false);
+                return true;
             }
         }
 
@@ -1226,27 +1163,25 @@ public class OperatingRound_1837 extends OperatingRound {
             possibleActions.clear();
             List<Player> players = gameManager.getPlayers();
             int index = specialActionCurrentIndex.value();
-
+log.warn("1837_DIAGNOSTIC: Generating Special Phase actions. Player Index: " + index);
             if (index >= 0 && index < players.size()) {
                 this.currentPlayer = players.get(index);
                 getRoot().getPlayerManager().setCurrentPlayer(this.currentPlayer);
-            } else {
-                this.currentPlayer = null;
             }
 
-            Set<String> processed = new HashSet<>();
             if (this.currentPlayer != null) {
+                Set<String> processed = new HashSet<>();
                 for (PublicCertificate cert : this.currentPlayer.getPortfolioModel().getCertificates()) {
                     PublicCompany comp = cert.getCompany();
-                    if (comp == null || processed.contains(comp.getId()))
-                        continue;
-                    if (skippedMinors.contains(comp.getId()))
+                    if (comp == null || processed.contains(comp.getId()) || skippedMinors.contains(comp.getId()))
                         continue;
 
                     String type = comp.getType().getId();
                     if ("Minor".equals(type) || "Coal".equals(type)) {
                         PublicCompany target = getMergeTarget(comp);
+                        // Check if target has floated and player is the president
                         if (target != null && target.hasFloated() && comp.getPresident() == this.currentPlayer) {
+                            log.warn("1837_DIAGNOSTIC:   Adding exchange action for " + comp.getId());
                             possibleActions.add(new ExchangeMinorAction(comp, target, false));
                             processed.add(comp.getId());
                         }
@@ -1254,10 +1189,12 @@ public class OperatingRound_1837 extends OperatingRound {
                 }
             }
 
-            NullAction na = new NullAction(getRoot(), NullAction.Mode.DONE);
-            na.setLabel("Done / Pass");
-            na.setPlayer(this.currentPlayer);
-            possibleActions.add(na);
+            // Always add the Done/Pass action to ensure the player can skip the opening
+            NullAction passAction = new NullAction(getRoot(), NullAction.Mode.DONE);
+            passAction.setLabel("Done / Pass Exchange");
+            passAction.setPlayer(this.currentPlayer);
+            possibleActions.add(passAction);
+            log.warn("1837_DIAGNOSTIC: Added 'Done / Pass Exchange' button.");
 
             return true;
         }
@@ -1317,14 +1254,26 @@ public class OperatingRound_1837 extends OperatingRound {
             if (company != null && getStep() == GameDef.OrStep.BUY_TRAIN && !isBelowTrainLimit()) {
                 boolean addedOption = false;
                 for (Train t : company.getPortfolioModel().getTrainList()) {
-                    int cost = t.getType().getCost() / 2;
-                    if (company.getCash() >= cost) {
+                    int scrapValue = t.getType().getCost() / 2;
+                    if (company.getCash() >= scrapValue) {
                         List<Train> trainList = new ArrayList<>();
                         trainList.add(t);
                         DiscardTrainVoluntarily dt = new DiscardTrainVoluntarily(company, trainList);
                         dt.setDiscardedTrain(t);
-                        String label = t.getName() + " (" + Bank.format(this, cost) + ")";
-                        dt.setLabel(label);
+                        
+
+                        // Explicitly construct the label with the price
+                        String priceText = Bank.format(this, scrapValue);
+                        String finalLabel = "Scrap " + t.getName() + " (" + priceText + ")";
+                        
+                        // Set the label via the standard setter
+                        dt.setLabel(finalLabel);
+                        
+                        // Force the action to return this label as its primary identifier
+                        // if DiscardTrainVoluntarily has an internal name field.
+                        log.warn("1837_DIAGNOSTIC: Created action with label: " + finalLabel);
+
+
                         possibleActions.add(dt);
                         addedOption = true;
                     }
@@ -1395,7 +1344,7 @@ public class OperatingRound_1837 extends OperatingRound {
         // Fix for "Captured in Final Move" loop
         if (action instanceof NullAction) {
             if (getStep() == GameDef.OrStep.BUY_TRAIN) {
-                log.info("1837_FIX: NullAction in BUY_TRAIN detected. Forcing finishTurn().");
+                log.debug("1837_FIX: NullAction in BUY_TRAIN detected. Forcing finishTurn().");
                 finishTurn();
                 return true;
             }
@@ -1407,6 +1356,7 @@ public class OperatingRound_1837 extends OperatingRound {
 
     @Override
     public void start() {
+
         processMandatoryExchanges();
 
         // These persist across reloads (same JVM) and cause "dirty state" bugs 
@@ -1425,6 +1375,7 @@ public class OperatingRound_1837 extends OperatingRound {
             specialActionPhase.set(false);
         }
         
+
         nextSpecialActionPlayer();
     }
 
@@ -1499,4 +1450,86 @@ public class OperatingRound_1837 extends OperatingRound {
         return super.layTile(action);
     }
 
+
+
+public void nextSpecialActionPlayer() {
+        // --- START FIX ---
+
+        
+        List<Player> players = gameManager.getPlayers();
+        int start = specialActionCurrentIndex.value();
+
+        
+        for (int i = 0; i < players.size(); i++) {
+            int checkIndex;
+            if (start == -1) {
+                checkIndex = i;
+            } else {
+                checkIndex = (start + 1 + i) % players.size();
+            }
+
+            Player p = players.get(checkIndex);
+            boolean hasAction = false;
+
+
+            
+            if (p instanceof PortfolioOwner) {
+                PortfolioModel pm = ((PortfolioOwner) p).getPortfolioModel();
+                
+                // Inspect certificates
+                java.util.Collection<PublicCertificate> certs = pm.getCertificates();
+
+                
+                for (PublicCertificate cert : certs) {
+                    if (cert == null) continue;
+
+                    PublicCompany comp = cert.getCompany();
+                    if (comp == null) continue;
+
+                    String type = comp.getType().getId();
+                    PublicCompany target = getMergeTarget(comp);
+                    
+                    boolean targetExists = target != null;
+                    boolean targetFloated = targetExists && target.hasFloated();
+                    boolean isPrez = comp.getPresident() == p;
+                    boolean isSkipped = skippedMinors.contains(comp.getId());
+                    boolean isClosed = comp.isClosed();
+
+                    // This log identifies EXACTLY why a company is or isn't shown
+ 
+                    
+                    if (("Minor".equals(type) || "Coal".equals(type)) && !isClosed) {
+                        if (targetExists && targetFloated && isPrez && !isSkipped) {
+                            hasAction = true;
+
+                            break;
+                        }
+                    }
+                }
+            }
+
+            if (hasAction) {
+
+                specialActionCurrentIndex.set(checkIndex);
+                specialActionPhase.set(true);
+                this.currentPlayer = p;
+                getRoot().getPlayerManager().setCurrentPlayer(p);
+                setPossibleActions();
+                return;
+            }
+        }
+
+
+        specialActionPhase.set(false);
+        specialActionPhaseFinished.set(true);
+        super.start();
+
+    }
+
+
+
+
+
+
+    
 }

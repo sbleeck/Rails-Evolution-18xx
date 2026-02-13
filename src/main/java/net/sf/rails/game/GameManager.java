@@ -2128,6 +2128,42 @@ public class GameManager extends RailsManager implements Configurable, Owner {
         try {
             // for (PossibleAction savedAction : savedActions) { // <-- DELETE
             for (this.reloadActionIndex = 0; this.reloadActionIndex < savedActions.size(); this.reloadActionIndex++) {
+                
+// INSTRUMENTATION: Identity Check
+            try {
+                GameManager rootGM = getRoot().getGameManager();
+                RoundFacade currentRound = getCurrentRound();
+                Object roundGM = null;
+                
+                // Reflection to get the GM from the Round
+                if (currentRound != null) {
+                    try {
+                        java.lang.reflect.Field gmField = currentRound.getClass().getSuperclass().getDeclaredField("gameManager"); // Assumes Round.java has this
+                        gmField.setAccessible(true);
+                        roundGM = gmField.get(currentRound);
+                    } catch (Exception e) {
+                        roundGM = "ReflectionFailed";
+                    }
+                }
+
+                log.info(String.format("DEBUG_ID: Reload Loop Step %d", this.reloadActionIndex));
+                log.info(String.format("DEBUG_ID: GM_Current (this) = %d", System.identityHashCode(this)));
+                log.info(String.format("DEBUG_ID: GM_Root     = %s", (rootGM == null ? "null" : System.identityHashCode(rootGM))));
+                log.info(String.format("DEBUG_ID: GM_Round    = %s", (roundGM instanceof GameManager ? System.identityHashCode(roundGM) : roundGM)));
+                
+                // Attempt Aggressive Sync if we find a mismatch
+                if (roundGM instanceof GameManager && roundGM != this) {
+                    log.info("DEBUG_ID: MISMATCH DETECTED! Attempting Sync to GM_Round...");
+                    GameManager target = (GameManager) roundGM;
+                    target.actionsBeingReloaded = this.actionsBeingReloaded;
+                    target.reloadActionIndex = this.reloadActionIndex;
+                    target.setReloading(true);
+                }
+
+            } catch (Exception e) {
+                log.error("DEBUG_ID: Error in instrumentation", e);
+            }
+                
                 PossibleAction savedAction = savedActions.get(this.reloadActionIndex);
                 if (this.reloadActionIndex < executedActionsCount) { // <-- USE MEMBER
                     executedAction = executedActions.get(this.reloadActionIndex); // <-- USE MEMBER
@@ -3224,17 +3260,40 @@ public class GameManager extends RailsManager implements Configurable, Owner {
      * @return The *next* PossibleAction in the log, or null if not reloading
      *         or if at the end of the list.
      */
-    public PossibleAction getNextActionFromLog() {
-        if (!isReloading() || this.actionsBeingReloaded == null) {
+public PossibleAction getNextActionFromLog() {
+        // --- START FIX ---
+        // INSTRUMENTATION: Strict logging to diagnose Fatal Reload Error
+        boolean reloadingState = isReloading();
+        boolean listExists = (this.actionsBeingReloaded != null);
+        int listSize = listExists ? this.actionsBeingReloaded.size() : -1;
+        int currentIndex = this.reloadActionIndex;
+        int targetIndex = currentIndex + 1;
+
+        log.info("DEBUG_INSTRUMENTATION: getNextActionFromLog() called.");
+        log.info(String.format("DEBUG_INSTRUMENTATION: State -> isReloading=%b, listExists=%b, size=%d, currentIndex=%d, targetIndex=%d",
+                reloadingState, listExists, listSize, currentIndex, targetIndex));
+
+        if (!reloadingState) {
+            log.info("DEBUG_INSTRUMENTATION: Returning NULL because !isReloading()");
             return null;
         }
 
-        int nextIndex = this.reloadActionIndex + 1;
-        if (nextIndex < this.actionsBeingReloaded.size()) {
-            return this.actionsBeingReloaded.get(nextIndex);
+        if (!listExists) {
+            log.info("DEBUG_INSTRUMENTATION: Returning NULL because actionsBeingReloaded is null");
+            return null;
         }
 
-        return null;
+        if (targetIndex >= listSize) {
+            log.info("DEBUG_INSTRUMENTATION: Returning NULL because targetIndex >= listSize (End of Log)");
+            return null;
+        }
+
+        PossibleAction action = this.actionsBeingReloaded.get(targetIndex);
+        String actionName = (action != null) ? action.toString() : "null_object";
+        log.info("DEBUG_INSTRUMENTATION: Returning Action -> " + actionName);
+
+        return action;
+        // --- END FIX ---
     }
 
     public boolean processOnReload(PossibleAction action) {

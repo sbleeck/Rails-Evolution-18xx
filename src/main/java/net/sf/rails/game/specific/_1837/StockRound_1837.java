@@ -12,6 +12,7 @@ import net.sf.rails.common.DisplayBuffer;
 import net.sf.rails.common.LocalText;
 import net.sf.rails.common.ReportBuffer;
 
+import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -29,7 +30,7 @@ public class StockRound_1837 extends StockRound {
             this, "discardingCompanyIndex");
     protected final BooleanState discardingTrains = new BooleanState(this,
             "discardingTrains");
-
+    protected final BooleanState specialActionProcessed = new BooleanState(this, "specialActionProcessed", false);
     protected PublicCompany[] discardingCompanies;
 
     // States for the Pre-Round Special Action Phase
@@ -107,45 +108,6 @@ public class StockRound_1837 extends StockRound {
         return actionsAdded;
     }
 
-    // ... (rest of the method: getMergeTarget) ...
-    /**
-     * Maps Coal/Minor companies to their Major/National targets based on 1837
-     * rules.
-     */
-    protected PublicCompany getMergeTarget(PublicCompany source) {
-        String id = source.getId();
-        String targetId = null;
-
-        // Coal Mappings (Rules 7.3)
-        if (id.equals("EPP") || id.equals("RGTE"))
-            targetId = "BK";
-        else if (id.equals("EOD") || id.equals("EKT"))
-            targetId = "MS";
-        else if (id.equals("MLB"))
-            targetId = "CL";
-        else if (id.equals("ZKB") || id.equals("SPB"))
-            targetId = "TR";
-        else if (id.equals("LRB") || id.equals("EHS"))
-            targetId = "TI";
-        else if (id.equals("BB"))
-            targetId = "BH";
-
-        // Minor Mappings (Rules 7.2) - Simple prefix matching
-        // Sd 1-5 -> Sd, kk 1-3 -> kk, Ug 1-3 -> Ug
-        else if (id.startsWith("Sd"))
-            targetId = "Sd"; // Southern Railway
-        else if (id.startsWith("kk"))
-            targetId = "kk"; // k.k. National
-        else if (id.startsWith("Ug"))
-            targetId = "Ug"; // Hungarian National
-
-        if (targetId != null) {
-            // Use getRoot() to access the CompanyManager
-            return gameManager.getRoot().getCompanyManager().getPublicCompany(targetId);
-        }
-        return null;
-    }
-
     public void setBuyableCerts() {
         super.setBuyableCerts();
 
@@ -203,9 +165,8 @@ public class StockRound_1837 extends StockRound {
     }
 
     /**
-     * Complemented by a shorter version in subclass CoalExchangeRound.
-     * TODO: to be reconsidered once Nationals formation has been tested.
      *
+     * 
      * @param minor The minor (or coal company) to be merged...
      * @param major ...into the related major company
      * @return True if the merge was successful
@@ -235,26 +196,13 @@ public class StockRound_1837 extends StockRound {
     @Override
     protected void finishTurn() {
 
-        if (!discardingTrains.value()) {
-            super.finishTurn();
-        } else {
-            PublicCompany comp = discardingCompanies[discardingCompanyIndex.value()];
-            if (comp != null && comp.getNumberOfTrains() <= comp.getCurrentTrainLimit()) {
-                discardingCompanyIndex.add(1);
-                if (discardingCompanyIndex.value() >= discardingCompanies.length) {
-                    // All excess trains have been discarded
-                    finishRound();
-                    return;
-                }
-            }
-            PublicCompany discardingCompany = discardingCompanies[discardingCompanyIndex.value()];
-            if (discardingCompany != null) {
-                setCurrentPlayer(discardingCompany.getPresident());
-            }
+        if (specialActionProcessed.value()) {
+            specialActionProcessed.set(false);
+            return;
         }
-    }
 
-    // ... inside StockRound_1837.java ...
+        super.finishTurn();
+    }
 
     public boolean buyShares(String playerName, BuyCertificate action) {
 
@@ -288,7 +236,7 @@ public class StockRound_1837 extends StockRound {
     protected void gameSpecificChecks(PortfolioModel boughtFrom,
             PublicCompany company,
             boolean justStarted) {
-        log.info("1837_DEBUG: gameSpecificChecks. Company=" + company.getId()
+        log.debug("1837_DEBUG: gameSpecificChecks. Company=" + company.getId()
                 + ", SourceModel=" + (boughtFrom != null ? boughtFrom.toString() : "null"));
 
         super.gameSpecificChecks(boughtFrom, company, justStarted);
@@ -313,65 +261,12 @@ public class StockRound_1837 extends StockRound {
         }
     }
 
-    @Override
-    public boolean setPossibleActions() {
-        if (discardingTrains.value()) {
-            return setTrainDiscardActions();
-        }
-
-        if (specialActionPhase.value() && gameManager.isReloading()) {
-            PossibleAction next = gameManager.getNextActionFromLog();
-            if (next != null) {
-                boolean isSpecialAction = (next instanceof ExchangeMinorAction);
-                if (!isSpecialAction && next instanceof NullAction) {
-                    if (((NullAction) next).getMode() == NullAction.Mode.DONE) {
-                        isSpecialAction = true;
-                    }
-                }
-                if (!isSpecialAction) {
-                    specialActionPhase.set(false);
-                }
-            }
-        }
-
-        if (specialActionPhase.value()) {
-            return setSpecialPhaseActions();
-        }
-
-        return super.setPossibleActions();
-    }
-
-    private boolean setSpecialPhaseActions() {
-        possibleActions.clear();
-        Set<String> processedCompanies = new HashSet<>();
-
-        if (currentPlayer != null) {
-            for (PublicCertificate cert : currentPlayer.getPortfolioModel().getCertificates()) {
-                PublicCompany company = cert.getCompany();
-                if (company == null || processedCompanies.contains(company.getId()))
-                    continue;
-
-                String type = company.getType().getId();
-                if ("Minor".equals(type) || "Coal".equals(type)) {
-                    PublicCompany target = getMergeTarget(company);
-                    if (target != null && target.hasFloated() && company.getPresident() == currentPlayer) {
-                        possibleActions.add(new ExchangeMinorAction(company, target, false));
-                        processedCompanies.add(company.getId());
-                    }
-                }
-            }
-        }
-
-        possibleActions.add(new NullAction(getRoot(), NullAction.Mode.DONE).setLabel("Done / No Exchanges"));
-        return true;
-    }
-
     protected boolean processGameSpecificAction(PossibleAction action) {
         log.debug("GameSpecificAction: {}", action);
         boolean result = false;
 
-        // FIXED: Removed Duplicate Code Block
         if (action instanceof ExchangeMinorAction) {
+            specialActionProcessed.set(true);
             ExchangeMinorAction exc = (ExchangeMinorAction) action;
             result = mergeCompanies(exc.getMinor(), exc.getTargetMajor(), false, false);
             if (result) {
@@ -383,22 +278,6 @@ public class StockRound_1837 extends StockRound {
             }
             return result;
 
-        } else if (action instanceof NullAction && specialActionPhase.value()) {
-            int count = specialActionPlayerCount.value() + 1;
-            specialActionPlayerCount.set(count);
-            List<Player> players = gameManager.getPlayers();
-
-            if (count >= players.size()) {
-                specialActionPhase.set(false);
-                setCurrentPlayer(playerManager.getPriorityPlayer());
-                super.start();
-            } else {
-                int nextIndex = (specialActionCurrentIndex.value() + 1) % players.size();
-                specialActionCurrentIndex.set(nextIndex);
-                setCurrentPlayer(players.get(nextIndex));
-                setPossibleActions();
-            }
-            return true;
         }
 
         if (action instanceof MergeCompanies) {
@@ -408,52 +287,6 @@ public class StockRound_1837 extends StockRound {
         }
 
         return result;
-    }
-
-    @Override
-    public void start() {
-        boolean exchangePossible = false;
-
-        for (Player p : gameManager.getPlayers()) {
-            for (PublicCertificate cert : p.getPortfolioModel().getCertificates()) {
-                PublicCompany comp = cert.getCompany();
-                if (comp == null)
-                    continue;
-                String type = comp.getType().getId();
-
-                if ("Minor".equals(type) || "Coal".equals(type)) {
-                    PublicCompany target = getMergeTarget(comp);
-                    boolean targetFloated = (target != null && target.hasFloated());
-                    boolean isPresident = (comp.getPresident() == p);
-
-                    if (targetFloated && isPresident) {
-                        exchangePossible = true;
-                        break;
-                    }
-                }
-            }
-            if (exchangePossible)
-                break;
-        }
-
-        specialActionPhase.set(exchangePossible);
-
-        if (exchangePossible) {
-            specialActionPlayerCount.set(0);
-            List<Player> players = gameManager.getPlayers();
-            Player priority = playerManager.getPriorityPlayer();
-            int pdIndex = 0;
-            if (priority != null && players.contains(priority)) {
-                pdIndex = players.indexOf(priority);
-            }
-            specialActionCurrentIndex.set(pdIndex);
-        }
-
-        if (discardingTrains.value()) {
-            discardingTrains.set(false);
-        }
-
-        super.start();
     }
 
     private void processSoldOutMergers() {
@@ -480,11 +313,284 @@ public class StockRound_1837 extends StockRound {
             }
 
             if (isSoldOut) {
-                log.info("Major " + major.getId() + " is Sold Out. Force merging " + minor.getId());
+                log.debug("Major " + major.getId() + " is Sold Out. Force merging " + minor.getId());
                 ReportBuffer.add(this, LocalText.getText("MergeSoldOut", minor.getId(), major.getId()));
                 mergeCompanies(minor, major, false, true);
             }
         }
     }
+
+    @Override
+    public boolean setPossibleActions() {
+
+        if (discardingTrains.value()) {
+            return setTrainDiscardActions();
+        }
+
+        if (specialActionPhase.value() && gameManager.isReloading()) {
+            PossibleAction next = gameManager.getNextActionFromLog();
+            if (next != null) {
+                boolean isSpecialAction = (next instanceof ExchangeMinorAction);
+                if (!isSpecialAction && next instanceof NullAction) {
+                    if (((NullAction) next).getMode() == NullAction.Mode.DONE) {
+                        isSpecialAction = true;
+                    }
+                }
+                if (!isSpecialAction) {
+                    specialActionPhase.set(false);
+                }
+            }
+        }
+
+        if (specialActionPhase.value()) {
+            return setSpecialPhaseActions();
+        }
+
+        return super.setPossibleActions();
+    }
+
+    @Override
+    public void finishRound() {
+
+        
+        super.finishRound();
+    }
+
+    @Override
+    public void start() {
+        // 1. Initialize standard Stock Round FIRST
+        super.start();
+
+        boolean exchangePossible = false;
+        List<Player> players = gameManager.getPlayers();
+
+        // 2. Check all players for ANY valid exchange
+        for (Player p : players) {
+            // PASS NULL to check all types
+            if (hasExchangeableMinors(p, null)) {
+                exchangePossible = true;
+            }
+        }
+
+        specialActionPhase.set(exchangePossible);
+
+        if (exchangePossible) {
+            specialActionPlayerCount.set(0);
+
+            // Start checking from the Priority Player
+            Player priority = playerManager.getPriorityPlayer();
+            int pdIndex = (priority != null && players.contains(priority)) ? players.indexOf(priority) : 0;
+
+            // 3. Skip players who have nothing to exchange
+            int checked = 0;
+            while (!hasExchangeableMinors(players.get(pdIndex), null) && checked < players.size()) {
+                pdIndex = (pdIndex + 1) % players.size();
+                checked++;
+            }
+
+            // 4. Set the actual starting player for the Special Phase
+            specialActionCurrentIndex.set(pdIndex);
+            setCurrentPlayer(players.get(pdIndex));
+
+            // FORCE action regeneration so the UI sees the Special Phase actions
+            // immediately.
+            setPossibleActions();
+
+        }
+
+        if (discardingTrains.value()) {
+            discardingTrains.set(false);
+        }
+    }
+
+
+    @Override
+    public boolean process(PossibleAction action) {
+        // CRITICAL: Always reset the flag at the start of a new action processing
+        // cycle.
+        // This handles cases where finishTurn() was skipped (e.g., after super.start())
+        // and prevents the flag from "leaking" into the standard round.
+        specialActionProcessed.set(false);
+
+        if (specialActionPhase.value()) {
+            // Mark true here to intercept finishTurn() for any Special Phase action
+            specialActionProcessed.set(true);
+
+            if (action instanceof NullAction) {
+                advanceSpecialPhase();
+                return true;
+            }
+
+            if (action instanceof ExchangeMinorAction) {
+                ExchangeMinorAction exc = (ExchangeMinorAction) action;
+
+                boolean result = mergeCompanies(exc.getMinor(), exc.getTargetMajor(), false, false);
+
+                if (result) {
+                    // Check if the player has ANY remaining exchanges
+                    if (hasExchangeableMinors(currentPlayer, null)) {
+                        setPossibleActions();
+                    } else {
+                        advanceSpecialPhase();
+                    }
+                }
+                return result;
+            }
+        }
+
+        boolean result = super.process(action);
+        return result;
+    }
+
+    /**
+     * Helper to handle the transition to the next player in the Special Phase.
+     */
+    private void advanceSpecialPhase() {
+        List<Player> players = gameManager.getPlayers();
+
+        int nextIdx = (specialActionCurrentIndex.value() + 1) % players.size();
+        int newCount = specialActionPlayerCount.value() + 1;
+
+        // Skip players with no exchangeable items
+        while (newCount < players.size() && !hasExchangeableMinors(players.get(nextIdx), null)) {
+            nextIdx = (nextIdx + 1) % players.size();
+            newCount++;
+        }
+
+        specialActionPlayerCount.set(newCount);
+        specialActionCurrentIndex.set(nextIdx);
+
+        if (newCount >= players.size()) {
+            specialActionPhase.set(false);
+            setCurrentPlayer(playerManager.getPriorityPlayer());
+
+            // Mark true to prevent the transition from counting as a Pass for the Priority
+            // Deal
+            specialActionProcessed.set(true);
+
+            super.start();
+        } else {
+            setCurrentPlayer(players.get(nextIdx));
+            setPossibleActions();
+        }
+    }
+
+
+    private boolean setSpecialPhaseActions() {
+        possibleActions.clear();
+        Set<String> processedCompanies = new HashSet<>();
+
+
+        
+        if (currentPlayer != null) {
+
+            for (PublicCertificate cert : currentPlayer.getPortfolioModel().getCertificates()) {
+                PublicCompany company = cert.getCompany();
+                if (company == null || processedCompanies.contains(company.getId()))
+                    continue;
+
+                String type = company.getType().getId();
+
+                if ("Minor".equals(type) || "Coal".equals(type)) {
+                    PublicCompany target = getMergeTarget(company);
+                    boolean isPres = (company.getPresident() == currentPlayer);
+                    boolean hasFloated = (target != null && target.hasFloated());
+
+                  
+                    
+
+
+
+                    if (target != null && hasFloated && isPres) {
+
+                        possibleActions.add(new ExchangeMinorAction(company, target, false));
+                        processedCompanies.add(company.getId());
+                    }
+                }
+            }
+        }
+        // --- END FIX ---
+
+        possibleActions.add(new NullAction(getRoot(), NullAction.Mode.DONE).setLabel("Done / No Exchanges"));
+        return true;
+    }
+
+
+    protected boolean hasExchangeableMinors(Player p, String typeFilter) {
+        if (p == null)
+            return false;
+        boolean found = false;
+
+     
+        for (PublicCertificate cert : p.getPortfolioModel().getCertificates()) {
+            PublicCompany comp = cert.getCompany();
+            if (comp == null)
+                continue;
+
+            String type = comp.getType().getId();
+
+            if (!"Minor".equals(type) && !"Coal".equals(type))
+                continue;
+
+            PublicCompany target = getMergeTarget(comp);
+
+            boolean isPresident = (comp.getPresident() == p);
+            boolean targetExists = (target != null);
+            boolean targetFloated = (targetExists && target.hasFloated());
+            boolean targetClosed = (targetExists && target.isClosed());
+            boolean typeMatch = (typeFilter == null || typeFilter.equals(type));
+            boolean compClosed = comp.isClosed();
+
+         
+            
+            if (compClosed)
+                continue;
+            if (!typeMatch)
+                continue;
+
+            if (targetFloated && isPresident && !targetClosed) {
+
+                found = true;
+            }
+        }
+
+        return found;
+    }
+
+
+        /**
+     * Helper duplicated from StockRound to avoid cross-round dependency issues.
+     */
+private PublicCompany getMergeTarget(PublicCompany source) {
+        String id = source.getId();
+        String targetId = null;
+
+        if (id.equals("EPP") || id.equals("RGTE"))
+            targetId = "BK";
+        else if (id.equals("EOD") || id.equals("EKT"))
+            targetId = "MS";
+        else if (id.equals("MLB"))
+            targetId = "CL";
+        else if (id.equals("ZKB") || id.equals("SPB"))
+            targetId = "SB";
+        else if (id.equals("LRB") || id.equals("EHS"))
+            targetId = "TH"; // Corrected from TI to TH
+        else if (id.equals("BB"))
+            targetId = "BH";
+
+        else if (id.startsWith("S"))
+            targetId = "Sd";
+        else if (id.startsWith("K"))
+            targetId = "KK";
+        else if (id.startsWith("U"))
+            targetId = "Ug";
+
+        if (targetId != null) {
+            return gameManager.getRoot().getCompanyManager().getPublicCompany(targetId);
+        }
+        return null;
+    }
+
+
 
 }

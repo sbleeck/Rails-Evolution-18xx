@@ -40,8 +40,6 @@ public class Mergers {
     }
 
     /**
-     * Complemented by a shorter version in subclass CoalExchangeRound.
-     * TODO: to be reconsidered once Nationals formation has been tested.
      *
      * @param gameManager A link to the actual game instance
      * @param minor The minor (or coal company) to be merged...

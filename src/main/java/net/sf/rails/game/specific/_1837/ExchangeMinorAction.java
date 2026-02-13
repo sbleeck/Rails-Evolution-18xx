@@ -3,6 +3,7 @@ package net.sf.rails.game.specific._1837;
 import java.awt.Color;
 import java.io.IOException;
 import java.io.ObjectInputStream;
+
 import com.google.common.base.Objects;
 
 import net.sf.rails.game.CompanyManager;
@@ -13,18 +14,20 @@ import rails.game.action.PossibleAction;
 
 /**
  * Generic action for exchanging a minor for a share in a major.
- * Used for: Coal Companies (CoalExchangeRound) AND KK Formation (OperatingRound).
+ * Modeled strictly after StartPrussian.java to ensure correct UI visualization.
  */
 public class ExchangeMinorAction extends PossibleAction implements GuiTargetedAction {
 
     private static final long serialVersionUID = 1L;
     
+    // Transient references to the objects
     private transient PublicCompany minor;
     private transient PublicCompany targetMajor;
     
+    // Persisted IDs for reconstruction
     private String minorId;
     private String targetMajorId;
-    private boolean isFormation; // True if this action forms the major (e.g. KK1)
+    private boolean isFormation;
 
     public ExchangeMinorAction(PublicCompany minor, PublicCompany targetMajor, boolean isFormation) {
         super(minor.getRoot());
@@ -36,10 +39,12 @@ public class ExchangeMinorAction extends PossibleAction implements GuiTargetedAc
     }
 
     public PublicCompany getMinor() {
+        if (minor == null) resolveCompanies();
         return minor;
     }
 
     public PublicCompany getTargetMajor() {
+        if (targetMajor == null) resolveCompanies();
         return targetMajor;
     }
     
@@ -49,13 +54,26 @@ public class ExchangeMinorAction extends PossibleAction implements GuiTargetedAc
 
     @Override
     public Owner getActor() {
-        // The action is performed by the Minor (via its President)
+        // --- START FIX ---
+        // Lazy Load: Ensure minor is not null before returning.
+        // This fixes the "Active Company (Reflect): None" issue in ORPanel
+        // where serialization timing left 'minor' as null.
+        if (minor == null) {
+            resolveCompanies();
+        }
         return minor;
+        // --- END FIX ---
+    }
+    
+    // Explicitly implement getTarget to match DiscardTrain pattern
+    @Override
+    public Object getTarget() {
+        return getActor();
     }
 
     @Override
     public String getGroupLabel() {
-        return "Exchange " + minor.getType().getId();
+        return "Exchange " + minorId;
     }
 
     @Override
@@ -66,11 +84,29 @@ public class ExchangeMinorAction extends PossibleAction implements GuiTargetedAc
         return "Exchange " + minorId + " for " + targetMajorId;
     }
 
+    // --- GuiTargetedAction UI Implementation (StartPrussian Style) ---
+
     @Override
     public Color getButtonColor() {
-        // Use Green for Formation/Exchange to indicate positive action
         return new Color(152, 251, 152); // PaleGreen
     }
+
+    @Override
+    public Color getHighlightBackgroundColor() {
+        return new Color(152, 251, 152); // PaleGreen
+    }
+
+    @Override
+    public Color getHighlightBorderColor() {
+        return new Color(34, 139, 34); // ForestGreen
+    }
+
+    @Override
+    public Color getHighlightTextColor() {
+        return Color.BLACK; 
+    }
+
+    // --- Serialization & Equality ---
 
     @Override
     public boolean equalsAs(PossibleAction pa, boolean asOption) {
@@ -84,8 +120,32 @@ public class ExchangeMinorAction extends PossibleAction implements GuiTargetedAc
     
     private void readObject(ObjectInputStream in) throws IOException, ClassNotFoundException {
         in.defaultReadObject();
-        CompanyManager cm = getCompanyManager();
-        this.minor = cm.getPublicCompany(minorId);
-        this.targetMajor = cm.getPublicCompany(targetMajorId);
+        // Attempt immediate resolution, but don't fail if root isn't ready
+        resolveCompanies();
+    }
+    
+    /**
+     * Helper to restore transient fields from IDs.
+     * Safe to call multiple times.
+     */
+    private void resolveCompanies() {
+        if (minor == null && minorId != null) {
+            CompanyManager cm = getCompanyManager();
+            if (cm != null) {
+                this.minor = cm.getPublicCompany(minorId);
+            }
+        }
+        if (targetMajor == null && targetMajorId != null) {
+            CompanyManager cm = getCompanyManager();
+            if (cm != null) {
+                this.targetMajor = cm.getPublicCompany(targetMajorId);
+            }
+        }
+    }
+    
+    @Override
+    public String toString() {
+        return String.format("ExchangeMinorAction [minor=%s, target=%s, formation=%s]", 
+                minorId, targetMajorId, isFormation);
     }
 }

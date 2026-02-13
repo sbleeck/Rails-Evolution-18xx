@@ -129,8 +129,6 @@ public /*abstract*/ class Round extends RailsAbstractItem implements RoundFacade
     /**
      * Set the operating companies in their current acting order
      */
-    // What is the reason of that to have that here? => move to OR?
-    // EV: No, also used in 1837/CoalExchangeRound, which is an SR type
     public List<PublicCompany> setOperatingCompanies() {
         return setOperatingCompanies(null, null);
     }

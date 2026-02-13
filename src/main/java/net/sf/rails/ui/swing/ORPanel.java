@@ -774,14 +774,13 @@ if (btnTrainSkip != null) btnTrainSkip.setEnabled(true);
         sidebarPanel.add(lblCompanyInfo);
 
 
-       lblPlayerInfo = new JLabel("Player", SwingConstants.CENTER); 
 lblPlayerInfo = new JLabel("", SwingConstants.CENTER);
-lblPlayerInfo.setOpaque(true);
-lblPlayerInfo.setBackground(Color.LIGHT_GRAY); 
-lblPlayerInfo.setAlignmentX(Component.CENTER_ALIGNMENT);
-lblPlayerInfo.setPreferredSize(new Dimension(SIDEBAR_WIDTH, 20)); // Smaller height for player
-lblPlayerInfo.setMaximumSize(new Dimension(SIDEBAR_WIDTH, 20));
-sidebarPanel.add(lblPlayerInfo);
+       lblPlayerInfo.setOpaque(true);
+       lblPlayerInfo.setBackground(Color.LIGHT_GRAY); 
+       lblPlayerInfo.setAlignmentX(Component.CENTER_ALIGNMENT);
+       lblPlayerInfo.setPreferredSize(new Dimension(SIDEBAR_WIDTH, 20)); // Smaller height for player
+       lblPlayerInfo.setMaximumSize(new Dimension(SIDEBAR_WIDTH, 20));
+       sidebarPanel.add(lblPlayerInfo);
 
         sidebarPanel.add(lblPhaseInstruction);
 
@@ -1639,6 +1638,10 @@ private void updateRevenueButton(ActionButton btn, int amount, int special) {
             lblCompanyInfo.setBorder(BorderFactory.createMatteBorder(1, 1, 0, 1, Color.DARK_GRAY));
             lblCompanyInfo.setVisible(true);
 
+            // Hide the special mode player label to prevent "hangovers" from previous rounds
+            if (lblPlayerInfo != null) {
+                lblPlayerInfo.setVisible(false);
+            }
             // BOTTOM LABEL: Instruction
             // Reverted to match Company Logo colors (Unified Header)
             String bottomText = "<html><center><font face='SansSerif' size='4'><b>" + instruction
@@ -1980,6 +1983,8 @@ bindActionHotkey(btn, action);
                     specialActions.add(pa);
                     if (contextProvider == null) contextProvider = (GuiTargetedAction) pa;
                 }
+
+                
                 // Legacy Fallback for Home Token (if not yet upgraded to GuiTargetedAction)
                 else if (pa instanceof LayBaseToken && ((LayBaseToken) pa).getType() == LayBaseToken.HOME_CITY) {
                     specialActions.add(pa);
@@ -2031,6 +2036,14 @@ bindActionHotkey(btn, action);
                     }
                     specialPanel.revalidate();
                     specialPanel.repaint();
+
+                    // had 0 height despite being visible.
+                    if (sidebarPanel != null) {
+                        sidebarPanel.revalidate();
+                        sidebarPanel.repaint();
+                    }
+
+                    
                 }
                 return;
             }
@@ -2053,6 +2066,7 @@ bindActionHotkey(btn, action);
             updatePhaseSpecifics();
 
             if (sidebarPanel != null)
+                sidebarPanel.revalidate(); // Ensure standard mode revalidates too
                 sidebarPanel.repaint();
 
         } catch (Exception e) {

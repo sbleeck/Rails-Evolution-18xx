@@ -215,9 +215,7 @@ public class DiscardTrain extends PossibleORAction implements GuiTargetedAction 
         }
         
         // 2. Your Special Coal Round
-        // Return FALSE. This tells the system "I didn't handle this".
-        // This allows your CoalExchangeRound.process() method to step in 
-        // and call executeDiscardTrain() from Round.java.
+
         return false;
     }
 

@@ -138,29 +138,29 @@ public class GameManager_1837 extends GameManager {
             } else {
                 startOperatingRound(runIfStartPacketIsNotCompletelySold());
             }
-        } else if (prevRound instanceof CoalExchangeRound) {
-            doneThisRound.add("CER");
-            // Pass newPhaseId.value() instead of null
-            if (checkAndRunNFR(newPhaseId.value(), previousSRorOR.value(), (Round) getInterruptedRound())) {
-                return;
-            }
+        // } else if (prevRound instanceof CoalExchangeRound) {
+        //     doneThisRound.add("CER");
+        //     // Pass newPhaseId.value() instead of null
+        //     if (checkAndRunNFR(newPhaseId.value(), previousSRorOR.value(), (Round) getInterruptedRound())) {
+        //         return;
+        //     }
 
-            boolean cameFromStockRound = (previousSRorOR.value() instanceof StockRound);
+        //     boolean cameFromStockRound = (previousSRorOR.value() instanceof StockRound);
 
-            if (cameFromStockRound) {
-                Phase currentPhase = getRoot().getPhaseManager().getCurrentPhase();
-                if (currentPhase != null) {
-                    numOfORs.set(currentPhase.getNumberOfOperatingRounds());
-                }
-                relativeORNumber.set(0);
-                startOperatingRound(true);
-            } else if (relativeORNumber.value() < numOfORs.value()) {
-                startOperatingRound(true);
-            } else {
-                startStockRound();
-            }
+        //     if (cameFromStockRound) {
+        //         Phase currentPhase = getRoot().getPhaseManager().getCurrentPhase();
+        //         if (currentPhase != null) {
+        //             numOfORs.set(currentPhase.getNumberOfOperatingRounds());
+        //         }
+        //         relativeORNumber.set(0);
+        //         startOperatingRound(true);
+        //     } else if (relativeORNumber.value() < numOfORs.value()) {
+        //         startOperatingRound(true);
+        //     } else {
+        //         startStockRound();
+        //     }
 
-            getCurrentRound().setPossibleActions();
+        //     getCurrentRound().setPossibleActions();
 
         } else if (prevRound instanceof NationalFormationRound) {
             doneThisRound.add(((NationalFormationRound) prevRound).getNational().getId());
@@ -213,17 +213,17 @@ public class GameManager_1837 extends GameManager {
             }
         }
         if (runCER) {
-            String cerId;
-            if (newPhaseId != null) {
-                cerId = "CER_phase_" + newPhaseId;
-            } else if (namingRound instanceof StockRound_1837) {
-                cerId = namingRound.getId().replaceFirst("SR_(\\d+)", "CER_$1.0");
-            } else {
-                cerId = namingRound.getId().replaceFirst("OR_(\\d+)(\\.\\d+)?", "CER_$1$2");
-                if (!cerId.contains(".")) cerId += ".1";
-            }
-            log.debug("Prev round {}, new round {}", namingRound.getId(), cerId);
-            createRound(CoalExchangeRound.class, cerId).start();
+            // String cerId;
+            // if (newPhaseId != null) {
+            //     cerId = "CER_phase_" + newPhaseId;
+            // } else if (namingRound instanceof StockRound_1837) {
+            //     cerId = namingRound.getId().replaceFirst("SR_(\\d+)", "CER_$1.0");
+            // } else {
+            //     cerId = namingRound.getId().replaceFirst("OR_(\\d+)(\\.\\d+)?", "CER_$1$2");
+            //     if (!cerId.contains(".")) cerId += ".1";
+            // }
+            // log.debug("Prev round {}, new round {}", namingRound.getId(), cerId);
+            // createRound(CoalExchangeRound.class, cerId).start();
         } else {
             doneThisRound.add("CER");
         }

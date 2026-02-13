@@ -44,7 +44,6 @@ String id = minor.getId();
         // Assets MUST be moved before the minor is modified or closed
         log.info("1837_MERGER: Commencing asset transfer for " + id);
       // Use the standard engine method to move Cash, Trains, and Privates.
-        // This matches the logic in Mergers.java used by CoalExchangeRound.
         // It bypasses the "getTrains() is empty" bug by handling portfolios internally.
         major.transferAssetsFrom(minor);
         log.info("1837_MERGER: Assets (Trains, Cash, Privates) transferred via transferAssetsFrom().");
