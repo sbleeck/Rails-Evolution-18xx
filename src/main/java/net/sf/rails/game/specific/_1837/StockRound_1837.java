@@ -43,55 +43,6 @@ public class StockRound_1837 extends StockRound {
         super(parent, id);
     }
 
-
-
-
-
-@Override
-    protected void gameSpecificChecks(PortfolioModel boughtFrom,
-                                      PublicCompany company,
-                                      boolean justStarted) {
-        // --- START FIX ---
-        // 1. Logging (Safe version: Removed .getHolder() call)
-        log.info("1837_DEBUG: gameSpecificChecks. Company=" + company.getId() 
-                + ", SourceModel=" + (boughtFrom != null ? boughtFrom.toString() : "null"));
-
-        // 2. CALL SUPER FIRST
-        // This performs standard validation and state updates
-        super.gameSpecificChecks(boughtFrom, company, justStarted);
-
-        // 3. Par Space Logic (1837 specific)
-        if (justStarted) {
-            StockSpace parSpace = company.getCurrentSpace();
-            if (parSpace != null) {
-                ((StockMarket_1837) stockMarket).addParSpaceUser(parSpace);
-            }
-        }
-        
-        // 4. SPECIAL FIX for 1837 Pool Buys: 
-        if (boughtFrom != null) {
-            // Check if source is IPO by comparing objects directly
-            // (PortfolioModel does not have .isIPO(), so we compare with the Bank's IPO model)
-            PortfolioModel ipoModel = net.sf.rails.game.financial.Bank.getIpo(gameManager).getPortfolioModel();
-            boolean isIPO = boughtFrom.equals(ipoModel);
-
-            // If we bought from Pool (i.e., NOT the IPO), ensure the game knows we acted.
-            if (!isIPO) {
-                 // Force update if super failed to do it for Pool
-                 if (companyBoughtThisTurnWrapper.value() == null) {
-                     log.warn("1837_DEBUG: FORCING companyBoughtThisTurnWrapper for Pool buy");
-                     companyBoughtThisTurnWrapper.set(company);
-                 }
-            }
-        }
-
-    }
-
-
-
-
-
-
     /**
      * Share price goes down 1 space for any number of shares sold.
      */
@@ -102,80 +53,6 @@ public class StockRound_1837 extends StockRound {
             super.adjustSharePrice(company, seller, 1, soldBefore);
         }
     }
-
-    @Override
-    public boolean setPossibleActions() {
-        if (discardingTrains.value()) {
-            return setTrainDiscardActions();
-        }
-        // If we are reloading an old save, the log might contain "BuyCertificate" right
-        // away.
-        // We must detect this and skip the Special Phase to match the history.
-        if (specialActionPhase.value() && gameManager.isReloading()) {
-            PossibleAction next = gameManager.getNextActionFromLog();
-            if (next != null) {
-                // Check if the log action is a Special Phase action
-                boolean isSpecialAction = (next instanceof ExchangeMinorAction);
-                if (!isSpecialAction && next instanceof NullAction) {
-                    // Check if it is the specific "Done" button for the special phase
-                    if (((NullAction) next).getMode() == NullAction.Mode.DONE) {
-                        isSpecialAction = true;
-                    }
-                }
-
-                // If the log contains a Standard Action (StartCompany, Buy, Pass), disable
-                // special phase
-                if (!isSpecialAction) {
-                    specialActionPhase.set(false);
-                }
-            }
-        }
-
-        // 0. Special Action Phase Check
-        if (specialActionPhase.value()) {
-            return setSpecialPhaseActions();
-        }
-
-        // 1. Load standard Stock Round actions (Buy, Sell, Pass)
-        boolean actionsAdded = super.setPossibleActions();
-
-        return actionsAdded;
-    }
-
-    // ... (lines of unchanged context code) ...
-    private boolean setSpecialPhaseActions() {
-        possibleActions.clear();
-
-        Set<String> processedCompanies = new HashSet<>();
-
-        // Iterate certs of the CURRENT player (set in start/process)
-        if (currentPlayer != null) {
-            for (PublicCertificate cert : currentPlayer.getPortfolioModel().getCertificates()) {
-                PublicCompany company = cert.getCompany();
-                if (company == null || processedCompanies.contains(company.getId()))
-                    continue;
-
-                String type = company.getType().getId();
-                if ("Minor".equals(type) || "Coal".equals(type)) {
-
-                    PublicCompany target = getMergeTarget(company);
-
-                    if (target != null && target.hasFloated() && company.getPresident() == currentPlayer) {
-                        possibleActions.add(new ExchangeMinorAction(company, target, false));
-                        processedCompanies.add(company.getId());
-                    }
-                }
-            }
-        }
-
-        // --- START FIX ---
-        // Use Mode.DONE and .setLabel()
-        possibleActions.add(new NullAction(getRoot(), NullAction.Mode.DONE).setLabel("Done / No Exchanges"));
-        // --- END FIX ---
-
-        return true;
-    }
-    // ... (rest of the class) ...
 
     /**
      * Identifies potential voluntary mergers for the current player and adds them
@@ -310,69 +187,6 @@ public class StockRound_1837 extends StockRound {
         return true;
     }
 
-    @Override
-    protected boolean processGameSpecificAction(PossibleAction action) {
-        log.debug("GameSpecificAction: {}", action);
-        boolean result = false;
-
-        if (action instanceof ExchangeMinorAction) {
-            ExchangeMinorAction exc = (ExchangeMinorAction) action;
-            // Pass 'true' for the last argument (autoMerge) to suppress internal pop-ups.
-            // The user has already confirmed via the button click.
-            result = mergeCompanies(exc.getMinor(), exc.getTargetMajor(), false, true);
-
-            // If in special phase, refresh actions without ending turn
-            if (specialActionPhase.value()) {
-                setPossibleActions();
-            } else {
-                // If this happened outside special phase (shouldn't, but for safety), mark
-                // acted
-                hasActed.set(true);
-            }
-            return result;
-        }
-
-        if (action instanceof ExchangeMinorAction) {
-            ExchangeMinorAction exc = (ExchangeMinorAction) action;
-            result = mergeCompanies(exc.getMinor(), exc.getTargetMajor(), false, false);
-            if (result) {
-                setPossibleActions();
-            }
-            return result;
-
-        } else if (action instanceof NullAction && specialActionPhase.value()) {
-            // "Done" clicked in special phase
-            int count = specialActionPlayerCount.value() + 1;
-            specialActionPlayerCount.set(count);
-
-            List<Player> players = gameManager.getPlayers();
-
-            if (count >= players.size()) {
-                // All players done
-                specialActionPhase.set(false);
-                // Start the REAL stock round
-                // We must manually set the current player back to Priority Deal
-                setCurrentPlayer(playerManager.getPriorityPlayer());
-                super.start();
-            } else {
-                // Next player in loop
-                int nextIndex = (specialActionCurrentIndex.value() + 1) % players.size();
-                specialActionCurrentIndex.set(nextIndex);
-                setCurrentPlayer(players.get(nextIndex));
-                setPossibleActions();
-            }
-            return true;
-        }
-
-        if (action instanceof MergeCompanies) { // Legacy check, can likely be removed if unused
-            result = mergeCompanies((MergeCompanies) action);
-        } else if (action instanceof DiscardTrain) {
-            result = discardTrain((DiscardTrain) action);
-        }
-
-        return result;
-    }
-
     /**
      * Merge a minor into an already started company.
      * 
@@ -440,59 +254,7 @@ public class StockRound_1837 extends StockRound {
         }
     }
 
-    @Override
-    public void start() {
-        boolean exchangePossible = false;
-
-        for (Player p : gameManager.getPlayers()) {
-            for (PublicCertificate cert : p.getPortfolioModel().getCertificates()) {
-                PublicCompany comp = cert.getCompany();
-                if (comp == null)
-                    continue;
-                String type = comp.getType().getId();
-
-                if ("Minor".equals(type) || "Coal".equals(type)) {
-                    PublicCompany target = getMergeTarget(comp);
-                    boolean targetFloated = (target != null && target.hasFloated());
-                    boolean isPresident = (comp.getPresident() == p);
-
-                    if (targetFloated && isPresident) {
-                        exchangePossible = true;
-                        break;
-                    }
-                }
-            }
-            if (exchangePossible)
-                break;
-        }
-
-        if (!exchangePossible) {
-            specialActionPhase.set(false);
-            super.start();
-            return;
-        }
-
-        // Initialize Special Phase sequence
-        specialActionPhase.set(true);
-        specialActionPlayerCount.set(0);
-
-        List<Player> players = gameManager.getPlayers();
-        Player priority = playerManager.getPriorityPlayer();
-
-        int pdIndex = 0;
-        if (priority != null && players.contains(priority)) {
-            pdIndex = players.indexOf(priority);
-        }
-
-        specialActionCurrentIndex.set(pdIndex);
-        setCurrentPlayer(players.get(pdIndex));
-        // --- END FIX ---
-
-        if (discardingTrains.value()) {
-            discardingTrains.set(false);
-        }
-
-    }
+    // ... inside StockRound_1837.java ...
 
     public boolean buyShares(String playerName, BuyCertificate action) {
 
@@ -522,31 +284,192 @@ public class StockRound_1837 extends StockRound {
         return result;
     }
 
-    /**
-     * Checks all Coal/Minor companies. If their target Major is "Sold Out" (IPO
-     * empty),
-     * forces an immediate automatic merger.
-     */
+    @Override
+    protected void gameSpecificChecks(PortfolioModel boughtFrom,
+            PublicCompany company,
+            boolean justStarted) {
+        log.info("1837_DEBUG: gameSpecificChecks. Company=" + company.getId()
+                + ", SourceModel=" + (boughtFrom != null ? boughtFrom.toString() : "null"));
+
+        super.gameSpecificChecks(boughtFrom, company, justStarted);
+
+        if (justStarted) {
+            StockSpace parSpace = company.getCurrentSpace();
+            if (parSpace != null) {
+                ((StockMarket_1837) stockMarket).addParSpaceUser(parSpace);
+            }
+        }
+
+        if (boughtFrom != null) {
+            PortfolioModel ipoModel = net.sf.rails.game.financial.Bank.getIpo(gameManager).getPortfolioModel();
+            boolean isIPO = boughtFrom.equals(ipoModel);
+
+            if (!isIPO) {
+                if (companyBoughtThisTurnWrapper.value() == null) {
+                    log.warn("1837_DEBUG: FORCING companyBoughtThisTurnWrapper for Pool buy");
+                    companyBoughtThisTurnWrapper.set(company);
+                }
+            }
+        }
+    }
+
+    @Override
+    public boolean setPossibleActions() {
+        if (discardingTrains.value()) {
+            return setTrainDiscardActions();
+        }
+
+        if (specialActionPhase.value() && gameManager.isReloading()) {
+            PossibleAction next = gameManager.getNextActionFromLog();
+            if (next != null) {
+                boolean isSpecialAction = (next instanceof ExchangeMinorAction);
+                if (!isSpecialAction && next instanceof NullAction) {
+                    if (((NullAction) next).getMode() == NullAction.Mode.DONE) {
+                        isSpecialAction = true;
+                    }
+                }
+                if (!isSpecialAction) {
+                    specialActionPhase.set(false);
+                }
+            }
+        }
+
+        if (specialActionPhase.value()) {
+            return setSpecialPhaseActions();
+        }
+
+        return super.setPossibleActions();
+    }
+
+    private boolean setSpecialPhaseActions() {
+        possibleActions.clear();
+        Set<String> processedCompanies = new HashSet<>();
+
+        if (currentPlayer != null) {
+            for (PublicCertificate cert : currentPlayer.getPortfolioModel().getCertificates()) {
+                PublicCompany company = cert.getCompany();
+                if (company == null || processedCompanies.contains(company.getId()))
+                    continue;
+
+                String type = company.getType().getId();
+                if ("Minor".equals(type) || "Coal".equals(type)) {
+                    PublicCompany target = getMergeTarget(company);
+                    if (target != null && target.hasFloated() && company.getPresident() == currentPlayer) {
+                        possibleActions.add(new ExchangeMinorAction(company, target, false));
+                        processedCompanies.add(company.getId());
+                    }
+                }
+            }
+        }
+
+        possibleActions.add(new NullAction(getRoot(), NullAction.Mode.DONE).setLabel("Done / No Exchanges"));
+        return true;
+    }
+
+    protected boolean processGameSpecificAction(PossibleAction action) {
+        log.debug("GameSpecificAction: {}", action);
+        boolean result = false;
+
+        // FIXED: Removed Duplicate Code Block
+        if (action instanceof ExchangeMinorAction) {
+            ExchangeMinorAction exc = (ExchangeMinorAction) action;
+            result = mergeCompanies(exc.getMinor(), exc.getTargetMajor(), false, false);
+            if (result) {
+                if (specialActionPhase.value()) {
+                    setPossibleActions();
+                } else {
+                    hasActed.set(true);
+                }
+            }
+            return result;
+
+        } else if (action instanceof NullAction && specialActionPhase.value()) {
+            int count = specialActionPlayerCount.value() + 1;
+            specialActionPlayerCount.set(count);
+            List<Player> players = gameManager.getPlayers();
+
+            if (count >= players.size()) {
+                specialActionPhase.set(false);
+                setCurrentPlayer(playerManager.getPriorityPlayer());
+                super.start();
+            } else {
+                int nextIndex = (specialActionCurrentIndex.value() + 1) % players.size();
+                specialActionCurrentIndex.set(nextIndex);
+                setCurrentPlayer(players.get(nextIndex));
+                setPossibleActions();
+            }
+            return true;
+        }
+
+        if (action instanceof MergeCompanies) {
+            result = mergeCompanies((MergeCompanies) action);
+        } else if (action instanceof DiscardTrain) {
+            result = discardTrain((DiscardTrain) action);
+        }
+
+        return result;
+    }
+
+    @Override
+    public void start() {
+        boolean exchangePossible = false;
+
+        for (Player p : gameManager.getPlayers()) {
+            for (PublicCertificate cert : p.getPortfolioModel().getCertificates()) {
+                PublicCompany comp = cert.getCompany();
+                if (comp == null)
+                    continue;
+                String type = comp.getType().getId();
+
+                if ("Minor".equals(type) || "Coal".equals(type)) {
+                    PublicCompany target = getMergeTarget(comp);
+                    boolean targetFloated = (target != null && target.hasFloated());
+                    boolean isPresident = (comp.getPresident() == p);
+
+                    if (targetFloated && isPresident) {
+                        exchangePossible = true;
+                        break;
+                    }
+                }
+            }
+            if (exchangePossible)
+                break;
+        }
+
+        specialActionPhase.set(exchangePossible);
+
+        if (exchangePossible) {
+            specialActionPlayerCount.set(0);
+            List<Player> players = gameManager.getPlayers();
+            Player priority = playerManager.getPriorityPlayer();
+            int pdIndex = 0;
+            if (priority != null && players.contains(priority)) {
+                pdIndex = players.indexOf(priority);
+            }
+            specialActionCurrentIndex.set(pdIndex);
+        }
+
+        if (discardingTrains.value()) {
+            discardingTrains.set(false);
+        }
+
+        super.start();
+    }
+
     private void processSoldOutMergers() {
-        // Create a safe copy to avoid ConcurrentModificationException if companies
-        // close during iteration
         List<PublicCompany> allCompanies = new java.util.ArrayList<>(gameManager.getAllPublicCompanies());
 
         for (PublicCompany minor : allCompanies) {
             if (minor.isClosed())
                 continue;
-
             String type = minor.getType().getId();
-            // Only Coal and Minors are subject to this rule
             if (!"Coal".equals(type) && !"Minor".equals(type))
                 continue;
 
             PublicCompany major = getMergeTarget(minor);
-            // Major must exist and be floated to accept a Sold Out merger
             if (major == null || !major.hasFloated() || major.isClosed())
                 continue;
 
-            // Check if Major is Sold Out (No shares remaining in IPO)
             boolean isSoldOut = true;
             for (PublicCertificate cert : net.sf.rails.game.financial.Bank.getIpo(gameManager).getPortfolioModel()
                     .getCertificates()) {
@@ -558,13 +481,7 @@ public class StockRound_1837 extends StockRound {
 
             if (isSoldOut) {
                 log.info("Major " + major.getId() + " is Sold Out. Force merging " + minor.getId());
-
-                // Report to UI
                 ReportBuffer.add(this, LocalText.getText("MergeSoldOut", minor.getId(), major.getId()));
-
-                // Execute Merge:
-                // majorPresident=false (system forced)
-                // autoMerge=true (suppress confirmation pop-ups)
                 mergeCompanies(minor, major, false, true);
             }
         }

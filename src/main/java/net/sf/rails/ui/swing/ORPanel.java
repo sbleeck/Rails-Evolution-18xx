@@ -1204,52 +1204,79 @@ sidebarPanel.add(lblPlayerInfo);
         setRevenue(i, a);
     }
 
-    public void setRevenue(int i, int a) {
-        updateRevenueButton(btnRevPayout, a);
-        updateRevenueButton(btnRevWithhold, a);
-        updateRevenueButton(btnRevSplit, a);
-    }
 
 
     public void revenueUpdate(int best, int special, boolean finalRes) {
         SwingUtilities.invokeLater(() -> {
+           
             try {
-                // --- START FIX ---
                 if (lblRevenue != null) {
-                    // Do not use format(best) directly, as it bypasses game-specific split logic (e.g. 1837 Coal).
-                    // We delegate back to the OperatingRound to get the consistent "X + Y" string.
+                    // --- START FIX ---
+                    // Delegate display formatting to the OperatingRound (e.g., "30 + 30")
+                    // This keeps logic out of the Panel.
                     RoundFacade rf = orUIManager.getGameUIManager().getCurrentRound();
                     if (rf instanceof OperatingRound) {
                         lblRevenue.setText(((OperatingRound) rf).getRevenueDisplayString(orComp));
                     } else {
-                        // Fallback for non-standard states
                         lblRevenue.setText(format(best));
                     }
+                    // --- END FIX ---
                 }
-                // --- END FIX ---
 
-                if (isRevenueValueToBeSet)
-                    setRevenue(orCompIndex, best);
+                if (isRevenueValueToBeSet) {
+                    // --- START FIX ---
+                    // Pass the 'special' value (Mine Revenue) from the calculator to the button.
+                    setRevenue(orCompIndex, best, special);
+                    // --- END FIX ---
+                }
+                
                 if (finalRes && isDisplayCurrentRoutes()) {
                     revenueAdapter.drawOptimalRunAsPath(orUIManager.getMap());
                 }
             } catch (Exception e) {
                 log.error("Error in revenueUpdate UI update", e);
             }
+        
         });
     }
+
+    /**
+     * Overloaded setRevenue to handle Special (Direct/Mine) revenue
+     */
+    public void setRevenue(int i, int a, int special) {
+        updateRevenueButton(btnRevPayout, a, special);
+        updateRevenueButton(btnRevWithhold, a, special);
+        updateRevenueButton(btnRevSplit, a, special);
+    }
+
+    /**
+     * Legacy method support
+     */
+    public void setRevenue(int i, int a) {
+        setRevenue(i, a, 0);
+    }
+
     
     // Revenue Helpers
     private void updateRevenueButton(ActionButton btn, int amount) {
+        updateRevenueButton(btn, amount, 0);
+    }
+    
+private void updateRevenueButton(ActionButton btn, int amount, int special) {
         if (btn == null || !btn.isEnabled())
             return;
         List<PossibleAction> actions = btn.getPossibleActions();
         if (actions != null && !actions.isEmpty() && actions.get(0) instanceof SetDividend) {
-            ((SetDividend) actions.get(0)).setActualRevenue(amount);
+            SetDividend sd = (SetDividend) actions.get(0);
+            
+            // Bind the data from the calculator to the Action
+            sd.setActualRevenue(amount);
+            sd.setActualCompanyTreasuryRevenue(special);
+            
             btn.repaint();
         }
     }
-
+    
     private void updateCurrentRoutes(boolean isSetRevenueStep) {
         if (orComp != null && !orComp.isClosed()) {
             isRevenueValueToBeSet = isSetRevenueStep;

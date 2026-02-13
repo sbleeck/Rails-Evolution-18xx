@@ -40,97 +40,6 @@ public class GameManager_1837 extends GameManager {
         newPhaseId.set(round.getId());
     }
 
-    public void nextRound(Round prevRound) {
-        log.info("Transitioning Round. Previous: {} ({})", prevRound.getId(), prevRound.getClass().getSimpleName());
-
-        if (prevRound instanceof StartRound) {
-            buyOnly.set(true);
-            if (((StartRound) prevRound).getStartPacket().areAllSold()) {
-                beginStartRound();
-            } else {
-                startOperatingRound(runIfStartPacketIsNotCompletelySold());
-            }
-        } else if (prevRound instanceof CoalExchangeRound) {
-            doneThisRound.add("CER");
-            if (checkAndRunNFR(newPhaseId.value(), previousSRorOR.value(), (Round) getInterruptedRound())) {
-                return;
-            }
-
-            boolean cameFromStockRound = (previousSRorOR.value() instanceof StockRound);
-
-            if (cameFromStockRound) {
-                Phase currentPhase = getRoot().getPhaseManager().getCurrentPhase();
-                if (currentPhase != null) {
-                    numOfORs.set(currentPhase.getNumberOfOperatingRounds());
-                }
-                relativeORNumber.set(0);
-                startOperatingRound(true);
-            } else if (relativeORNumber.value() < numOfORs.value()) {
-                startOperatingRound(true);
-            } else {
-                startStockRound();
-            }
-
-            getCurrentRound().setPossibleActions();
-
-        } else if (prevRound instanceof NationalFormationRound) {
-            doneThisRound.add(((NationalFormationRound) prevRound).getNational().getId());
-            OperatingRound_1837 interruptedRound = (OperatingRound_1837) getInterruptedRound();
-            
-            if (checkAndRunNFR(newPhaseId.value(), previousSRorOR.value(), interruptedRound)) {
-                return;
-            }
-
-            if (interruptedRound != null) {
-                setRound(interruptedRound);
-                interruptedRound.resume();
-            } else {
-                super.nextRound(previousSRorOR.value());
-            }
-        } else if (prevRound instanceof StockRound_1837 || prevRound instanceof OperatingRound_1837) {
-            previousSRorOR.set(prevRound);
-            doneThisRound.clear();
-            setInterruptedRound(prevRound);
-            log.info("Saving Interrupted Round: {}", prevRound.getId());
-            if (!checkAndRunCER(null, prevRound, null)
-                    && !checkAndRunNFR(null, prevRound, null)) {
-                super.nextRound(prevRound);
-            }
-        } else {
-            setInterruptedRound(null);
-            super.nextRound(prevRound);
-        }
-    }
-
-    public boolean checkAndRunCER(String newPhaseId, Round namingRound, Round interruptedRound) {
-        if (doneThisRound.contains("CER")) return false;
-        List<PublicCompany> coalCompanies = getRoot().getCompanyManager().getPublicCompaniesByType("Coal");
-        boolean runCER = false;
-        for (PublicCompany coalComp : coalCompanies) {
-            if (!coalComp.isClosed() && coalComp.getRelatedPublicCompany().hasFloated()) {
-                runCER = true;
-                setInterruptedRound(interruptedRound);
-                setNewPhaseId(newPhaseId);
-                break;
-            }
-        }
-        if (runCER) {
-            String cerId;
-            if (newPhaseId != null) {
-                cerId = "CER_phase_" + newPhaseId;
-            } else if (namingRound instanceof StockRound_1837) {
-                cerId = namingRound.getId().replaceFirst("SR_(\\d+)", "CER_$1.0");
-            } else {
-                cerId = namingRound.getId().replaceFirst("OR_(\\d+)(\\.\\d+)?", "CER_$1$2");
-                if (!cerId.contains(".")) cerId += ".1";
-            }
-            log.debug("Prev round {}, new round {}", namingRound.getId(), cerId);
-            createRound(CoalExchangeRound.class, cerId).start();
-        } else {
-            doneThisRound.add("CER");
-        }
-        return runCER;
-    }
 
     public boolean checkAndRunNFR(String newPhaseId, Round namingRound, Round interruptedRound) {
         this.newPhaseId.set(newPhaseId);
@@ -213,4 +122,121 @@ public class GameManager_1837 extends GameManager {
     public void setNewPhaseId(String newPhaseId) {
         this.newPhaseId.set(newPhaseId);
     }
+
+
+
+// In GameManager_1837.java
+
+    @Override
+    public void nextRound(Round prevRound) {
+        log.info("Transitioning Round. Previous: {} ({})", prevRound.getId(), prevRound.getClass().getSimpleName());
+
+        if (prevRound instanceof StartRound) {
+            buyOnly.set(true);
+            if (((StartRound) prevRound).getStartPacket().areAllSold()) {
+                beginStartRound();
+            } else {
+                startOperatingRound(runIfStartPacketIsNotCompletelySold());
+            }
+        } else if (prevRound instanceof CoalExchangeRound) {
+            doneThisRound.add("CER");
+            // Pass newPhaseId.value() instead of null
+            if (checkAndRunNFR(newPhaseId.value(), previousSRorOR.value(), (Round) getInterruptedRound())) {
+                return;
+            }
+
+            boolean cameFromStockRound = (previousSRorOR.value() instanceof StockRound);
+
+            if (cameFromStockRound) {
+                Phase currentPhase = getRoot().getPhaseManager().getCurrentPhase();
+                if (currentPhase != null) {
+                    numOfORs.set(currentPhase.getNumberOfOperatingRounds());
+                }
+                relativeORNumber.set(0);
+                startOperatingRound(true);
+            } else if (relativeORNumber.value() < numOfORs.value()) {
+                startOperatingRound(true);
+            } else {
+                startStockRound();
+            }
+
+            getCurrentRound().setPossibleActions();
+
+        } else if (prevRound instanceof NationalFormationRound) {
+            doneThisRound.add(((NationalFormationRound) prevRound).getNational().getId());
+            OperatingRound_1837 interruptedRound = (OperatingRound_1837) getInterruptedRound();
+            
+            // Pass newPhaseId.value() instead of null
+            if (checkAndRunNFR(newPhaseId.value(), previousSRorOR.value(), interruptedRound)) {
+                return;
+            }
+
+            if (interruptedRound != null) {
+                setRound(interruptedRound);
+                interruptedRound.resume();
+            } else {
+                super.nextRound(previousSRorOR.value());
+            }
+        } else if (prevRound instanceof StockRound_1837 || prevRound instanceof OperatingRound_1837) {
+            previousSRorOR.set(prevRound);
+            doneThisRound.clear();
+            setInterruptedRound(prevRound);
+            log.info("Saving Interrupted Round: {}", prevRound.getId());
+            
+            // --- FIX: Pass newPhaseId.value() to enforce trigger logic ---
+            if (!checkAndRunCER(newPhaseId.value(), prevRound, null)
+                    && !checkAndRunNFR(newPhaseId.value(), prevRound, null)) {
+                super.nextRound(prevRound);
+            }
+        } else {
+            setInterruptedRound(null);
+            super.nextRound(prevRound);
+        }
+    }
+
+    public boolean checkAndRunCER(String newPhaseId, Round namingRound, Round interruptedRound) {
+        if (doneThisRound.contains("CER")) return false;
+        
+        // --- FIX: Only run CER if we have a specific Phase Trigger ---
+        // If newPhaseId is null, it means we are just transitioning rounds normally.
+        // We should NOT trigger a CER just because a company is open.
+        if (newPhaseId == null) return false;
+
+        List<PublicCompany> coalCompanies = getRoot().getCompanyManager().getPublicCompaniesByType("Coal");
+        boolean runCER = false;
+        for (PublicCompany coalComp : coalCompanies) {
+            if (!coalComp.isClosed() && coalComp.getRelatedPublicCompany().hasFloated()) {
+                runCER = true;
+                setInterruptedRound(interruptedRound);
+                setNewPhaseId(newPhaseId);
+                break;
+            }
+        }
+        if (runCER) {
+            String cerId;
+            if (newPhaseId != null) {
+                cerId = "CER_phase_" + newPhaseId;
+            } else if (namingRound instanceof StockRound_1837) {
+                cerId = namingRound.getId().replaceFirst("SR_(\\d+)", "CER_$1.0");
+            } else {
+                cerId = namingRound.getId().replaceFirst("OR_(\\d+)(\\.\\d+)?", "CER_$1$2");
+                if (!cerId.contains(".")) cerId += ".1";
+            }
+            log.debug("Prev round {}, new round {}", namingRound.getId(), cerId);
+            createRound(CoalExchangeRound.class, cerId).start();
+        } else {
+            doneThisRound.add("CER");
+        }
+        return runCER;
+    }
+
+
+
+
+
+
+
+
+
+
 }

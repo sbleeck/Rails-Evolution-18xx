@@ -4217,20 +4217,34 @@ public static final Color BG_DISCARD_VOLUNTARY = Color.CYAN; // Light Blue (#ADD
             f = compCashButton[i] = new ClickField(compCash[i].getText(), CASH_CORRECT_CMD, "", this, buySellGroup);
             addField(f, compCashXOffset, y, 1, 1, 0, false);
 
-            // REVENUE COLUMN: Switch to "Last Dividend" (Player/Split portion) if Direct
-            // Income exists.
-            // We inline the ternary to avoid needing to know the exact fully qualified name
-            // of the common interface (Model/State).
 
+            // REVENUE COLUMN: Display ONLY the Route Revenue (Base).
+            // We explicitly calculate (Total - Special) to ensure Fixed Mine revenue is excluded.
             f = compRevenue[i] = new Field(
                     hasDirectCompanyIncomeInOr ? c.getLastDividendModel() : c.getLastRevenueModel()) {
                 @Override
                 public void setText(String t) {
-                    // Ignore 't' (the total). Fetch strictly the Base Revenue (Route Revenue).
                     int val = 0;
                     net.sf.rails.game.round.RoundFacade rf = gameUIManager.getGameManager().getCurrentRound();
+                    
                     if (rf instanceof net.sf.rails.game.OperatingRound) {
-                        val = ((net.sf.rails.game.OperatingRound) rf).getBaseRevenueOnly(c);
+                        net.sf.rails.game.OperatingRound or = (net.sf.rails.game.OperatingRound) rf;
+                        
+                        // 1. Get Total Revenue
+                        int total = c.getLastRevenue();
+                        
+                        // 2. Get Special (Fixed) Revenue
+                        int special = 0;
+                        if (hasDirectCompanyIncomeInOr) {
+                            special = or.getSpecialRevenueOnly(c);
+                        }
+
+                        // 3. Calculate Base (Route) Revenue by subtracting Fixed portion
+                        if (special > 0) {
+                            val = total - special;
+                        } else {
+                            val = or.getBaseRevenueOnly(c);
+                        }
                     } else if (t != null && t.trim().length() > 0) {
                         // Fallback for non-OR states
                         try {
@@ -4239,8 +4253,7 @@ public static final Color BG_DISCARD_VOLUNTARY = Color.CYAN; // Light Blue (#ADD
                         }
                     }
 
-                    // Existing formatting logic (Colors/Suffixes) applied to the specific Base
-                    // value
+                    // Existing formatting logic (Colors/Suffixes) applied to the specific Base value
                     if (val == 0 && (t == null || t.length() == 0)) {
                         super.setText("");
                         return;
@@ -4270,6 +4283,7 @@ public static final Color BG_DISCARD_VOLUNTARY = Color.CYAN; // Light Blue (#ADD
                 }
             };
 
+            
             f.setBackground(isOperating ? BG_OPERATING : (!isActive ? BG_INACTIVE : BG_MAUVE));
             f.setOpaque(true);
             f.setBorder(bDet);
