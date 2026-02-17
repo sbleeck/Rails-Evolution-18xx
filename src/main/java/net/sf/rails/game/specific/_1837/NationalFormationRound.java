@@ -131,6 +131,7 @@ public class NationalFormationRound extends Round {
             possibleActions.add(exchange);
 
             if (!forcedStart.value()) {
+// 1. Existing PASS action (mapped to specific "Keep/Decline" buttons)
                 NullAction pass = new NullAction(getRoot(), NullAction.Mode.PASS);
                 if (isFormation) {
                     pass.setLabel(LocalText.getText("DeclineFormation"));
@@ -138,6 +139,11 @@ public class NationalFormationRound extends Round {
                     pass.setLabel(LocalText.getText("KeepMinor", target.getId()));
                 }
                 possibleActions.add(pass);
+
+                // 2. NEW DONE action
+                // Allows the global "Done" button to function as "Keep Minor/Skip" 
+                // preventing the validation error if the user clicks it.
+                possibleActions.add(new NullAction(getRoot(), NullAction.Mode.DONE));
             }
 
             return true;

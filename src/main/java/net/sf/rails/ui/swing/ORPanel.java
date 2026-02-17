@@ -110,8 +110,7 @@ public class ORPanel extends GridPanel
     private boolean specialModeActive = false;
     private boolean isRevenueValueToBeSet = false;
     private boolean showNumbersActive = false;
-private AbstractButton directPassButton;
-
+    private AbstractButton directPassButton;
 
     // Game Params
     private boolean privatesCanBeBought;
@@ -129,7 +128,7 @@ private AbstractButton directPassButton;
     private JLabel companyLogo;
     private JLabel lblCash;
     private JLabel lblRevenue;
-    
+
     private TokenDisplayPanel tokenDisplay;
     private TrainDisplayPanel trainDisplay;
     private JPanel legendPanel;
@@ -181,7 +180,7 @@ private AbstractButton directPassButton;
 
         round = gameUIManager.getCurrentRound();
 
-if (round instanceof OperatingRound) {
+        if (round instanceof OperatingRound) {
             companies = ((OperatingRound) round).getOperatingCompanies().toArray(new PublicCompany[0]);
             nc = companies.length;
             this.orComp = ((OperatingRound) round).getOperatingCompany();
@@ -219,7 +218,6 @@ if (round instanceof OperatingRound) {
         setupHotkeys();
         setVisible(true);
     }
-
 
     /**
      * Determines the current Operating Round phase based on the available actions.
@@ -272,9 +270,9 @@ if (round instanceof OperatingRound) {
 
     private void distributeStandardActions(List<PossibleAction> actions) {
         boolean doneActionFound = false;
-PossibleAction donePa = null;
+        PossibleAction donePa = null;
         // if (activePhase == 1 || activePhase == 2)
-        //     enableConfirm(false);
+        // enableConfirm(false);
 
         for (PossibleAction pa : actions) {
             if (pa instanceof CorrectionModeAction)
@@ -307,15 +305,15 @@ PossibleAction donePa = null;
                 if (mode == NullAction.Mode.DONE || mode == NullAction.Mode.PASS) {
                     setupButton(btnDone, pa);
                     bindActionHotkey(btnDone, pa); // Bind hotkey for Done/Pass
-                    
+
                     // Save for later re-binding
                     donePa = pa;
                     doneActionFound = true;
                 }
-            } 
+            }
         }
-        // CRITICAL: Re-bind the DONE action last. 
-        // This ensures that if DiscardTrain (or any other action) claimed 'Enter' 
+        // CRITICAL: Re-bind the DONE action last.
+        // This ensures that if DiscardTrain (or any other action) claimed 'Enter'
         // during the loop or via addSpecialActionButton, the DONE button overwrites it.
         if (doneActionFound && donePa != null) {
             // log.info(">>> ENSURING DONE HAS HOTKEY PRIORITY <<<");
@@ -325,8 +323,6 @@ PossibleAction donePa = null;
     }
 
     private void updatePhaseSpecifics() {
-
-
 
         if (activePhase == 1 || activePhase == 2) {
             setTileBuildNumbers(true);
@@ -347,26 +343,21 @@ PossibleAction donePa = null;
 
     }
 
-
-
-
     private void updateSpecialHeader(GuiTargetedAction context) {
-        if (lblCompanyInfo == null || context == null) return;
+        if (lblCompanyInfo == null || context == null)
+            return;
 
         // 1. Extract Data correctly
         Owner actor = context.getActor();
-        
-
-
 
         // TOP: The Company Name (ID)
-        String companyName = (actor != null) ? actor.getId() : "Game"; 
+        String companyName = (actor != null) ? actor.getId() : "Game";
 
         // MIDDLE: The Player Name (from our new interface method)
-        String playerName = context.getPlayerName(); 
-        
+        String playerName = context.getPlayerName();
+
         // BOTTOM: The Action Text
-        String actionTitle = context.getGroupLabel(); 
+        String actionTitle = context.getGroupLabel();
 
         // 2. Determine Colors (Company Styling for ALL panels)
         Color bg = BG_SPECIAL_HEADER;
@@ -397,17 +388,13 @@ PossibleAction donePa = null;
         // BOTTOM: Action Title
         // FIX: Applied Company Colors here as well
         if (lblPhaseInstruction != null) {
-            lblPhaseInstruction.setText("<html><center><font size='4'><b>" + actionTitle + "</b></font></center></html>");
-            lblPhaseInstruction.setBackground(bg); 
-            lblPhaseInstruction.setForeground(fg); 
+            lblPhaseInstruction
+                    .setText("<html><center><font size='4'><b>" + actionTitle + "</b></font></center></html>");
+            lblPhaseInstruction.setBackground(bg);
+            lblPhaseInstruction.setForeground(fg);
             lblPhaseInstruction.setVisible(true);
         }
     }
-
-
-
-
-
 
     private void setStandardPanelsVisible(boolean visible) {
         if (phase1Panel != null)
@@ -501,7 +488,8 @@ PossibleAction donePa = null;
             // Phase 4: Capital - Trains (Matches Industrial Orange Palette)
         } else if (activePhase == 4) {
 
-if (btnTrainSkip != null) btnTrainSkip.setEnabled(true);
+            if (btnTrainSkip != null)
+                btnTrainSkip.setEnabled(true);
 
             boolean canBuy = (trainButtonsPanel != null && trainButtonsPanel.getComponentCount() > 0);
             String label = canBuy ? "Skip Buy" : "Done Buying";
@@ -643,7 +631,6 @@ if (btnTrainSkip != null) btnTrainSkip.setEnabled(true);
         this.orComp = orComp;
         this.currentOperatingComp = orComp;
 
-
         removeAllHighlights();
         setStandardPanelsVisible(true);
         if (specialContainer != null)
@@ -683,7 +670,8 @@ if (btnTrainSkip != null) btnTrainSkip.setEnabled(true);
         if (btnTrainSkip != null)
             btnTrainSkip.setEnabled(false);
 
-        // Critical: Clear the cached action list so we don't buy "Ghost Trains" from previous states
+        // Critical: Clear the cached action list so we don't buy "Ghost Trains" from
+        // previous states
         if (availableTrainActions != null) {
             availableTrainActions.clear();
         }
@@ -773,14 +761,13 @@ if (btnTrainSkip != null) btnTrainSkip.setEnabled(true);
         lblPhaseInstruction.setMaximumSize(new Dimension(SIDEBAR_WIDTH, HEADER_PHASE_HEIGHT));
         sidebarPanel.add(lblCompanyInfo);
 
-
-lblPlayerInfo = new JLabel("", SwingConstants.CENTER);
-       lblPlayerInfo.setOpaque(true);
-       lblPlayerInfo.setBackground(Color.LIGHT_GRAY); 
-       lblPlayerInfo.setAlignmentX(Component.CENTER_ALIGNMENT);
-       lblPlayerInfo.setPreferredSize(new Dimension(SIDEBAR_WIDTH, 20)); // Smaller height for player
-       lblPlayerInfo.setMaximumSize(new Dimension(SIDEBAR_WIDTH, 20));
-       sidebarPanel.add(lblPlayerInfo);
+        lblPlayerInfo = new JLabel("", SwingConstants.CENTER);
+        lblPlayerInfo.setOpaque(true);
+        lblPlayerInfo.setBackground(Color.LIGHT_GRAY);
+        lblPlayerInfo.setAlignmentX(Component.CENTER_ALIGNMENT);
+        lblPlayerInfo.setPreferredSize(new Dimension(SIDEBAR_WIDTH, 20)); // Smaller height for player
+        lblPlayerInfo.setMaximumSize(new Dimension(SIDEBAR_WIDTH, 20));
+        sidebarPanel.add(lblPlayerInfo);
 
         sidebarPanel.add(lblPhaseInstruction);
 
@@ -1203,11 +1190,9 @@ lblPlayerInfo = new JLabel("", SwingConstants.CENTER);
         setRevenue(i, a);
     }
 
-
-
     public void revenueUpdate(int best, int special, boolean finalRes) {
         SwingUtilities.invokeLater(() -> {
-           
+
             try {
                 if (lblRevenue != null) {
                     // --- START FIX ---
@@ -1228,14 +1213,14 @@ lblPlayerInfo = new JLabel("", SwingConstants.CENTER);
                     setRevenue(orCompIndex, best, special);
                     // --- END FIX ---
                 }
-                
+
                 if (finalRes && isDisplayCurrentRoutes()) {
                     revenueAdapter.drawOptimalRunAsPath(orUIManager.getMap());
                 }
             } catch (Exception e) {
                 log.error("Error in revenueUpdate UI update", e);
             }
-        
+
         });
     }
 
@@ -1255,27 +1240,26 @@ lblPlayerInfo = new JLabel("", SwingConstants.CENTER);
         setRevenue(i, a, 0);
     }
 
-    
     // Revenue Helpers
     private void updateRevenueButton(ActionButton btn, int amount) {
         updateRevenueButton(btn, amount, 0);
     }
-    
-private void updateRevenueButton(ActionButton btn, int amount, int special) {
+
+    private void updateRevenueButton(ActionButton btn, int amount, int special) {
         if (btn == null || !btn.isEnabled())
             return;
         List<PossibleAction> actions = btn.getPossibleActions();
         if (actions != null && !actions.isEmpty() && actions.get(0) instanceof SetDividend) {
             SetDividend sd = (SetDividend) actions.get(0);
-            
+
             // Bind the data from the calculator to the Action
             sd.setActualRevenue(amount);
             sd.setActualCompanyTreasuryRevenue(special);
-            
+
             btn.repaint();
         }
     }
-    
+
     private void updateCurrentRoutes(boolean isSetRevenueStep) {
         if (orComp != null && !orComp.isClosed()) {
             isRevenueValueToBeSet = isSetRevenueStep;
@@ -1307,39 +1291,41 @@ private void updateRevenueButton(ActionButton btn, int amount, int special) {
         return "yes".equalsIgnoreCase(Config.get("map.displayCurrentRoutes"));
     }
 
-
-// ... (lines of unchanged context code) ...
+    // ... (lines of unchanged context code) ...
     public void processIPOBuy() {
-  
+
         if (availableTrainActions != null && !availableTrainActions.isEmpty()) {
             for (BuyTrain action : availableTrainActions) {
-                
+
                 // Debug Logging
                 net.sf.rails.game.state.Owner seller = action.getFromOwner();
                 String sellerId = (seller != null) ? seller.getId() : "null";
-                String parentId = (seller != null && seller.getParent() != null) ? seller.getParent().getClass().getSimpleName() : "null";
-         
-               // Strict Filter: Only buy if seller is explicitly IPO or Bank (and NOT Pool)
+                String parentId = (seller != null && seller.getParent() != null)
+                        ? seller.getParent().getClass().getSimpleName()
+                        : "null";
+
+                // Strict Filter: Only buy if seller is explicitly IPO or Bank (and NOT Pool)
                 boolean isIpo = false;
                 if (seller != null) {
                     if ("IPO".equals(seller.getId())) {
                         isIpo = true;
-                    } else if (seller.getParent() instanceof net.sf.rails.game.financial.Bank 
+                    } else if (seller.getParent() instanceof net.sf.rails.game.financial.Bank
                             && !"Pool".equals(seller.getId())) {
                         isIpo = true;
                     }
                 }
 
                 if (isIpo) {
-                    
-                    // Fix: Auto-fill price if missing. Engine rejects 0-price buys for standard trains.
+
+                    // Fix: Auto-fill price if missing. Engine rejects 0-price buys for standard
+                    // trains.
                     if (action.getPricePaid() == 0 && action.getFixedCost() > 0) {
                         action.setPricePaid(action.getFixedCost());
                     }
 
                     List<PossibleAction> toExec = new ArrayList<>();
                     toExec.add(action);
-                
+
                     orUIManager.processAction(BUY_TRAIN_CMD, toExec, this);
                     break;
                 } else {
@@ -1349,7 +1335,6 @@ private void updateRevenueButton(ActionButton btn, int amount, int special) {
         } else {
         }
     }
-
 
     public void finishORCompanyTurn(int index) {
         resetActions();
@@ -1619,7 +1604,7 @@ private void updateRevenueButton(ActionButton btn, int amount, int special) {
                 phaseColor = UITheme.ACTION_DONE;
                 instruction = "FINALIZE";
                 break;
-           
+
         }
 
         if (lblCompanyInfo != null) {
@@ -1638,7 +1623,8 @@ private void updateRevenueButton(ActionButton btn, int amount, int special) {
             lblCompanyInfo.setBorder(BorderFactory.createMatteBorder(1, 1, 0, 1, Color.DARK_GRAY));
             lblCompanyInfo.setVisible(true);
 
-            // Hide the special mode player label to prevent "hangovers" from previous rounds
+            // Hide the special mode player label to prevent "hangovers" from previous
+            // rounds
             if (lblPlayerInfo != null) {
                 lblPlayerInfo.setVisible(false);
             }
@@ -1674,7 +1660,6 @@ private void updateRevenueButton(ActionButton btn, int amount, int special) {
             tokenDisplay.setTokens(available, orComp);
         }
 
-       
         if (lblRevenue != null) {
             // Use the smart display string instead of raw LastRevenue
             RoundFacade rf = orUIManager.getGameUIManager().getCurrentRound();
@@ -1688,12 +1673,11 @@ private void updateRevenueButton(ActionButton btn, int amount, int special) {
         if (trainDisplay != null)
             trainDisplay.updateAssets(orComp);
 
-
-        // Force the UpgradesPanel's mini tile dock to refresh immediately on state changes
+        // Force the UpgradesPanel's mini tile dock to refresh immediately on state
+        // changes
         if (orWindow != null && orWindow.getUpgradePanel() != null) {
             orWindow.getUpgradePanel().refreshMiniDock();
         }
-
 
     }
 
@@ -1728,8 +1712,6 @@ private void updateRevenueButton(ActionButton btn, int amount, int special) {
             }
         });
     }
-
-
 
     @Override
     public void actionPerformed(ActionEvent e) {
@@ -1805,13 +1787,9 @@ private void updateRevenueButton(ActionButton btn, int amount, int special) {
         return false;
     }
 
-
-
-
-// ... (lines of unchanged context code) ...
+    // ... (lines of unchanged context code) ...
     private void addSpecialActionButton(PossibleAction action) {
         String label = action.getButtonLabel();
-        
 
         // Defaults
         Color bgColor = Color.LIGHT_GRAY;
@@ -1822,14 +1800,13 @@ private void updateRevenueButton(ActionButton btn, int amount, int special) {
         // 1. Extract Visual Signature via Interface
         if (action instanceof GuiTargetedAction) {
             GuiTargetedAction gta = (GuiTargetedAction) action;
-            label = gta.getButtonLabel(); 
-            
+            label = gta.getButtonLabel();
+
             // CONSUME THE SIGNATURE
             bgColor = gta.getHighlightBackgroundColor();
             borderColor = gta.getHighlightBorderColor();
             textColor = gta.getHighlightTextColor();
-        } 
-        else if (action instanceof NullAction) {
+        } else if (action instanceof NullAction) {
             label = ((NullAction) action).getMode() == NullAction.Mode.PASS ? "Decline" : "Done";
             bgColor = UITheme.ACTION_SKIP;
             borderColor = bgColor.darker();
@@ -1838,27 +1815,27 @@ private void updateRevenueButton(ActionButton btn, int amount, int special) {
 
         // 2. Create Button
         ActionButton btn = createSidebarButton(label, cmd);
-        
+
         // HTML Formatting to match RailCard text style if needed
         if (!label.toLowerCase().startsWith("<html>")) {
             btn.setText("<html><center>" + label + "</center></html>");
         } else {
-            btn.setText(label); 
+            btn.setText(label);
         }
 
         btn.setPossibleAction(action);
         btn.setEnabled(true);
         btn.setAlignmentX(Component.CENTER_ALIGNMENT);
         // Allow button to be taller to fit the HTML content
-        btn.setMaximumSize(new Dimension(SIDEBAR_WIDTH - 20, 60)); 
-bindActionHotkey(btn, action);
+        btn.setMaximumSize(new Dimension(SIDEBAR_WIDTH - 20, 60));
+        bindActionHotkey(btn, action);
 
         // 3. APPLY "RAILCARD" STYLING (Flattened)
-        
+
         // A. Background & Text
         btn.setBackground(bgColor);
         btn.setForeground(textColor);
-        
+
         // B. Border (Thick Line Border to match GameStatus Card)
         // Outer: The colored line (3px)
         // Inner: Padding (5px)
@@ -1872,12 +1849,11 @@ bindActionHotkey(btn, action);
         btn.setFocusPainted(false); // Remove dotted focus line
         // Force the font to match RailCard
         btn.setFont(new Font("SansSerif", Font.BOLD, 12));
-   
 
         specialPanel.add(btn);
         specialPanel.add(Box.createVerticalStrut(8));
     }
-// ... (lines of unchanged context code) ...
+    // ... (lines of unchanged context code) ...
 
     /**
      * Replaces the tooltip logic with a formatted log entry.
@@ -1940,11 +1916,24 @@ bindActionHotkey(btn, action);
         log.info(sb.toString());
     }
 
-
-
     public void updateDynamicActions(List<PossibleAction> actions) {
 
-     
+        // --- START DEBUG INSTRUMENTATION ---
+        log.info("\nORPanel: updateDynamicActions() RECEIVED " + (actions == null ? "null" : actions.size())
+                + " actions.");
+        if (actions != null) {
+            for (int i = 0; i < actions.size(); i++) {
+                PossibleAction pa = actions.get(i);
+                // Filter out CorrectionModeAction entries from the UI log output
+                if (pa.toString().contains("CorrectionModeAction")) {
+                    continue;
+                }
+                String hash = Integer.toHexString(System.identityHashCode(pa));
+                log.info(String.format("   UI Action[%d]: Class: %-20s | Hash: %s | Str: %s",
+                        i, pa.getClass().getSimpleName(), hash, pa.toString()));
+            }
+        }
+        // --- END DEBUG INSTRUMENTATION ---
 
         try {
 
@@ -1954,7 +1943,8 @@ bindActionHotkey(btn, action);
             // ROBUST CONTEXT HANDOVER
             PublicCompany engineActiveComp = null;
             if (orUIManager != null && orUIManager.getGameUIManager().getGameManager() != null) {
-                net.sf.rails.game.round.RoundFacade rf = orUIManager.getGameUIManager().getGameManager().getCurrentRound();
+                net.sf.rails.game.round.RoundFacade rf = orUIManager.getGameUIManager().getGameManager()
+                        .getCurrentRound();
                 if (rf instanceof net.sf.rails.game.OperatingRound) {
                     engineActiveComp = ((net.sf.rails.game.OperatingRound) rf).getOperatingCompany();
                 }
@@ -1968,12 +1958,13 @@ bindActionHotkey(btn, action);
                 this.orComp = this.currentOperatingComp;
             }
 
-          // 3. FILTER & DETECT SPECIAL ACTIONS (Generic "Stupid Panel" Logic)
+            // 3. FILTER & DETECT SPECIAL ACTIONS (Generic "Stupid Panel" Logic)
             List<PossibleAction> specialActions = new ArrayList<>();
             GuiTargetedAction contextProvider = null;
 
-            // Fix: Buffer the NullAction to process it AFTER checking for other special actions.
-            // This prevents the "Done" button from being swallowed if it appears 
+            // Fix: Buffer the NullAction to process it AFTER checking for other special
+            // actions.
+            // This prevents the "Done" button from being swallowed if it appears
             // before the Discard/Special action in the list.
             PossibleAction deferredNullAction = null;
 
@@ -1981,10 +1972,10 @@ bindActionHotkey(btn, action);
                 // If it implements the interface, it is definitely a special UI action
                 if (pa instanceof GuiTargetedAction) {
                     specialActions.add(pa);
-                    if (contextProvider == null) contextProvider = (GuiTargetedAction) pa;
+                    if (contextProvider == null)
+                        contextProvider = (GuiTargetedAction) pa;
                 }
 
-                
                 // Legacy Fallback for Home Token (if not yet upgraded to GuiTargetedAction)
                 else if (pa instanceof LayBaseToken && ((LayBaseToken) pa).getType() == LayBaseToken.HOME_CITY) {
                     specialActions.add(pa);
@@ -1995,29 +1986,31 @@ bindActionHotkey(btn, action);
                 }
             }
 
-            // Post-Loop: Now we know if special actions exist, so we can safely decide on the Done button
+            // Post-Loop: Now we know if special actions exist, so we can safely decide on
+            // the Done button
             if (deferredNullAction != null) {
                 // If we have special actions (like Discards), enable the Done button.
                 // Also enable it if it is an explicit PASS.
-                if (!specialActions.isEmpty() || ((NullAction)deferredNullAction).getMode() == NullAction.Mode.PASS) {
+                if (!specialActions.isEmpty() || ((NullAction) deferredNullAction).getMode() == NullAction.Mode.PASS) {
                     specialActions.add(deferredNullAction);
                 }
             }
-            
+
             // 4. GENERIC CONTEXT SWITCH
-            // If the special action dictates a specific actor (e.g. a Company discarding out of turn),
+            // If the special action dictates a specific actor (e.g. a Company discarding
+            // out of turn),
             // we switch the panel's focus to that actor immediately.
             if (contextProvider != null) {
                 Owner actor = contextProvider.getActor();
                 if (actor instanceof PublicCompany && actor != this.orComp) {
                     this.orComp = (PublicCompany) actor;
-                    updateSidebarData(); 
+                    updateSidebarData();
                 }
             }
 
             // 5. RENDER SPECIAL MODE
             if (!specialActions.isEmpty()) {
-                
+
                 this.specialModeActive = true;
                 this.activePhase = 0;
                 setStandardPanelsVisible(false);
@@ -2043,40 +2036,38 @@ bindActionHotkey(btn, action);
                         sidebarPanel.repaint();
                     }
 
-                    
                 }
                 return;
             }
             // --- 6. STANDARD MODE ---
-            
+
             this.specialModeActive = false;
             if (specialContainer != null)
                 specialContainer.setVisible(false);
 
-            activePhase = determineActivePhase(actions); 
+            activePhase = determineActivePhase(actions);
             setStandardPanelsVisible(true);
 
             // if (activePhase == 1 || activePhase == 2) {
-            //     boolean hasSelection = (orUIManager != null && orUIManager.getMap().getSelectedHex() != null);
-            //     enableConfirm(hasSelection);
+            // boolean hasSelection = (orUIManager != null &&
+            // orUIManager.getMap().getSelectedHex() != null);
+            // enableConfirm(hasSelection);
             // }
 
-            distributeStandardActions(actions); 
-            updateSidebarData(); 
+            distributeStandardActions(actions);
+            updateSidebarData();
             updatePhaseSpecifics();
 
             if (sidebarPanel != null)
                 sidebarPanel.revalidate(); // Ensure standard mode revalidates too
-                sidebarPanel.repaint();
+            sidebarPanel.repaint();
 
         } catch (Exception e) {
             log.error("Error in updateDynamicActions", e);
         }
     }
 
-
-
-private void bindActionHotkey(ActionButton btn, PossibleAction action) {
+    private void bindActionHotkey(ActionButton btn, PossibleAction action) {
         int key = 0;
         String actionName = action.getClass().getSimpleName();
 
@@ -2088,25 +2079,25 @@ private void bindActionHotkey(ActionButton btn, PossibleAction action) {
         // --- START FIX ---
         // 1. Capture the Pass button for external access (GlobalHotkeyManager)
         if (action instanceof NullAction) {
-             this.directPassButton = btn;
+            this.directPassButton = btn;
         }
 
-// 2. RESTORE 'ENTER' MAPPING FOR PASS
+        // 2. RESTORE 'ENTER' MAPPING FOR PASS
         // We strictly bind ENTER to the Pass button (NullAction).
         if (action instanceof NullAction) {
-             this.directPassButton = btn; // Keep reference for Global Manager
-             key = KeyEvent.VK_ENTER;
+            this.directPassButton = btn; // Keep reference for Global Manager
+            key = KeyEvent.VK_ENTER;
         }
 
         if (key != 0) {
             InputMap im = this.getInputMap(JComponent.WHEN_IN_FOCUSED_WINDOW);
             ActionMap am = this.getActionMap();
-            
+
             // Unique command name using identityHashCode to avoid collisions
             String commandKey = "invoke_" + actionName + "_" + System.identityHashCode(action);
-            
+
             im.put(KeyStroke.getKeyStroke(key, 0), commandKey);
-            
+
             // log.info("DEBUG: Mapped KeyCode " + key + " to command " + commandKey);
 
             am.put(commandKey, new AbstractAction() {
@@ -2123,7 +2114,6 @@ private void bindActionHotkey(ActionButton btn, PossibleAction action) {
             });
         }
 
-        
     }
 
     /**
@@ -2134,15 +2124,14 @@ private void bindActionHotkey(ActionButton btn, PossibleAction action) {
         if (directPassButton != null && directPassButton.isShowing() && directPassButton.isEnabled()) {
             // log.info("DEBUG ORPANEL: directPassButton clicked via Global Manager");
             directPassButton.doClick();
-            return true; 
+            return true;
         }
-        return false; 
+        return false;
     }
 
+    // We are modifying ORPanel.java to ensure the scanner is robust.
 
-// We are modifying ORPanel.java to ensure the scanner is robust.
-
-// ... (lines of unchanged context code) ...
+    // ... (lines of unchanged context code) ...
 
     // --- START FIX ---
     public void handleEnterPress() {
@@ -2150,23 +2139,30 @@ private void bindActionHotkey(ActionButton btn, PossibleAction action) {
 
         // 1. Check Special Panel (Discards, etc)
         if (specialContainer != null && specialContainer.isVisible()) {
-            if (scanAndClickBestButton(specialPanel)) return;
+            if (scanAndClickBestButton(specialPanel))
+                return;
         }
 
         // 2. Check Active Phase Panel
         JPanel activePanel = null;
-        if (activePhase == 1) activePanel = phase1Panel;       
-        else if (activePhase == 2) activePanel = phase2Panel;  
-        else if (activePhase == 3) activePanel = phase3Panel;  
-        else if (activePhase == 4) activePanel = phase4Panel;  
+        if (activePhase == 1)
+            activePanel = phase1Panel;
+        else if (activePhase == 2)
+            activePanel = phase2Panel;
+        else if (activePhase == 3)
+            activePanel = phase3Panel;
+        else if (activePhase == 4)
+            activePanel = phase4Panel;
 
         if (activePanel != null && activePanel.isVisible()) {
-             if (scanAndClickBestButton(activePanel)) return;
+            if (scanAndClickBestButton(activePanel))
+                return;
         }
 
         // 3. Check Sidebar (Fallback)
         if (sidebarPanel != null && sidebarPanel.isVisible()) {
-             // scanAndClickBestButton(sidebarPanel); // Optional: Enable if sidebar has "Pay" buttons
+            // scanAndClickBestButton(sidebarPanel); // Optional: Enable if sidebar has
+            // "Pay" buttons
         }
 
         // 4. Default Fallback
@@ -2178,14 +2174,15 @@ private void bindActionHotkey(ActionButton btn, PossibleAction action) {
         }
     }
 
-// We are modifying ORPanel.java
-// Fix: Add 'decline' to the scoring logic to catch the Prussian Pass action.
+    // We are modifying ORPanel.java
+    // Fix: Add 'decline' to the scoring logic to catch the Prussian Pass action.
 
-// ... (existing imports) ...
+    // ... (existing imports) ...
 
     private boolean scanAndClickBestButton(Container container) {
-        if (container == null) return false;
-        
+        if (container == null)
+            return false;
+
         AbstractButton bestCandidate = null;
         int bestScore = 0;
 
@@ -2193,16 +2190,18 @@ private void bindActionHotkey(ActionButton btn, PossibleAction action) {
         for (Component comp : comps) {
             // Recursive dive
             if (comp instanceof Container && !(comp instanceof AbstractButton)) {
-                if (scanAndClickBestButton((Container) comp)) return true;
+                if (scanAndClickBestButton((Container) comp))
+                    return true;
                 continue;
             }
 
             if (comp instanceof AbstractButton) {
                 AbstractButton btn = (AbstractButton) comp;
-                if (!btn.isEnabled() || !btn.isVisible()) continue;
+                if (!btn.isEnabled() || !btn.isVisible())
+                    continue;
 
                 String text = btn.getText();
-                // Strip HTML tags for cleaner logging/matching if needed, 
+                // Strip HTML tags for cleaner logging/matching if needed,
                 // but .contains() usually works fine on the raw string.
                 String lowerText = (text != null) ? text.toLowerCase() : "";
                 String cmd = (btn.getActionCommand() != null) ? btn.getActionCommand() : "";
@@ -2211,41 +2210,41 @@ private void bindActionHotkey(ActionButton btn, PossibleAction action) {
                 // --- SCORING LOGIC ---
 
                 // 1. CRITICAL FLOW (Score 10)
-                if (cmd.equals(PAYOUT_CMD) || 
-                    lowerText.contains("pay") || 
-                    lowerText.contains("confirm") || 
-                    lowerText.contains("yes")) {
+                if (cmd.equals(PAYOUT_CMD) ||
+                        lowerText.contains("pay") ||
+                        lowerText.contains("confirm") ||
+                        lowerText.contains("yes")) {
                     score = 10;
                 }
-                
+
                 // 2. EXPLICIT SKIP / REFUSAL (Score 8)
                 // ADDED "decline" HERE
-                else if (lowerText.contains("skip") || 
-                         lowerText.contains("decline")) { 
+                else if (lowerText.contains("skip") ||
+                        lowerText.contains("decline")) {
                     score = 8;
                 }
 
                 // 3. GENERIC COMPLETION (Score 5)
-                else if (cmd.equals(DONE_CMD) || 
-                         lowerText.contains("done") || 
-                         lowerText.contains("end turn") || 
-                         lowerText.contains("pass")) {
+                else if (cmd.equals(DONE_CMD) ||
+                        lowerText.contains("done") ||
+                        lowerText.contains("end turn") ||
+                        lowerText.contains("pass")) {
                     score = 5;
                 }
 
                 // 4. SECONDARY OPTIONS (Score 3)
-                else if (cmd.equals(WITHHOLD_CMD) || cmd.equals(SPLIT_CMD) || 
-                         lowerText.contains("hold") || lowerText.contains("withhold") || 
-                         lowerText.contains("split")) {
+                else if (cmd.equals(WITHHOLD_CMD) || cmd.equals(SPLIT_CMD) ||
+                        lowerText.contains("hold") || lowerText.contains("withhold") ||
+                        lowerText.contains("split")) {
                     score = 3;
                 }
 
                 // 5. EXPLICITLY IGNORE (Score -1)
                 // "Start" is ignored, which correctly handles "Start (Fold M2)"
-                else if (lowerText.contains("buy") || 
-                         lowerText.contains("undo") || 
-                         lowerText.contains("redo") || 
-                         lowerText.contains("start")) {
+                else if (lowerText.contains("buy") ||
+                        lowerText.contains("undo") ||
+                        lowerText.contains("redo") ||
+                        lowerText.contains("start")) {
                     score = -1;
                 }
 
@@ -2267,17 +2266,16 @@ private void bindActionHotkey(ActionButton btn, PossibleAction action) {
         return false;
     }
 
-@Override
+    @Override
     protected boolean processKeyBinding(KeyStroke ks, KeyEvent e, int condition, boolean pressed) {
         if (e.getKeyCode() == KeyEvent.VK_ENTER) {
-            log.info("DEBUG ORPANEL: processKeyBinding checking ENTER. Condition: " + condition + ", Pressed: " + pressed);
+            log.info("DEBUG ORPANEL: processKeyBinding checking ENTER. Condition: " + condition + ", Pressed: "
+                    + pressed);
             boolean result = super.processKeyBinding(ks, e, condition, pressed);
             log.info("DEBUG ORPANEL: Result: " + result);
             return result;
         }
         return super.processKeyBinding(ks, e, condition, pressed);
     }
-
-
 
 }

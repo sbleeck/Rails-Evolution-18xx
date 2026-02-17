@@ -1489,7 +1489,20 @@ public class GameManager extends RailsManager implements Configurable, Owner {
         }
     }
 
+
     public boolean process(PossibleAction action) {
+
+        // --- START DEBUG INSTRUMENTATION ---
+        if (action != null) {
+            String actionHash = Integer.toHexString(System.identityHashCode(action));
+            log.info(String.format("GM: process() INVOKED. Action: %s | Hash: %s", action.toString(), actionHash));
+            
+            // Log what the engine *thought* was possible before this move
+            debugLogPossibleActions();
+        } else {
+            log.info("GM: process() INVOKED with NULL action.");
+        }
+        // --- END DEBUG INSTRUMENTATION ---
 
         // EMERGENCY OVERRIDE: Check for "FORCE_SKIP" signal
         if (action != null && action.toString().contains("FORCE_SKIP")) {
@@ -1630,6 +1643,9 @@ public class GameManager extends RailsManager implements Configurable, Owner {
 
             if (!possibleActions.validate(action)) {
                 DisplayBuffer.add(this, LocalText.getText("ActionNotAllowed", action.toString()));
+                // INSTRUMENTATION: Log failure
+                log.error("GM: Action VALIDATION FAILED for: " + action.toString());
+                debugLogPossibleActions(); // Show what was actually allowed
                 return false;
             }
 
@@ -1666,6 +1682,7 @@ public class GameManager extends RailsManager implements Configurable, Owner {
                 }
             } catch (Exception e) {
                 result = false;
+                log.error("GM: process() Exception caught", e);
             }
 
         } else {
@@ -1750,6 +1767,8 @@ public class GameManager extends RailsManager implements Configurable, Owner {
 
         return result;
     }
+
+
 
     protected void logActionTaken(PossibleAction action) {
         if (action instanceof NullAction
@@ -3750,16 +3769,16 @@ public PossibleAction getNextActionFromLog() {
         logAction(action, actionCount.value());
     }
 
-    public void logAction(PossibleAction action, int moveNumber) {
+public void logAction(PossibleAction action, int moveNumber) {
         if (action == null)
             return;
 
         // Strict De-duplication:
         // If we are asked to log the EXACT same action object for the EXACT same move
-        // number,
-        // we ignore it. This suppresses the double/triple logs caused by UI/Engine
-        // overlaps.
+        // number, we ignore it.
         if (action == lastLoggedAction && moveNumber == lastLoggedMoveNumber) {
+            // INSTRUMENTATION: Explicitly log that a duplicate was suppressed
+            log.info("GM: logAction() SUPPRESSED DUPLICATE: " + action.toString() + " (Move #" + moveNumber + ")");
             return;
         }
         lastLoggedAction = action;
@@ -4014,4 +4033,42 @@ public PossibleAction getNextActionFromLog() {
             log.error("Error generating history log", e);
         }
     }
+
+
+private void debugLogPossibleActions() {
+        if (possibleActions == null || possibleActions.getList() == null || possibleActions.getList().isEmpty()) {
+            log.info("DEBUG_STATE: PossibleActions list is EMPTY/NULL.");
+            return;
+        }
+
+        StringBuilder sb = new StringBuilder();
+        sb.append("\n=== GM STATE: Current PossibleActions List ===\n");
+        int count = 0;
+        for (PossibleAction pa : possibleActions.getList()) {
+            // Filter out CorrectionModeAction entries from the log output
+            if (pa.toString().contains("CorrectionModeAction")) {
+                continue;
+            }
+            
+            String hash = Integer.toHexString(System.identityHashCode(pa));
+            sb.append(String.format(" [%d] Class: %-20s | Hash: %s | Str: %s\n", 
+                count++, 
+                pa.getClass().getSimpleName(), 
+                hash, 
+                pa.toString()));
+        }
+        sb.append("==============================================\n");
+        log.info(sb.toString());
+    }
+
+
+
+
+
+
+
+
+
+
+
 }

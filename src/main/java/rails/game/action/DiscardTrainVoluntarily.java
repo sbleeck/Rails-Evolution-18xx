@@ -21,21 +21,32 @@ public class DiscardTrainVoluntarily extends DiscardTrain {
         super(company, new HashSet<>(trains));
     }
     
-    // --- FIX 3: Custom Button Label ---
     public void setLabel(String label) {
         this.customLabel = label;
     }
 
     @Override
     public int getHotkey() {
-return 0;
+        return 0;
     }
+
+    // --- START FIX ---
+    // Override the interface method used by ORPanel to create the button text.
+    // Without this, it falls back to DiscardTrain.getButtonLabel() which generates
+    // a fresh string ("Discard X") and ignores the custom label.
+    @Override
+    public String getButtonLabel() {
+        if (customLabel != null) {
+            return customLabel;
+        }
+        return super.getButtonLabel();
+    }
+    // --- END FIX ---
 
     @Override
     public String toString() {
         return customLabel != null ? customLabel : super.toString();
     }
-    // ----------------------------------
 
     @Override
     public boolean execute(OperatingRound round) {
@@ -60,7 +71,6 @@ return 0;
         return success;
     }
 
-        
     @Override
     public String getGroupLabel() {
         return "May discard Train";

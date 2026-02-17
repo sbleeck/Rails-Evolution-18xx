@@ -30,15 +30,7 @@ public class StockRound_1837 extends StockRound {
             this, "discardingCompanyIndex");
     protected final BooleanState discardingTrains = new BooleanState(this,
             "discardingTrains");
-    protected final BooleanState specialActionProcessed = new BooleanState(this, "specialActionProcessed", false);
     protected PublicCompany[] discardingCompanies;
-
-    // States for the Pre-Round Special Action Phase
-    protected final BooleanState specialActionPhase = new BooleanState(this, "specialActionPhase", false);
-    // Tracks how many players have had their turn in the special phase
-    protected final IntegerState specialActionPlayerCount = IntegerState.create(this, "specialActionPlayerCount", 0);
-    // Tracks the actual index in the player list we are currently querying
-    protected final IntegerState specialActionCurrentIndex = IntegerState.create(this, "specialActionCurrentIndex", 0);
 
     public StockRound_1837(GameManager parent, String id) {
         super(parent, id);
@@ -83,8 +75,7 @@ public class StockRound_1837 extends StockRound {
             if ("Minor".equals(type) || "Coal".equals(type)) {
 
                 // 3. Find Target
-                PublicCompany target = getMergeTarget(company);
-
+PublicCompany target = Merger1837.getMergeTarget(gameManager, company);
                 // 4. Validate Merge Eligibility
                 // - Target must exist
                 // - Target must have floated (Rule: "Coal companies... if a corporation has
@@ -138,16 +129,6 @@ public class StockRound_1837 extends StockRound {
         return result;
     }
 
-    protected boolean setTrainDiscardActions() {
-
-        PublicCompany discardingCompany = discardingCompanies[discardingCompanyIndex.value()];
-        log.debug("Company {} to discard a train", discardingCompany.getId());
-        possibleActions.add(new DiscardTrain(discardingCompany,
-                discardingCompany.getPortfolioModel().getUniqueTrains()));
-        // We handle one train at at time.
-        // We come back here until all excess trains have been discarded.
-        return true;
-    }
 
     /**
      * Merge a minor into an already started company.
@@ -191,17 +172,6 @@ public class StockRound_1837 extends StockRound {
         finishTurn();
 
         return true;
-    }
-
-    @Override
-    protected void finishTurn() {
-
-        if (specialActionProcessed.value()) {
-            specialActionProcessed.set(false);
-            return;
-        }
-
-        super.finishTurn();
     }
 
     public boolean buyShares(String playerName, BuyCertificate action) {
@@ -261,23 +231,20 @@ public class StockRound_1837 extends StockRound {
         }
     }
 
+    // ... (lines of unchanged context code) ...
     protected boolean processGameSpecificAction(PossibleAction action) {
         log.debug("GameSpecificAction: {}", action);
         boolean result = false;
 
         if (action instanceof ExchangeMinorAction) {
-            specialActionProcessed.set(true);
+            // Removed references to deleted variables: specialActionProcessed,
+            // specialActionPhase
             ExchangeMinorAction exc = (ExchangeMinorAction) action;
             result = mergeCompanies(exc.getMinor(), exc.getTargetMajor(), false, false);
             if (result) {
-                if (specialActionPhase.value()) {
-                    setPossibleActions();
-                } else {
-                    hasActed.set(true);
-                }
+                hasActed.set(true);
             }
             return result;
-
         }
 
         if (action instanceof MergeCompanies) {
@@ -299,7 +266,7 @@ public class StockRound_1837 extends StockRound {
             if (!"Coal".equals(type) && !"Minor".equals(type))
                 continue;
 
-            PublicCompany major = getMergeTarget(minor);
+            PublicCompany major = Merger1837.getMergeTarget(gameManager, minor);
             if (major == null || !major.hasFloated() || major.isClosed())
                 continue;
 
@@ -318,210 +285,22 @@ public class StockRound_1837 extends StockRound {
                 mergeCompanies(minor, major, false, true);
             }
         }
-    }
-
-    @Override
-    public boolean setPossibleActions() {
-
-        if (discardingTrains.value()) {
-            return setTrainDiscardActions();
-        }
-
-        if (specialActionPhase.value() && gameManager.isReloading()) {
-            PossibleAction next = gameManager.getNextActionFromLog();
-            if (next != null) {
-                boolean isSpecialAction = (next instanceof ExchangeMinorAction);
-                if (!isSpecialAction && next instanceof NullAction) {
-                    if (((NullAction) next).getMode() == NullAction.Mode.DONE) {
-                        isSpecialAction = true;
-                    }
-                }
-                if (!isSpecialAction) {
-                    specialActionPhase.set(false);
-                }
-            }
-        }
-
-        if (specialActionPhase.value()) {
-            return setSpecialPhaseActions();
-        }
-
-        return super.setPossibleActions();
+        checkExcessTrains();
     }
 
     @Override
     public void finishRound() {
 
-        
+        if (discardingTrains.value()) return;
+
         super.finishRound();
     }
-
-    @Override
-    public void start() {
-        // 1. Initialize standard Stock Round FIRST
-        super.start();
-
-        boolean exchangePossible = false;
-        List<Player> players = gameManager.getPlayers();
-
-        // 2. Check all players for ANY valid exchange
-        for (Player p : players) {
-            // PASS NULL to check all types
-            if (hasExchangeableMinors(p, null)) {
-                exchangePossible = true;
-            }
-        }
-
-        specialActionPhase.set(exchangePossible);
-
-        if (exchangePossible) {
-            specialActionPlayerCount.set(0);
-
-            // Start checking from the Priority Player
-            Player priority = playerManager.getPriorityPlayer();
-            int pdIndex = (priority != null && players.contains(priority)) ? players.indexOf(priority) : 0;
-
-            // 3. Skip players who have nothing to exchange
-            int checked = 0;
-            while (!hasExchangeableMinors(players.get(pdIndex), null) && checked < players.size()) {
-                pdIndex = (pdIndex + 1) % players.size();
-                checked++;
-            }
-
-            // 4. Set the actual starting player for the Special Phase
-            specialActionCurrentIndex.set(pdIndex);
-            setCurrentPlayer(players.get(pdIndex));
-
-            // FORCE action regeneration so the UI sees the Special Phase actions
-            // immediately.
-            setPossibleActions();
-
-        }
-
-        if (discardingTrains.value()) {
-            discardingTrains.set(false);
-        }
-    }
-
-
-    @Override
-    public boolean process(PossibleAction action) {
-        // CRITICAL: Always reset the flag at the start of a new action processing
-        // cycle.
-        // This handles cases where finishTurn() was skipped (e.g., after super.start())
-        // and prevents the flag from "leaking" into the standard round.
-        specialActionProcessed.set(false);
-
-        if (specialActionPhase.value()) {
-            // Mark true here to intercept finishTurn() for any Special Phase action
-            specialActionProcessed.set(true);
-
-            if (action instanceof NullAction) {
-                advanceSpecialPhase();
-                return true;
-            }
-
-            if (action instanceof ExchangeMinorAction) {
-                ExchangeMinorAction exc = (ExchangeMinorAction) action;
-
-                boolean result = mergeCompanies(exc.getMinor(), exc.getTargetMajor(), false, false);
-
-                if (result) {
-                    // Check if the player has ANY remaining exchanges
-                    if (hasExchangeableMinors(currentPlayer, null)) {
-                        setPossibleActions();
-                    } else {
-                        advanceSpecialPhase();
-                    }
-                }
-                return result;
-            }
-        }
-
-        boolean result = super.process(action);
-        return result;
-    }
-
-    /**
-     * Helper to handle the transition to the next player in the Special Phase.
-     */
-    private void advanceSpecialPhase() {
-        List<Player> players = gameManager.getPlayers();
-
-        int nextIdx = (specialActionCurrentIndex.value() + 1) % players.size();
-        int newCount = specialActionPlayerCount.value() + 1;
-
-        // Skip players with no exchangeable items
-        while (newCount < players.size() && !hasExchangeableMinors(players.get(nextIdx), null)) {
-            nextIdx = (nextIdx + 1) % players.size();
-            newCount++;
-        }
-
-        specialActionPlayerCount.set(newCount);
-        specialActionCurrentIndex.set(nextIdx);
-
-        if (newCount >= players.size()) {
-            specialActionPhase.set(false);
-            setCurrentPlayer(playerManager.getPriorityPlayer());
-
-            // Mark true to prevent the transition from counting as a Pass for the Priority
-            // Deal
-            specialActionProcessed.set(true);
-
-            super.start();
-        } else {
-            setCurrentPlayer(players.get(nextIdx));
-            setPossibleActions();
-        }
-    }
-
-
-    private boolean setSpecialPhaseActions() {
-        possibleActions.clear();
-        Set<String> processedCompanies = new HashSet<>();
-
-
-        
-        if (currentPlayer != null) {
-
-            for (PublicCertificate cert : currentPlayer.getPortfolioModel().getCertificates()) {
-                PublicCompany company = cert.getCompany();
-                if (company == null || processedCompanies.contains(company.getId()))
-                    continue;
-
-                String type = company.getType().getId();
-
-                if ("Minor".equals(type) || "Coal".equals(type)) {
-                    PublicCompany target = getMergeTarget(company);
-                    boolean isPres = (company.getPresident() == currentPlayer);
-                    boolean hasFloated = (target != null && target.hasFloated());
-
-                  
-                    
-
-
-
-                    if (target != null && hasFloated && isPres) {
-
-                        possibleActions.add(new ExchangeMinorAction(company, target, false));
-                        processedCompanies.add(company.getId());
-                    }
-                }
-            }
-        }
-        // --- END FIX ---
-
-        possibleActions.add(new NullAction(getRoot(), NullAction.Mode.DONE).setLabel("Done / No Exchanges"));
-        return true;
-    }
-
 
     protected boolean hasExchangeableMinors(Player p, String typeFilter) {
         if (p == null)
             return false;
         boolean found = false;
 
-     
         for (PublicCertificate cert : p.getPortfolioModel().getCertificates()) {
             PublicCompany comp = cert.getCompany();
             if (comp == null)
@@ -532,7 +311,7 @@ public class StockRound_1837 extends StockRound {
             if (!"Minor".equals(type) && !"Coal".equals(type))
                 continue;
 
-            PublicCompany target = getMergeTarget(comp);
+            PublicCompany target =Merger1837.getMergeTarget(gameManager, comp);
 
             boolean isPresident = (comp.getPresident() == p);
             boolean targetExists = (target != null);
@@ -541,8 +320,6 @@ public class StockRound_1837 extends StockRound {
             boolean typeMatch = (typeFilter == null || typeFilter.equals(type));
             boolean compClosed = comp.isClosed();
 
-         
-            
             if (compClosed)
                 continue;
             if (!typeMatch)
@@ -558,38 +335,135 @@ public class StockRound_1837 extends StockRound {
     }
 
 
-        /**
-     * Helper duplicated from StockRound to avoid cross-round dependency issues.
-     */
-private PublicCompany getMergeTarget(PublicCompany source) {
-        String id = source.getId();
-        String targetId = null;
+    @Override
+    public void start() {
+        // Restore to standard Stock Round start.
+        super.start();
 
-        if (id.equals("EPP") || id.equals("RGTE"))
-            targetId = "BK";
-        else if (id.equals("EOD") || id.equals("EKT"))
-            targetId = "MS";
-        else if (id.equals("MLB"))
-            targetId = "CL";
-        else if (id.equals("ZKB") || id.equals("SPB"))
-            targetId = "SB";
-        else if (id.equals("LRB") || id.equals("EHS"))
-            targetId = "TH"; // Corrected from TI to TH
-        else if (id.equals("BB"))
-            targetId = "BH";
-
-        else if (id.startsWith("S"))
-            targetId = "Sd";
-        else if (id.startsWith("K"))
-            targetId = "KK";
-        else if (id.startsWith("U"))
-            targetId = "Ug";
-
-        if (targetId != null) {
-            return gameManager.getRoot().getCompanyManager().getPublicCompany(targetId);
+        if (discardingTrains.value()) {
+            discardingTrains.set(false);
         }
-        return null;
     }
+ 
+    @Override
+    public boolean setPossibleActions() {
+        // --- START FIX ---
+        if (compWithExcessTrains.isEmpty()) {
+            discardingTrains.set(false);
+            return super.setPossibleActions();
+        }
+
+        // Handle the first company in the list that requires a discard
+        PublicCompany company = compWithExcessTrains.get(0);
+
+        // Generate a discard action for EACH unique train type
+        for (Train train : company.getPortfolioModel().getUniqueTrains()) {
+            Set<Train> singleTrainSet = new HashSet<>();
+            singleTrainSet.add(train);
+
+            DiscardTrain action = new DiscardTrain(company, singleTrainSet);
+            action.setLabel("Force Discard " + train.getName());
+            possibleActions.add(action);
+        }
+
+        return true;
+    }
+
+
+    @Override
+    public boolean process(PossibleAction action) {
+
+        if (discardingTrains.value()) {
+            if (action instanceof DiscardTrain) {
+                DiscardTrain discard = (DiscardTrain) action;
+                Train train = discard.getSelectedTrain();
+                if (train != null) {
+                    // Move train to Bank Pool (Standard discard)
+                    train.getCard().discard();
+
+                    // Re-evaluate limits
+                    checkExcessTrains();
+                    if (!discardingTrains.value()) {
+                        finishTurn();
+                    }
+                }
+                return true;
+            }
+            // Allow Undo/Redo/Pass while discarding? usually Undo only.
+            // If we are strictly forcing discard, we might block others,
+            // but standard 'super.process' handles undo.
+            // For now, let's catch Discard and return.
+        }
+
+        return super.process(action);
+    }
+
+   
+    @Override
+    protected void finishTurn() {
+        // Restore to standard Stock Round turn finish.
+        super.finishTurn();
+    }
+
+
+
+// ... (lines of unchanged context code) ...
+
+    // --- START FIX: Generate Discard Buttons ---
+    protected boolean setTrainDiscardActions() {
+        if (compWithExcessTrains.isEmpty()) {
+            discardingTrains.set(false);
+            return super.setPossibleActions();
+        }
+
+        PublicCompany company = compWithExcessTrains.get(0);
+        
+        for (Train train : company.getPortfolioModel().getUniqueTrains()) {
+            Set<Train> singleTrainSet = new HashSet<>();
+            singleTrainSet.add(train);
+            
+            DiscardTrain action = new DiscardTrain(company, singleTrainSet);
+            action.setLabel("Force Discard " + train.getName());
+            possibleActions.add(action);
+        }
+
+        // Fix 1: Remove broken GameAction. 
+        // The ORPanel automatically provides Undo/Redo functionality.
+        // We do not need to manually inject a FORCED_UNDO action here.
+        
+        return true;
+    }
+    // --- END FIX ---
+
+    // --- START FIX: Helper to detect over-limit companies ---
+    private void checkExcessTrains() {
+        compWithExcessTrains.clear();
+        
+        // Fix 2: Fetch Majors explicitly since getAllCompanies() is missing.
+        // Only Major companies persist and have train limits in this phase.
+        List<PublicCompany> companies = gameManager.getRoot().getCompanyManager().getPublicCompaniesByType("Major");
+        
+        if (companies != null) {
+            for (PublicCompany comp : companies) {
+                // Fix 3: Use getCurrentTrainLimit()
+                if (!comp.isClosed() && comp.hasFloated() && comp.getNumberOfTrains() > comp.getCurrentTrainLimit()) {
+                    compWithExcessTrains.add(comp);
+                }
+            }
+        }
+
+        if (!compWithExcessTrains.isEmpty()) {
+            discardingTrains.set(true);
+            setPossibleActions(); 
+        } else {
+            discardingTrains.set(false);
+        }
+    }
+    // --- END FIX ---
+
+
+
+
 
 
 

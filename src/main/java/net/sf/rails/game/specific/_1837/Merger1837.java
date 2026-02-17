@@ -246,4 +246,52 @@ String id = minor.getId();
             }
         }
     }
+
+    /**
+     * Centralized logic to determine if a company merges into another.
+     * STRICTLY checks IDs to avoid false positives (e.g. SB -> Sd).
+     */
+    public static PublicCompany getMergeTarget(GameManager gameManager, PublicCompany source) {
+        if (source == null) return null;
+        
+        String id = source.getId();
+        String targetId = null;
+
+        // 1. Explicit Coal Mappings (Exact Match)
+        switch (id) {
+            case "EPP": 
+            case "RGTE": targetId = "BK"; break;
+            
+            case "EOD": 
+            case "EKT":  targetId = "MS"; break;
+            
+            case "MLB":  targetId = "CL"; break;
+            
+            case "ZKB": 
+            case "SPB":  targetId = "SB"; break;
+            
+            case "LRB": 
+            case "EHS":  targetId = "TH"; break;
+            
+            case "BB":   targetId = "BH"; break;
+        }
+
+        // 2. National Minor Mappings (Strict Regex)
+        // Only matches S1-S5, K1-K3, U1-U3. 
+        // Ignores "SB", "Sd", "KK", "Ug", "KA", etc.
+        if (targetId == null) {
+            if (id.matches("S[1-5]")) {
+                targetId = "Sd";
+            } else if (id.matches("K[1-3]")) {
+                targetId = "KK"; 
+            } else if (id.matches("U[1-3]")) {
+                targetId = "Ug";
+            }
+        }
+
+        if (targetId != null) {
+            return gameManager.getRoot().getCompanyManager().getPublicCompany(targetId);
+        }
+        return null;
+    }
 }

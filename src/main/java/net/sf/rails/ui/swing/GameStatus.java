@@ -178,7 +178,7 @@ public static final Color BG_DISCARD_VOLUNTARY = Color.CYAN; // Light Blue (#ADD
     protected int rightCompCaptionXOffset;
 
     private final int MAX_TRAIN_SLOTS = 4; // Max trains to display per company
-    private final int MAX_FUTURE_SLOTS = 5; // Max future trains to display
+    private final int MAX_FUTURE_SLOTS = 6; // Max future trains to display
 
     // Track previous times to detect jumps (penalties/undo)
     private int[] lastPlayerTimes;
@@ -352,7 +352,7 @@ public static final Color BG_DISCARD_VOLUNTARY = Color.CYAN; // Light Blue (#ADD
     protected ClickField futureTrainsButton;
     // Config
     private final int MAX_POOL_SLOTS = 3;
-    private final int MAX_IPO_SLOTS = 2; // Create space for 2 IPO trains
+    private final int MAX_IPO_SLOTS = 3; // Create space for 2 IPO trains
     protected javax.swing.JLabel[] newTrainQtyLabels;
     protected RailCard[] newTrainButtons;
 
@@ -1588,6 +1588,17 @@ public static final Color BG_DISCARD_VOLUNTARY = Color.CYAN; // Light Blue (#ADD
             previousDashboardSignature = currentSignature;
             recreate();
         } else {
+            // We must call initTurn to clear stale actions (e.g. K2) and attach new ones (e.g. K3).
+            
+            int currentActor = -1;
+            if (players != null && players.getCurrentPlayer() != null) {
+                currentActor = players.getCurrentPlayer().getIndex();
+            } else {
+                currentActor = this.actorIndex;
+            }
+            
+            // Re-run the turn logic to update button states (Active/Passive) without rebuilding components
+            initTurn(currentActor, true);
             repaint();
         }
     }
@@ -4934,12 +4945,11 @@ public static final Color BG_DISCARD_VOLUNTARY = Color.CYAN; // Light Blue (#ADD
             // 1. Scan Player Shares (The most common target for "Exchange Share")
             if (playerShareCards != null) {
                 for (int i = 0; i < nc; i++) {
-                    if (companies[i] == targetComp) {
-                        for (int j = 0; j < np; j++) {
-                            // Find the first visible card in the row (usually belongs to the actor)
-                            if (playerShareCards[i][j] != null && playerShareCards[i][j].isVisible()) {
-                                return playerShareCards[i][j];
-                            }
+                    for (int j = 0; j < np; j++) {
+                        RailCard card = playerShareCards[i][j];
+                        // Match Found? Return immediately.
+                        if (card != null && card.isVisible() && card.getCompany() == targetComp) {
+                            return card;
                         }
                     }
                 }

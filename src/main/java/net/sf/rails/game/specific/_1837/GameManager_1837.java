@@ -25,6 +25,14 @@ public class GameManager_1837 extends GameManager {
     protected CompanyManager companyManager;
     protected PhaseManager phaseManager;
 
+    private java.util.List<String> tempSkippedMinors = new java.util.ArrayList<>();
+
+    public java.util.List<String> popTempSkippedMinors() {
+        java.util.List<String> list = new java.util.ArrayList<>(tempSkippedMinors);
+        tempSkippedMinors.clear();
+        return list;
+    }
+
     public GameManager_1837(RailsRoot parent, String id) {
         super(parent, id);
     }
@@ -40,13 +48,13 @@ public class GameManager_1837 extends GameManager {
         newPhaseId.set(round.getId());
     }
 
-
     public boolean checkAndRunNFR(String newPhaseId, Round namingRound, Round interruptedRound) {
         this.newPhaseId.set(newPhaseId);
         setInterruptedRound(interruptedRound);
         String[] nationalNames = GameDef_1837.Nationals;
         for (String nationalName : nationalNames) {
-            if (doneThisRound.contains(nationalName)) continue;
+            if (doneThisRound.contains(nationalName))
+                continue;
             PublicCompany_1837 national = (PublicCompany_1837) companyManager.getPublicCompany(nationalName);
             if (phaseManager.hasReachedPhase(national.getFormationStartPhase())
                     && !NationalFormationRound.nationalIsComplete(national)) {
@@ -76,7 +84,8 @@ public class GameManager_1837 extends GameManager {
         if (newPhaseId.value() == null) {
             if (previousSRorOR.value() instanceof OperatingRound_1837) {
                 nfrReportName = previousSRorOR.value().getId().replaceFirst("OR_(\\d+)(\\.\\d+)?", "$1$2");
-                if (!nfrReportName.contains(".")) nfrReportName += ".1";
+                if (!nfrReportName.contains("."))
+                    nfrReportName += ".1";
             } else {
                 nfrReportName = previousSRorOR.value().getId().replaceFirst("SR_(\\d+)", "$1.0");
             }
@@ -125,8 +134,6 @@ public class GameManager_1837 extends GameManager {
 
 
 
-// In GameManager_1837.java
-
     @Override
     public void nextRound(Round prevRound) {
         log.info("Transitioning Round. Previous: {} ({})", prevRound.getId(), prevRound.getClass().getSimpleName());
@@ -138,35 +145,49 @@ public class GameManager_1837 extends GameManager {
             } else {
                 startOperatingRound(runIfStartPacketIsNotCompletelySold());
             }
-        // } else if (prevRound instanceof CoalExchangeRound) {
-        //     doneThisRound.add("CER");
-        //     // Pass newPhaseId.value() instead of null
-        //     if (checkAndRunNFR(newPhaseId.value(), previousSRorOR.value(), (Round) getInterruptedRound())) {
-        //         return;
-        //     }
+        } else if (prevRound instanceof CoalExchangeRound) {
+            doneThisRound.add("CER");
 
-        //     boolean cameFromStockRound = (previousSRorOR.value() instanceof StockRound);
+if (prevRound instanceof CoalExchangeRound) {
+                tempSkippedMinors.clear();
+                for (String minorId : ((CoalExchangeRound) prevRound).skippedMinors) {
+                    tempSkippedMinors.add(minorId);
+                }
+            }
 
-        //     if (cameFromStockRound) {
-        //         Phase currentPhase = getRoot().getPhaseManager().getCurrentPhase();
-        //         if (currentPhase != null) {
-        //             numOfORs.set(currentPhase.getNumberOfOperatingRounds());
-        //         }
-        //         relativeORNumber.set(0);
-        //         startOperatingRound(true);
-        //     } else if (relativeORNumber.value() < numOfORs.value()) {
-        //         startOperatingRound(true);
-        //     } else {
-        //         startStockRound();
-        //     }
+            // 1. Check if we have a suspended round to resume (e.g. OR interrupted by formation)
+            Round interrupted = (Round) getInterruptedRound();
+            if (interrupted != null) {
+                log.info("1837_LOGIC: Returning from CER to interrupted round: " + interrupted.getId());
+                setRound(interrupted);
+                if (interrupted instanceof OperatingRound_1837) {
+                    ((OperatingRound_1837) interrupted).resume();
+                }
+                return;
+            }
 
-        //     getCurrentRound().setPossibleActions();
+            // 2. Standard Flow: No interruption, so proceed to next logical round
+            boolean cameFromStockRound = (previousSRorOR.value() instanceof StockRound);
+            if (cameFromStockRound) {
+                Phase currentPhase = getRoot().getPhaseManager().getCurrentPhase();
+                if (currentPhase != null) {
+                    numOfORs.set(currentPhase.getNumberOfOperatingRounds());
+                }
+                relativeORNumber.set(0);
+                // SR -> CER -> OR
+                startOperatingRound(true);
+            } else if (relativeORNumber.value() < numOfORs.value()) {
+                // OR -> CER -> OR (next in sequence)
+                startOperatingRound(true);
+            } else {
+                // OR -> CER -> SR
+                startStockRound();
+            }
 
         } else if (prevRound instanceof NationalFormationRound) {
             doneThisRound.add(((NationalFormationRound) prevRound).getNational().getId());
             OperatingRound_1837 interruptedRound = (OperatingRound_1837) getInterruptedRound();
-            
-            // Pass newPhaseId.value() instead of null
+
             if (checkAndRunNFR(newPhaseId.value(), previousSRorOR.value(), interruptedRound)) {
                 return;
             }
@@ -180,63 +201,106 @@ public class GameManager_1837 extends GameManager {
         } else if (prevRound instanceof StockRound_1837 || prevRound instanceof OperatingRound_1837) {
             previousSRorOR.set(prevRound);
             doneThisRound.clear();
-            setInterruptedRound(prevRound);
-            log.info("Saving Interrupted Round: {}", prevRound.getId());
             
-            // --- FIX: Pass newPhaseId.value() to enforce trigger logic ---
-            if (!checkAndRunCER(newPhaseId.value(), prevRound, null)
-                    && !checkAndRunNFR(newPhaseId.value(), prevRound, null)) {
-                super.nextRound(prevRound);
+            // --- START FIX ---
+            // DO NOT setInterruptedRound(prevRound) here.
+            // If we are transitioning, the previous round is over.
+            // We pass 'null' to checkAndRunCER/NFR so they don't set a return point.
+            
+            // 1. Check for Coal Exchanges
+            if (checkAndRunCER(newPhaseId.value(), prevRound, null)) {
+                return;
             }
+            
+            // 2. Check for National Formations
+            if (checkAndRunNFR(newPhaseId.value(), prevRound, null)) {
+                return;
+            }
+            
+            // 3. No specials triggered, proceed normally
+            super.nextRound(prevRound);
+            // --- END FIX ---
         } else {
             setInterruptedRound(null);
             super.nextRound(prevRound);
         }
     }
 
-    public boolean checkAndRunCER(String newPhaseId, Round namingRound, Round interruptedRound) {
-        if (doneThisRound.contains("CER")) return false;
-        
-        // --- FIX: Only run CER if we have a specific Phase Trigger ---
-        // If newPhaseId is null, it means we are just transitioning rounds normally.
-        // We should NOT trigger a CER just because a company is open.
-        if (newPhaseId == null) return false;
 
+    public boolean checkAndRunCER(String newPhaseId, Round namingRound, Round interruptedRound) {
+        if (doneThisRound.contains("CER"))
+            return false;
+
+        // --- START FIX ---
+        // Clean implementation for triggering the CER.
+        // This ensures the round is created and started as a standalone entity.
         List<PublicCompany> coalCompanies = getRoot().getCompanyManager().getPublicCompaniesByType("Coal");
         boolean runCER = false;
         for (PublicCompany coalComp : coalCompanies) {
             if (!coalComp.isClosed() && coalComp.getRelatedPublicCompany().hasFloated()) {
                 runCER = true;
-                setInterruptedRound(interruptedRound);
-                setNewPhaseId(newPhaseId);
                 break;
             }
         }
+
         if (runCER) {
-            // String cerId;
-            // if (newPhaseId != null) {
-            //     cerId = "CER_phase_" + newPhaseId;
-            // } else if (namingRound instanceof StockRound_1837) {
-            //     cerId = namingRound.getId().replaceFirst("SR_(\\d+)", "CER_$1.0");
-            // } else {
-            //     cerId = namingRound.getId().replaceFirst("OR_(\\d+)(\\.\\d+)?", "CER_$1$2");
-            //     if (!cerId.contains(".")) cerId += ".1";
-            // }
-            // log.debug("Prev round {}, new round {}", namingRound.getId(), cerId);
-            // createRound(CoalExchangeRound.class, cerId).start();
+            String cerId;
+            if (newPhaseId != null) {
+                cerId = "CER_phase_" + newPhaseId;
+            } else if (namingRound instanceof StockRound_1837) {
+                cerId = namingRound.getId().replaceFirst("SR_(\\d+)", "CER_$1.0");
+            } else {
+                cerId = namingRound.getId().replaceFirst("OR_(\\d+)(\\.\\d+)?", "CER_$1$2");
+                if (!cerId.contains("."))
+                    cerId += ".1";
+            }
+
+            setInterruptedRound(interruptedRound);
+            createRound(CoalExchangeRound.class, cerId).start();
+            return true;
         } else {
             doneThisRound.add("CER");
         }
-        return runCER;
+        return false;
     }
 
 
 
-
-
-
-
-
-
-
+    @Override
+    public boolean process(rails.game.action.PossibleAction action) {
+        if (action instanceof rails.game.action.NullAction) {
+            rails.game.action.NullAction incoming = (rails.game.action.NullAction) action;
+            
+            // Logic: If the UI sends a SKIP or PASS, we treat them as semantically 
+            // identical for the purpose of moving the game forward in 1837.
+            if (incoming.getMode() == rails.game.action.NullAction.Mode.SKIP || 
+                incoming.getMode() == rails.game.action.NullAction.Mode.PASS) {
+                
+                // 1. Get the current RoundFacade from the state model
+                net.sf.rails.game.round.RoundFacade facade = currentRound.value();
+                
+                // 2. Cast to the concrete Round class to access the action list
+                if (facade instanceof net.sf.rails.game.Round) {
+                    net.sf.rails.game.Round activeRound = (net.sf.rails.game.Round) facade;
+                    
+                    for (rails.game.action.PossibleAction valid : activeRound.getPossibleActionsList()) {
+                        if (valid instanceof rails.game.action.NullAction) {
+                            rails.game.action.NullAction validNa = (rails.game.action.NullAction) valid;
+                            
+                            // 3. If the server is offering EITHER mode, and the user 
+                            // sent EITHER mode, we have a match.
+                            if (validNa.getMode() == rails.game.action.NullAction.Mode.SKIP || 
+                                validNa.getMode() == rails.game.action.NullAction.Mode.PASS) {
+                                
+                                log.info("1837_FIX: Normalizing NullAction " + incoming.getMode() + 
+                                         " -> " + validNa.getMode() + " for " + action.getPlayerName());
+                                return super.process(validNa);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        return super.process(action);
+    }
 }
