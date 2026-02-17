@@ -132,6 +132,7 @@ public class ORPanel extends GridPanel
     private TokenDisplayPanel tokenDisplay;
     private TrainDisplayPanel trainDisplay;
     private JPanel legendPanel;
+    private JPanel specialNotificationPanel;
 
     private static final List<ORPanel> activeInstances = new ArrayList<>();
 
@@ -271,25 +272,73 @@ public class ORPanel extends GridPanel
     private void distributeStandardActions(List<PossibleAction> actions) {
         boolean doneActionFound = false;
         PossibleAction donePa = null;
-        // if (activePhase == 1 || activePhase == 2)
-        // enableConfirm(false);
+
+// 1. DEDUPLICATION SET (Must be OUTSIDE the loop)
+        java.util.Set<String> addedSpecialLabels = new java.util.HashSet<>();
+        
+        // 2. CONSTANTS (To prevent typo-induced duplicates)
+        final String LBL_TILE  = "EXTRA TILE BUILD";
+        final String LBL_TOKEN = "EXTRA TOKEN";
 
         for (PossibleAction pa : actions) {
             if (pa instanceof CorrectionModeAction)
                 continue;
 
-            if (pa instanceof UseSpecialProperty) {
-                // Add to phase 1 miscellaneous panel
-                ActionButton b = createSidebarButton(pa.getButtonLabel(), "SpecialProperty");
-                b.setPossibleAction(pa);
-                b.setEnabled(true);
-                bindActionHotkey(b, pa); // Bind hotkey for Special Properties
+            String labelToAdd = null;
 
-                if (miscActionPanel != null) {
-                    miscActionPanel.add(b);
-                    miscActionPanel.add(Box.createVerticalStrut(2));
+            // --- A. UseSpecialProperty (The Menu Trigger) ---
+            if (pa instanceof UseSpecialProperty) {
+                String text = pa.getButtonLabel().toLowerCase();
+                
+                // Map known keywords to our Canonical Labels
+                if (text.contains("tile")) {
+                    labelToAdd = LBL_TILE;
+                } else if (text.contains("token")) {
+                    labelToAdd = LBL_TOKEN;
+                } else {
+                    // Unknown special (e.g. "Exchange"), use raw label
+                    labelToAdd = pa.getButtonLabel().trim(); 
                 }
-            } else if (pa instanceof SetDividend) {
+            } 
+            
+            // --- B. LayTile (The Execution) ---
+            else if (pa instanceof LayTile) {
+                 LayTile lt = (LayTile) pa;
+                 // Strict Check: Must have a SpecialProperty object OR be flagged extra
+                 boolean hasSpecialProp = (lt.getSpecialProperty() != null);
+                 boolean isExtra = pa.toString().contains("extra=true");
+                 
+                 if (hasSpecialProp || isExtra) {
+                     labelToAdd = LBL_TILE; // Strictly map to TILE
+                 }
+            }
+            
+            // --- C. LayBaseToken (The Execution) ---
+            else if (pa instanceof LayBaseToken) {
+                 LayBaseToken lbt = (LayBaseToken) pa;
+                 
+                 // Strict Check: Type is NOT Generic, OR has SpecialProperty, OR flagged extra
+                 boolean isNonGeneric = (lbt.getType() != LayBaseToken.GENERIC);
+                 boolean hasSpecialProp = (lbt.getSpecialProperty() != null);
+                 boolean isExtra = pa.toString().contains("extra=true");
+
+                 if (isNonGeneric || hasSpecialProp || isExtra) {
+                     labelToAdd = LBL_TOKEN; // Strictly map to TOKEN
+                 }
+            }
+
+            // --- D. ADD BUTTON (With strict deduplication) ---
+            if (labelToAdd != null) {
+                // If we haven't seen this EXACT label yet, add the button
+                if (!addedSpecialLabels.contains(labelToAdd)) {
+                    addSpecialNotificationButton(labelToAdd, pa);
+                    addedSpecialLabels.add(labelToAdd);
+                }
+            }            
+            // Continue with standard distribution...
+            if (pa instanceof SetDividend) {
+
+
                 SetDividend sd = (SetDividend) pa;
                 if (sd.isAllocationAllowed(SetDividend.PAYOUT))
                     enableRevenueBtn(btnRevPayout, sd, SetDividend.PAYOUT);
@@ -341,6 +390,52 @@ public class ORPanel extends GridPanel
                 btnTrainSkip.setEnabled(true);
         }
 
+    }
+
+    private void addSpecialNotificationButton(String text, PossibleAction sourceAction) {
+        if (specialNotificationPanel == null) return;
+        
+        specialNotificationPanel.setVisible(true);
+
+        ActionButton b = new ActionButton(RailsIcon.INFO); // Use Info icon or null
+        b.setText(text);
+        b.setIcon(null); 
+        b.setHorizontalAlignment(SwingConstants.CENTER);
+        b.setAlignmentX(Component.CENTER_ALIGNMENT);
+        b.setPreferredSize(new Dimension(SIDEBAR_WIDTH - 20, BTN_HEIGHT));
+        b.setMaximumSize(new Dimension(SIDEBAR_WIDTH - 20, BTN_HEIGHT));
+        
+        // --- STYLING ---
+        // High Visibility Gold/Orange
+        Color bg = new Color(255, 193, 7); // Amber/Gold
+        Color fg = Color.BLACK;
+        
+        // Force UI to ignore "Disabled" greying out
+        b.setUI(new javax.swing.plaf.basic.BasicButtonUI());
+        b.setBackground(bg);
+        b.setForeground(fg);
+        b.setFont(new Font("SansSerif", Font.BOLD, 12));
+        
+        b.setOpaque(true);
+        b.setContentAreaFilled(true);
+        b.setBorderPainted(true);
+        
+        // Thick border to indicate "Special"
+        b.setBorder(BorderFactory.createCompoundBorder(
+                BorderFactory.createLineBorder(new Color(184, 134, 11), 2), // Dark Goldenrod
+                BorderFactory.createEmptyBorder(2, 2, 2, 2)
+        ));
+
+        // Functionally disabled (not clickable)
+        b.setEnabled(false); 
+        
+        // Optional: Add tooltip to explain
+        if (sourceAction != null) {
+            b.setToolTipText(sourceAction.toString());
+        }
+
+        specialNotificationPanel.add(b);
+        specialNotificationPanel.add(Box.createVerticalStrut(4));
     }
 
     private void updateSpecialHeader(GuiTargetedAction context) {
@@ -684,6 +779,12 @@ public class ORPanel extends GridPanel
             miscActionPanel.removeAll();
         }
 
+        if (specialNotificationPanel != null) {
+specialNotificationPanel.removeAll();
+            specialNotificationPanel.setVisible(false);
+        }
+
+
         activePhase = 0;
     }
 
@@ -888,10 +989,10 @@ public class ORPanel extends GridPanel
         sidebarPanel.add(Box.createVerticalStrut(5));
 
         // 8. Footer (Done Button)
-        footerPanel = new JPanel(new FlowLayout(FlowLayout.CENTER, 0, 0));
+       // Change Footer to Vertical Box to hold Done + Notifications tightly together
+        footerPanel = new JPanel();
+        footerPanel.setLayout(new BoxLayout(footerPanel, BoxLayout.Y_AXIS));
         footerPanel.setOpaque(false);
-
-        // Apply the same breathing space to the Footer via EmptyBorder
         footerPanel.setBorder(BorderFactory.createEmptyBorder(PANEL_ACTION_GAP, 0, PANEL_ACTION_GAP, 0));
 
         // Rename to "END TURN" and set initial state to Disabled/Grey
@@ -901,9 +1002,22 @@ public class ORPanel extends GridPanel
         btnDone.setEnabled(false);
         resetButtonStyle(btnDone); // Forces grey/standard look
 
+        // Add Done Button
         footerPanel.add(btnDone);
+
+        // 9. Special Notifications (Attached directly below Done)
+        specialNotificationPanel = new JPanel();
+        specialNotificationPanel.setLayout(new BoxLayout(specialNotificationPanel, BoxLayout.Y_AXIS));
+        specialNotificationPanel.setOpaque(false);
+        specialNotificationPanel.setVisible(false);
+        
+        // Small gap between Done and Notification
+        footerPanel.add(Box.createVerticalStrut(4)); 
+        footerPanel.add(specialNotificationPanel);
+
         sidebarPanel.add(footerPanel);
         sidebarPanel.add(Box.createVerticalStrut(5));
+
 
         add(sidebarPanel);
     }
