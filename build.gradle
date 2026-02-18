@@ -313,8 +313,7 @@ task renameExecutables(type: Copy) {
     into '.'
     rename '(.+)\\.(.+)', 'rails-18xx.$2'
 }
-
-
+// ... (previous tasks like buildpkgPackage and renameExecutables)
 
 processResources {
     // 1. Calculate Timestamp from ALL source files
@@ -338,7 +337,6 @@ processResources {
     }
 
     // 3. FORCE GENERATION of version.properties
-    // This guarantees the file exists, even if it's missing from source.
     doLast {
         def resourcesDir = sourceSets.main.output.resourcesDir
         if (!resourcesDir.exists()) {
@@ -349,4 +347,6 @@ processResources {
         versionFile.text = "buildTimestamp=" + buildTime
         println "Generated version.properties with timestamp: " + buildTime
     }
-}
+} // This closes processResources
+
+// Ensure there are NO extra braces here at the end of the file.

@@ -269,47 +269,42 @@ public class ORPanel extends GridPanel
         return phase;
     }
 
+// ... (lines of unchanged context code) ...
     private void distributeStandardActions(List<PossibleAction> actions) {
         boolean doneActionFound = false;
         PossibleAction donePa = null;
-
-// 1. DEDUPLICATION SET (Must be OUTSIDE the loop)
+        
+        // --- START FIX ---
+        // 1. DEDUPLICATION SET
         java.util.Set<String> addedSpecialLabels = new java.util.HashSet<>();
         
-        // 2. CONSTANTS (To prevent typo-induced duplicates)
+        // 2. CONSTANTS (Normalized Labels)
         final String LBL_TILE  = "EXTRA TILE BUILD";
         final String LBL_TOKEN = "EXTRA TOKEN";
 
         for (PossibleAction pa : actions) {
-            if (pa instanceof CorrectionModeAction)
+            // IGNORE LIST: Structural actions that should never be special buttons
+            if (pa instanceof CorrectionModeAction || 
+                pa instanceof GameAction) { 
                 continue;
+            }
 
             String labelToAdd = null;
 
-            // --- A. UseSpecialProperty (The Menu Trigger) ---
+            // --- A. UseSpecialProperty (The Menu/Trigger) ---
             if (pa instanceof UseSpecialProperty) {
                 String text = pa.getButtonLabel().toLowerCase();
-                
-                // Map known keywords to our Canonical Labels
-                if (text.contains("tile")) {
-                    labelToAdd = LBL_TILE;
-                } else if (text.contains("token")) {
-                    labelToAdd = LBL_TOKEN;
-                } else {
-                    // Unknown special (e.g. "Exchange"), use raw label
-                    labelToAdd = pa.getButtonLabel().trim(); 
-                }
+                if (text.contains("tile")) labelToAdd = LBL_TILE;
+                else if (text.contains("token")) labelToAdd = LBL_TOKEN;
+                else labelToAdd = pa.getButtonLabel().trim();
             } 
             
             // --- B. LayTile (The Execution) ---
             else if (pa instanceof LayTile) {
                  LayTile lt = (LayTile) pa;
-                 // Strict Check: Must have a SpecialProperty object OR be flagged extra
-                 boolean hasSpecialProp = (lt.getSpecialProperty() != null);
-                 boolean isExtra = pa.toString().contains("extra=true");
-                 
-                 if (hasSpecialProp || isExtra) {
-                     labelToAdd = LBL_TILE; // Strictly map to TILE
+                 // ONLY show if it has a linked SpecialProperty object or explicit extra flag
+                 if (lt.getSpecialProperty() != null || pa.toString().contains("extra=true")) {
+                     labelToAdd = LBL_TILE; 
                  }
             }
             
@@ -317,28 +312,45 @@ public class ORPanel extends GridPanel
             else if (pa instanceof LayBaseToken) {
                  LayBaseToken lbt = (LayBaseToken) pa;
                  
-                 // Strict Check: Type is NOT Generic, OR has SpecialProperty, OR flagged extra
-                 boolean isNonGeneric = (lbt.getType() != LayBaseToken.GENERIC);
+                 // STRICT FILTER BASED ON DEBUG ANALYSIS:
+                 // 1. Check for attached SpecialProperty (Debug confirmed Type 2 has SP=true)
                  boolean hasSpecialProp = (lbt.getSpecialProperty() != null);
-                 boolean isExtra = pa.toString().contains("extra=true");
+                 
+                 // 2. Check for explicit "extra=true" flag
+                 boolean isExplicitlyExtra = pa.toString().contains("extra=true");
 
-                 if (isNonGeneric || hasSpecialProp || isExtra) {
-                     labelToAdd = LBL_TOKEN; // Strictly map to TOKEN
+                 // 3. Check for Special Types, BUT EXCLUDE TYPE 1 (Home City/Normal)
+                 // Type 0 = Generic, Type 1 = Home/Normal. Both are ignored.
+                 // Any other Type (2+) is considered special.
+                 boolean isSpecialType = (lbt.getType() != LayBaseToken.GENERIC && lbt.getType() != 1);
+
+                 if (hasSpecialProp || isExplicitlyExtra || isSpecialType) {
+                     labelToAdd = LBL_TOKEN;
                  }
             }
+            
+            // --- D. CATCH-ALL (The Safety Net) ---
+            else if (!(pa instanceof SetDividend) && 
+                     !(pa instanceof BuyTrain) && 
+                     !(pa instanceof NullAction) && 
+                     !(pa instanceof LayTile) &&       
+                     !(pa instanceof LayToken) &&      
+                     !(pa instanceof LayBaseToken)) {  
+                 
+                 labelToAdd = pa.getButtonLabel().toUpperCase();
+            }
 
-            // --- D. ADD BUTTON (With strict deduplication) ---
+            // --- E. ADD BUTTON (Deduplicated) ---
             if (labelToAdd != null) {
-                // If we haven't seen this EXACT label yet, add the button
                 if (!addedSpecialLabels.contains(labelToAdd)) {
                     addSpecialNotificationButton(labelToAdd, pa);
                     addedSpecialLabels.add(labelToAdd);
                 }
-            }            
+            }
+            // --- END FIX ---
+
             // Continue with standard distribution...
             if (pa instanceof SetDividend) {
-
-
                 SetDividend sd = (SetDividend) pa;
                 if (sd.isAllocationAllowed(SetDividend.PAYOUT))
                     enableRevenueBtn(btnRevPayout, sd, SetDividend.PAYOUT);
@@ -353,23 +365,21 @@ public class ORPanel extends GridPanel
                 NullAction.Mode mode = ((NullAction) pa).getMode();
                 if (mode == NullAction.Mode.DONE || mode == NullAction.Mode.PASS) {
                     setupButton(btnDone, pa);
-                    bindActionHotkey(btnDone, pa); // Bind hotkey for Done/Pass
+                    bindActionHotkey(btnDone, pa); 
 
-                    // Save for later re-binding
                     donePa = pa;
                     doneActionFound = true;
                 }
             }
         }
-        // CRITICAL: Re-bind the DONE action last.
-        // This ensures that if DiscardTrain (or any other action) claimed 'Enter'
-        // during the loop or via addSpecialActionButton, the DONE button overwrites it.
         if (doneActionFound && donePa != null) {
-            // log.info(">>> ENSURING DONE HAS HOTKEY PRIORITY <<<");
             bindActionHotkey(btnDone, donePa);
         }
 
     }
+// ... (rest of the method) ...
+
+
 
     private void updatePhaseSpecifics() {
 

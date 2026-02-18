@@ -1,9 +1,9 @@
 package net.sf.rails.ui.swing;
 
-
 import java.awt.*;
 import java.awt.event.*;
 import java.util.EnumSet;
+import java.util.HashSet;
 import java.util.List;
 import java.util.SortedSet;
 import java.util.TreeSet;
@@ -17,7 +17,9 @@ import net.sf.rails.game.financial.*;
 import net.sf.rails.game.round.RoundFacade;
 import net.sf.rails.sound.SoundManager;
 import net.sf.rails.ui.swing.elements.*;
+import net.sf.rails.ui.swing.hexmap.GUIHex;
 import net.sf.rails.ui.swing.hexmap.HexHighlightMouseListener;
+import net.sf.rails.ui.swing.hexmap.HexMap;
 import net.sf.rails.util.Util;
 import net.sf.rails.ui.swing.ORPanel;
 
@@ -137,6 +139,7 @@ public class StartRoundWindow extends JFrame implements ActionListener, KeyListe
     protected JPanel[] cardWrappers;
     protected static final Color COLOR_AVAILABLE = new Color(204, 255, 204);
     protected static final Color COLOR_SOLD = new Color(220, 220, 220);
+    protected static final Color COLOR_HIGHLIGHT = new Color(160, 32, 240); // Prominent Purple
 
     public StartRoundWindow() {
     }
@@ -158,7 +161,6 @@ public class StartRoundWindow extends JFrame implements ActionListener, KeyListe
         separatorXOffset = new int[numberOfColumns];
 
         bidPerPlayer = new Field[ni][np];
-        // REMOVED: info = new Field[ni];
         itemStatus = new Field[ni];
         upperPlayerCaption = new Field[numberOfColumns][np];
         lowerPlayerCaption = new Field[np];
@@ -172,8 +174,6 @@ public class StartRoundWindow extends JFrame implements ActionListener, KeyListe
             minBidXOffset = new int[numberOfColumns];
         bidPerPlayerXOffset = new int[numberOfColumns];
         playerCaptionXOffset = new int[numberOfColumns];
-
-        // REMOVED: infoXOffset array allocation
 
         if (includeBidding != StartRound.Bidding.NO)
             playerBidsXOffset = new int[numberOfColumns];
@@ -202,13 +202,9 @@ public class StartRoundWindow extends JFrame implements ActionListener, KeyListe
             if (col == 0)
                 bidPerPlayerYOffset = lastY;
 
-            // REMOVED: Info column logic
-            // infoXOffset[col] = bidPerPlayerXOffset[col] + np;
-
-            lastX += np; // Skip over the player columns
+            lastX += np;
 
             if (col == 0) {
-                // infoYOffset = lastY; // Removed
                 columnWidth = lastX + 1;
             }
 
@@ -274,25 +270,38 @@ public class StartRoundWindow extends JFrame implements ActionListener, KeyListe
             }
 
             cards[i] = new RailCard(si, itemGroup);
-
             // 1. Enable Clicks
             cards[i].addActionListener(this);
-            log.error("Added ActionListener to RailCard for StartItem index {}", si.getIndex());
-
-            // // 2. Scale Card Down (so it doesn't touch edges)
+            // 2. Scale Card
             cards[i].setScale(1.2);
 
-            // 3. Create Wrapper Panel (The Green Edge)
+            // --- CENTRALIZED HIGHLIGHTING LOGIC ---
+            configureMapHighlighting(cards[i], si);
+            // -------------------------------------
+
+            // 3. Create Wrapper Panel
             cardWrappers[i] = new JPanel();
-            cardWrappers[i].setLayout(new GridBagLayout()); // Centers component by default
+            // Use GridLayout(1,1) to force the card to fill the entire wrapper area
+            cardWrappers[i].setLayout(new GridLayout(1, 1));
             cardWrappers[i].setBackground(COLOR_AVAILABLE);
-            cardWrappers[i].setBorder(BorderFactory.createEtchedBorder()); // Optional: defined edge
+            cardWrappers[i].setBorder(BorderFactory.createEtchedBorder());
 
-            // 4. Add Card to Wrapper (Center it)
-            cardWrappers[i].add(cards[i], new GridBagConstraints());
+            // 4. Add Card to Wrapper
+            cardWrappers[i].add(cards[i]);
 
-            // 5. Add Wrapper to Main Grid
-            // The Wrapper FILLS the cell, creating the background area
+            // 5. Add MouseListener to the wrapper itself
+            // This ensures clicks on the border/background are forwarded to the window
+            // logic
+            final int cardIndex = i;
+            cardWrappers[i].addMouseListener(new MouseAdapter() {
+                @Override
+                public void mouseClicked(MouseEvent e) {
+                    // Forward the click as an ActionEvent from the card
+                    actionPerformed(new ActionEvent(cards[cardIndex], ActionEvent.ACTION_PERFORMED, "WrapperClick"));
+                }
+            });
+
+            // 6. Add Wrapper to Main Grid
             gbc.gridx = itemNameXOffset[col];
             gbc.gridy = itemNameYOffset + row;
             gbc.gridwidth = 1;
@@ -300,11 +309,10 @@ public class StartRoundWindow extends JFrame implements ActionListener, KeyListe
             gbc.weightx = 0.5;
             gbc.weighty = 0.5;
             gbc.fill = GridBagConstraints.BOTH;
-            gbc.insets = new Insets(1, 1, 1, 1); // Tiny gap between wrappers
+            gbc.insets = new Insets(1, 1, 1, 1);
 
             statusPanel.add(cardWrappers[i], gbc);
 
-            // IMPORTANT: The "field" logic must track the Wrapper now, not the card
             if (fields != null && gbc.gridx < fields.length && gbc.gridy < fields[0].length) {
                 fields[gbc.gridx][gbc.gridy] = cardWrappers[i];
             }
@@ -331,25 +339,6 @@ public class StartRoundWindow extends JFrame implements ActionListener, KeyListe
 
             }
 
-            Certificate cert = si.getPrimary();
-            Company comp = null;
-            if (cert instanceof PublicCertificate) {
-                comp = (PublicCompany) cert.getParent();
-            } else if (cert instanceof PrivateCompany) {
-                comp = (PrivateCompany) cert;
-            }
-
-            if (comp != null) {
-                // 1. Set Rich Tooltip (replaces Info button click) using RailCard helper
-                // Ensure the RailCard class has this method from previous updates
-                cards[i].setCompanyDetailsTooltip(comp);
-
-                // 2. Add Hex Highlighting (Map lights up when hovering card)
-                // Passing 'si' (StartItem) as the token source
-                HexHighlightMouseListener.addMouseListener(cards[i], gameUIManager.getORUIManager(), si);
-            }
-
-            // Invisible field, only used to hold current item status.
             itemStatus[i] = new Field(si.getStatusModel());
         }
 
@@ -717,7 +706,6 @@ public class StartRoundWindow extends JFrame implements ActionListener, KeyListe
         passButton.setEnabled(false);
         buttonPanel.add(passButton);
 
-        // Initialize Undo Button
         undoButton = new ActionButton(RailsIcon.UNDO);
         undoButton.setToolTipText("Undo last action (Z)");
         undoButton.addActionListener(this);
@@ -737,8 +725,6 @@ public class StartRoundWindow extends JFrame implements ActionListener, KeyListe
             crossIndex[item.getIndex()] = i;
         }
 
-        // REMOVED: infoIcon creation
-
         initCells();
 
         getContentPane().add(statusPanel, BorderLayout.NORTH);
@@ -748,7 +734,6 @@ public class StartRoundWindow extends JFrame implements ActionListener, KeyListe
         gameUIManager.setMeVisible(this, true);
         requestFocus();
 
-        // Setup Hotkeys using InputMap/ActionMap (Better than KeyListener)
         setupHotkeys();
 
         setDefaultCloseOperation(JFrame.DO_NOTHING_ON_CLOSE);
@@ -823,298 +808,315 @@ public class StartRoundWindow extends JFrame implements ActionListener, KeyListe
         // --- END FIX ---
     }
 
+    // We are modifying StartRoundWindow.java
+
+    /**
+     * Configures the RailCard with Tooltips and Map Highlighting based on the
+     * associated StartItem.
+     * Centralized logic ensures that Privates, Minors, and Majors highlight
+     * correctly in all games.
+     */
+    protected void configureMapHighlighting(RailCard card, StartItem si) {
+        if (card == null || si == null)
+            return;
+
+        // 1. Collect all certificates for highlighting (Primary and Secondary)
+        java.util.List<Certificate> certs = new java.util.ArrayList<>();
+        if (si.getPrimary() != null)
+            certs.add(si.getPrimary());
+        if (si.getSecondary() != null)
+            certs.add(si.getSecondary());
+
+        log.info("SRW: Configuring highlighting for StartItem {}. Found {} certs.", si.getId(), certs.size());
+
+        // 2. Set Tooltip (based on primary company)
+        if (!certs.isEmpty()) {
+            Certificate pCert = certs.get(0);
+            Company pComp = null;
+            if (pCert instanceof PrivateCompany) {
+                pComp = (PrivateCompany) pCert;
+            } else if (pCert instanceof PublicCertificate) {
+                pComp = ((PublicCertificate) pCert).getCompany();
+                if (pComp == null && pCert.getParent() instanceof PublicCompany) {
+                    pComp = (PublicCompany) pCert.getParent();
+                }
+            }
+            if (pComp != null) {
+                card.setCompanyDetailsTooltip(pComp);
+                log.info("SRW: Assigned tooltip for Company {}", pComp.getId());
+            }
+        }
+
+        // 3. Add Map Highlight Listeners
+        if (gameUIManager != null && gameUIManager.getORUIManager() != null) {
+
+            // A. Attach the StartItem listener (highlights blocked hexes for contained
+            // Privates)
+            HexHighlightMouseListener.addMouseListener(card, gameUIManager.getORUIManager(), si);
+            log.info("SRW: Attached generic StartItem listener for {}", si.getId());
+
+            // B. Attach explicit listeners for all associated companies
+            for (Certificate cert : certs) {
+                PublicCompany pubComp = null;
+                if (cert instanceof PublicCertificate) {
+                    pubComp = ((PublicCertificate) cert).getCompany();
+                    if (pubComp == null && cert.getParent() instanceof PublicCompany) {
+                        pubComp = (PublicCompany) cert.getParent();
+                    }
+                }
+
+                if (pubComp != null) {
+                    // Log the Home Hexes to verify they exist in the model
+                    java.util.List<MapHex> homes = pubComp.getHomeHexes();
+                    log.info("SRW: Attaching PublicCompany listener for {}. HomeHexes count: {}",
+                            pubComp.getId(), (homes != null ? homes.size() : "NULL"));
+
+                    HexHighlightMouseListener.addMouseListener(card, gameUIManager.getORUIManager(), pubComp, true);
+                } else if (cert instanceof PrivateCompany) {
+                    PrivateCompany priv = (PrivateCompany) cert;
+                    log.info("SRW: Attaching explicit PrivateCompany listener for {}. BlockedHexes count: {}",
+                            priv.getId(), (priv.getBlockedHexes() != null ? priv.getBlockedHexes().size() : "NULL"));
+
+                    HexHighlightMouseListener.addMouseListener(card, gameUIManager.getORUIManager(), priv, true);
+                }
+            }
+        } else {
+            log.warn("SRW: Skipping highlight attachment - ORUIManager or Map not available.");
+        }
+    }
+
+    protected void clearMapHighlights() {
+        if (gameUIManager != null && gameUIManager.getORUIManager() != null) {
+            net.sf.rails.ui.swing.hexmap.HexMap map = gameUIManager.getORUIManager().getMap();
+            if (map != null) {
+                // --- START FIX ---
+                // setOwnerHighlight requires a List, and we must iterate over the map values
+                map.setOwnerHighlight(new java.util.ArrayList<net.sf.rails.ui.swing.hexmap.GUIHex>(), null);
+
+                for (net.sf.rails.ui.swing.hexmap.GUIHex guiHex : map.getGuiHexes().values()) {
+                    guiHex.setActiveOwnerHighlight(false, null);
+                }
+                // --- END FIX ---
+            }
+        }
+    }
+
+    protected void updateMapHighlights() {
+        if (gameUIManager == null || gameUIManager.getORUIManager() == null)
+            return;
+        net.sf.rails.ui.swing.hexmap.HexMap map = gameUIManager.getORUIManager().getMap();
+        if (map == null)
+            return;
+
+        // --- START FIX ---
+        java.util.List<net.sf.rails.ui.swing.hexmap.GUIHex> hexesToHighlight = new java.util.ArrayList<>();
+
+        for (int i = 0; i < cards.length; i++) {
+            if (cards[i] != null && (cards[i].getState() == RailCard.State.ACTIONABLE
+                    || cards[i].getState() == RailCard.State.SELECTED)) {
+                StartItem si = round.getStartItem(i);
+                Certificate cert = si.getPrimary();
+                PublicCompany pubComp = null;
+
+                if (cert instanceof PublicCertificate) {
+                    pubComp = ((PublicCertificate) cert).getCompany();
+                }
+
+                if (pubComp != null) {
+                    for (MapHex hex : pubComp.getHomeHexes()) {
+                        net.sf.rails.ui.swing.hexmap.GUIHex guiHex = map.getHex(hex);
+                        if (guiHex != null) {
+                            guiHex.setActiveOwnerHighlight(true, pubComp.getId());
+                            hexesToHighlight.add(guiHex);
+                        }
+                    }
+                }
+            }
+        }
+        map.setOwnerHighlight(hexesToHighlight, null);
+        // --- END FIX ---
+        map.repaintAll(new Rectangle(map.getSize()));
+    }
+
     @Override
     public void updateStatus(boolean myTurn) {
-        log.info("SRW: updateStatus STARTED. MyTurn={}", myTurn);
+        // --- START FIX ---
+        if (gameUIManager != null && gameUIManager.getGameManager() != null) {
+            possibleActions = gameUIManager.getGameManager().getPossibleActions();
+        }
 
-        // 1. Reset all cards to their default state based on game status
+        // 1. Reset Map Highlights and Card States
+        clearMapHighlights();
+
         for (int i = 0; i < round.getNumberOfStartItems(); i++) {
             StartItem si = round.getStartItem(i);
             int status = si.getStatus();
-
-            // Clear previous actions
             cards[i].clearPossibleActions();
 
             if (status == StartItem.SOLD) {
                 cards[i].setState(RailCard.State.DISABLED);
-                String tooltipKey = itemStatusTextKeys[status];
-                cards[i].setToolTipText(LocalText.getText(tooltipKey));
-
-                // Turn background Gray to indicate Sold
                 if (cardWrappers[i] != null)
                     cardWrappers[i].setBackground(COLOR_SOLD);
             } else {
                 cards[i].setState(RailCard.State.PASSIVE);
-                // Turn background Green to indicate Available
                 if (cardWrappers[i] != null)
                     cardWrappers[i].setBackground(COLOR_AVAILABLE);
-
-                Certificate cert = si.getPrimary();
-                Company comp = null;
-                if (cert instanceof PublicCertificate) {
-                    comp = (PublicCompany) cert.getParent();
-                } else if (cert instanceof PrivateCompany) {
-                    comp = (PrivateCompany) cert;
-                }
-                if (comp != null) {
-                    cards[i].setCompanyDetailsTooltip(comp);
-                }
+                configureMapHighlighting(cards[i], si);
             }
         }
 
+        // 2. Setup Buttons (Default Disabled)
         dummyButton.setSelected(true);
-
-        if (includeBuying)
+        if (includeBuying && buyButton != null)
             buyButton.setEnabled(false);
         if (includeBidding != StartRound.Bidding.NO) {
-            bidButton.setEnabled(false);
-            bidAmount.setEnabled(false);
+            if (bidButton != null)
+                bidButton.setEnabled(false);
+            if (bidAmount != null)
+                bidAmount.setEnabled(false);
         }
-        passButton.setEnabled(false);
-
-        // Disable new buttons initially
+        if (passButton != null)
+            passButton.setEnabled(false);
         if (undoButton != null)
-            undoButton.setEnabled(false);
-
-        // AI Button logic removed as requested
+            undoButton.setEnabled(true); // Always check possibleActions for undo
 
         RoundFacade currentRound = gameUIManager.getCurrentRound();
-        if (!(currentRound instanceof StartRound)) {
-            log.info("SRW: updateStatus ABORT - Not StartRound.");
+        if (!(currentRound instanceof StartRound) || !myTurn || possibleActions == null) {
             return;
-        }
-
-        if (!myTurn) {
-            log.info("SRW: updateStatus ABORT - Not My Turn.");
-            return;
-        }
-
-        List<StartItemAction> actions = possibleActions.getType(StartItemAction.class);
-
-        // --- ENABLE UNDO BUTTON ---
-        GameAction undoAction = null;
-        List<GameAction> gameActions = possibleActions.getType(GameAction.class);
-        for (GameAction ga : gameActions) {
-            if (ga.getMode() == GameAction.Mode.UNDO) {
-                undoAction = ga;
-                break;
-            }
-        }
-        if (undoButton != null && undoAction != null) {
-            undoButton.setEnabled(true);
-            undoButton.setPossibleAction(undoAction);
-        }
-
-        if (actions == null) {
-            log.warn("SRW: actions list is NULL");
-        } else if (actions.isEmpty()) {
-            log.warn("SRW: actions list is EMPTY");
-            close();
-            return;
-        } else {
-            log.info("SRW: Found {} StartItemActions to distribute.", actions.size());
         }
 
         setSRPlayerTurn();
 
-        boolean buyAllowed = false;
-        boolean bidAllowed = false;
-        boolean selected = false;
-        BuyStartItem buyAction;
+        // 3. Handle Undo Action
+        List<GameAction> gameActions = possibleActions.getType(GameAction.class);
+        undoButton.setEnabled(false);
+        for (GameAction ga : gameActions) {
+            if (ga.getMode() == GameAction.Mode.UNDO && undoButton != null) {
+                undoButton.setEnabled(true);
+                undoButton.setPossibleAction(ga);
+                break;
+            }
+        }
 
-        // 2. Distribute Actions Loop
-        for (StartItemAction action : actions) {
-            int j = action.getItemIndex();
-            int i = crossIndex[j];
-            StartItem item = action.getStartItem();
+        // 4. Distribute Actions and Apply Prominent Highlighting
+        List<StartItemAction> actions = possibleActions.getType(StartItemAction.class);
+        if (actions != null) {
+            for (StartItemAction action : actions) {
+                int j = action.getItemIndex();
+                int i = crossIndex[j];
+                cards[i].setPossibleAction(action);
 
-            // LOGGING ASSIGNMENT
-            cards[i].setPossibleAction(action);
+                // PROMINENT HIGHLIGHT: Purple background for actionable items
+                if (cardWrappers[i] != null) {
+                    cardWrappers[i].setBackground(COLOR_HIGHLIGHT);
+                }
 
-            if (action instanceof BuyStartItem) {
-                buyAction = (BuyStartItem) action;
-
-                if (i == selectedItemIndex) {
-                    cards[i].setState(RailCard.State.SELECTED);
-                    if (buyButton != null && includeBuying) {
-                        buyButton.setEnabled(true);
-                        buyButton.setPossibleAction(action);
+                if (action instanceof BuyStartItem) {
+                    BuyStartItem bsi = (BuyStartItem) action;
+                    if (bsi.isSelected() || i == selectedItemIndex) {
+                        cards[i].setState(RailCard.State.SELECTED);
+                        selectedItemIndex = i;
+                        if (cardWrappers[i] != null) {
+                            cardWrappers[i].setBackground(Color.YELLOW);
+                        }
+                        if (buyButton != null && includeBuying) {
+                            buyButton.setEnabled(true);
+                            buyButton.setPossibleAction(action);
+                        }
+                    } else {
+                        cards[i].setState(RailCard.State.ACTIONABLE);
                     }
-                } else {
-                    cards[i].setState(RailCard.State.ACTIONABLE);
-                }
-
-                selected = buyAction.isSelected();
-                if (selected) {
-                    cards[i].setState(RailCard.State.SELECTED);
-                }
-
-                if (includeBidding == StartRound.Bidding.ON_ITEMS && showBasePrices)
-                    minBid[i].setText("");
-                buyAllowed = true;
-
-            } else if (action instanceof BidStartItem) {
-                BidStartItem bidAction = (BidStartItem) action;
-                selected = bidAction.isSelected();
-                if (selected) {
-                    bidButton.addPossibleAction(action);
-                    bidButton.setPossibleAction(action);
-                    int mb = bidAction.getMinimumBid();
-                    spinnerModel.setMinimum(mb);
-                    spinnerModel.setStepSize(bidAction.getBidIncrement());
-                    spinnerModel.setValue(mb);
-                }
-
-                if (selected) {
-                    cards[i].setState(RailCard.State.SELECTED);
-                } else {
-                    cards[i].setState(RailCard.State.ACTIONABLE);
-                }
-
-                bidAllowed = selected;
-                if (includeBidding == StartRound.Bidding.ON_ITEMS) {
-                    minBid[i].setText(Bank.format(item, item.getMinimumBid()));
+                } else if (action instanceof BidStartItem) {
+                    BidStartItem bidAction = (BidStartItem) action;
+                    if (bidAction.isSelected()) {
+                        cards[i].setState(RailCard.State.SELECTED);
+                        selectedItemIndex = i;
+                        if (bidButton != null) {
+                            bidButton.setEnabled(true);
+                            bidButton.setPossibleAction(action);
+                        }
+                        if (bidAmount != null) {
+                            bidAmount.setEnabled(true);
+                            spinnerModel.setMinimum(bidAction.getMinimumBid());
+                            spinnerModel.setValue(bidAction.getMinimumBid());
+                        }
+                    } else {
+                        cards[i].setState(RailCard.State.ACTIONABLE);
+                    }
                 }
             }
         }
 
-        // 3. Pass Button Logic
-        boolean passAllowed = false;
-        List<NullAction> inactiveItems = possibleActions.getType(NullAction.class);
-        if (inactiveItems != null && !inactiveItems.isEmpty()) {
-            NullAction na = inactiveItems.get(0);
-            passButton.setRailsIcon(RailsIcon.getByConfigKey(na.getMode().name()));
-            passAllowed = true;
-            passButton.setPossibleAction(na);
-            passButton.setMnemonic(KeyEvent.VK_P);
+        // 5. Handle Pass Button
+        List<NullAction> passes = possibleActions.getType(NullAction.class);
+        if (passes != null && !passes.isEmpty() && passButton != null) {
+            passButton.setEnabled(true);
+            passButton.setPossibleAction(passes.get(0));
         }
 
-        if (includeBuying)
-            buyButton.setEnabled(buyAllowed);
-        if (includeBidding != StartRound.Bidding.NO) {
-            bidButton.setEnabled(bidAllowed);
-            bidAmount.setEnabled(bidAllowed);
-        }
-        passButton.setEnabled(passAllowed);
-
-        // Replaced pack() with validate/repaint to preserve user-resized window
-        // dimensions
+        // 6. Final UI and Map Refresh
+        updateMapHighlights();
         revalidate();
         repaint();
-        requestFocus();
-        log.info("SRW: updateStatus COMPLETED.");
+        // --- END FIX ---
     }
 
+
+// ... (lines of unchanged context code) ...
     @Override
     public void actionPerformed(ActionEvent actor) {
-        JComponent source = (JComponent) actor.getSource();
-
-        // Identify RailCard Clicks
+        // --- START FIX ---
+        Object source = actor.getSource();
         int clickedIndex = -1;
+        
+        // Use hierarchy search to find which card (if any) was clicked
         for (int k = 0; k < cards.length; k++) {
-            if (source == cards[k] || SwingUtilities.isDescendingFrom(source, cards[k])) {
+            if (cards[k] == null) continue;
+            if (source == cards[k] || (source instanceof Component && SwingUtilities.isDescendingFrom((Component)source, cards[k]))) {
                 clickedIndex = k;
-                log.info("SRW: Source identified as descending from RailCard index {}", k);
                 break;
             }
         }
 
         if (clickedIndex != -1) {
             RailCard card = cards[clickedIndex];
-            java.util.List<PossibleAction> actions = card.getPossibleActions();
+            if (card.getState() == RailCard.State.DISABLED) return;
 
-            if (actions == null || actions.isEmpty()) {
-                // Log the state to help debug why actions might be missing
-                log.warn("SRW: RailCard index {} clicked, but has NO actions assigned. State: {}", clickedIndex,
-                        card.getState());
-                return;
-            }
+            List<PossibleAction> acts = card.getPossibleActions();
+            if (acts == null || acts.isEmpty()) return;
 
-            StartItemAction currentActiveItem = (StartItemAction) actions.get(0);
-            SoundManager.notifyOfClickFieldSelection(currentActiveItem);
+            StartItemAction action = (StartItemAction) acts.get(0);
+            SoundManager.notifyOfClickFieldSelection(action);
 
-            if (currentActiveItem instanceof BuyStartItem) {
-                BuyStartItem bsi = (BuyStartItem) currentActiveItem;
-
+            if (action instanceof BuyStartItem) {
                 if (clickedIndex == selectedItemIndex) {
-                    if (bsi.hasSharePriceToSet()) {
-                        if (requestStartPrice(bsi))
-                            return;
-                    }
+                    // Second click confirms purchase
+                    BuyStartItem bsi = (BuyStartItem) action;
+                    if (bsi.hasSharePriceToSet() && requestStartPrice(bsi))
+                        return;
                     process(bsi);
                     selectedItemIndex = -1;
                 } else {
+                    // First click highlights and enables buttons
                     selectedItemIndex = clickedIndex;
-                    for (int k = 0; k < cards.length; k++) {
-                        if (cards[k] != null && cards[k].isEnabled()) {
-                            cards[k].setState(
-                                    k == selectedItemIndex ? RailCard.State.SELECTED : RailCard.State.ACTIONABLE);
-                        }
-                    }
-                    if (buyButton != null && includeBuying) {
-                        buyButton.setEnabled(true);
-                        buyButton.setPossibleAction(bsi);
-                    }
+                    updateStatus(true);
                 }
-            } else if (currentActiveItem instanceof BidStartItem) {
-                BidStartItem bidAction = (BidStartItem) currentActiveItem;
-                if (includeBuying)
-                    buyButton.setEnabled(false);
-
-                if (bidAction.isSelectForAuction()) {
-                    passButton.setPossibleAction(currentActiveItem);
-                    passButton.setEnabled(true);
-                    passButton.setRailsIcon(RailsIcon.SELECT_NO_BID);
-                    passButton.setVisible(true);
-                    pack();
-                }
-
-                if (includeBidding != StartRound.Bidding.NO) {
-                    bidButton.setEnabled(true);
-                    bidButton.setPossibleAction(currentActiveItem);
-                    bidAmount.setEnabled(true);
-                    int minBid = bidAction.getMinimumBid();
-                    spinnerModel.setMinimum(minBid);
-                    spinnerModel.setStepSize(bidAction.getBidIncrement());
-                    spinnerModel.setValue(minBid);
-                }
-
-                for (int k = 0; k < cards.length; k++) {
-                    if (cards[k] != null && cards[k].isEnabled()) {
-                        cards[k].setState(k == clickedIndex ? RailCard.State.SELECTED : RailCard.State.ACTIONABLE);
-                    }
-                }
+            } else {
+                // For bidding, select immediately
+                selectedItemIndex = clickedIndex;
+                updateStatus(true);
             }
             return;
         }
 
+        // Handle ActionButtons (Buy, Bid, Pass, Undo)
         if (source instanceof ActionButton) {
-            java.util.List<PossibleAction> actions = ((ActionButton) source).getPossibleActions();
-            if (actions == null || actions.isEmpty()) {
-                log.warn("SRW: ActionButton clicked but actions list is empty.");
-                return;
-            }
-            PossibleAction activeItem = actions.get(0);
-
-            if (source == buyButton) {
-                if (activeItem instanceof BuyStartItem && ((BuyStartItem) activeItem).hasSharePriceToSet()) {
-                    if (requestStartPrice((BuyStartItem) activeItem))
-                        return;
-                } else {
-                    process(activeItem);
-                }
-            } else if (source == bidButton) {
-                ((BidStartItem) activeItem).setActualBid(((Integer) spinnerModel.getValue()));
-                process(activeItem);
-            } else if (source == passButton) {
-                if (activeItem instanceof BidStartItem && ((BidStartItem) activeItem).isSelectForAuction()) {
-                    ((BidStartItem) activeItem).setActualBid(-1);
-                }
-                process(activeItem);
-            } else {
-                process(activeItem);
+            List<PossibleAction> actions = ((ActionButton) source).getPossibleActions();
+            if (actions != null && !actions.isEmpty()) {
+                process(actions.get(0));
             }
         }
+        // --- END FIX ---
     }
-
+// ... (rest of the method) ...
 }

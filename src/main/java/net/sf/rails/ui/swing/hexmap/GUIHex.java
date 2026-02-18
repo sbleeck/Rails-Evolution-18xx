@@ -51,7 +51,6 @@ public class GUIHex implements Observer {
 
     private String customOverlayText = null;
 
-
     /**
      * Static class that describes x-y coordinates for GUIHexes
      */
@@ -63,7 +62,7 @@ public class GUIHex implements Observer {
         }
 
         public HexPoint(Point2D point) {
-           this.point = point;
+            this.point = point;
         }
 
         public Point2D get2D() {
@@ -84,14 +83,16 @@ public class GUIHex implements Observer {
         }
 
         public HexPoint rotate(double radians) {
-            if (radians == 0) return this;
+            if (radians == 0)
+                return this;
             double x = getX() * Math.cos(radians) + getY() * Math.sin(radians);
             double y = getY() * Math.cos(radians) - getX() * Math.sin(radians);
             return new HexPoint(x, y);
         }
 
         public HexPoint translate(double x, double y) {
-            if (x == 0 && y == 0) return this;
+            if (x == 0 && y == 0)
+                return this;
             return new HexPoint(this.getX() + x, this.getY() + y);
         }
 
@@ -104,23 +105,24 @@ public class GUIHex implements Observer {
         }
 
         public static HexPoint difference(HexPoint a, HexPoint b) {
-            return new HexPoint(a.getX() - b.getX(), a.getY()- b.getY());
+            return new HexPoint(a.getX() - b.getX(), a.getY() - b.getY());
         }
 
     }
 
     public enum State {
 
-NORMAL(1.0, Color.black),
+        NORMAL(1.0, Color.black),
         // Phase 1: Build Track (Construction Brown)
         SELECTABLE(0.9, Color.RED),
         // Phase 2: Lay Token (Forest Green - Matching OR Panel)
-        TOKEN_SELECTABLE(0.8,Color.RED),
+        TOKEN_SELECTABLE(0.8, Color.RED),
         // Selected Hex (Construction red)
         SELECTED(0.8, Color.GREEN),
         // Merged Purple Highlight (Active Owner)
-        HIGHLIGHT_PURPLE(0.8, new Color(128, 0, 128)), 
+        HIGHLIGHT_PURPLE(0.8, new Color(128, 0, 128)),
         INVALIDS(0.9, Color.pink);
+
         private final double scale;
         private final Color color;
 
@@ -142,22 +144,20 @@ NORMAL(1.0, Color.black),
         }
 
         private GeneralPath getInnerHexagon(GeneralPath hexagon, HexPoint center) {
-            //inner hexagons are drawn outlined (not filled)
-            //for this draw, the stroke width is half the scale reduction
-            //the scale factor is multiplied by the average of hex width / height in order
-            //to get a good estimate for which for stroke width the hex borders are touched
-            //by the stroke
+            // inner hexagons are drawn outlined (not filled)
+            // for this draw, the stroke width is half the scale reduction
+            // the scale factor is multiplied by the average of hex width / height in order
+            // to get a good estimate for which for stroke width the hex borders are touched
+            // by the stroke
 
-            AffineTransform at =
-                    AffineTransform.getScaleInstance(getHexDrawScale(), getHexDrawScale());
+            AffineTransform at = AffineTransform.getScaleInstance(getHexDrawScale(), getHexDrawScale());
             GeneralPath innerHexagon = (GeneralPath) hexagon.createTransformedShape(at);
 
             // Translate innerHexagon to make it concentric.
             Rectangle2D innerBounds = innerHexagon.getBounds2D();
             HexPoint innerCenter = new HexPoint(
                     innerBounds.getX() + innerBounds.getWidth() / 2.0,
-                    innerBounds.getY() + innerBounds.getHeight() / 2.0
-            );
+                    innerBounds.getY() + innerBounds.getHeight() / 2.0);
             HexPoint difference = HexPoint.difference(center, innerCenter);
 
             at = AffineTransform.getTranslateInstance(difference.getX(), difference.getY());
@@ -166,10 +166,9 @@ NORMAL(1.0, Color.black),
             return innerHexagon;
         }
 
-
         private double getStrokeWidth(GeneralPath hexagon) {
-            return ( 1 - getHexDrawScale() ) *
-                    ( hexagon.getBounds().width + hexagon.getBounds().height ) / 2;
+            return (1 - getHexDrawScale()) *
+                    (hexagon.getBounds().width + hexagon.getBounds().height) / 2;
         }
     }
 
@@ -204,12 +203,11 @@ NORMAL(1.0, Color.black),
                     points.get(HexSide.defaultRotation().opposite()));
 
             rectBound = hexagon.getBounds();
-            marksDirtyRectBound = new Rectangle (
+            marksDirtyRectBound = new Rectangle(
                     rectBound.x - MARKS_DIRTY_MARGIN,
                     rectBound.y - MARKS_DIRTY_MARGIN,
                     rectBound.width + MARKS_DIRTY_MARGIN * 2,
-                    rectBound.height + MARKS_DIRTY_MARGIN * 2
-            );
+                    rectBound.height + MARKS_DIRTY_MARGIN * 2);
         }
 
         // Replace with Path2D
@@ -219,14 +217,13 @@ NORMAL(1.0, Color.black),
             HexPoint start = points.get(HexSide.defaultRotation());
             polygon.moveTo((float) start.getX(), (float) start.getY());
 
-            for (HexSide side:HexSide.allExceptDefault()) {
+            for (HexSide side : HexSide.allExceptDefault()) {
                 HexPoint point = points.get(side);
                 polygon.lineTo((float) point.getX(), (float) point.getY());
             }
             polygon.closePath();
             return polygon;
         }
-
 
     }
 
@@ -240,10 +237,9 @@ NORMAL(1.0, Color.black),
     private static final Color BORDER_COLOUR = Color.RED;
     private static final int BORDER_WIDTH = 2;
 
-    private static final Color highlightedFillColor = new Color(255,255,255,128);
+    private static final Color highlightedFillColor = new Color(255, 255, 255, 128);
     private static final Color highlightedBorderColor = Color.BLACK;
     private static final Stroke highlightedBorderStroke = new BasicStroke(3);
-
 
     // Defines by how much the hex bounds have to be increased in each direction
     // for obtaining the dirty rectangle (markings could got beyond hex limits)
@@ -292,11 +288,11 @@ NORMAL(1.0, Color.black),
         return hexMap;
     }
 
-    public Point2D getStopPoint2D(Stop stop){
+    public Point2D getStopPoint2D(Stop stop) {
         return getTokenCenter(0, stop).get2D();
     }
 
-    public Point2D getSidePoint2D(HexSide side){
+    public Point2D getSidePoint2D(HexSide side) {
         HexPoint middle = HexPoint.middle(dimensions.points.get(side),
                 dimensions.points.get(side.next()));
         return middle.get2D();
@@ -305,7 +301,6 @@ NORMAL(1.0, Color.black),
     public Point2D getCenterPoint2D() {
         return dimensions.center.get2D();
     }
-
 
     // TODO: Make this based on MapHex model
     public void addBar(HexSide side) {
@@ -321,7 +316,6 @@ NORMAL(1.0, Color.black),
         }
         borderSides.add(side);
     }
-
 
     public Rectangle getBounds() {
         return dimensions.rectBound;
@@ -345,7 +339,7 @@ NORMAL(1.0, Color.black),
 
     public void setState(State state) {
         if (this.state != state) {
-            //trigger hexmap marks repaint if status changes
+            // trigger hexmap marks repaint if status changes
             hexMap.repaintMarks(getMarksDirtyBounds());
             hexMap.repaintTiles(getBounds()); // tile is drawn smaller if selected
         }
@@ -360,8 +354,9 @@ NORMAL(1.0, Color.black),
      * Indicate that this hex should be highlighted
      */
     public void addHighlightRequest() {
-        //trigger hexmap marks repaint if hex becomes highlighted
-        if (highlightCounter == 0) hexMap.repaintMarks(getMarksDirtyBounds());
+        // trigger hexmap marks repaint if hex becomes highlighted
+        if (highlightCounter == 0)
+            hexMap.repaintMarks(getMarksDirtyBounds());
 
         highlightCounter++;
     }
@@ -369,13 +364,15 @@ NORMAL(1.0, Color.black),
     /**
      * Indicate that this hex does not need to be highlighted any more (from the
      * caller's point of view).
-     * Note that the hex could still remain highlighted if another entity has requested
+     * Note that the hex could still remain highlighted if another entity has
+     * requested
      * highlighting.
      */
     public void removeHighlightRequest() {
         highlightCounter--;
-        //trigger hexmap marks repaint if hex becomes not highlighted
-        if (highlightCounter == 0) hexMap.repaintMarks(getMarksDirtyBounds());
+        // trigger hexmap marks repaint if hex becomes not highlighted
+        if (highlightCounter == 0)
+            hexMap.repaintMarks(getMarksDirtyBounds());
     }
 
     public boolean isHighlighted() {
@@ -393,22 +390,24 @@ NORMAL(1.0, Color.black),
     }
 
     /**
-     * @return the current tile shown on the map (if an upgrade is shown the upgrade target tile is returned)
+     * @return the current tile shown on the map (if an upgrade is shown the upgrade
+     *         target tile is returned)
      */
     private Tile getVisibleTile() {
         if (upgrade instanceof TileHexUpgrade) {
-            return ((TileHexUpgrade)upgrade).getUpgrade().getTargetTile();
+            return ((TileHexUpgrade) upgrade).getUpgrade().getTargetTile();
         } else {
             return hex.getCurrentTile();
         }
     }
 
     /**
-     * @return the current tile rotation (if an upgrade is shown the rotation of that tile is returned)
+     * @return the current tile rotation (if an upgrade is shown the rotation of
+     *         that tile is returned)
      */
     private HexSide getVisibleRotation() {
         if (upgrade instanceof TileHexUpgrade) {
-            return ((TileHexUpgrade)upgrade).getCurrentRotation();
+            return ((TileHexUpgrade) upgrade).getCurrentRotation();
         } else {
             return hex.getCurrentTileRotation();
         }
@@ -428,6 +427,7 @@ NORMAL(1.0, Color.black),
 
     /**
      * Marks are selected / selectable / highlighted
+     * 
      * @param g A graphics 2D object
      */
     public void paintMarks(Graphics2D g) {
@@ -441,7 +441,7 @@ NORMAL(1.0, Color.black),
             g.setStroke(oldStroke);
         }
 
-        //highlight on top of tiles
+        // highlight on top of tiles
         if (isHighlighted()) {
             g.setColor(highlightedFillColor);
             g.fill(dimensions.hexagon);
@@ -461,42 +461,47 @@ NORMAL(1.0, Color.black),
         paintStationTokens(g);
         paintOffStationTokens(g);
 
-        if (!isTilePainted()) return;
+        if (!isTilePainted())
+            return;
 
         // The old file did NOT check hexMap.getDisplayBuildNumbers() here.
         // We revert to checking only if cost > 0.
         if (getHex().getTileCost() > 0) {
-             // Optional: You can keep the flag check if you fixed HexMap.java default to true
-             // if (hexMap.getDisplayBuildNumbers()) { 
-            
+            // Optional: You can keep the flag check if you fixed HexMap.java default to
+            // true
+            // if (hexMap.getDisplayBuildNumbers()) {
+
             FontMetrics fontMetrics = g.getFontMetrics();
             g.drawString(
                     Bank.format(getHex(), getHex().getTileCost()),
                     dimensions.rectBound.x
-                            + (dimensions.rectBound.width - fontMetrics.stringWidth(Integer.toString(getHex().getTileCost())))
-                            * 3 / 5,
+                            + (dimensions.rectBound.width
+                                    - fontMetrics.stringWidth(Integer.toString(getHex().getTileCost())))
+                                    * 3 / 5,
                     dimensions.rectBound.y
                             + ((fontMetrics.getHeight() + dimensions.rectBound.height) * 9 / 15));
             // }
         }
 
-
         Map<PublicCompany, Stop> homes = getHex().getHomes();
 
-        if (homes  != null) {
+        if (homes != null) {
             for (PublicCompany company : homes.keySet()) {
-                if (company.isClosed()) continue;
+                if (company.isClosed())
+                    continue;
 
                 // Only draw the company name if there isn't yet a token of that company
-                if (hex.hasTokenOfCompany(company)) continue;
+                if (hex.hasTokenOfCompany(company))
+                    continue;
                 // Do not draw if hex is never blocked for token lays
-                if (hex.getBlockedForTokenLays() == MapHex.BlockedToken.NEVER) continue;
+                if (hex.getBlockedForTokenLays() == MapHex.BlockedToken.NEVER)
+                    continue;
 
                 Stop homeCity = homes.get(company);
                 if (homeCity.getRelatedStation() == null) { // not yet decided where the token will be
                     // find a free slot
                     Set<Stop> stops = getHex().getStops();
-                    for (Stop stop:stops) {
+                    for (Stop stop : stops) {
                         if (stop.hasTokenSlotsLeft()) {
                             homeCity = stop;
                             break;
@@ -504,81 +509,79 @@ NORMAL(1.0, Color.black),
                     }
                 }
                 // check the number of tokens laid there already
-                HexPoint p = getTokenCenter (1, homeCity);
-                if (company.isDisplayHomeHex()) drawHome(g, company, p);
+                HexPoint p = getTokenCenter(1, homeCity);
+                if (company.isDisplayHomeHex())
+                    drawHome(g, company, p);
             }
         }
 
         if (hex.isBlockedByPrivateCompany()) {
-           PrivateCompany p = hex.getBlockingPrivateCompany();
-           String text = "(" + p.getId() + ")";
-           drawString (g, text, 0, 0);
-           /*
-           g.drawString(
-                   text,
-                   dimensions.rectBound.x
-                   + (dimensions.rectBound.width - fontMetrics.stringWidth(text))
-                   * 1 / 2,
-                   dimensions.rectBound.y
-                   + ((fontMetrics.getHeight() + dimensions.rectBound.height) * 5 / 15));
-
-            */
+            PrivateCompany p = hex.getBlockingPrivateCompany();
+            String text = "(" + p.getId() + ")";
+            drawString(g, text, 0, 0);
+            /*
+             * g.drawString(
+             * text,
+             * dimensions.rectBound.x
+             * + (dimensions.rectBound.width - fontMetrics.stringWidth(text))
+             * 1 / 2,
+             * dimensions.rectBound.y
+             * + ((fontMetrics.getHeight() + dimensions.rectBound.height) * 5 / 15));
+             * 
+             */
         }
 
         if (hex.isReservedForCompany()
-        		&& hex.isPreprintedTileCurrent()) {
-        	String text = "[" + hex.getReservedForCompany().getId() + "]";
-        	drawString (g, text, 0, 0);
-        	/*
-            g.drawString(
-                  text,
-                  dimensions.rectBound.x
-                  + (dimensions.rectBound.width - fontMetrics.stringWidth(text))
-                  * 1 / 2,
-                  dimensions.rectBound.y
-                  + ((fontMetrics.getHeight() + dimensions.rectBound.height) * 5 / 25));
-
-        	 */
+                && hex.isPreprintedTileCurrent()) {
+            String text = "[" + hex.getReservedForCompany().getId() + "]";
+            drawString(g, text, 0, 0);
+            /*
+             * g.drawString(
+             * text,
+             * dimensions.rectBound.x
+             * + (dimensions.rectBound.width - fontMetrics.stringWidth(text))
+             * 1 / 2,
+             * dimensions.rectBound.y
+             * + ((fontMetrics.getHeight() + dimensions.rectBound.height) * 5 / 25));
+             * 
+             */
         }
 
-   String extraText = hex.getExtraText();
+        String extraText = hex.getExtraText();
         if (extraText != null) {
             drawString(g, extraText, hex.getExtraTextX(), hex.getExtraTextY());
         }
-        
+
         // Fügt die Logik zum Zeichnen des Custom Overlay Textes hinzu, falls vorhanden
         if (customOverlayText != null) {
             drawString(g, customOverlayText, 0, 0); // Zeichnet den Text zentriert
         }
 
-        // If an active owner label is set, draw it using standard text 
+        // If an active owner label is set, draw it using standard text
         // (The purple BORDER is handled by paintMarks via the State enum now)
         if (activeOwnerLabel != null) {
             drawString(g, activeOwnerLabel, 0, 0);
         }
 
-    
     }
 
+    public void setCustomOverlayText(String text) {
+        String safeText = (text == null) ? "" : text;
 
-
-public void setCustomOverlayText(String text) {
-    String safeText = (text == null) ? "" : text; 
-    
-    if (!Objects.equals(this.customOverlayText, safeText)) {
-        this.customOverlayText = safeText;
-        if (this.hexMap != null) {
-            // FÜR DAS FINALE FIX: Wir rufen die spezifische Methode für die TokensTextsLayer auf (TokensLayer)
-            // Die Methode repaintTokens löst ein repaint der TokensTextsLayer aus.
-            this.hexMap.repaintTokens(this.getBounds()); 
+        if (!Objects.equals(this.customOverlayText, safeText)) {
+            this.customOverlayText = safeText;
+            if (this.hexMap != null) {
+                // FÜR DAS FINALE FIX: Wir rufen die spezifische Methode für die
+                // TokensTextsLayer auf (TokensLayer)
+                // Die Methode repaintTokens löst ein repaint der TokensTextsLayer aus.
+                this.hexMap.repaintTokens(this.getBounds());
+            }
         }
     }
-}
-public String getCustomOverlayText() {
+
+    public String getCustomOverlayText() {
         return this.customOverlayText;
     }
-    
-
 
     private void paintOverlay(Graphics2D g2) {
         Tile visibleTile = this.getVisibleTile();
@@ -607,7 +610,7 @@ public String getCustomOverlayText() {
 
         g2d.setColor(BAR_COLOUR);
         g2d.setStroke(new BasicStroke(BAR_WIDTH));
-        g2d.draw(new Line2D.Double(start.get2D(),end.get2D()));
+        g2d.draw(new Line2D.Double(start.get2D(), end.get2D()));
 
         g2d.setColor(oldColor);
         g2d.setStroke(oldStroke);
@@ -619,16 +622,16 @@ public String getCustomOverlayText() {
 
         g2d.setColor(BORDER_COLOUR);
         g2d.setStroke(new BasicStroke(BORDER_WIDTH));
-        g2d.draw(new Line2D.Double(start.get2D(),end.get2D()));
+        g2d.draw(new Line2D.Double(start.get2D(), end.get2D()));
 
         g2d.setColor(oldColor);
         g2d.setStroke(oldStroke);
     }
 
     private void paintStationTokens(Graphics2D g2) {
-        for (Stop stop:getHex().getStops()) {
+        for (Stop stop : getHex().getStops()) {
             int j = 0;
-            for (BaseToken token:stop.getBaseTokens()) {
+            for (BaseToken token : stop.getBaseTokens()) {
                 HexPoint origin = getTokenCenter(j++, stop);
                 PublicCompany company = token.getParent();
                 drawBaseToken(g2, company, origin, dimensions.tokenDiameter);
@@ -646,16 +649,17 @@ public String getCustomOverlayText() {
     // FIXME: Where to paint more than one offStationTokens?
     private void paintOffStationTokens(Graphics2D g2) {
         int i = 0;
-        for (BonusToken token : hex.getBonusTokens())  {
+        for (BonusToken token : hex.getBonusTokens()) {
             HexPoint origin = dimensions.center.translate(offStationTokenX[i], offStationTokenY[i]);
             drawBonusToken(g2, token, origin);
-            if (++i > 1) return;
+            if (++i > 1)
+                return;
 
         }
         // check for temporary token
         if (upgrade instanceof TokenHexUpgrade && ((TokenHexUpgrade) upgrade).getAction() instanceof LayBonusToken) {
             HexPoint origin = dimensions.center.translate(offStationTokenX[i], offStationTokenY[i]);
-            BonusToken token = ((LayBonusToken)((TokenHexUpgrade) upgrade).getAction()).getToken();
+            BonusToken token = ((LayBonusToken) ((TokenHexUpgrade) upgrade).getAction()).getToken();
             drawBonusToken(g2, token, origin);
         }
     }
@@ -664,22 +668,22 @@ public String getCustomOverlayText() {
 
         GUIToken token = new GUIToken(
                 co.getFgColour(), co.getBgColour(), co.getId(), center, diameter);
-        // token.setBounds((int)Math.round(dimensions.center.getX()-0.5*diameter), (int) Math.round(dimensions.center.getY()-0.5*diameter),
-        //        diameter, diameter);
+        // token.setBounds((int)Math.round(dimensions.center.getX()-0.5*diameter), (int)
+        // Math.round(dimensions.center.getY()-0.5*diameter),
+        // diameter, diameter);
 
         token.drawToken(g2);
 
     }
 
-    private void drawHome (Graphics2D g2, PublicCompany co, HexPoint origin) {
+    private void drawHome(Graphics2D g2, PublicCompany co, HexPoint origin) {
 
         GUIToken.drawTokenText(co.getId(), g2, Color.BLACK, origin, dimensions.tokenDiameter);
     }
 
     private void drawBonusToken(Graphics2D g2, BonusToken bt, HexPoint origin) {
-        GUIToken token =
-                new GUIToken(Color.BLACK, Color.WHITE, "+" + bt.getValue(),
-                        origin, 15);
+        GUIToken token = new GUIToken(Color.BLACK, Color.WHITE, "+" + bt.getValue(),
+                origin, 15);
         token.drawToken(g2);
     }
 
@@ -692,7 +696,7 @@ public String getCustomOverlayText() {
             // FIXME: Check if we need both x and y
             // or only y as in Rails1.x
             double initial = TILE_GRID_SCALE * dimensions.zoomFactor;
-            double r = MapOrientation.DEG30 * (positionCode / (double)50);
+            double r = MapOrientation.DEG30 * (positionCode / (double) 50);
             tokenCenter = new HexPoint(0, initial).rotate(r);
         } else {
             tokenCenter = new HexPoint(0.0, 0.0);
@@ -701,46 +705,46 @@ public String getCustomOverlayText() {
         // Correct for the number of base slots and the token number
         double delta_x = 0, delta_y = 0;
         switch (stop.getSlots()) {
-        case 2:
-            delta_x = (-0.5 + currentToken) * CITY_SIZE * dimensions.zoomFactor;
-            break;
-        case 3:
-            if (currentToken < 2) {
-                delta_x = (-0.5 + currentToken) * CITY_SIZE * dimensions.zoomFactor;
-                delta_y = -3 + 0.25 * MapOrientation.SQRT3 * CITY_SIZE * dimensions.zoomFactor;
-            } else {
-               delta_y = -(3 + 0.5 * CITY_SIZE * dimensions.zoomFactor);
-            }
-            break;
-        case 4:
-            delta_x = (-0.5 + currentToken % 2) * CITY_SIZE * dimensions.zoomFactor;
-            delta_y = (0.5 - currentToken / (double)2) * CITY_SIZE * dimensions.zoomFactor;
-            break;
-        case 6:
-            switch (currentToken)  {
-            case 0:
-                delta_x += (-1) * CITY_SIZE * dimensions.zoomFactor;
-                delta_y += (-0.5) * CITY_SIZE * dimensions.zoomFactor;
-                break;
-            case 1:
-                delta_x += (-1) * CITY_SIZE * dimensions.zoomFactor;
-                delta_y += (0.5) * CITY_SIZE * dimensions.zoomFactor;
-                break;
             case 2:
-                delta_y += (1) * CITY_SIZE * dimensions.zoomFactor;
+                delta_x = (-0.5 + currentToken) * CITY_SIZE * dimensions.zoomFactor;
                 break;
             case 3:
-                delta_x += (1) * CITY_SIZE * dimensions.zoomFactor;
-                delta_y += (0.5) * CITY_SIZE * dimensions.zoomFactor;
+                if (currentToken < 2) {
+                    delta_x = (-0.5 + currentToken) * CITY_SIZE * dimensions.zoomFactor;
+                    delta_y = -3 + 0.25 * MapOrientation.SQRT3 * CITY_SIZE * dimensions.zoomFactor;
+                } else {
+                    delta_y = -(3 + 0.5 * CITY_SIZE * dimensions.zoomFactor);
+                }
                 break;
             case 4:
-                delta_x += (1) * CITY_SIZE * dimensions.zoomFactor;
-                delta_y += (-0.5) * CITY_SIZE * dimensions.zoomFactor;
+                delta_x = (-0.5 + currentToken % 2) * CITY_SIZE * dimensions.zoomFactor;
+                delta_y = (0.5 - currentToken / (double) 2) * CITY_SIZE * dimensions.zoomFactor;
                 break;
-            case 5:
-                delta_y += (-1) * CITY_SIZE * dimensions.zoomFactor;
-                break;
-            }
+            case 6:
+                switch (currentToken) {
+                    case 0:
+                        delta_x += (-1) * CITY_SIZE * dimensions.zoomFactor;
+                        delta_y += (-0.5) * CITY_SIZE * dimensions.zoomFactor;
+                        break;
+                    case 1:
+                        delta_x += (-1) * CITY_SIZE * dimensions.zoomFactor;
+                        delta_y += (0.5) * CITY_SIZE * dimensions.zoomFactor;
+                        break;
+                    case 2:
+                        delta_y += (1) * CITY_SIZE * dimensions.zoomFactor;
+                        break;
+                    case 3:
+                        delta_x += (1) * CITY_SIZE * dimensions.zoomFactor;
+                        delta_y += (0.5) * CITY_SIZE * dimensions.zoomFactor;
+                        break;
+                    case 4:
+                        delta_x += (1) * CITY_SIZE * dimensions.zoomFactor;
+                        delta_y += (-0.5) * CITY_SIZE * dimensions.zoomFactor;
+                        break;
+                    case 5:
+                        delta_y += (-1) * CITY_SIZE * dimensions.zoomFactor;
+                        break;
+                }
 
         }
         tokenCenter = tokenCenter.translate(delta_x, delta_y);
@@ -751,7 +755,7 @@ public String getCustomOverlayText() {
         double radians = MapOrientation.rotationInRadians(hex, rotation);
         tokenCenter = tokenCenter.rotate(radians);
 
-        tokenCenter = dimensions.center.translate(tokenCenter.getX(), - tokenCenter.getY());
+        tokenCenter = dimensions.center.translate(tokenCenter.getX(), -tokenCenter.getY());
         return tokenCenter;
     }
 
@@ -766,7 +770,7 @@ public String getCustomOverlayText() {
         StringBuilder tt = new StringBuilder();
         if (bonuses != null) {
             Set<String> bonusNames = new HashSet<>();
-            for (RevenueBonusTemplate bonus:bonuses) {
+            for (RevenueBonusTemplate bonus : bonuses) {
                 if (bonus.getName() == null) {
                     tt.append("<br>Bonus:");
                     tt.append(bonus.getToolTip());
@@ -785,19 +789,20 @@ public String getCustomOverlayText() {
         StringBuilder tt = new StringBuilder("<html>");
         tt.append("<b>Hex</b>: ").append(hex.toText());
         // For debugging: display x,y-coordinates
-        //tt.append("<small> x=" + x + " y="+y+"</small>");
+        // tt.append("<small> x=" + x + " y="+y+"</small>");
 
         tt.append("<br><b>Tile</b>: ").append(currentTile.toText());
 
         // For debugging: display rotation
-        //tt.append("<small> rot=" + currentTileOrientation + "</small>");
+        // tt.append("<small> rot=" + currentTileOrientation + "</small>");
 
         if (hex.hasValuesPerPhase()) {
             tt.append("<br>Value ");
             tt.append(hex.getCurrentValueForPhase(hexMap.getPhase())).append(" [");
             List<Integer> values = hex.getValuesPerPhase();
             for (int i = 0; i < values.size(); i++) {
-                if (i > 0) tt.append(",");
+                if (i > 0)
+                    tt.append(",");
                 tt.append(values.get(i));
             }
             tt.append("]");
@@ -805,8 +810,8 @@ public String getCustomOverlayText() {
             for (Stop stop : hex.getStops()) {
                 Station station = stop.getRelatedStation();
                 tt.append("<br>  ").append(station.toText())
-                    .append(" (").append(hex.getConnectionString(station))
-                    .append("): value ");
+                        .append(" (").append(hex.getConnectionString(station))
+                        .append("): value ");
                 tt.append(station.getValue());
                 if (station.getBaseSlots() > 0) {
                     tt.append(", ").append(station.getBaseSlots()).append(" slots");
@@ -815,7 +820,8 @@ public String getCustomOverlayText() {
                         tt.append(" (");
                         int oldsize = tt.length();
                         for (BaseToken token : tokens) {
-                            if (tt.length() > oldsize) tt.append(",");
+                            if (tt.length() > oldsize)
+                                tt.append(",");
                             tt.append(token.getParent().getId());
                         }
                         tt.append(")");
@@ -847,7 +853,6 @@ public String getCustomOverlayText() {
             }
         }
 
-
         tt.append("</html>");
         return tt.toString();
     }
@@ -860,7 +865,6 @@ public String getCustomOverlayText() {
     public String toText() {
         return hex.toText();
     }
-
 
     // Observer methods
     @Override
@@ -875,30 +879,30 @@ public String getCustomOverlayText() {
 
     // Object methods
     @Override
-    public String toString () {
+    public String toString() {
         return toText() + " (" + hex.getCurrentTile().toText() + ")";
     }
 
-
-
-  /**
+    /**
      * Draw a string anywhere on a hex.
      * Modified to handle "High Contrast Overlays" in the top-left corner,
      * while keeping standard text (Private Companies) centered.
      */
     private void drawString(Graphics2D g, String text, int x, int y) {
-        if (text == null) return;
+        if (text == null)
+            return;
 
         String rawText = text;
         Font originalFont = g.getFont();
         Color originalColor = g.getColor();
         boolean restore = false;
-        
+
         // Detect if this is our "Special Overlay" (passed as HTML)
         boolean isOverlay = text.startsWith("<html>");
 
         if (isOverlay) {
-           // Support multi-line text: Replace <br> with newline BEFORE stripping other tags
+            // Support multi-line text: Replace <br> with newline BEFORE stripping other
+            // tags
             rawText = text.replaceAll("(?i)<br\\s*/?>", "\n");
             // Strip remaining HTML tags
             rawText = rawText.replaceAll("<[^>]*>", "");
@@ -915,12 +919,12 @@ public String getCustomOverlayText() {
 
         if (isOverlay) {
             // --- STRATEGY: MEME TEXT (Top Left) ---
-            
+
             // Calculate Top-Left Position (Safe zone inside the hex)
             // x: Start at hex x + 20% of width
             // y: Start at hex y + 30% of height (clears the top corner)
-            x_final = dimensions.rectBound.x + (int)(dimensions.rectBound.width * 0.20);
-            y_final = dimensions.rectBound.y + (int)(dimensions.rectBound.height * 0.30);
+            x_final = dimensions.rectBound.x + (int) (dimensions.rectBound.width * 0.20);
+            y_final = dimensions.rectBound.y + (int) (dimensions.rectBound.height * 0.30);
 
             // Split into lines (handling N12 and Cost on separate lines)
             String[] lines = rawText.split("\n");
@@ -929,7 +933,7 @@ public String getCustomOverlayText() {
             for (int i = 0; i < lines.length; i++) {
                 String line = lines[i];
                 int y_pos = y_final + (i * lineHeight); // Shift down for second line
-// Apply different styles for ID vs Price
+                // Apply different styles for ID vs Price
                 if (i == 0) {
                     // Line 0 (ID): White Text with Black Outline (High Contrast)
                     g.setColor(Color.BLACK);
@@ -953,12 +957,13 @@ public String getCustomOverlayText() {
                     g.setColor(Color.BLACK);
                     g.drawString(line, x_final, y_pos);
                 }
-                
+
             }
         } else {
             // --- STRATEGY: STANDARD TEXT (Centered) ---
-            // This preserves logic for Private Companies (e.g., "(C&A)"), Reserved Hexes, etc.
-            
+            // This preserves logic for Private Companies (e.g., "(C&A)"), Reserved Hexes,
+            // etc.
+
             // 1. Horizontal Center
             x_final = dimensions.rectBound.x + x + (dimensions.rectBound.width - fontMetrics.stringWidth(rawText)) / 2;
 
@@ -978,15 +983,17 @@ public String getCustomOverlayText() {
             g.setColor(originalColor);
         }
     }
-  // ... (inside GUIHex class) ...
+    // ... (inside GUIHex class) ...
 
     private boolean activeOwnerHighlight = false;
     private String activeOwnerLabel = null;
 
     /**
      * Bridges the UIManager call to the internal State system.
-     * @param active If true, sets state to HIGHLIGHT_PURPLE. If false, reverts to NORMAL.
-     * @param label The text to display (or null).
+     * 
+     * @param active If true, sets state to HIGHLIGHT_PURPLE. If false, reverts to
+     *               NORMAL.
+     * @param label  The text to display (or null).
      */
     public void setActiveOwnerHighlight(boolean active, String label) {
         // 1. Update Internal Fields
@@ -996,28 +1003,28 @@ public String getCustomOverlayText() {
         // 2. Handle the Highlight State
         if (active) {
             setState(State.HIGHLIGHT_PURPLE);
-            
+
             // CRITICAL FIX: Force a repaint of the marks (border) layer.
-            // Even if the state was *already* HIGHLIGHT_PURPLE (no change), 
-            // we must ensure the map knows to redraw this area, specifically 
+            // Even if the state was *already* HIGHLIGHT_PURPLE (no change),
+            // we must ensure the map knows to redraw this area, specifically
             // if the map background was just cleared or redrawn.
             hexMap.repaintMarks(getMarksDirtyBounds());
-            
+
         } else {
-            // Only revert to normal if we are currently purple. 
-            // We don't want to accidentally clear a 'SELECTED' or 'SELECTABLE' state 
+            // Only revert to normal if we are currently purple.
+            // We don't want to accidentally clear a 'SELECTED' or 'SELECTABLE' state
             // if the UI Logic overlaps.
             if (getState() == State.HIGHLIGHT_PURPLE) {
                 setState(State.NORMAL);
             }
         }
-        
+
         // 3. Trigger Token Layer Repaint (For the Label)
-        // We always do this because the label text might have changed 
+        // We always do this because the label text might have changed
         // even if the active state remained true.
         hexMap.repaintTokens(getBounds());
     }
 
-// ...
+    // ...
 
 }

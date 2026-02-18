@@ -26,7 +26,7 @@ public class StartRound_1837_2ndEd extends StartRound {
     protected final IntegerState currentBuyPrice = IntegerState.create(this, "currentBuyPrice");
     protected final GenericState<StartItem> currentAuctionItem = new GenericState<>(this, "currentAuctionItem");
     protected final IntegerState numPasses = IntegerState.create(this, "numberOfPasses", 0);
-
+private boolean buyOnly = false;
     /**
      * Constructed via Configure
      */
@@ -43,9 +43,8 @@ public class StartRound_1837_2ndEd extends StartRound {
     public void start() {
         super.start();
         // Removed unused 'buyOnly' assignment.
-        // If specific 'Stock Round' logic is needed here for v2.0,
-        // it must be implemented in setPossibleActions.
 
+        buyOnly = ((GameManager_1837)gameManager).isBuyOnly();
         currentStep.set(SELECT_STEP);
         setPossibleActions();
     }
