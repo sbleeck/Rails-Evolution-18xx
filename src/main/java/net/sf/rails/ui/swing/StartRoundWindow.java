@@ -1,5 +1,6 @@
 package net.sf.rails.ui.swing;
 
+
 import java.awt.*;
 import java.awt.event.*;
 import java.util.EnumSet;
@@ -37,15 +38,15 @@ public class StartRoundWindow extends JFrame implements ActionListener, KeyListe
     private static final long serialVersionUID = 1L;
 
     // Gap sizes between screen cells, in pixels
-    private static final int NARROW_GAP = 2;
-    private static final int WIDE_GAP = 5;
+    protected static final int NARROW_GAP = 2;
+    protected static final int WIDE_GAP = 5;
     // Bits for specifying where to apply wide gaps
-    private static final int WIDE_LEFT = 1;
-    private static final int WIDE_RIGHT = 2;
-    private static final int WIDE_TOP = 4;
-    private static final int WIDE_BOTTOM = 8;
+    protected static final int WIDE_LEFT = 1;
+    protected static final int WIDE_RIGHT = 2;
+    protected static final int WIDE_TOP = 4;
+    protected static final int WIDE_BOTTOM = 8;
 
-    private ActionButton undoButton;
+    protected ActionButton undoButton;
 
     protected static final String[] itemStatusTextKeys = new String[] { "Status_Unavailable", "Status_Biddable",
             "Status_Buyable",
@@ -57,70 +58,66 @@ public class StartRoundWindow extends JFrame implements ActionListener, KeyListe
 
     private static final Logger log = LoggerFactory.getLogger(StartRoundWindow.class);
 
-    private JPanel statusPanel;
-    private JPanel buttonPanel;
+    protected JPanel statusPanel;
+    protected JPanel buttonPanel;
 
-    private GridBagLayout gb;
-    private GridBagConstraints gbc;
+    protected GridBagLayout gb;
+    protected GridBagConstraints gbc;
 
     // Grid elements per function
-    private Caption[] itemName;
-    private int[] itemNameXOffset;
-    private int itemNameYOffset;
-    private Field[] basePrice;
-    private int[] basePriceXOffset;
-    private int basePriceYOffset;
-    private Field[] minBid;
-    private int[] minBidXOffset;
-    private int minBidYOffset;
+    protected Caption[] itemName;
+    protected int[] itemNameXOffset;
+    protected int itemNameYOffset;
+    protected Field[] basePrice;
+    protected int[] basePriceXOffset;
+    protected int basePriceYOffset;
+    protected Field[] minBid;
+    protected int[] minBidXOffset;
+    protected int minBidYOffset;
 
     // Separator Fields
-    private JComponent[] verticalSeparators;
-    private int[] separatorXOffset;
+    protected JComponent[] verticalSeparators;
+    protected int[] separatorXOffset;
 
-    private Field[][] bidPerPlayer;
-    private int[] bidPerPlayerXOffset;
-    private int bidPerPlayerYOffset;
-    private Field[] playerBids;
-    private int[] playerBidsXOffset;
-    private int playerBidsYOffset;
-    private Field[] playerFree;
-    private int[] playerFreeCashXOffset;
-    private int playerFreeCashYOffset;
+    protected Field[][] bidPerPlayer;
+    protected int[] bidPerPlayerXOffset;
+    protected int bidPerPlayerYOffset;
+    protected Field[] playerBids;
+    protected int[] playerBidsXOffset;
+    protected int playerBidsYOffset;
+    protected Field[] playerFree;
+    protected int[] playerFreeCashXOffset;
+    protected int playerFreeCashYOffset;
 
-    // REMOVED: Info column arrays (info, infoXOffset, infoYOffset)
+    protected Field[] itemStatus;
 
-    private Field[] itemStatus; // Remains invisible, only used for status tooltip
+    protected int[] playerCaptionXOffset;
+    protected int upperPlayerCaptionYOffset, lowerPlayerCaptionYOffset;
+    protected Field[][] upperPlayerCaption;
+    protected Field[] lowerPlayerCaption;
+    protected JComponent[][] fields;
+    protected int currentFontSize = 14;
 
-    private int[] playerCaptionXOffset;
-    private int upperPlayerCaptionYOffset, lowerPlayerCaptionYOffset;
-    private Field[][] upperPlayerCaption;
-    private Field[] lowerPlayerCaption;
-    private JComponent[][] fields;
-    private int currentFontSize = 14; // Default to larger size
+    protected ActionButton bidButton;
+    protected ActionButton buyButton;
 
-    private ActionButton bidButton;
-    private ActionButton buyButton;
+    protected ActionButton aiIRButton;
+    protected JSpinner bidAmount;
+    protected SpinnerNumberModel spinnerModel;
+    protected ActionButton passButton;
 
-    private ActionButton aiIRButton;
-    private JSpinner bidAmount;
-    private SpinnerNumberModel spinnerModel;
-    private ActionButton passButton;
+    protected RailCard[] cards;
+    protected PlayerManager players;
 
-    private RailCard[] cards;
-
-    private PlayerManager players;
-
-    private int[] crossIndex;
+    protected int[] crossIndex;
     protected StartRound round;
-    private GameUIManager gameUIManager;
+    protected GameUIManager gameUIManager;
     protected StartPacket startPacket;
     protected boolean multipleColumns;
     protected int numberOfColumns;
     protected int numberOfRows;
     protected int columnWidth = 0;
 
-    // For the non-modal dialog to ask for a company starting share price.
     protected JDialog currentDialog;
     protected PossibleAction currentDialogAction;
     protected SortedSet<StockSpace> startSpaces;
@@ -128,32 +125,31 @@ public class StartRoundWindow extends JFrame implements ActionListener, KeyListe
     protected PossibleActions possibleActions;
     protected PossibleAction immediateAction;
 
-    // We don't use the ItemGroup for the click buttons anymore to avoid "sticky"
-    // selection
-    private final ButtonGroup itemGroup = new ButtonGroup();
-    private ClickField dummyButton;
+    protected final ButtonGroup itemGroup = new ButtonGroup();
+    protected ClickField dummyButton;
 
-    private StartRound.Bidding includeBidding;
-    private boolean includeBuying;
-    private boolean showBasePrices;
+    protected StartRound.Bidding includeBidding;
+    protected boolean includeBuying;
+    protected boolean showBasePrices;
 
-    private ORUIManager orUIManager;
-    private int selectedItemIndex = -1;
-    private JPanel[] cardWrappers;
-    private static final Color COLOR_AVAILABLE = new Color(204, 255, 204); // Light Green
-    private static final Color COLOR_SOLD = new Color(220, 220, 220);      // Light Gray
+    protected ORUIManager orUIManager;
+    protected int selectedItemIndex = -1;
+    protected JPanel[] cardWrappers;
+    protected static final Color COLOR_AVAILABLE = new Color(204, 255, 204);
+    protected static final Color COLOR_SOLD = new Color(220, 220, 220);
 
-    private void initCells() {
+    public StartRoundWindow() {
+    }
+
+    protected void initCells() {
         int lastX = -1;
         int lastY = 0;
-
 
         int np = players.getNumberOfPlayers();
         int ni = round.getNumberOfStartItems();
         cards = new RailCard[ni];
-cardWrappers = new JPanel[ni];
+        cardWrappers = new JPanel[ni];
         Font cellFont = new Font("SansSerif", Font.BOLD, currentFontSize);
-        
 
         basePrice = new Field[ni];
         minBid = new Field[ni];
@@ -259,7 +255,7 @@ cardWrappers = new JPanel[ni];
                     playerCaptionXOffset[col], 0, np, 1, 0);
             for (int i = 0; i < np; i++) {
                 upperPlayerCaption[col][i] = new Field(players.getPlayerByPosition(i).getPlayerNameModel());
-             upperPlayerCaption[col][i].setFont(cellFont);
+                upperPlayerCaption[col][i].setFont(cellFont);
                 addField(upperPlayerCaption[col][i], playerCaptionXOffset[col] + i,
                         upperPlayerCaptionYOffset, 1, 1, WIDE_BOTTOM);
             }
@@ -283,7 +279,7 @@ cardWrappers = new JPanel[ni];
             cards[i].addActionListener(this);
             log.error("Added ActionListener to RailCard for StartItem index {}", si.getIndex());
 
-// // 2. Scale Card Down (so it doesn't touch edges)
+            // // 2. Scale Card Down (so it doesn't touch edges)
             cards[i].setScale(1.2);
 
             // 3. Create Wrapper Panel (The Green Edge)
@@ -303,11 +299,11 @@ cardWrappers = new JPanel[ni];
             gbc.gridheight = 1;
             gbc.weightx = 0.5;
             gbc.weighty = 0.5;
-            gbc.fill = GridBagConstraints.BOTH; 
+            gbc.fill = GridBagConstraints.BOTH;
             gbc.insets = new Insets(1, 1, 1, 1); // Tiny gap between wrappers
 
             statusPanel.add(cardWrappers[i], gbc);
-            
+
             // IMPORTANT: The "field" logic must track the Wrapper now, not the card
             if (fields != null && gbc.gridx < fields.length && gbc.gridy < fields[0].length) {
                 fields[gbc.gridx][gbc.gridy] = cardWrappers[i];
@@ -332,7 +328,7 @@ cardWrappers = new JPanel[ni];
                 bidPerPlayer[i][j].setFont(cellFont);
                 addField(bidPerPlayer[i][j], bidPerPlayerXOffset[col] + j, bidPerPlayerYOffset + row,
                         1, 1, 0);
-                        
+
             }
 
             Certificate cert = si.getPrimary();
@@ -365,7 +361,7 @@ cardWrappers = new JPanel[ni];
 
             for (int i = 0; i < np; i++) {
                 playerBids[i] = new Field(round.getBlockedCashModel(players.getPlayerByPosition(i)));
-               playerBids[i].setFont(cellFont);
+                playerBids[i].setFont(cellFont);
                 addField(playerBids[i], playerBidsXOffset[0] + i, playerBidsYOffset,
                         1, 1, WIDE_TOP);
             }
@@ -384,7 +380,7 @@ cardWrappers = new JPanel[ni];
             playerFree[i] = new Field(includeBidding != StartRound.Bidding.NO
                     ? round.getFreeCashModel(players.getPlayerByPosition(i))
                     : players.getPlayerByPosition(i).getWallet());
-                    playerFree[i].setFont(cellFont);
+            playerFree[i].setFont(cellFont);
             addField(playerFree[i], playerFreeCashXOffset[0] + i, playerFreeCashYOffset, 1, 1,
                     firstBelowTable ? WIDE_TOP : 0);
         }
@@ -396,8 +392,8 @@ cardWrappers = new JPanel[ni];
         }
 
         dummyButton = new ClickField("", "", "", this, itemGroup);
-    
-    updateFonts(currentFontSize);
+
+        updateFonts(currentFontSize);
     }
 
     private void addField(JComponent comp, int x, int y, int width, int height, int wideGapPositions) {
@@ -421,36 +417,58 @@ cardWrappers = new JPanel[ni];
         }
     }
 
-    private void updateFonts(int size) {
-        if (size < 8) size = 8;
-        if (size > 48) size = 48;
+    public void updateFonts(int size) {
+        if (size < 8)
+            size = 8;
+        if (size > 48)
+            size = 48;
         currentFontSize = size;
-        
+
         Font f = new Font("SansSerif", Font.BOLD, currentFontSize);
 
-
         // Helper logic to update all arrays if they exist
-        if (basePrice != null) for (Field c : basePrice) if (c != null) c.setFont(f);
-        if (minBid != null) for (Field c : minBid) if (c != null) c.setFont(f);
-        if (playerBids != null) for (Field c : playerBids) if (c != null) c.setFont(f);
-        if (playerFree != null) for (Field c : playerFree) if (c != null) c.setFont(f);
-        if (lowerPlayerCaption != null) for (Field c : lowerPlayerCaption) if (c != null) c.setFont(f);
-        
+        if (basePrice != null)
+            for (Field c : basePrice)
+                if (c != null)
+                    c.setFont(f);
+        if (minBid != null)
+            for (Field c : minBid)
+                if (c != null)
+                    c.setFont(f);
+        if (playerBids != null)
+            for (Field c : playerBids)
+                if (c != null)
+                    c.setFont(f);
+        if (playerFree != null)
+            for (Field c : playerFree)
+                if (c != null)
+                    c.setFont(f);
+        if (lowerPlayerCaption != null)
+            for (Field c : lowerPlayerCaption)
+                if (c != null)
+                    c.setFont(f);
+
         if (upperPlayerCaption != null) {
             for (Field[] row : upperPlayerCaption) {
-                if (row != null) for (Field c : row) if (c != null) c.setFont(f);
+                if (row != null)
+                    for (Field c : row)
+                        if (c != null)
+                            c.setFont(f);
             }
         }
         if (bidPerPlayer != null) {
             for (Field[] row : bidPerPlayer) {
-                if (row != null) for (Field c : row) if (c != null) c.setFont(f);
+                if (row != null)
+                    for (Field c : row)
+                        if (c != null)
+                            c.setFont(f);
             }
         }
-        
-        // Re-pack window to accommodate new size
-        if (gameUIManager != null) gameUIManager.packAndApplySizing(this);
-    }
 
+        // Re-pack window to accommodate new size
+        if (gameUIManager != null)
+            gameUIManager.packAndApplySizing(this);
+    }
 
     @Override
     public boolean processImmediateAction() {
@@ -706,7 +724,6 @@ cardWrappers = new JPanel[ni];
         undoButton.setEnabled(false);
         buttonPanel.add(undoButton);
 
-
         buttonPanel.setOpaque(true);
 
         gbc = new GridBagConstraints();
@@ -761,21 +778,21 @@ cardWrappers = new JPanel[ni];
         gameUIManager.packAndApplySizing(this);
     }
 
-
     // ... (lines of unchanged context code) ...
     private void setupHotkeys() {
         // --- START FIX ---
         // Bind Command/Ctrl + and - to font size adjustment
         InputMap inputMap = statusPanel.getInputMap(JComponent.WHEN_IN_FOCUSED_WINDOW);
         ActionMap actionMap = statusPanel.getActionMap();
-        
+
         int mask = Toolkit.getDefaultToolkit().getMenuShortcutKeyMaskEx();
-        
+
         // Increase Font (Cmd = and Cmd +)
         inputMap.put(KeyStroke.getKeyStroke(KeyEvent.VK_EQUALS, mask), "increaseFont");
         inputMap.put(KeyStroke.getKeyStroke(KeyEvent.VK_ADD, mask), "increaseFont");
         actionMap.put("increaseFont", new AbstractAction() {
             private static final long serialVersionUID = 1L;
+
             public void actionPerformed(ActionEvent e) {
                 updateFonts(currentFontSize + 2);
             }
@@ -786,6 +803,7 @@ cardWrappers = new JPanel[ni];
         inputMap.put(KeyStroke.getKeyStroke(KeyEvent.VK_SUBTRACT, mask), "decreaseFont");
         actionMap.put("decreaseFont", new AbstractAction() {
             private static final long serialVersionUID = 1L;
+
             public void actionPerformed(ActionEvent e) {
                 updateFonts(currentFontSize - 2);
             }
@@ -795,6 +813,7 @@ cardWrappers = new JPanel[ni];
         inputMap.put(KeyStroke.getKeyStroke(KeyEvent.VK_ENTER, 0), "triggerPass");
         actionMap.put("triggerPass", new AbstractAction() {
             private static final long serialVersionUID = 1L;
+
             public void actionPerformed(ActionEvent e) {
                 if (passButton != null && passButton.isEnabled()) {
                     passButton.doClick();
@@ -804,8 +823,6 @@ cardWrappers = new JPanel[ni];
         // --- END FIX ---
     }
 
-
- 
     @Override
     public void updateStatus(boolean myTurn) {
         log.info("SRW: updateStatus STARTED. MyTurn={}", myTurn);
@@ -814,22 +831,24 @@ cardWrappers = new JPanel[ni];
         for (int i = 0; i < round.getNumberOfStartItems(); i++) {
             StartItem si = round.getStartItem(i);
             int status = si.getStatus();
-            
+
             // Clear previous actions
             cards[i].clearPossibleActions();
 
-if (status == StartItem.SOLD) {
+            if (status == StartItem.SOLD) {
                 cards[i].setState(RailCard.State.DISABLED);
                 String tooltipKey = itemStatusTextKeys[status];
                 cards[i].setToolTipText(LocalText.getText(tooltipKey));
-                
+
                 // Turn background Gray to indicate Sold
-                if (cardWrappers[i] != null) cardWrappers[i].setBackground(COLOR_SOLD);
+                if (cardWrappers[i] != null)
+                    cardWrappers[i].setBackground(COLOR_SOLD);
             } else {
                 cards[i].setState(RailCard.State.PASSIVE);
                 // Turn background Green to indicate Available
-                if (cardWrappers[i] != null) cardWrappers[i].setBackground(COLOR_AVAILABLE);
-                
+                if (cardWrappers[i] != null)
+                    cardWrappers[i].setBackground(COLOR_AVAILABLE);
+
                 Certificate cert = si.getPrimary();
                 Company comp = null;
                 if (cert instanceof PublicCertificate) {
@@ -845,16 +864,18 @@ if (status == StartItem.SOLD) {
 
         dummyButton.setSelected(true);
 
-        if (includeBuying) buyButton.setEnabled(false);
+        if (includeBuying)
+            buyButton.setEnabled(false);
         if (includeBidding != StartRound.Bidding.NO) {
             bidButton.setEnabled(false);
             bidAmount.setEnabled(false);
         }
         passButton.setEnabled(false);
-        
+
         // Disable new buttons initially
-        if (undoButton != null) undoButton.setEnabled(false);
-        
+        if (undoButton != null)
+            undoButton.setEnabled(false);
+
         // AI Button logic removed as requested
 
         RoundFacade currentRound = gameUIManager.getCurrentRound();
@@ -909,10 +930,10 @@ if (status == StartItem.SOLD) {
 
             // LOGGING ASSIGNMENT
             cards[i].setPossibleAction(action);
-            
+
             if (action instanceof BuyStartItem) {
                 buyAction = (BuyStartItem) action;
-                
+
                 if (i == selectedItemIndex) {
                     cards[i].setState(RailCard.State.SELECTED);
                     if (buyButton != null && includeBuying) {
@@ -943,20 +964,19 @@ if (status == StartItem.SOLD) {
                     spinnerModel.setStepSize(bidAction.getBidIncrement());
                     spinnerModel.setValue(mb);
                 }
-                
+
                 if (selected) {
                     cards[i].setState(RailCard.State.SELECTED);
                 } else {
                     cards[i].setState(RailCard.State.ACTIONABLE);
                 }
-                
+
                 bidAllowed = selected;
                 if (includeBidding == StartRound.Bidding.ON_ITEMS) {
                     minBid[i].setText(Bank.format(item, item.getMinimumBid()));
                 }
             }
         }
-        
 
         // 3. Pass Button Logic
         boolean passAllowed = false;
@@ -969,26 +989,25 @@ if (status == StartItem.SOLD) {
             passButton.setMnemonic(KeyEvent.VK_P);
         }
 
-        if (includeBuying) buyButton.setEnabled(buyAllowed);
+        if (includeBuying)
+            buyButton.setEnabled(buyAllowed);
         if (includeBidding != StartRound.Bidding.NO) {
             bidButton.setEnabled(bidAllowed);
             bidAmount.setEnabled(bidAllowed);
         }
         passButton.setEnabled(passAllowed);
 
-        // Replaced pack() with validate/repaint to preserve user-resized window dimensions
+        // Replaced pack() with validate/repaint to preserve user-resized window
+        // dimensions
         revalidate();
-        repaint(); 
+        repaint();
         requestFocus();
         log.info("SRW: updateStatus COMPLETED.");
     }
 
-
     @Override
     public void actionPerformed(ActionEvent actor) {
         JComponent source = (JComponent) actor.getSource();
-
-      
 
         // Identify RailCard Clicks
         int clickedIndex = -1;
@@ -1003,13 +1022,14 @@ if (status == StartItem.SOLD) {
         if (clickedIndex != -1) {
             RailCard card = cards[clickedIndex];
             java.util.List<PossibleAction> actions = card.getPossibleActions();
-            
+
             if (actions == null || actions.isEmpty()) {
                 // Log the state to help debug why actions might be missing
-                log.warn("SRW: RailCard index {} clicked, but has NO actions assigned. State: {}", clickedIndex, card.getState());
+                log.warn("SRW: RailCard index {} clicked, but has NO actions assigned. State: {}", clickedIndex,
+                        card.getState());
                 return;
             }
-            
+
             StartItemAction currentActiveItem = (StartItemAction) actions.get(0);
             SoundManager.notifyOfClickFieldSelection(currentActiveItem);
 
@@ -1018,7 +1038,8 @@ if (status == StartItem.SOLD) {
 
                 if (clickedIndex == selectedItemIndex) {
                     if (bsi.hasSharePriceToSet()) {
-                        if (requestStartPrice(bsi)) return;
+                        if (requestStartPrice(bsi))
+                            return;
                     }
                     process(bsi);
                     selectedItemIndex = -1;
@@ -1026,7 +1047,8 @@ if (status == StartItem.SOLD) {
                     selectedItemIndex = clickedIndex;
                     for (int k = 0; k < cards.length; k++) {
                         if (cards[k] != null && cards[k].isEnabled()) {
-                            cards[k].setState(k == selectedItemIndex ? RailCard.State.SELECTED : RailCard.State.ACTIONABLE);
+                            cards[k].setState(
+                                    k == selectedItemIndex ? RailCard.State.SELECTED : RailCard.State.ACTIONABLE);
                         }
                     }
                     if (buyButton != null && includeBuying) {
@@ -1036,7 +1058,8 @@ if (status == StartItem.SOLD) {
                 }
             } else if (currentActiveItem instanceof BidStartItem) {
                 BidStartItem bidAction = (BidStartItem) currentActiveItem;
-                if (includeBuying) buyButton.setEnabled(false);
+                if (includeBuying)
+                    buyButton.setEnabled(false);
 
                 if (bidAction.isSelectForAuction()) {
                     passButton.setPossibleAction(currentActiveItem);
@@ -1055,7 +1078,7 @@ if (status == StartItem.SOLD) {
                     spinnerModel.setStepSize(bidAction.getBidIncrement());
                     spinnerModel.setValue(minBid);
                 }
-                
+
                 for (int k = 0; k < cards.length; k++) {
                     if (cards[k] != null && cards[k].isEnabled()) {
                         cards[k].setState(k == clickedIndex ? RailCard.State.SELECTED : RailCard.State.ACTIONABLE);
@@ -1075,7 +1098,8 @@ if (status == StartItem.SOLD) {
 
             if (source == buyButton) {
                 if (activeItem instanceof BuyStartItem && ((BuyStartItem) activeItem).hasSharePriceToSet()) {
-                    if (requestStartPrice((BuyStartItem) activeItem)) return;
+                    if (requestStartPrice((BuyStartItem) activeItem))
+                        return;
                 } else {
                     process(activeItem);
                 }
@@ -1093,6 +1117,4 @@ if (status == StartItem.SOLD) {
         }
     }
 
-
-    
 }
