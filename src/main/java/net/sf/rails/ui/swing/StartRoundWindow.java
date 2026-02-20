@@ -137,6 +137,7 @@ public class StartRoundWindow extends JFrame implements ActionListener, KeyListe
     protected ORUIManager orUIManager;
     protected int selectedItemIndex = -1;
     protected JPanel[] cardWrappers;
+    protected JPanel[] playerInventoryPanels; // New field for player inventories
     protected static final Color COLOR_AVAILABLE = new Color(204, 255, 204);
     protected static final Color COLOR_SOLD = new Color(220, 220, 220);
     protected static final Color COLOR_HIGHLIGHT = new Color(160, 32, 240); // Prominent Purple
@@ -144,244 +145,187 @@ public class StartRoundWindow extends JFrame implements ActionListener, KeyListe
     public StartRoundWindow() {
     }
 
-    protected void initCells() {
-        int lastX = -1;
-        int lastY = 0;
 
-        int np = players.getNumberOfPlayers();
+protected void initCells() {
         int ni = round.getNumberOfStartItems();
-        cards = new RailCard[ni];
-        cardWrappers = new JPanel[ni];
+        int np = players.getNumberOfPlayers();
         Font cellFont = new Font("SansSerif", Font.BOLD, currentFontSize);
 
+        cards = new RailCard[ni];
+        cardWrappers = new JPanel[ni];
+        playerInventoryPanels = new JPanel[np];
+        
         basePrice = new Field[ni];
         minBid = new Field[ni];
-
-        verticalSeparators = new JComponent[numberOfColumns];
-        separatorXOffset = new int[numberOfColumns];
-
         bidPerPlayer = new Field[ni][np];
         itemStatus = new Field[ni];
+        
+        // Arrays for layout offsets
+        itemNameXOffset = new int[numberOfColumns];
+        if (showBasePrices) basePriceXOffset = new int[numberOfColumns];
+        if (includeBidding == StartRound.Bidding.ON_ITEMS) minBidXOffset = new int[numberOfColumns];
+        bidPerPlayerXOffset = new int[numberOfColumns]; // Always initialized to avoid nulls
+        
         upperPlayerCaption = new Field[numberOfColumns][np];
         lowerPlayerCaption = new Field[np];
         playerBids = new Field[np];
         playerFree = new Field[np];
 
-        itemNameXOffset = new int[numberOfColumns];
-        if (showBasePrices)
-            basePriceXOffset = new int[numberOfColumns];
-        if (includeBidding == StartRound.Bidding.ON_ITEMS)
-            minBidXOffset = new int[numberOfColumns];
-        bidPerPlayerXOffset = new int[numberOfColumns];
-        playerCaptionXOffset = new int[numberOfColumns];
+        int lastX = -1;
 
-        if (includeBidding != StartRound.Bidding.NO)
-            playerBidsXOffset = new int[numberOfColumns];
-        playerFreeCashXOffset = new int[numberOfColumns];
-
-        upperPlayerCaptionYOffset = ++lastY;
-
+        // 1. Setup Left Side (Market) Headers
         for (int col = 0; col < numberOfColumns; col++) {
             itemNameXOffset[col] = ++lastX;
-            if (col == 0)
-                itemNameYOffset = ++lastY;
+            addField(new Caption(LocalText.getText("ITEM")), itemNameXOffset[col], 0, 1, 1, WIDE_LEFT + WIDE_RIGHT + WIDE_BOTTOM);
+
             if (showBasePrices) {
                 basePriceXOffset[col] = ++lastX;
-                if (col == 0)
-                    basePriceYOffset = lastY;
+                addField(new Caption(LocalText.getText(includeBidding == StartRound.Bidding.ON_ITEMS ? "BASE_PRICE" : "PRICE")), 
+                        basePriceXOffset[col], 0, 1, 1, WIDE_BOTTOM);
             }
+
             if (includeBidding == StartRound.Bidding.ON_ITEMS) {
                 minBidXOffset[col] = ++lastX;
-                if (col == 0)
-                    minBidYOffset = lastY;
+                addField(new Caption(LocalText.getText("MINIMUM_BID")), minBidXOffset[col], 0, 1, 1, WIDE_BOTTOM + WIDE_RIGHT);
             }
 
-            separatorXOffset[col] = ++lastX;
-
-            bidPerPlayerXOffset[col] = playerCaptionXOffset[col] = ++lastX;
-            if (col == 0)
-                bidPerPlayerYOffset = lastY;
-
-            lastX += np;
-
-            if (col == 0) {
-                columnWidth = lastX + 1;
-            }
-
-            // Bottom rows
-            lastY += (numberOfRows - 1);
+            // If bidding is active, we display the bid matrix here on the left
             if (includeBidding != StartRound.Bidding.NO) {
-                playerBidsXOffset[col] = bidPerPlayerXOffset[col];
-                if (col == 0)
-                    playerBidsYOffset = ++lastY;
-            }
-            playerFreeCashXOffset[col] = bidPerPlayerXOffset[col];
-
-            if (col == 0) {
-                playerFreeCashYOffset = ++lastY;
-                lowerPlayerCaptionYOffset = ++lastY;
-
-                fields = new JComponent[columnWidth * numberOfColumns][2 + lastY];
-                log.debug("Columns={} (width/col={} nbOfCol={}) rows={}", columnWidth * numberOfColumns,
-                        columnWidth, numberOfColumns, 2 + lastY);
-            }
-
-            addField(new Caption(LocalText.getText("ITEM")),
-                    itemNameXOffset[col], 0, 1, 2,
-                    WIDE_LEFT + WIDE_RIGHT + WIDE_BOTTOM);
-
-            if (showBasePrices) {
-                addField(new Caption(LocalText.getText(includeBidding == StartRound.Bidding.ON_ITEMS
-                        ? "BASE_PRICE"
-                        : "PRICE")), basePriceXOffset[col], 0, 1, 2,
-                        WIDE_BOTTOM);
-            }
-            if (includeBidding == StartRound.Bidding.ON_ITEMS) {
-                addField(new Caption(LocalText.getText("MINIMUM_BID")),
-                        minBidXOffset[col], 0, 1, 2, WIDE_BOTTOM + WIDE_RIGHT);
-            }
-
-            // Vertical Separator
-            JSeparator sep = new JSeparator(SwingConstants.VERTICAL);
-            sep.setForeground(Color.GRAY);
-            int totalHeight = lastY + 2;
-            addField(sep, separatorXOffset[col], 0, 1, totalHeight, 0);
-
-            addField(new Caption(LocalText.getText("PLAYERS")),
-                    playerCaptionXOffset[col], 0, np, 1, 0);
-            for (int i = 0; i < np; i++) {
-                upperPlayerCaption[col][i] = new Field(players.getPlayerByPosition(i).getPlayerNameModel());
-                upperPlayerCaption[col][i].setFont(cellFont);
-                addField(upperPlayerCaption[col][i], playerCaptionXOffset[col] + i,
-                        upperPlayerCaptionYOffset, 1, 1, WIDE_BOTTOM);
+                bidPerPlayerXOffset[col] = ++lastX;
+                // Add Player Headers for the Bid Matrix
+                for (int i = 0; i < np; i++) {
+                    upperPlayerCaption[col][i] = new Field(players.getPlayerByPosition(i).getPlayerNameModel());
+                    upperPlayerCaption[col][i].setFont(cellFont);
+                    addField(upperPlayerCaption[col][i], lastX, 0, 1, 1, WIDE_BOTTOM);
+                    if (i < np - 1) lastX++; // Increment X for next player column
+                }
             }
         }
 
-        int row, col;
+        // 2. Vertical Separator
+        int separatorX = ++lastX;
+        addField(new JSeparator(SwingConstants.VERTICAL), separatorX, 0, 1, ni + 5, WIDE_LEFT + WIDE_RIGHT);
+
+        // 3. Setup Right Side (Player Inventories)
+        int playerStartX = ++lastX;
+        playerCaptionXOffset = new int[]{playerStartX}; // Reuse existing field for referencing right side start
+
+        for (int i = 0; i < np; i++) {
+            // Player Name Header
+            Caption playerHeader = new Caption(players.getPlayerByPosition(i).getName());
+            playerHeader.setFont(cellFont);
+            addField(playerHeader, playerStartX + i, 0, 1, 1, WIDE_BOTTOM);
+
+            // Inventory Panel
+            playerInventoryPanels[i] = new JPanel();
+            playerInventoryPanels[i].setLayout(new BoxLayout(playerInventoryPanels[i], BoxLayout.Y_AXIS));
+            playerInventoryPanels[i].setBackground(Color.WHITE);
+            playerInventoryPanels[i].setBorder(BorderFactory.createLineBorder(Color.LIGHT_GRAY));
+            
+            gbc.gridx = playerStartX + i;
+            gbc.gridy = 1;
+            gbc.gridheight = ni; // Span the height of all items
+            gbc.fill = GridBagConstraints.BOTH;
+            gbc.weightx = 1.0; 
+            gbc.weighty = 1.0; 
+            statusPanel.add(playerInventoryPanels[i], gbc);
+        }
+
+        // 4. Create Items (Rows)
         for (int i = 0; i < ni; i++) {
             final StartItem si = round.getStartItem(i);
+            int col = multipleColumns ? si.getColumn() - 1 : 0;
+            int row = multipleColumns ? si.getRow() - 1 : i;
+            int yPos = row + 1; // Start at row 1 (below headers)
 
-            if (multipleColumns) {
-                row = si.getRow() - 1;
-                col = si.getColumn() - 1;
-            } else {
-                row = i;
-                col = 0;
-            }
-
+            // Setup RailCard
             cards[i] = new RailCard(si, itemGroup);
-            // 1. Enable Clicks
-            cards[i].addActionListener(this);
-            // 2. Scale Card
-            cards[i].setScale(1.2);
-
-            // --- CENTRALIZED HIGHLIGHTING LOGIC ---
+            cards[i].addActionListener(this); 
+            cards[i].setScale(1.2); 
             configureMapHighlighting(cards[i], si);
-            // -------------------------------------
 
-            // 3. Create Wrapper Panel
-            cardWrappers[i] = new JPanel();
-            // Use GridLayout(1,1) to force the card to fill the entire wrapper area
-            cardWrappers[i].setLayout(new GridLayout(1, 1));
-            cardWrappers[i].setBackground(COLOR_AVAILABLE);
+            // Setup Wrapper
+            cardWrappers[i] = new JPanel(new GridLayout(1, 1)); 
+            cardWrappers[i].setBackground(COLOR_AVAILABLE); 
             cardWrappers[i].setBorder(BorderFactory.createEtchedBorder());
-
-            // 4. Add Card to Wrapper
             cardWrappers[i].add(cards[i]);
 
-            // 5. Add MouseListener to the wrapper itself
-            // This ensures clicks on the border/background are forwarded to the window
-            // logic
             final int cardIndex = i;
             cardWrappers[i].addMouseListener(new MouseAdapter() {
                 @Override
                 public void mouseClicked(MouseEvent e) {
-                    // Forward the click as an ActionEvent from the card
-                    actionPerformed(new ActionEvent(cards[cardIndex], ActionEvent.ACTION_PERFORMED, "WrapperClick"));
+                    if (cards[cardIndex].getState() != RailCard.State.DISABLED) {
+                        actionPerformed(new ActionEvent(cards[cardIndex], ActionEvent.ACTION_PERFORMED, "WrapperClick"));
+                    }
                 }
             });
-
-            // 6. Add Wrapper to Main Grid
+            
+            // Add Wrapper to Left Side
             gbc.gridx = itemNameXOffset[col];
-            gbc.gridy = itemNameYOffset + row;
+            gbc.gridy = yPos;
             gbc.gridwidth = 1;
             gbc.gridheight = 1;
             gbc.weightx = 0.5;
-            gbc.weighty = 0.5;
-            gbc.fill = GridBagConstraints.BOTH;
+            gbc.weighty = 0.5; 
+            gbc.fill = GridBagConstraints.BOTH; 
             gbc.insets = new Insets(1, 1, 1, 1);
-
             statusPanel.add(cardWrappers[i], gbc);
 
-            if (fields != null && gbc.gridx < fields.length && gbc.gridy < fields[0].length) {
-                fields[gbc.gridx][gbc.gridy] = cardWrappers[i];
-            }
-
+            // Add Price Field
             if (showBasePrices) {
                 basePrice[i] = new Field(si.getBasePriceModel());
                 basePrice[i].setFont(cellFont);
-                addField(basePrice[i], basePriceXOffset[col], basePriceYOffset + row,
-                        1, 1, 0);
+                addField(basePrice[i], basePriceXOffset[col], yPos, 1, 1, 0);
             }
-
+            
+            // Add Min Bid Field
             if (includeBidding == StartRound.Bidding.ON_ITEMS) {
                 minBid[i] = new Field(round.getMinimumBidModel(i));
                 minBid[i].setFont(cellFont);
-                addField(minBid[i], minBidXOffset[col], minBidYOffset + row,
-                        1, 1, WIDE_RIGHT);
+                addField(minBid[i], minBidXOffset[col], yPos, 1, 1, WIDE_RIGHT);
             }
 
-            for (int j = 0; j < np; j++) {
-                bidPerPlayer[i][j] = new Field(round.getBidModel(i, players.getPlayerByPosition(j)));
-                bidPerPlayer[i][j].setFont(cellFont);
-                addField(bidPerPlayer[i][j], bidPerPlayerXOffset[col] + j, bidPerPlayerYOffset + row,
-                        1, 1, 0);
-
+            // Add Bid Matrix Fields (if bidding exists)
+            if (includeBidding != StartRound.Bidding.NO) {
+                for (int j = 0; j < np; j++) {
+                    bidPerPlayer[i][j] = new Field(round.getBidModel(i, players.getPlayerByPosition(j)));
+                    bidPerPlayer[i][j].setFont(cellFont);
+                    // Add starting at bidPerPlayerXOffset
+                    addField(bidPerPlayer[i][j], bidPerPlayerXOffset[col] + j, yPos, 1, 1, 0);
+                }
             }
-
+            
             itemStatus[i] = new Field(si.getStatusModel());
         }
 
-        // Player money
-        boolean firstBelowTable = true;
-        if (includeBidding != StartRound.Bidding.NO) {
-            addField(new Caption(LocalText.getText("BID")), basePriceXOffset[0], playerBidsYOffset,
-                    1, 1, WIDE_TOP + WIDE_RIGHT);
+        // 5. Setup Footers (Cash / Bids Summary)
+        int footerY = ni + 1;
+        
+        // Add Cash/Bid summary below the Players on the Right side? 
+        // Or keep it aligned? Let's put it below the Player Inventories on the Right.
+        
+        addField(new Caption(LocalText.getText("CASH")), playerStartX - 1, footerY + 1, 1, 1, WIDE_RIGHT);
 
-            for (int i = 0; i < np; i++) {
+        for (int i = 0; i < np; i++) {
+            // Player Bids (Total Blocked)
+            if (includeBidding != StartRound.Bidding.NO) {
                 playerBids[i] = new Field(round.getBlockedCashModel(players.getPlayerByPosition(i)));
                 playerBids[i].setFont(cellFont);
-                addField(playerBids[i], playerBidsXOffset[0] + i, playerBidsYOffset,
-                        1, 1, WIDE_TOP);
+                addField(playerBids[i], playerStartX + i, footerY, 1, 1, WIDE_TOP);
             }
 
-            firstBelowTable = false;
-        }
-
-        int cashLabelX = (showBasePrices) ? basePriceXOffset[0] : itemNameXOffset[0];
-
-        addField(new Caption(
-                LocalText.getText(includeBidding != StartRound.Bidding.NO ? "FREE" : "CASH")),
-                cashLabelX, playerFreeCashYOffset, 1, 1,
-                WIDE_RIGHT + (firstBelowTable ? WIDE_TOP : 0));
-
-        for (int i = 0; i < np; i++) {
-            playerFree[i] = new Field(includeBidding != StartRound.Bidding.NO
-                    ? round.getFreeCashModel(players.getPlayerByPosition(i))
-                    : players.getPlayerByPosition(i).getWallet());
+            // Player Free Cash
+            playerFree[i] = new Field(round.getFreeCashModel(players.getPlayerByPosition(i)));
             playerFree[i].setFont(cellFont);
-            addField(playerFree[i], playerFreeCashXOffset[0] + i, playerFreeCashYOffset, 1, 1,
-                    firstBelowTable ? WIDE_TOP : 0);
-        }
-
-        for (int i = 0; i < np; i++) {
+            addField(playerFree[i], playerStartX + i, footerY + 1, 1, 1, 0);
+            
+            // Bottom Name Caption
             lowerPlayerCaption[i] = new Field(players.getPlayerByPosition(i).getPlayerNameModel());
             lowerPlayerCaption[i].setFont(cellFont);
-            addField(lowerPlayerCaption[i], playerFreeCashXOffset[0] + i, playerFreeCashYOffset + 1, 1, 1, WIDE_TOP);
+            addField(lowerPlayerCaption[i], playerStartX + i, footerY + 2, 1, 1, WIDE_TOP);
         }
 
         dummyButton = new ClickField("", "", "", this, itemGroup);
-
         updateFonts(currentFontSize);
     }
 
@@ -578,8 +522,9 @@ public class StartRoundWindow extends JFrame implements ActionListener, KeyListe
         int playerIndex = players.getCurrentPlayer().getIndex();
         for (int i = 0; i < players.getNumberOfPlayers(); i++) {
             for (int j = 0; j < numberOfColumns; j++) {
-                upperPlayerCaption[j][i].setHighlight(i == playerIndex);
-            }
+if (upperPlayerCaption[j][i] != null) {
+                    upperPlayerCaption[j][i].setHighlight(i == playerIndex);
+                }            }
             lowerPlayerCaption[i].setHighlight(i == playerIndex);
         }
     }
@@ -940,9 +885,15 @@ public class StartRoundWindow extends JFrame implements ActionListener, KeyListe
 
     @Override
     public void updateStatus(boolean myTurn) {
-        // --- START FIX ---
-        if (gameUIManager != null && gameUIManager.getGameManager() != null) {
+      if (gameUIManager != null && gameUIManager.getGameManager() != null) {
             possibleActions = gameUIManager.getGameManager().getPossibleActions();
+        }
+
+        // 0. Prevent NPE from base class calls if panels aren't ready
+        if (playerInventoryPanels != null) {
+             for (JPanel panel : playerInventoryPanels) {
+                if (panel != null) panel.removeAll();
+            }
         }
 
         // 1. Reset Map Highlights and Card States
@@ -950,21 +901,55 @@ public class StartRoundWindow extends JFrame implements ActionListener, KeyListe
 
         for (int i = 0; i < round.getNumberOfStartItems(); i++) {
             StartItem si = round.getStartItem(i);
-            int status = si.getStatus();
-            cards[i].clearPossibleActions();
-
-            if (status == StartItem.SOLD) {
-                cards[i].setState(RailCard.State.DISABLED);
-                if (cardWrappers[i] != null)
-                    cardWrappers[i].setBackground(COLOR_SOLD);
+            StartItemAction buyAction = null;
+            
+            // IMPORTANT: VISUAL MOVEMENT LOGIC
+            if (si.isSold()) {
+                // If sold, hide from Market (Left) and Move to Inventory (Right)
+                if (cardWrappers[i] != null) cardWrappers[i].setVisible(false);
+                if (showBasePrices && basePrice[i] != null) basePrice[i].setVisible(false);
+                
+                // If we have bidding matrix, hide those fields too? 
+                // Usually better to leave them or clear them.
+                
+                Player owner = si.getBidder(); // In StartRound, bidder usually becomes owner
+                if (owner != null && playerInventoryPanels != null && owner.getIndex() < playerInventoryPanels.length) {
+                    cards[i].setState(RailCard.State.PASSIVE);
+                    cards[i].clearPossibleActions();
+                    cards[i].setVisible(true);
+                    
+                    // Add to player panel
+                    playerInventoryPanels[owner.getIndex()].add(cards[i]);
+                    playerInventoryPanels[owner.getIndex()].add(Box.createVerticalStrut(2));
+                }
             } else {
+                // Not Sold: Ensure it's visible in the Market (Left)
+                if (cardWrappers[i] != null) cardWrappers[i].setVisible(true);
+                if (showBasePrices && basePrice[i] != null) basePrice[i].setVisible(true);
+                
+                // Ensure card is physically in the wrapper (it might have been moved previously)
+                if (cardWrappers[i] != null && cards[i].getParent() != cardWrappers[i]) {
+                    cardWrappers[i].add(cards[i]);
+                }
+                
+                cards[i].clearPossibleActions();
                 cards[i].setState(RailCard.State.PASSIVE);
-                if (cardWrappers[i] != null)
-                    cardWrappers[i].setBackground(COLOR_AVAILABLE);
+                if (cardWrappers[i] != null) cardWrappers[i].setBackground(COLOR_AVAILABLE);
+                
                 configureMapHighlighting(cards[i], si);
             }
         }
 
+        // Refresh Inventory Panels
+        if (playerInventoryPanels != null) {
+            for (JPanel panel : playerInventoryPanels) {
+                if (panel != null) {
+                    panel.revalidate();
+                    panel.repaint();
+                }
+            }
+        }
+        
         // 2. Setup Buttons (Default Disabled)
         dummyButton.setSelected(true);
         if (includeBuying && buyButton != null)
@@ -978,7 +963,7 @@ public class StartRoundWindow extends JFrame implements ActionListener, KeyListe
         if (passButton != null)
             passButton.setEnabled(false);
         if (undoButton != null)
-            undoButton.setEnabled(true); // Always check possibleActions for undo
+            undoButton.setEnabled(true);
 
         RoundFacade currentRound = gameUIManager.getCurrentRound();
         if (!(currentRound instanceof StartRound) || !myTurn || possibleActions == null) {
@@ -1004,44 +989,47 @@ public class StartRoundWindow extends JFrame implements ActionListener, KeyListe
             for (StartItemAction action : actions) {
                 int j = action.getItemIndex();
                 int i = crossIndex[j];
-                cards[i].setPossibleAction(action);
-
-                // PROMINENT HIGHLIGHT: Purple background for actionable items
-                if (cardWrappers[i] != null) {
-                    cardWrappers[i].setBackground(COLOR_HIGHLIGHT);
-                }
-
-                if (action instanceof BuyStartItem) {
-                    BuyStartItem bsi = (BuyStartItem) action;
-                    if (bsi.isSelected() || i == selectedItemIndex) {
-                        cards[i].setState(RailCard.State.SELECTED);
-                        selectedItemIndex = i;
-                        if (cardWrappers[i] != null) {
-                            cardWrappers[i].setBackground(Color.YELLOW);
-                        }
-                        if (buyButton != null && includeBuying) {
-                            buyButton.setEnabled(true);
-                            buyButton.setPossibleAction(action);
-                        }
-                    } else {
-                        cards[i].setState(RailCard.State.ACTIONABLE);
+                
+                // Only interact with cards that are NOT sold (though sold ones shouldn't have actions anyway)
+                if (cardWrappers[i].isVisible()) {
+                    cards[i].setPossibleAction(action);
+                    
+                    if (cardWrappers[i] != null) {
+                        cardWrappers[i].setBackground(COLOR_HIGHLIGHT);
                     }
-                } else if (action instanceof BidStartItem) {
-                    BidStartItem bidAction = (BidStartItem) action;
-                    if (bidAction.isSelected()) {
-                        cards[i].setState(RailCard.State.SELECTED);
-                        selectedItemIndex = i;
-                        if (bidButton != null) {
-                            bidButton.setEnabled(true);
-                            bidButton.setPossibleAction(action);
+
+                    if (action instanceof BuyStartItem) {
+                        BuyStartItem bsi = (BuyStartItem) action;
+                        if (bsi.isSelected() || i == selectedItemIndex) {
+                            cards[i].setState(RailCard.State.SELECTED);
+                            selectedItemIndex = i;
+                            if (cardWrappers[i] != null) {
+                                cardWrappers[i].setBackground(Color.YELLOW);
+                            }
+                            if (buyButton != null && includeBuying) {
+                                buyButton.setEnabled(true);
+                                buyButton.setPossibleAction(action);
+                            }
+                        } else {
+                            cards[i].setState(RailCard.State.ACTIONABLE);
                         }
-                        if (bidAmount != null) {
-                            bidAmount.setEnabled(true);
-                            spinnerModel.setMinimum(bidAction.getMinimumBid());
-                            spinnerModel.setValue(bidAction.getMinimumBid());
+                    } else if (action instanceof BidStartItem) {
+                        BidStartItem bidAction = (BidStartItem) action;
+                        if (bidAction.isSelected()) {
+                            cards[i].setState(RailCard.State.SELECTED);
+                            selectedItemIndex = i;
+                            if (bidButton != null) {
+                                bidButton.setEnabled(true);
+                                bidButton.setPossibleAction(action);
+                            }
+                            if (bidAmount != null) {
+                                bidAmount.setEnabled(true);
+                                spinnerModel.setMinimum(bidAction.getMinimumBid());
+                                spinnerModel.setValue(bidAction.getMinimumBid());
+                            }
+                        } else {
+                            cards[i].setState(RailCard.State.ACTIONABLE);
                         }
-                    } else {
-                        cards[i].setState(RailCard.State.ACTIONABLE);
                     }
                 }
             }
@@ -1056,11 +1044,10 @@ public class StartRoundWindow extends JFrame implements ActionListener, KeyListe
 
         // 6. Final UI and Map Refresh
         updateMapHighlights();
-        revalidate();
-        repaint();
+        statusPanel.revalidate();
+        statusPanel.repaint();
         // --- END FIX ---
     }
-
 
 // ... (lines of unchanged context code) ...
     @Override

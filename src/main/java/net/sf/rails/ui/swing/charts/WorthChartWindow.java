@@ -339,7 +339,16 @@ public class WorthChartWindow extends JDialog {
         public final GameManager gameManager;
         public final Map<String, Color> colorMap = new java.util.HashMap<>();
         
-        private final Color[] PALETTE = { Color.BLUE, Color.RED, new Color(0, 153, 0), Color.ORANGE, Color.MAGENTA, Color.CYAN, Color.PINK, Color.DARK_GRAY };
+        private final Color[] PALETTE = {
+            new Color(31, 119, 180),  // Blau
+            new Color(255, 127, 14),  // Orange
+            new Color(44, 160, 44),   // Grün
+            new Color(214, 39, 40),   // Rot
+            new Color(148, 103, 189), // Violett
+            new Color(188, 189, 34),  // Oliv
+            new Color(23, 190, 207)   // Cyan
+        };
+
 
         public WorthData(GameManager gm) {
             this.gameManager = gm;
@@ -384,11 +393,9 @@ public class WorthChartWindow extends JDialog {
             
             int pIdx = 0;
             for (String p : playerNames) {
-                Color c;
-                if (p.equalsIgnoreCase("Rainer")) c = new Color(128, 0, 128);
-                else if (p.equalsIgnoreCase("Bjoern") || p.equalsIgnoreCase("Björn")) c = new Color(0, 153, 0);
-                else { c = PALETTE[pIdx % PALETTE.length]; pIdx++; }
+Color c = PALETTE[pIdx % PALETTE.length];
                 colorMap.put(p, c);
+                pIdx++;
             }
         }
         public Color getPlayerColor(String name) { return colorMap.getOrDefault(name, Color.BLACK); }

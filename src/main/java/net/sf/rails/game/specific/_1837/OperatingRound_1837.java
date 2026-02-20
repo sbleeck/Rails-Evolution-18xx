@@ -1401,6 +1401,9 @@ if (gameManager instanceof GameManager_1837) {
             log.warn("1837_LOGIC: Resuming OR but operating company " + operatingCompany.value().getId() 
                     + " is CLOSED. Advancing turn.");
             finishTurn();
+            if (gameManager.getCurrentRound() == this) {
+                setPossibleActions();
+            }
             return;
         }
 
@@ -1412,17 +1415,16 @@ if (gameManager instanceof GameManager_1837) {
             possibleActions.clear();
             finishTurn();
 
-            // for the NEW company (MS), the replayer will fail on the next move.
-            if (gameManager.isReloading()) {
-                // Ensure the engine identifies the next company in line
-                setPossibleActions(); 
-                log.info("1837_LOGIC: Reload sync - Prepared actions for " + 
-                         (operatingCompany.value() != null ? operatingCompany.value().getId() : "next player"));
+            // 1. Correct the compilation error by using getCurrentRound()
+            // 2. Prevent legacy actions from overwriting the next round's list
+            if (gameManager.getCurrentRound() != this) {
+                return;
             }
             
+            // 3. Ensure the replayer has valid actions if we didn't transition
+            setPossibleActions(); 
             return;
         }
-
 
 
         setPossibleActions();

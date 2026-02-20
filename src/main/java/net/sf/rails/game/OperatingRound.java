@@ -4234,9 +4234,19 @@ protected boolean processGameSpecificDiscard(DiscardTrain action, boolean moreDi
             if (cost > 0) {
                 costText = Currency.toBank(operatingCompany.value(), cost);
             }
+// Capture the old tile before the upgrade overwrites it
+            Tile oldTile = hex.getCurrentTile();
 
             operatingCompany.value().layTile(hex, tile, orientation, cost);
             hex.upgrade(action);
+
+            // Deregister the old tile to return it to the pool
+            if (oldTile != null) {
+                oldTile.remove(hex);
+            }
+            // Register the new tile to decrement its count
+            tile.add(hex);
+            
 
             try {
                 int newPresetRevenue = calculateCurrentPotentialRevenue(operatingCompany.value());

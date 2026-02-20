@@ -132,8 +132,6 @@ public class GameManager_1837 extends GameManager {
         this.newPhaseId.set(newPhaseId);
     }
 
-
-
     @Override
     public void nextRound(Round prevRound) {
         log.info("Transitioning Round. Previous: {} ({})", prevRound.getId(), prevRound.getClass().getSimpleName());
@@ -148,14 +146,15 @@ public class GameManager_1837 extends GameManager {
         } else if (prevRound instanceof CoalExchangeRound) {
             doneThisRound.add("CER");
 
-if (prevRound instanceof CoalExchangeRound) {
+            if (prevRound instanceof CoalExchangeRound) {
                 tempSkippedMinors.clear();
                 for (String minorId : ((CoalExchangeRound) prevRound).skippedMinors) {
                     tempSkippedMinors.add(minorId);
                 }
             }
 
-            // 1. Check if we have a suspended round to resume (e.g. OR interrupted by formation)
+            // 1. Check if we have a suspended round to resume (e.g. OR interrupted by
+            // formation)
             Round interrupted = (Round) getInterruptedRound();
             if (interrupted != null) {
                 log.info("1837_LOGIC: Returning from CER to interrupted round: " + interrupted.getId());
@@ -186,7 +185,13 @@ if (prevRound instanceof CoalExchangeRound) {
 
         } else if (prevRound instanceof NationalFormationRound) {
             doneThisRound.add(((NationalFormationRound) prevRound).getNational().getId());
-            OperatingRound_1837 interruptedRound = (OperatingRound_1837) getInterruptedRound();
+Round interruptedRound = (Round) getInterruptedRound();
+
+            // If the NFR finished, check if a CER or another NFR is now due
+            // before returning to the OR or SR.
+            if (checkAndRunCER(newPhaseId.value(), previousSRorOR.value(), interruptedRound)) {
+                return;
+            }
 
             if (checkAndRunNFR(newPhaseId.value(), previousSRorOR.value(), interruptedRound)) {
                 return;
@@ -194,29 +199,37 @@ if (prevRound instanceof CoalExchangeRound) {
 
             if (interruptedRound != null) {
                 setRound(interruptedRound);
-                interruptedRound.resume();
+
+                if (interruptedRound instanceof OperatingRound_1837) {
+                    ((OperatingRound_1837) interruptedRound).resume();
+                } else {
+                    // Fallback for StockRound or other unexpected round types
+                    interruptedRound.setPossibleActions();
+                }
+
+
             } else {
                 super.nextRound(previousSRorOR.value());
             }
         } else if (prevRound instanceof StockRound_1837 || prevRound instanceof OperatingRound_1837) {
             previousSRorOR.set(prevRound);
             doneThisRound.clear();
-            
+
             // --- START FIX ---
             // DO NOT setInterruptedRound(prevRound) here.
             // If we are transitioning, the previous round is over.
             // We pass 'null' to checkAndRunCER/NFR so they don't set a return point.
-            
+
             // 1. Check for Coal Exchanges
             if (checkAndRunCER(newPhaseId.value(), prevRound, null)) {
                 return;
             }
-            
+
             // 2. Check for National Formations
             if (checkAndRunNFR(newPhaseId.value(), prevRound, null)) {
                 return;
             }
-            
+
             // 3. No specials triggered, proceed normally
             super.nextRound(prevRound);
             // --- END FIX ---
@@ -225,7 +238,6 @@ if (prevRound instanceof CoalExchangeRound) {
             super.nextRound(prevRound);
         }
     }
-
 
     public boolean checkAndRunCER(String newPhaseId, Round namingRound, Round interruptedRound) {
         if (doneThisRound.contains("CER"))
@@ -264,36 +276,34 @@ if (prevRound instanceof CoalExchangeRound) {
         return false;
     }
 
-
-
     @Override
     public boolean process(rails.game.action.PossibleAction action) {
         if (action instanceof rails.game.action.NullAction) {
             rails.game.action.NullAction incoming = (rails.game.action.NullAction) action;
-            
-            // Logic: If the UI sends a SKIP or PASS, we treat them as semantically 
+
+            // Logic: If the UI sends a SKIP or PASS, we treat them as semantically
             // identical for the purpose of moving the game forward in 1837.
-            if (incoming.getMode() == rails.game.action.NullAction.Mode.SKIP || 
-                incoming.getMode() == rails.game.action.NullAction.Mode.PASS) {
-                
+            if (incoming.getMode() == rails.game.action.NullAction.Mode.SKIP ||
+                    incoming.getMode() == rails.game.action.NullAction.Mode.PASS) {
+
                 // 1. Get the current RoundFacade from the state model
                 net.sf.rails.game.round.RoundFacade facade = currentRound.value();
-                
+
                 // 2. Cast to the concrete Round class to access the action list
                 if (facade instanceof net.sf.rails.game.Round) {
                     net.sf.rails.game.Round activeRound = (net.sf.rails.game.Round) facade;
-                    
+
                     for (rails.game.action.PossibleAction valid : activeRound.getPossibleActionsList()) {
                         if (valid instanceof rails.game.action.NullAction) {
                             rails.game.action.NullAction validNa = (rails.game.action.NullAction) valid;
-                            
-                            // 3. If the server is offering EITHER mode, and the user 
+
+                            // 3. If the server is offering EITHER mode, and the user
                             // sent EITHER mode, we have a match.
-                            if (validNa.getMode() == rails.game.action.NullAction.Mode.SKIP || 
-                                validNa.getMode() == rails.game.action.NullAction.Mode.PASS) {
-                                
-                                log.info("1837_FIX: Normalizing NullAction " + incoming.getMode() + 
-                                         " -> " + validNa.getMode() + " for " + action.getPlayerName());
+                            if (validNa.getMode() == rails.game.action.NullAction.Mode.SKIP ||
+                                    validNa.getMode() == rails.game.action.NullAction.Mode.PASS) {
+
+                                log.info("1837_FIX: Normalizing NullAction " + incoming.getMode() +
+                                        " -> " + validNa.getMode() + " for " + action.getPlayerName());
                                 return super.process(validNa);
                             }
                         }

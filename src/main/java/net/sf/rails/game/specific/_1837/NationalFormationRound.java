@@ -24,10 +24,10 @@ public class NationalFormationRound extends Round {
 
     protected final StringState nationalId = StringState.create(this, "nationalId");
     protected final BooleanState forcedStart = new BooleanState(this, "forcedStart");
-    
+
     // Tracks which minor we are currently asking (0=K1, 1=K2, 2=K3)
     protected final IntegerState minorIndex = IntegerState.create(this, "MinorIndex", 0);
-    
+
     // Helper to track if we need to discard trains at the end
     protected final BooleanState discardStep = new BooleanState(this, "DiscardStep", false);
 
@@ -38,7 +38,8 @@ public class NationalFormationRound extends Round {
     }
 
     public PublicCompany_1837 getNational() {
-        if (nationalId.value() == null) return null;
+        if (nationalId.value() == null)
+            return null;
         return (PublicCompany_1837) companyManager.getPublicCompany(nationalId.value());
     }
 
@@ -56,23 +57,12 @@ public class NationalFormationRound extends Round {
     }
     // ---------------------------------------------------
 
-    public void start(PublicCompany_1837 national, boolean isTriggered, String reportName) {
-        this.nationalId.set(national.getId());
-        this.minorIndex.set(0); 
-        this.discardStep.set(false);
-
-        PhaseManager pm = getRoot().getPhaseManager();
-        boolean isForced = !national.hasStarted() && pm.hasReachedPhase(national.getForcedStartPhase());
-        if ("Sd".equals(national.getId())) isForced = true;
-        this.forcedStart.set(isForced);
-
-        ReportBuffer.add(this, LocalText.getText("StartFormationRound", national.getId(), reportName));
-    }
 
     private List<PublicCompany_1837> getSortedMinors() {
         PublicCompany_1837 national = getNational();
-        if (national == null) return new ArrayList<>();
-        
+        if (national == null)
+            return new ArrayList<>();
+
         List<PublicCompany_1837> list = new ArrayList<>();
         for (PublicCompany c : national.getMinors()) {
             if (c instanceof PublicCompany_1837) {
@@ -84,45 +74,106 @@ public class NationalFormationRound extends Round {
         return list;
     }
 
+    /**
+     * Pure check to see if the national is over the limit.
+     */
+    private boolean isOverTrainLimit() {
+        PublicCompany national = getNational();
+        return (national != null && national.hasStarted() &&
+                national.getNumberOfTrains() > national.getCurrentTrainLimit());
+    }
+
     @Override
-    public boolean setPossibleActions() {
-        possibleActions.clear();
-
-        PublicCompany_1837 national = getNational();
-        
-        // 1. DISCARD STEP
-        if (discardStep.value()) {
-            if (national.getNumberOfTrains() > national.getCurrentTrainLimit()) {
-                generateGroupedDiscardActions(national, possibleActions);
-                return true;
-            } else {
-                finishRound();
-                return false;
-            }
+    protected void floatCompany(PublicCompany company) {
+        if (!company.hasFloated()) {
+            company.setFloated();
         }
+    }
 
-        // 2. EXCHANGE STEPS
-        List<PublicCompany_1837> minors = getSortedMinors();
+    private void setCurrentPlayer(Player p) {
+        this.currentPlayer = p;
+        playerManager.setCurrentPlayer(p);
+    }
+
+    private void processExchange(PublicCompany minor, PublicCompany major) {
+        log.info("1837_NFR: Merging " + minor.getId() + " into " + major.getId());
+
+        // Use Merger1837 class for specific token and asset logic
+        Merger1837.mergeMinor(gameManager, minor, major);
+        Merger1837.fixDirectorship(gameManager, (PublicCompany_1837) major);
+    }
+
+
+public void start(PublicCompany_1837 national, boolean isTriggered, String reportName) {
+        this.nationalId.set(national.getId());
+        this.minorIndex.set(0);
+        this.discardStep.set(false);
+
+        PhaseManager pm = getRoot().getPhaseManager();
+        boolean isForced = !national.hasStarted() && pm.hasReachedPhase(national.getForcedStartPhase());
+        if ("Sd".equals(national.getId()))
+            isForced = true;
+        this.forcedStart.set(isForced);
+
+        ReportBuffer.add(this, LocalText.getText("StartFormationRound", national.getId(), reportName));
         
+        // Immediately check if the first minor is valid or if we need to skip/finish
+        advanceToNextValidMinorOrFinish();
+    }
+
+    private void advanceToNextValidMinorOrFinish() {
+        List<PublicCompany_1837> minors = getSortedMinors();
         while (minorIndex.value() < minors.size()) {
             PublicCompany_1837 target = minors.get(minorIndex.value());
-            
-            if (target.isClosed()) {
-                minorIndex.add(1);
-                continue;
+            // If valid, pause here and wait for user input
+            if (target != null && !target.isClosed() && target.getPresident() != null) {
+                return;
             }
-            
-            Player owner = target.getPresident();
-            if (owner == null) {
-                minorIndex.add(1); 
-                continue;
-            }
+            // Skip closed or invalid minor
+            minorIndex.add(1);
+        }
 
-            setCurrentPlayer(owner);
+        // We have processed all minors. Check for discard or finish.
+        if (isOverTrainLimit()) {
+            discardStep.set(true);
+            setCurrentPlayer(getNational().getPresident());
+        } else {
+            finishRound();
+        }
+    }
+
+@Override
+    protected void finishRound() {
+        // CRITICAL FIX: Pass 'this' (NFR) to GameManager.
+        // Do NOT pass the interrupted round, or GameManager will think the OR is done.
+        gameManager.nextRound(this);
+    }
+
+@Override
+    public boolean setPossibleActions() {
+        possibleActions.clear();
+        PublicCompany_1837 national = getNational();
+
+        // 1. DISCARD STEP
+        if (discardStep.value()) {
+            if (isOverTrainLimit()) {
+                generateGroupedDiscardActions(national, possibleActions);
+                return true;
+            }
+            return false;
+        }
+
+        // 2. EXCHANGE STEPS (Purely declarative, no state mutation)
+        List<PublicCompany_1837> minors = getSortedMinors();
+        if (minorIndex.value() < minors.size()) {
+            PublicCompany_1837 target = minors.get(minorIndex.value());
+            Player owner = target.getPresident();
             
+            setCurrentPlayer(owner);
+
             boolean isFormation = (minorIndex.value() == 0 && !national.hasStarted());
             ExchangeMinorAction exchange = new ExchangeMinorAction(target, national, isFormation);
-            
+
             if (isFormation) {
                 exchange.setButtonLabel(LocalText.getText("FormCompany", national.getId()));
             } else {
@@ -131,7 +182,6 @@ public class NationalFormationRound extends Round {
             possibleActions.add(exchange);
 
             if (!forcedStart.value()) {
-// 1. Existing PASS action (mapped to specific "Keep/Decline" buttons)
                 NullAction pass = new NullAction(getRoot(), NullAction.Mode.PASS);
                 if (isFormation) {
                     pass.setLabel(LocalText.getText("DeclineFormation"));
@@ -139,18 +189,12 @@ public class NationalFormationRound extends Round {
                     pass.setLabel(LocalText.getText("KeepMinor", target.getId()));
                 }
                 possibleActions.add(pass);
-
-                // 2. NEW DONE action
-                // Allows the global "Done" button to function as "Keep Minor/Skip" 
-                // preventing the validation error if the user clicks it.
                 possibleActions.add(new NullAction(getRoot(), NullAction.Mode.DONE));
             }
-
             return true;
         }
 
-        checkTrainLimit();
-        return true;
+        return false;
     }
 
     @Override
@@ -162,8 +206,8 @@ public class NationalFormationRound extends Round {
             if (ema.isFormation()) {
                 national.start();
                 floatCompany(national);
-                String msg = LocalText.getText("START_MERGED_COMPANY", national.getId(), 
-                             Bank.format(this, national.getIPOPrice()), national.getStartSpace());
+                String msg = LocalText.getText("START_MERGED_COMPANY", national.getId(),
+                        Bank.format(this, national.getIPOPrice()), national.getStartSpace());
                 ReportBuffer.add(this, msg);
                 DisplayBuffer.add(this, msg);
             }
@@ -171,77 +215,41 @@ public class NationalFormationRound extends Round {
             processExchange(ema.getMinor(), national);
             
             minorIndex.add(1);
+            advanceToNextValidMinorOrFinish();
             return true;
         }
 
         if (action instanceof NullAction) {
             // Case A: Director Declined Formation
-            if (minorIndex.value() == 0) {
+            if (minorIndex.value() == 0 && !getNational().hasStarted()) {
                 log.info("1837_NFR: Formation DECLINED by " + currentPlayer.getName());
-                
-                // Inform Operating Round directly
                 if (gameManager.getInterruptedRound() instanceof OperatingRound_1837) {
                     ((OperatingRound_1837) gameManager.getInterruptedRound())
-                        .setNationalFormationDeclined(nationalId.value());
+                            .setNationalFormationDeclined(nationalId.value());
                 }
-                
-                finishRound(); 
+                finishRound();
                 return true;
             }
 
-            // Case B: Player Kept Minor (Pass) -> Move to next
-            log.info("1837_NFR: Player kept minor " + getSortedMinors().get(minorIndex.value()).getId());
+            // Case B: Player Kept Minor
+            log.info("1837_NFR: Player passed/done on minor " + getSortedMinors().get(minorIndex.value()).getId());
             minorIndex.add(1);
+            advanceToNextValidMinorOrFinish();
             return true;
         }
 
         if (action instanceof DiscardTrain) {
             DiscardTrain dt = (DiscardTrain) action;
-            // Use generic execute helper from Round.java if available, or local logic
             executeDiscardTrain(dt);
-            checkTrainLimit();
+            if (!isOverTrainLimit()) {
+                finishRound();
+            }
             return true;
         }
 
         return false;
     }
 
-    private void processExchange(PublicCompany minor, PublicCompany major) {
-        log.info("1837_NFR: Merging " + minor.getId() + " into " + major.getId());
-        
-        // Use Merger1837 class for specific token and asset logic
-        Merger1837.mergeMinor(gameManager, minor, major);
-        Merger1837.fixDirectorship(gameManager, (PublicCompany_1837)major);
-    }
-    
-    private void checkTrainLimit() {
-        PublicCompany national = getNational();
-        if (national != null && national.hasStarted() && 
-            national.getNumberOfTrains() > national.getCurrentTrainLimit()) {
-            
-            discardStep.set(true);
-            setCurrentPlayer(national.getPresident());
-        } else {
-            finishRound();
-        }
-    }
 
-    @Override
-    protected void floatCompany(PublicCompany company) {
-         if (!company.hasFloated()) {
-             company.setFloated();
-         }
-    }
 
-    private void setCurrentPlayer(Player p) {
-        this.currentPlayer = p;
-        playerManager.setCurrentPlayer(p);
-    }
-    
-    @Override
-    protected void finishRound() {
-        // CRITICAL FIX: Pass 'this' (NFR) to GameManager.
-        // Do NOT pass the interrupted round, or GameManager will think the OR is done.
-        gameManager.nextRound(this);
-    }
 }

@@ -454,23 +454,19 @@ public class GUIHex implements Observer {
 
     }
 
+
     public void paintTokensAndText(Graphics2D g) {
 
-        GUIGlobals.setRenderingHints(g);
+    GUIGlobals.setRenderingHints(g);
 
+    try {
         paintStationTokens(g);
         paintOffStationTokens(g);
 
         if (!isTilePainted())
             return;
 
-        // The old file did NOT check hexMap.getDisplayBuildNumbers() here.
-        // We revert to checking only if cost > 0.
         if (getHex().getTileCost() > 0) {
-            // Optional: You can keep the flag check if you fixed HexMap.java default to
-            // true
-            // if (hexMap.getDisplayBuildNumbers()) {
-
             FontMetrics fontMetrics = g.getFontMetrics();
             g.drawString(
                     Bank.format(getHex(), getHex().getTileCost()),
@@ -480,7 +476,6 @@ public class GUIHex implements Observer {
                                     * 3 / 5,
                     dimensions.rectBound.y
                             + ((fontMetrics.getHeight() + dimensions.rectBound.height) * 9 / 15));
-            // }
         }
 
         Map<PublicCompany, Stop> homes = getHex().getHomes();
@@ -508,62 +503,36 @@ public class GUIHex implements Observer {
                         }
                     }
                 }
-                // check the number of tokens laid there already
-                HexPoint p = getTokenCenter(1, homeCity);
-                if (company.isDisplayHomeHex())
-                    drawHome(g, company, p);
+                
+                if (homeCity != null) {
+                    // check the number of tokens laid there already
+                    HexPoint p = getTokenCenter(1, homeCity);
+                    if (company.isDisplayHomeHex()) {
+                        drawHome(g, company, p);
+                    }
+                }
             }
         }
 
-        if (hex.isBlockedByPrivateCompany()) {
-            PrivateCompany p = hex.getBlockingPrivateCompany();
-            String text = "(" + p.getId() + ")";
-            drawString(g, text, 0, 0);
-            /*
-             * g.drawString(
-             * text,
-             * dimensions.rectBound.x
-             * + (dimensions.rectBound.width - fontMetrics.stringWidth(text))
-             * 1 / 2,
-             * dimensions.rectBound.y
-             * + ((fontMetrics.getHeight() + dimensions.rectBound.height) * 5 / 15));
-             * 
-             */
-        }
-
-        if (hex.isReservedForCompany()
-                && hex.isPreprintedTileCurrent()) {
-            String text = "[" + hex.getReservedForCompany().getId() + "]";
-            drawString(g, text, 0, 0);
-            /*
-             * g.drawString(
-             * text,
-             * dimensions.rectBound.x
-             * + (dimensions.rectBound.width - fontMetrics.stringWidth(text))
-             * 1 / 2,
-             * dimensions.rectBound.y
-             * + ((fontMetrics.getHeight() + dimensions.rectBound.height) * 5 / 25));
-             * 
-             */
-        }
-
-        String extraText = hex.getExtraText();
-        if (extraText != null) {
-            drawString(g, extraText, hex.getExtraTextX(), hex.getExtraTextY());
-        }
-
-        // Fügt die Logik zum Zeichnen des Custom Overlay Textes hinzu, falls vorhanden
-        if (customOverlayText != null) {
-            drawString(g, customOverlayText, 0, 0); // Zeichnet den Text zentriert
-        }
-
-        // If an active owner label is set, draw it using standard text
-        // (The purple BORDER is handled by paintMarks via the State enum now)
-        if (activeOwnerLabel != null) {
-            drawString(g, activeOwnerLabel, 0, 0);
-        }
-
+    } catch (java.util.ConcurrentModificationException e) {
+        // Abort painting for this frame if the map model is being updated concurrently by the main thread during a game load
+        return;
     }
+
+    // Fügt die Logik zum Zeichnen des Custom Overlay Textes hinzu, falls vorhanden
+    if (customOverlayText != null) {
+        drawString(g, customOverlayText, 0, 0); // Zeichnet den Text zentriert
+    }
+
+    // If an active owner label is set, draw it using standard text
+    // (The purple BORDER is handled by paintMarks via the State enum now)
+    if (activeOwnerLabel != null) {
+        drawString(g, activeOwnerLabel, 0, 0);
+    }
+
+}
+
+
 
     public void setCustomOverlayText(String text) {
         String safeText = (text == null) ? "" : text;
@@ -676,10 +645,72 @@ public class GUIHex implements Observer {
 
     }
 
-    private void drawHome(Graphics2D g2, PublicCompany co, HexPoint origin) {
 
+
+    private void drawHome(Graphics2D g2, PublicCompany co, HexPoint origin) {
+// 1. Branch logic: Check if this is a Major or National company
+boolean isMajor = false;
+if (co.getType() != null) {
+String typeName = co.getType().getId();
+if (typeName != null && (typeName.equals("Major") || typeName.equals("National"))) {
+isMajor = true;
+}
+}
+
+    // 2. Keep Minors and Coal companies completely intact
+    if (!isMajor) {
         GUIToken.drawTokenText(co.getId(), g2, Color.BLACK, origin, dimensions.tokenDiameter);
+        return;
     }
+
+    // 3. Draw the "empty ring" style for non-active Majors
+    double diameter = dimensions.tokenDiameter;
+    double radius = diameter / 2.0;
+    double x = origin.getX() - radius;
+    double y = origin.getY() - radius;
+
+    Color oldColor = g2.getColor();
+    Stroke oldStroke = g2.getStroke();
+    Font oldFont = g2.getFont();
+
+    java.awt.geom.Ellipse2D.Double circle = new java.awt.geom.Ellipse2D.Double(x, y, diameter, diameter);
+
+    // Black border (outer outline)
+    g2.setColor(Color.BLACK);
+    g2.setStroke(new BasicStroke(4.0f)); 
+    g2.draw(circle);
+
+    // Company colored ring inside the black border
+    g2.setColor(co.getBgColour());
+    g2.setStroke(new BasicStroke(2.0f)); 
+    g2.draw(circle);
+
+    // Setup Text
+    g2.setFont(new Font("SansSerif", Font.BOLD, (int)(diameter * 0.45))); 
+    FontMetrics fm = g2.getFontMetrics();
+    String text = co.getId();
+    int textWidth = fm.stringWidth(text);
+    int textHeight = fm.getAscent();
+
+    float textX = (float) (origin.getX() - textWidth / 2.0);
+    float textY = (float) (origin.getY() + textHeight / 2.0 - fm.getDescent());
+
+    // Draw solid white background box for text (cuts through the ring)
+    int padding = 2;
+    java.awt.geom.Rectangle2D.Double textBox = new java.awt.geom.Rectangle2D.Double(textX - padding, textY - textHeight, textWidth + padding * 2, textHeight + fm.getDescent());
+    g2.setColor(Color.WHITE);
+    g2.fill(textBox);
+
+    // Draw core text
+    g2.setColor(Color.BLACK);
+    g2.drawString(text, textX, textY);
+
+    g2.setColor(oldColor);
+    g2.setStroke(oldStroke);
+    g2.setFont(oldFont);
+}
+
+
 
     private void drawBonusToken(Graphics2D g2, BonusToken bt, HexPoint origin) {
         GUIToken token = new GUIToken(Color.BLACK, Color.WHITE, "+" + bt.getValue(),

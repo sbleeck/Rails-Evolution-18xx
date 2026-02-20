@@ -2669,8 +2669,7 @@ public class GameManager extends RailsManager implements Configurable, Owner {
                 if (share > 0) {
                     asset.sharePercents.put(comp.getId(), share);
                     int price = (comp.getCurrentSpace() != null) ? comp.getCurrentSpace().getPrice() : 0;
-                    int unit = (comp.getShareUnit() > 0) ? comp.getShareUnit() : 10;
-                    int value = (share / unit) * price;
+                    int value = (share * price) / 10;
                     asset.holdingValues.put(comp.getId(), value);
                 }
             }
@@ -3354,6 +3353,9 @@ public PossibleAction getNextActionFromLog() {
                 sb.append("  (NONE)\n");
             } else {
                 for (PossibleAction pa : possibleActions.getList()) {
+                    if (pa.toString().contains("CorrectionModeAction")) {
+                        continue;
+                    }
                     sb.append("  > ").append(pa).append("\n");
                 }
             }

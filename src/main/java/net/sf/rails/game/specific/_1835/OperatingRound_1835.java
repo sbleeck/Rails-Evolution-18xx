@@ -52,10 +52,12 @@ public class OperatingRound_1835 extends OperatingRound {
     // Tracks how many trains we have processed to distinguish new purchases from
     // old ones
     private final IntegerState pfrHandledTrainCount = IntegerState.create(this, "PfrHandledTrainCount", 0);
+protected final BooleanState badenHomeTokenCompleted = new BooleanState(this, "BadenHomeTokenCompleted");
 
     // Tracks which company actually triggered the PFR (e.g. M1) so we can calculate
-    // relative turn order even if the engine auto-advances the pointer after the trigger closes.
-private final StringState pfrTriggerId = StringState.create(this, "PfrTriggerId", null);
+    // relative turn order even if the engine auto-advances the pointer after the
+    // trigger closes.
+    private final StringState pfrTriggerId = StringState.create(this, "PfrTriggerId", null);
 
     public OperatingRound_1835(GameManager parent, String id) {
         super(parent, id);
@@ -76,6 +78,8 @@ private final StringState pfrTriggerId = StringState.create(this, "PfrTriggerId"
         hasLaidExtraOBBTile.set(false);
         pfrHandledTrainCount.set(0); // Reset count at start of turn
 
+        this.mandatoryBadenTokenLaid.set(false);
+
         if (current != null && !current.isClosed() && current.getPresident() != null) {
             Set<SpecialProperty> sps = current.getSpecialProperties();
             if (sps != null && !sps.isEmpty()) {
@@ -93,121 +97,10 @@ private final StringState pfrTriggerId = StringState.create(this, "PfrTriggerId"
         // We rely on the specific logic in resume() to restore state correctly.
     }
 
-    @Override
-    public boolean setPossibleActions() {
-        // --- GUARD 1: Dead Company Check ---
-        // If the engine asks for actions but the company is closed (e.g. M5 just
-        // merged),
-        // we advance to the next company and retry.
-        PublicCompany current = operatingCompany.value();
-        if (current != null && current.isClosed()) {
-            log.info("setPossibleActions: Company {} is closed. Advancing...", current.getId());
-            advanceToNextOperationalCompany();
-            return setPossibleActions(); // Recursively check actions for the new company
-        }
 
-        // --- GUARD 2: PFR Gatekeeper ---
-        // If PFR has been triggered, BLOCK all actions until the round switches.
-        if (pfrTriggeredThisOR.value()) {
-            GameManager_1835 gm = (GameManager_1835) gameManager;
-            // If the round switch hasn't happened yet, force it now.
-            if (!(gm.getCurrentRound() instanceof PrussianFormationRound)) {
-                log.warn("PFR Triggered but not active. Forcing startPrussianFormationRound().");
-                gm.startPrussianFormationRound(this);
-            }
-            possibleActions.clear();
-            return true;
-        }
 
-        // --- EXISTING 1835 LOGIC STARTS HERE ---
 
-        if (awaitingBadenHomeToken.value()) {
-            possibleActions.clear();
-            doneAllowed.set(false);
-            PublicCompany ba = companyManager.getPublicCompany("BA");
-            MapHex l6 = getRoot().getMapManager().getHex("L6");
-            for (Stop stop : l6.getStops()) {
-                possibleActions.add(new LayBadenHomeToken(l6, ba, stop));
-            }
-            return true;
-        }
 
-        if (getStep() == GameDef.OrStep.DISCARD_TRAINS) {
-            checkForExcessTrains();
-        }
-
-        // Call super to get standard actions (Buy Train, etc.)
-        boolean result = super.setPossibleActions();
-        if (result && !possibleActions.isEmpty()) {
-            pruneGhostActions();
-        }
-
-        GameDef.OrStep step = getStep();
-        PublicCompany company = operatingCompany.value();
-
-        // Specific Logic for INITIAL Step (Baden Home Token Check)
-        if (step == GameDef.OrStep.INITIAL) {
-            initTurn();
-            if (company != null && !company.hasOperated() && company.getId().equals("BA")) {
-                MapHex homeHex = null;
-                if (company.getHomeHexes() != null && !company.getHomeHexes().isEmpty()) {
-                    homeHex = company.getHomeHexes().get(0);
-                }
-                if (homeHex != null && !homeHex.isPreprintedTileCurrent() && !homeHex.hasTokenOfCompany(company)) {
-                    setStep(GameDef.OrStep.LAY_TOKEN);
-                    result = setPossibleActions();
-                    pruneGhostActions();
-                    return result;
-                }
-            }
-            nextStep();
-            result = setPossibleActions();
-            pruneGhostActions();
-            return result;
-        }
-
-        // Specific Logic for LAY_TRACK (Baden Home Hex)
-        if (step == GameDef.OrStep.LAY_TRACK) {
-            if (company.getId().equals("BA") && !company.hasOperated()) {
-                MapHex homeHex = null;
-                if (company.getHomeHexes() != null && !company.getHomeHexes().isEmpty()) {
-                    homeHex = company.getHomeHexes().get(0);
-                }
-                if (homeHex != null && homeHex.isPreprintedTileCurrent()) {
-                    possibleActions.clear();
-                    possibleActions.addAll(getNormalTileLays(true));
-                    possibleActions.addAll(getSpecialTileLays(true));
-                    pruneGhostActions();
-                    return true;
-                }
-            }
-        }
-
-        // Specific Logic for LAY_TOKEN (Baden Mandatory Token)
-        if (step == GameDef.OrStep.LAY_TOKEN) {
-            if (company.getId().equals("BA") && !company.hasOperated() && !this.mandatoryBadenTokenLaid.value()) {
-                possibleActions.clear();
-                for (MapHex homeHex : company.getHomeHexes()) {
-                    for (Stop stop : homeHex.getStops()) {
-                        LayBaseToken stationChoice = new LayBaseToken(getRoot(), homeHex);
-                        stationChoice.setCompany(company);
-                        stationChoice.setChosenStation(stop.getRelatedStationNumber());
-                        stationChoice.setType(LayBaseToken.HOME_CITY);
-                        Station station = homeHex.getStation(stop.getRelatedStationNumber());
-                        String buttonLabel = String.format("Lay Token on Station %d (%s)",
-                                stop.getRelatedStationNumber(),
-                                homeHex.getConnectionString(station));
-                        stationChoice.setButtonLabel(buttonLabel);
-                        possibleActions.add(stationChoice);
-                    }
-                }
-                pruneGhostActions();
-                return true;
-            }
-        }
-
-        return result;
-    }
 
     @Override
     public boolean buyTrain(BuyTrain action) {
@@ -244,10 +137,9 @@ private final StringState pfrTriggerId = StringState.create(this, "PfrTriggerId"
                     // 1. Lock the OR
                     pfrHandledTrainCount.set(trainsBoughtThisTurn.size());
                     pfrTriggeredThisOR.set(true);
-                    
+
                     // Capture the Trigger Company (M1) immediately
                     pfrTriggerId.set(action.getCompany().getId());
-
 
                     // 2. Identify Starter
                     Player starter = playerManager.getCurrentPlayer();
@@ -398,155 +290,105 @@ private final StringState pfrTriggerId = StringState.create(this, "PfrTriggerId"
         return !excessTrainCompanies.isEmpty();
     }
 
+    // --- INSERT THIS FROM OLD FILE (THE "HAMMER") ---
+    @Override
+    public boolean discardTrain(DiscardTrain action) {
 
-    // In OperatingRound_1835.java
+        PublicCompany currentOp = operatingCompany.value();
+        Player currentPlayer = playerManager.getCurrentPlayer();
 
-@Override
-protected boolean processGameSpecificDiscard(DiscardTrain action, boolean moreDiscards) {
-    
-    // Check the 1835-specific Prussian Flag
-    if (this.needPrussianFormationCall.value()) {
-        
-        if (!moreDiscards) {
-            PublicCompany prussian = companyManager.getPublicCompany(GameDef_1835.PR_ID);
-            
-            if (prussian.hasStarted()) {
-                if (operatingCompany.value().isClosed()) {
-                    operatingCompany.set(prussian);
-                    stepObject.set(GameDef.OrStep.INITIAL);
-                } else {
-                    stepObject.set(GameDef.OrStep.BUY_TRAIN);
-                }
-                playerManager.setCurrentPlayer(operatingCompany.value().getPresident());
-            } else {
-                ((GameManager_1835) gameManager).startPrussianFormationRound(this);
-            }
-            
-            // After PFR returns, the company that bought the train might be closed.
-            handleClosedOperatingCompany();
+        PublicCompany actionComp = action.getCompany();
+        Player actionPlayer = (actionComp != null) ? actionComp.getPresident() : null;
+
+        // --- CRITICAL FIX: ALWAYS patch the Excess List for DiscardTrain actions ---
+        // We force the company into this list to bypass false-negative validation failures.
+        if (excessTrainCompanies == null) {
+            excessTrainCompanies = new HashMap<>();
         }
-        
-        // We return TRUE to tell the superclass "We handled it, don't run standard logic"
-        return true; 
+        if (actionPlayer != null) {
+            List<PublicCompany> comps = excessTrainCompanies.get(actionPlayer);
+            if (comps == null) {
+                comps = new ArrayList<>();
+                excessTrainCompanies.put(actionPlayer, comps);
+            }
+            if (!comps.contains(actionComp)) {
+                comps.add(actionComp);
+            }
+        }
+        // --------------------------------------------------------------------------
+
+        boolean isInterjection = (actionComp != null && currentOp != null && actionComp != currentOp);
+
+        // Context Swap Logic
+        if (isInterjection) {
+            operatingCompany.set(actionComp);
+            if (actionPlayer != null) {
+                playerManager.setCurrentPlayer(actionPlayer);
+            }
+        }
+
+        // Execute Action
+        boolean processed = false;
+        try {
+            processed = action.process(this);
+        } catch (Exception e) {
+            log.error(">>> FORENSIC ERROR: Exception during action.process()", e);
+        }
+
+        // Restore Context
+        if (isInterjection) {
+            operatingCompany.set(currentOp);
+            if (currentPlayer != null) {
+                playerManager.setCurrentPlayer(currentPlayer);
+            }
+        }
+
+        if (!processed) {
+            return false;
+        }
+
+        boolean moreDiscards = super.checkForExcessTrains();
+
+        if (this.needPrussianFormationCall.value()) {
+            if (!moreDiscards) {
+                PublicCompany prussian = companyManager.getPublicCompany(GameDef_1835.PR_ID);
+                if (prussian.hasStarted()) {
+                    if (operatingCompany.value().isClosed()) {
+                        operatingCompany.set(prussian);
+                        stepObject.set(GameDef.OrStep.INITIAL);
+                    } else {
+                        stepObject.set(GameDef.OrStep.BUY_TRAIN);
+                    }
+                    playerManager.setCurrentPlayer(operatingCompany.value().getPresident());
+                } else {
+                    ((GameManager_1835) gameManager).startPrussianFormationRound(this);
+                }
+                // After PFR returns, the company that bought the train might be closed.
+                handleClosedOperatingCompany();
+            }
+        } else {
+            if (!moreDiscards) {
+                newPhaseChecks();
+                if (gameManager.getInterruptedRound() != null) {
+                    return true;
+                }
+
+                boolean companySwitched = handleClosedOperatingCompany();
+
+                if (!companySwitched) {
+                    playerManager.setCurrentPlayer(operatingCompany.value().getPresident());
+                    if (trainsBoughtThisTurn.isEmpty()) {
+                        setStep(GameDef.OrStep.INITIAL);
+                    } else {
+                        stepObject.set(GameDef.OrStep.BUY_TRAIN);
+                    }
+                }
+            }
+        }
+        return true;
     }
 
-    // If not a Prussian event, return FALSE to let the Superclass run standard logic.
-    return false; 
-}
-
-
-    // @Override
-    // public boolean discardTrain(DiscardTrain action) {
-
-    //     PublicCompany currentOp = operatingCompany.value();
-    //     Player currentPlayer = playerManager.getCurrentPlayer();
-
-    //     PublicCompany actionComp = action.getCompany();
-    //     Player actionPlayer = (actionComp != null) ? actionComp.getPresident() : null;
-
-    //     if (actionComp != null) {
-    //         log.info("    Portfolio Inspection [{}]: {}", actionComp.getId(),
-    //                 actionComp.getPortfolioModel().getTrainList());
-    //     }
-
-    //     // --- CRITICAL FIX: ALWAYS patch the Excess List for DiscardTrain actions ---
-    //     // Whether we swapped context or not, if we are processing a DiscardTrain
-    //     // action,
-    //     // the engine MUST allow it. The standard validation checks
-    //     // 'excessTrainCompanies'.
-    //     // We force the company into this list to bypass false-negative validation
-    //     // failures.
-    //     if (excessTrainCompanies == null) {
-    //         excessTrainCompanies = new HashMap<>();
-    //     }
-    //     if (actionPlayer != null) {
-    //         List<PublicCompany> comps = excessTrainCompanies.get(actionPlayer);
-    //         if (comps == null) {
-    //             comps = new ArrayList<>();
-    //             excessTrainCompanies.put(actionPlayer, comps);
-    //         }
-    //         if (!comps.contains(actionComp)) {
-    //             comps.add(actionComp);
-    //         }
-    //     }
-    //     // --------------------------------------------------------------------------
-
-    //     boolean isInterjection = (actionComp != null && currentOp != null && actionComp != currentOp);
-
-    //     // Context Swap Logic
-    //     if (isInterjection) {
-    //         operatingCompany.set(actionComp);
-    //         if (actionPlayer != null) {
-    //             playerManager.setCurrentPlayer(actionPlayer);
-    //         }
-    //     }
-
-    //     // Execute Action
-    //     boolean processed = false;
-    //     try {
-    //         processed = action.process(this);
-    //     } catch (Exception e) {
-    //         log.error(">>> FORENSIC ERROR: Exception during action.process()", e);
-    //     }
-
-    //     // Restore Context
-    //     if (isInterjection) {
-    //         operatingCompany.set(currentOp);
-    //         if (currentPlayer != null) {
-    //             playerManager.setCurrentPlayer(currentPlayer);
-    //         }
-    //     }
-
-    //     if (!processed) {
-    //         return false;
-    //     }
-
-    //     boolean moreDiscards = super.checkForExcessTrains();
-
-    //     if (this.needPrussianFormationCall.value()) {
-    //         if (!moreDiscards) {
-    //             PublicCompany prussian = companyManager.getPublicCompany(GameDef_1835.PR_ID);
-    //             if (prussian.hasStarted()) {
-    //                 if (operatingCompany.value().isClosed()) {
-    //                     operatingCompany.set(prussian);
-    //                     stepObject.set(GameDef.OrStep.INITIAL);
-    //                 } else {
-    //                     stepObject.set(GameDef.OrStep.BUY_TRAIN);
-    //                 }
-    //                 playerManager.setCurrentPlayer(operatingCompany.value().getPresident());
-    //             } else {
-    //                 ((GameManager_1835) gameManager).startPrussianFormationRound(this);
-    //             }
-    //             // After PFR returns, the company that bought the train (e.g., M5)
-    //             // might be closed. We must switch context now.
-    //             handleClosedOperatingCompany();
-    //         }
-    //     } else {
-    //         if (!moreDiscards) {
-    //             newPhaseChecks();
-    //             if (gameManager.getInterruptedRound() != null) {
-    //                 return true;
-    //             }
-
-    //             boolean companySwitched = handleClosedOperatingCompany();
-
-    //             if (!companySwitched) {
-    //                 playerManager.setCurrentPlayer(operatingCompany.value().getPresident());
-    //                 // If the current company hasn't bought trains yet, this discard
-    //                 // was likely an interrupt triggered by the PREVIOUS player (e.g. limit drop).
-    //                 // We must let the current company start their turn from the beginning.
-    //                 if (trainsBoughtThisTurn.isEmpty()) {
-    //                     setStep(GameDef.OrStep.INITIAL);
-    //                 } else {
-    //                     // Otherwise, we are in the middle of a buy phase, so continue buying.
-    //                     stepObject.set(GameDef.OrStep.BUY_TRAIN);
-    //                 }
-
-    //             }
-    //         }
-    //     }
-    //     return true;
-    // }
+   
 
     public void clearPfrTriggerFlag_AI() {
         this.needPrussianFormationCall.set(false);
@@ -586,150 +428,7 @@ protected boolean processGameSpecificDiscard(DiscardTrain action, boolean moreDi
         return super.finishTurnSpecials();
     }
 
-    @Override
-    public boolean layTile(LayTile action) {
 
-        // SAFETY NET: Force cleanup of closed private properties immediately before
-        // processing.
-        forceCleanupGhosts();
-
-        PublicCompany company = action.getCompany();
-        boolean isBAHomeLay = company.getId().equals("BA") &&
-                !company.hasOperated() &&
-                action.getChosenHex().isHomeFor(company) &&
-                !this.mandatoryBadenTokenLaid.value();
-
-        // Snapshot state for potential restoration (PfB Logic)
-        boolean wasNormalLaid = normalTileLaidThisTurn.value();
-        GameDef.OrStep stepBefore = getStep();
-        Map<String, Integer> laysSnapshot = new HashMap<>();
-        for (String key : tileLaysPerColour.viewKeySet()) {
-            laysSnapshot.put(key, tileLaysPerColour.get(key));
-        }
-
-        // Execute the parent action
-        boolean result = super.layTile(action);
-
-        // --- PfB/PF State Restoration Logic ---
-        // Identify if this specific action utilized the PfB or PF special property.
-        SpecialProperty actionSp = action.getSpecialProperty();
-        boolean isSpecialPfBLay = false;
-        if (result && actionSp != null && actionSp.getOriginalCompany() != null) {
-            String ownerId = actionSp.getOriginalCompany().getId();
-            if ("PfB".equals(ownerId) || "PF".equals(ownerId)) {
-                isSpecialPfBLay = true;
-            }
-        }
-
-        // Only revert the "Normal" lay status if we just used an "Extra" lay property.
-        // We MUST NOT clear the map if this was a normal lay (isSpecialPfBLay ==
-        // false),
-        // or the engine will lose the ability to UNDO the tile placement.
-        if (result && isSpecialPfBLay) {
-            normalTileLaidThisTurn.set(wasNormalLaid);
-            // Re-sync counts. We must explicitly remove keys added by super.layTile
-            // that were not in the snapshot (e.g. the color of the special tile just laid).
-            // We avoid clear() to preserve State metadata identity if possible, though
-            // clear() is safer.
-            // Here we perform a differential sync.
-            Set<String> currentKeys = new HashSet<>(tileLaysPerColour.viewKeySet());
-            for (String key : currentKeys) {
-                if (!laysSnapshot.containsKey(key)) {
-                    tileLaysPerColour.remove(key);
-                }
-            }
-
-            // Restore original values
-            for (Map.Entry<String, Integer> entry : laysSnapshot.entrySet()) {
-                tileLaysPerColour.put(entry.getKey(), entry.getValue());
-            }
-            if (getStep() != stepBefore && !action.getChosenHex().getId().equals("L6")) {
-                setStep(stepBefore);
-            }
-        }
-
-        if (result) {
-            SpecialProperty sp = action.getSpecialProperty();
-            // 1. OBB Extra Tile Limit Check
-            if (sp instanceof SpecialSingleTileLay) {
-                String loc = ((SpecialSingleTileLay) sp).getLocationNameString();
-                if (loc != null && loc.matches("M1[57]")) {
-                    hasLaidExtraOBBTile.set(true);
-                }
-            }
-            // 2. OBB Map Check
-            checkOBBClosure();
-        }
-
-        if (result && isBAHomeLay) {
-            setStep(GameDef.OrStep.LAY_TOKEN);
-        }
-
-        // --- Baden Interruption Check ---
-        if (result && action.getChosenHex().getId().equals("L6")) {
-            PublicCompany ba = companyManager.getPublicCompany("BA");
-            boolean isBrownUpgrade = false;
-            if (action.getLaidTile() != null) {
-                String color = action.getLaidTile().getColourText();
-                if ("Brown".equalsIgnoreCase(color)) {
-                    isBrownUpgrade = true;
-                }
-            }
-
-            if (!company.equals(ba) && ba.hasFloated() && !this.mandatoryBadenTokenLaid.value() && !isBrownUpgrade) {
-                interruptedCompany.set(company);
-                operatingCompany.set(ba);
-                playerManager.setCurrentPlayer(ba.getPresident());
-                awaitingBadenHomeToken.set(true);
-            }
-        }
-
-        // : WATERTIGHT SEQUENCE ENFORCEMENT ---
-        // Goal: Support "Normal Tile -> Special Tile" sequence ROBUSTLY.
-        // Logic: If the engine auto-advanced the step, but we still have a usable
-        // special property,
-        // we FORCE the step back to LAY_TRACK. This compels the user to either use the
-        // property
-        // or explicitly click "Done", which writes a NullAction to the log.
-        // This explicitly recorded "Done" ensures future replays never desync.
-        if (result && getStep() != GameDef.OrStep.LAY_TRACK
-                && company.equals(operatingCompany.value())
-                && !awaitingBadenHomeToken.value()) {
-
-            boolean hasUsableSpecial = false;
-            List<SpecialTileLay> specials = getSpecialProperties(SpecialTileLay.class);
-
-            if (specials != null) {
-                for (SpecialTileLay sp : specials) {
-                    // Filter 1: Already used?
-                    if (sp.isExercised())
-                        continue;
-
-                    // Filter 2: OBB Limit (already laid M15/M17 this turn?)
-                    if (sp instanceof SpecialSingleTileLay) {
-                        String loc = ((SpecialSingleTileLay) sp).getLocationNameString();
-                        if (loc != null && loc.matches("M1[57]") && hasLaidExtraOBBTile.value()) {
-                            continue;
-                        }
-                    }
-
-                    // Filter 3: Don't count the property we *just* used
-                    if (action.getSpecialProperty() == sp) {
-                        continue;
-                    }
-
-                    hasUsableSpecial = true;
-                    break;
-                }
-            }
-
-            if (hasUsableSpecial) {
-                setStep(GameDef.OrStep.LAY_TRACK);
-            }
-        }
-
-        return result;
-    }
 
     private void forceCleanupGhosts() {
         for (PrivateCompany pc : companyManager.getAllPrivateCompanies()) {
@@ -787,7 +486,7 @@ protected boolean processGameSpecificDiscard(DiscardTrain action, boolean moreDi
         return null;
     }
 
-    @Override
+@Override
     public boolean layBaseToken(LayBaseToken action) {
         PublicCompany company = action.getCompany();
 
@@ -810,6 +509,8 @@ protected boolean processGameSpecificDiscard(DiscardTrain action, boolean moreDi
         boolean isInterruption = awaitingBadenHomeToken.value();
         boolean isSpecial = (action.getType() != LayBaseToken.GENERIC);
 
+        GameDef.OrStep stepBefore = getStep();
+
         // Use the proper State object check. This ensures strict 1-token limits AND
         // supports Undo/Redo.
         // Previous logic using local 'tokensLaidCount' failed on Undo and didn't update
@@ -823,42 +524,67 @@ protected boolean processGameSpecificDiscard(DiscardTrain action, boolean moreDi
         if (result) {
             closePrivateIfSpecial(action.getSpecialProperty());
         }
-
-        if (result && isInterruption) {
+       // Baden Mandatory Token Logic
+        if (result && company.getId().equals("BA") && action.getChosenHex().getId().equals("L6")) {
+            
+            log.info("OR1835: Baden Mandatory Token successfully laid on L6.");
             this.mandatoryBadenTokenLaid.set(true);
-            awaitingBadenHomeToken.set(false);
+            this.badenHomeTokenCompleted.set(true);
 
-            PublicCompany originalCompany = interruptedCompany.value();
-            if (originalCompany != null) {
-                operatingCompany.set(originalCompany);
-                playerManager.setCurrentPlayer(originalCompany.getPresident());
-                interruptedCompany.set(null);
+            // Check if this was an interruption (e.g., BY laid the tile) 
+            if (isInterruption) {
+                awaitingBadenHomeToken.set(false);
+                PublicCompany originalCompany = interruptedCompany.value();
+                
+                if (originalCompany != null) {
+                    log.info("Restoring control to interrupted company: {}", originalCompany.getId());
+                    operatingCompany.set(originalCompany);
+                    playerManager.setCurrentPlayer(originalCompany.getPresident());
+                    interruptedCompany.set(null);
 
-                // : Restoration of Step for Original Company
-                // The original company (likely BY) was interrupted during Tile Laying.
-                // We must return the game state to LAY_TRACK so they can finish their turn.
-                setStep(GameDef.OrStep.LAY_TRACK);
+                    // Restoration of Step for Original Company
+                    setStep(GameDef.OrStep.LAY_TRACK);
 
-                // We also ensure the transient token list for BY is clear to avoid state
-                // pollution
-                if (currentNormalTokenLays != null)
-                    currentNormalTokenLays.clear();
+                    // Ensure transient token list for original company is clear to avoid state pollution
+                    if (currentNormalTokenLays != null) {
+                        currentNormalTokenLays.clear();
+                    }
+                }
+            } else {
+// Standard BA Turn or PfB Lay
+                if (stepBefore == GameDef.OrStep.INITIAL) {
+                    log.info("OR1835: Maintaining INITIAL step for native BA turn initialization.");
+                    setStep(GameDef.OrStep.INITIAL);
+                } else {
+                    setStep(GameDef.OrStep.LAY_TRACK);
+                    
+                    // Synergy Fix: If Baden is operating, the PfB lay and Home Token are "extra".
+                    // We reset the flags to ensure the standard turn actions are now offered.
+        // Synergy Fix: If Baden is operating, the PfB lay and Home Token are "extra".
+                    // We reset the flags to ensure the standard turn actions are now offered.
+                    BadenContext ctx = getBadenStatus();
+                    if (ctx.isBadenOperating) {
+                        log.info("OR1835: Resetting lay flags to allow BA's standard actions after L6 setup.");
+                        normalTileLaidThisTurn.set(false);
+                        normalTokenLaidThisTurn.set(false);
+                    }
+                    
+                    if (!normalTileLaidThisTurn.value()) {
+                        initNormalTileLays();
+                    }
+                }
+
+                // Ensure this mandatory token does NOT consume the normal token lay entitlement.
+                if (normalTokenLaidThisTurn.value()) {
+                     log.info("OR1835: Resetting normalTokenLaidThisTurn (Mandatory token is free/special).");
+                     normalTokenLaidThisTurn.set(false);
+                }
             }
             return true;
         }
-
-        if (result && action.getType() == LayBaseToken.HOME_CITY && company.getId().equals("BA")) {
-            this.mandatoryBadenTokenLaid.set(true);
-            setStep(GameDef.OrStep.LAY_TRACK);
-            if (!normalTileLaidThisTurn.value()) {
-                initNormalTileLays();
-            }
-            return true;
-        }
-
         return result;
     }
-
+    
     private void closePrivateIfSpecial(SpecialProperty sp) {
         if (sp == null)
             return;
@@ -1388,7 +1114,6 @@ protected boolean processGameSpecificDiscard(DiscardTrain action, boolean moreDi
         surgicalPrussiaFix();
     }
 
-
     @Override
     protected boolean setNextOperatingCompany(boolean initial) {
 
@@ -1426,14 +1151,14 @@ protected boolean processGameSpecificDiscard(DiscardTrain action, boolean moreDi
         return true;
     }
 
-
-// ... (lines of unchanged context code) ...
+    // ... (lines of unchanged context code) ...
     private void surgicalPrussiaFix() {
         PublicCompany m1 = companyManager.getPublicCompany("M1");
         PublicCompany m2 = companyManager.getPublicCompany("M2");
         PublicCompany pr = companyManager.getPublicCompany("PR");
 
-        if (m2 == null || pr == null) return;
+        if (m2 == null || pr == null)
+            return;
 
         // --- START FIX ---
         // 1. Resolve Trigger (Anchor)
@@ -1441,7 +1166,8 @@ protected boolean processGameSpecificDiscard(DiscardTrain action, boolean moreDi
         if (pfrTriggerId.value() != null) {
             trigger = companyManager.getPublicCompany(pfrTriggerId.value());
         }
-        if (trigger == null) trigger = operatingCompany.value(); // Fallback
+        if (trigger == null)
+            trigger = operatingCompany.value(); // Fallback
 
         // 2. Analyze Turn Order
         int triggerIndex = operatingCompanies.indexOf(trigger);
@@ -1451,15 +1177,15 @@ protected boolean processGameSpecificDiscard(DiscardTrain action, boolean moreDi
         boolean m2IsFuture = (triggerIndex != -1 && m2Index > triggerIndex);
         boolean prReady = (pr.getPresident() != null);
 
-        log.info("Surgical Fix: Trigger={}, M2_Index={}, Status={}, PR_Ready={}", 
+        log.info("Surgical Fix: Trigger={}, M2_Index={}, Status={}, PR_Ready={}",
                 trigger.getId(), m2Index, m2IsFuture ? "FUTURE" : "PAST", prReady);
 
         List<PublicCompany> newMinors = new ArrayList<>();
         List<PublicCompany> newMajors = new ArrayList<>();
-        
+
         // 3. Partition and Filter
         for (PublicCompany c : operatingCompanies) {
-            
+
             // Handle M2 Special Case
             if (c == m2) {
                 if (m2.isClosed()) {
@@ -1471,7 +1197,7 @@ protected boolean processGameSpecificDiscard(DiscardTrain action, boolean moreDi
                     log.info("Surgical Fix: M2 NOT Closed -> Keeping M2 in list.");
                     newMinors.add(c);
                 }
-                continue; 
+                continue;
             }
 
             // Partition others: Minors (M1-M6) vs Majors (BY, SA, PR, MS, etc.)
@@ -1486,8 +1212,8 @@ protected boolean processGameSpecificDiscard(DiscardTrain action, boolean moreDi
         // 4. Insert Prussia into MAJOR list (Only if Swap conditions met)
         // Condition: M2 was "Future" (hadn't acted), M2 is now Closed, and PR is valid.
         if (m2IsFuture && prReady && m2.isClosed()) {
-            
-            int prValue = pr.getCurrentPrice(); 
+
+            int prValue = pr.getCurrentPrice();
             int insertPos = newMajors.size(); // Default to end (lowest price)
 
             for (int i = 0; i < newMajors.size(); i++) {
@@ -1503,11 +1229,294 @@ protected boolean processGameSpecificDiscard(DiscardTrain action, boolean moreDi
 
         // 5. Reassemble: Minors First -> Then Majors
         operatingCompanies.clear();
-        for (PublicCompany c : newMinors) operatingCompanies.add(c);
-        for (PublicCompany c : newMajors) operatingCompanies.add(c);
-        
+        for (PublicCompany c : newMinors)
+            operatingCompanies.add(c);
+        for (PublicCompany c : newMajors)
+            operatingCompanies.add(c);
+
         // --- END FIX ---
     }
 
-}
 
+
+    @Override
+    public boolean setPossibleActions() {
+        // --- GUARD 1: Dead Company Check ---
+        PublicCompany current = operatingCompany.value();
+        if (current != null && current.isClosed()) {
+            log.info("setPossibleActions: Company {} is closed. Advancing...", current.getId());
+            advanceToNextOperationalCompany();
+            return setPossibleActions();
+        }
+
+        // --- GUARD 2: PFR Gatekeeper ---
+        if (pfrTriggeredThisOR.value()) {
+            GameManager_1835 gm = (GameManager_1835) gameManager;
+            if (!(gm.getCurrentRound() instanceof PrussianFormationRound)) {
+                log.warn("PFR Triggered but not active. Forcing startPrussianFormationRound().");
+                gm.startPrussianFormationRound(this);
+            }
+            possibleActions.clear();
+            return true;
+        }
+
+        // --- MASTER SEQUENCE: Baden L6 Station Selection ---
+        BadenContext ctx = getBadenStatus();
+
+// Self-Heal: The base engine places a placeholder token on the preprinted hex.
+        // We must ONLY self-heal if the physical token is present AND a real tile has been laid.
+        if (ctx.hasL6Tile && ctx.baHasL6Token && !badenHomeTokenCompleted.value()) {
+            log.info("Self-healing: Baden token found physically on laid L6 tile. Syncing state flags.");
+            badenHomeTokenCompleted.set(true);
+            awaitingBadenHomeToken.set(false);
+        }
+
+        // Prompt if: Not finished AND (Interrupted OR Baden active with tile)
+        boolean needsBadenL6Prompt = !badenHomeTokenCompleted.value() && 
+                                     (awaitingBadenHomeToken.value() || 
+                                     (ctx.isBadenOperating && ctx.hasL6Tile));
+
+
+        if (needsBadenL6Prompt) {
+            log.info("Forcing Baden L6 Station Selection Prompt. State mismatch detected.");
+            possibleActions.clear();
+            doneAllowed.set(false);
+            PublicCompany ba = companyManager.getPublicCompany("BA");
+            MapHex l6 = getRoot().getMapManager().getHex("L6");
+            for (Stop stop : l6.getStops()) {
+                possibleActions.add(new LayBadenHomeToken(l6, ba, stop));
+            }
+            return true;
+        }
+
+        // INITIAL Step Correction for Baden (Map is empty, go to LAY_TRACK)
+        if (ctx.isBadenOperating && getStep() == GameDef.OrStep.INITIAL && ctx.isL6Preprinted && !badenHomeTokenCompleted.value()) {
+            setStep(GameDef.OrStep.LAY_TRACK);
+        }
+
+        if (getStep() == GameDef.OrStep.DISCARD_TRAINS) {
+            checkForExcessTrains();
+        }
+
+        boolean result = super.setPossibleActions();
+        
+        // Final UI Guard: Baden cannot skip (Done) if L6 has tile but NO token [cite: 6, 8]
+        if (ctx.isBadenOperating && ctx.hasL6Tile && !ctx.baHasL6Token) {
+            doneAllowed.set(false);
+        }
+
+        if (result && !possibleActions.isEmpty()) {
+            pruneGhostActions();
+        }
+
+        return result;
+    }
+// --- END FIX ---
+
+
+// --- START FIX ---
+    @Override
+    public boolean layTile(LayTile action) {
+        forceCleanupGhosts();
+        PublicCompany company = action.getCompany();
+        
+        // Snapshots for PfB state restoration [cite: 10, 26]
+        boolean wasNormalLaid = normalTileLaidThisTurn.value();
+        GameDef.OrStep stepBefore = getStep();
+        Map<String, Integer> laysSnapshot = new HashMap<>();
+        for (String key : tileLaysPerColour.viewKeySet()) {
+            laysSnapshot.put(key, tileLaysPerColour.get(key));
+        }
+
+        boolean result = super.layTile(action);
+
+        // PfB/PF State Restoration Logic
+        SpecialProperty actionSp = action.getSpecialProperty();
+        boolean isSpecialPfBLay = false;
+        if (result && actionSp != null && actionSp.getOriginalCompany() != null) {
+            String ownerId = actionSp.getOriginalCompany().getId();
+            if ("PfB".equals(ownerId) || "PF".equals(ownerId)) {
+                isSpecialPfBLay = true;
+            }
+        }
+
+        if (result && isSpecialPfBLay) {
+            normalTileLaidThisTurn.set(wasNormalLaid);
+            Set<String> currentKeys = new HashSet<>(tileLaysPerColour.viewKeySet());
+            for (String key : currentKeys) {
+                if (!laysSnapshot.containsKey(key)) {
+                    tileLaysPerColour.remove(key);
+                }
+            }
+            for (Map.Entry<String, Integer> entry : laysSnapshot.entrySet()) {
+                tileLaysPerColour.put(entry.getKey(), entry.getValue());
+            }
+            if (getStep() != stepBefore && !action.getChosenHex().getId().equals("L6")) {
+                setStep(stepBefore);
+            }
+        }
+
+        if (result) {
+            SpecialProperty sp = action.getSpecialProperty();
+            if (sp instanceof SpecialSingleTileLay) {
+                String loc = ((SpecialSingleTileLay) sp).getLocationNameString();
+                if (loc != null && loc.matches("M1[57]")) {
+                    hasLaidExtraOBBTile.set(true);
+                }
+            }
+            checkOBBClosure();
+        }
+
+        // --- REFINED TRIGGER: Fix for "cannot find symbol: hasToken" ---
+        if (result && action.getChosenHex().getId().equals("L6")) {
+            PublicCompany ba = companyManager.getPublicCompany("BA");
+            
+            // The crucial check: BA is floated, but the mandatory 1835 choice hasn't been completed.
+            if (ba != null && ba.hasFloated() && !badenHomeTokenCompleted.value()) {
+                log.info("L6 Tile Lay: Reverting base engine auto-lay to force manual UI selection.");
+                
+                // 1. Revert Engine Auto-Lay using standard Rails movement
+                for (Stop s : action.getChosenHex().getStops()) {
+                    for (BaseToken token : new ArrayList<>(s.getBaseTokens())) {
+                        if (token.getParent().equals(ba)) {
+                            token.moveTo(ba); // Rips the token off the map and puts it back in BA's inventory
+                            log.info("Reverted auto-laid BA token on L6.");
+                        }
+                    }
+                }
+                
+                // 2. Trigger Interruption Sequence for Foreign Companies
+                if (!company.equals(ba)) {
+                    interruptedCompany.set(company);
+                    operatingCompany.set(ba);
+                    playerManager.setCurrentPlayer(ba.getPresident());
+                    awaitingBadenHomeToken.set(true);
+                }
+                mandatoryBadenTokenLaid.set(false);
+            }
+        }
+
+        // Normal sequence enforcement
+        if (result && getStep() != GameDef.OrStep.LAY_TRACK
+                && company.equals(operatingCompany.value())
+                && !awaitingBadenHomeToken.value()) {
+
+            boolean hasUsableSpecial = false;
+            List<SpecialTileLay> specials = getSpecialProperties(SpecialTileLay.class);
+            if (specials != null) {
+                for (SpecialTileLay sp : specials) {
+                    if (sp.isExercised()) continue;
+                    if (sp instanceof SpecialSingleTileLay) {
+                        String loc = ((SpecialSingleTileLay) sp).getLocationNameString();
+                        if (loc != null && loc.matches("M1[57]") && hasLaidExtraOBBTile.value()) {
+                            continue;
+                        }
+                    }
+                    if (action.getSpecialProperty() == sp) continue;
+                    hasUsableSpecial = true;
+                    break;
+                }
+            }
+            if (hasUsableSpecial) {
+                setStep(GameDef.OrStep.LAY_TRACK);
+            }
+        }
+
+        return result;
+    }
+
+
+    /**
+     * Diagnostic helper class to snapshot the absolute "Baden Situation". [cite: 1, 2]
+     */
+    private class BadenContext {
+        // Absolute Map & Company State (Permanent)
+        boolean baFloated;         // True if BA has started/floated [cite: 17]
+        boolean isL6Preprinted;    // True if NO tile has been laid yet (Map default) [cite: 4]
+        boolean hasL6Tile;         // True if a physical tile has been laid (by anyone) [cite: 18, 30]
+        boolean baHasL6Token;      // True strictly if BA owns a token on L6 
+
+        // Turn/Actor Context (Who is causing the check)
+        String activeCompanyId;    // The company currently operating
+        boolean isBadenOperating;  // True if BA is the active company
+        
+        // PfB Status [cite: 10]
+        boolean pfbClosed;         // True if PfB is definitively closed [cite: 52]
+        boolean pfbOwnedByActive;  // True if active company president owns PfB
+        boolean pfbOwnedByBaden;   // True if BA's president owns PfB [cite: 22]
+
+        @Override
+        public String toString() {
+            return String.format(
+                "BadenContext [Active=%s, BA_Floated=%b, L6_Preprinted=%b, L6_HasTile=%b, " +
+                "BA_HasToken=%b, PfB_Closed=%b, Active_Owns_PfB=%b, BA_Owns_PfB=%b]",
+                activeCompanyId, baFloated, isL6Preprinted, hasL6Tile, 
+                baHasL6Token, pfbClosed, pfbOwnedByActive, pfbOwnedByBaden
+            );
+        }
+    }
+
+    /**
+     * Scans the absolute map and permanent company state to determine the exact scenario for Baden.
+     * This is decoupled from transient Operating Round flags to prevent round-restart bugs[cite: 57].
+     */
+    private BadenContext getBadenStatus() {
+        BadenContext ctx = new BadenContext();
+        
+        // 1. Establish Actors
+        PublicCompany currentOp = operatingCompany.value();
+        PublicCompany ba = companyManager.getPublicCompany("BA");
+        
+        ctx.activeCompanyId = (currentOp != null) ? currentOp.getId() : "NONE";
+        ctx.isBadenOperating = "BA".equals(ctx.activeCompanyId);
+        ctx.baFloated = (ba != null && ba.hasFloated());
+
+        // 2. Absolute Map State (L6)
+        MapHex l6 = getRoot().getMapManager().getHex("L6");
+        if (l6 != null) {
+            ctx.isL6Preprinted = l6.isPreprintedTileCurrent();
+            ctx.hasL6Tile = !l6.isPreprintedTileCurrent();
+            
+boolean physicallyHasToken = false;
+            if (l6.getStops() != null) {
+                for (Stop s : l6.getStops()) {
+                    if (s.getBaseTokens() != null) {
+                        for (BaseToken t : s.getBaseTokens()) {
+                            if (ba != null && t.getParent().equals(ba)) {
+                                physicallyHasToken = true;
+                            }
+                        }
+                    }
+                }
+            }
+            ctx.baHasL6Token = physicallyHasToken;
+            
+        } else {
+            log.error("CRITICAL: Hex L6 not found on absolute map!");
+        }
+
+        // 3. Absolute PfB Status
+        PrivateCompany pfb = companyManager.getPrivateCompany("PfB");
+        if (pfb != null) {
+            ctx.pfbClosed = pfb.isClosed();
+            Owner pfbOwner = pfb.getOwner();
+            
+            ctx.pfbOwnedByActive = (currentOp != null && currentOp.getPresident() != null && pfbOwner == currentOp.getPresident());
+            ctx.pfbOwnedByBaden = (ba != null && ba.getPresident() != null && pfbOwner == ba.getPresident());
+        } else {
+            ctx.pfbClosed = true; 
+        }
+
+        // 4. Central Diagnostic Logging
+        log.info("Baden Diagnosis: " + ctx.toString());
+        
+        return ctx;
+    }
+
+
+
+    
+
+
+
+}

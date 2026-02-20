@@ -1921,38 +1921,57 @@ specialNotificationPanel.removeAll();
         Color textColor = Color.BLACK;
         String cmd = "SpecialAction";
 
-        // 1. Extract Visual Signature via Interface
-        if (action instanceof GuiTargetedAction) {
-            GuiTargetedAction gta = (GuiTargetedAction) action;
-            label = gta.getButtonLabel();
+Company highlightTarget = null;
 
-            // CONSUME THE SIGNATURE
-            bgColor = gta.getHighlightBackgroundColor();
-            borderColor = gta.getHighlightBorderColor();
-            textColor = gta.getHighlightTextColor();
-        } else if (action instanceof NullAction) {
-            label = ((NullAction) action).getMode() == NullAction.Mode.PASS ? "Decline" : "Done";
-            bgColor = UITheme.ACTION_SKIP;
-            borderColor = bgColor.darker();
-            textColor = Color.WHITE;
+    // 1. Extract Visual Signature via Interface
+    if (action instanceof GuiTargetedAction) {
+        GuiTargetedAction gta = (GuiTargetedAction) action;
+        label = gta.getButtonLabel();
+        
+        if (gta.getTarget() instanceof Company) {
+            highlightTarget = (Company) gta.getTarget();
         }
 
-        // 2. Create Button
-        ActionButton btn = createSidebarButton(label, cmd);
+        // CONSUME THE SIGNATURE
+        bgColor = gta.getHighlightBackgroundColor();
+        borderColor = gta.getHighlightBorderColor();
+        textColor = gta.getHighlightTextColor();
+    } else if (action instanceof NullAction) {
+        label = ((NullAction) action).getMode() == NullAction.Mode.PASS ? "Decline" : "Done";
+        bgColor = UITheme.ACTION_SKIP;
+        borderColor = bgColor.darker();
+        textColor = Color.WHITE;
+    } else if (action instanceof LayBaseToken) {
+        highlightTarget = ((LayBaseToken) action).getCompany();
+    }
 
-        // HTML Formatting to match RailCard text style if needed
-        if (!label.toLowerCase().startsWith("<html>")) {
-            btn.setText("<html><center>" + label + "</center></html>");
-        } else {
-            btn.setText(label);
-        }
+    // 2. Create Button
+    ActionButton btn = createSidebarButton(label, cmd);
 
-        btn.setPossibleAction(action);
-        btn.setEnabled(true);
-        btn.setAlignmentX(Component.CENTER_ALIGNMENT);
-        // Allow button to be taller to fit the HTML content
-        btn.setMaximumSize(new Dimension(SIDEBAR_WIDTH - 20, 60));
-        bindActionHotkey(btn, action);
+    // HTML Formatting to match RailCard text style if needed
+    if (!label.toLowerCase().startsWith("<html>")) {
+        btn.setText("<html><center>" + label + "</center></html>");
+    } else {
+        btn.setText(label);
+    }
+
+    btn.setPossibleAction(action);
+    btn.setEnabled(true);
+    btn.setAlignmentX(Component.CENTER_ALIGNMENT);
+    // Allow button to be taller to fit the HTML content
+    btn.setMaximumSize(new Dimension(SIDEBAR_WIDTH - 20, 60));
+    bindActionHotkey(btn, action);
+
+// Attach HexHighlightMouseListener based on specific Company type
+if (highlightTarget instanceof PublicCompany) {
+net.sf.rails.ui.swing.hexmap.HexHighlightMouseListener.addMouseListener(
+btn, orUIManager, (PublicCompany) highlightTarget, false);
+} else if (highlightTarget instanceof PrivateCompany) {
+net.sf.rails.ui.swing.hexmap.HexHighlightMouseListener.addMouseListener(
+btn, orUIManager, (PrivateCompany) highlightTarget, false);
+}
+
+    // 3. APPLY "RAILCARD" STYLING (Flattened)
 
         // 3. APPLY "RAILCARD" STYLING (Flattened)
 

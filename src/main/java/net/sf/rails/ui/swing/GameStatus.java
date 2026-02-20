@@ -2611,11 +2611,11 @@ public static final Color BG_DISCARD_VOLUNTARY = Color.CYAN; // Light Blue (#ADD
             setIPOCertButton(i, false);
             setPoolCertButton(i, false);
 
-            // Update Company Name background (ALWAYS STANDARD, never yellow)
+// Update Company Name background (ALWAYS STANDARD, never yellow)
             if (compNameCaption[i] != null) {
-                // Ensure standard colors (Black/White for minors, Company colors for Majors)
-                compNameCaption[i].setBackground(isMinor ? Color.BLACK : c.getBgColour());
-                compNameCaption[i].setForeground(isMinor ? Color.WHITE : c.getFgColour());
+                // Ensure XML-defined colors are used for all companies
+                compNameCaption[i].setBackground(c.getBgColour());
+                compNameCaption[i].setForeground(c.getFgColour());
                 compNameCaption[i].setOpaque(true);
             }
 
@@ -4068,11 +4068,13 @@ public static final Color BG_DISCARD_VOLUNTARY = Color.CYAN; // Light Blue (#ADD
             companyCertRow.put(c, y);
 
             javax.swing.border.Border bName = BorderFactory.createMatteBorder(tHeight, 0, bHeight, 1, Color.BLACK);
+
             compNameCaption[i] = new Caption(c.getId());
-            compNameCaption[i].setForeground(isMinor ? FG_MINOR : c.getFgColour());
-            compNameCaption[i].setBackground(isMinor ? BG_MINOR : c.getBgColour());
+            compNameCaption[i].setForeground(c.getFgColour());
+            compNameCaption[i].setBackground(c.getBgColour());
             compNameCaption[i].setBorder(bName);
             compNameCaption[i].setOpaque(true);
+
             HexHighlightMouseListener.addMouseListener(compNameCaption[i], gameUIManager.getORUIManager(), c, false);
             addField(compNameCaption[i], compNameCol, y, 1, 1, 0, visible);
 
@@ -4114,6 +4116,7 @@ public static final Color BG_DISCARD_VOLUNTARY = Color.CYAN; // Light Blue (#ADD
                 playerShareCards[i][j] = new RailCard((net.sf.rails.game.Train) null, buySellGroup);
                 playerShareCards[i][j].setCompany(c); // Tell the card it belongs to Company 'c'
                 playerShareCards[i][j].addActionListener(this);
+                HexHighlightMouseListener.addMouseListener(playerShareCards[i][j], gameUIManager.getORUIManager(), c, false);
                 if (stickyFont != null)
                     playerShareCards[i][j].setFont(stickyFont);
 
@@ -4154,6 +4157,7 @@ public static final Color BG_DISCARD_VOLUNTARY = Color.CYAN; // Light Blue (#ADD
             poolShareCards[i] = new RailCard((net.sf.rails.game.Train) null, buySellGroup);
             poolShareCards[i].addActionListener(this);
             poolShareCards[i].setCompany(c); // Ensure metadata is present for UI Search
+            HexHighlightMouseListener.addMouseListener(poolShareCards[i], gameUIManager.getORUIManager(), c, false);
             if (stickyFont != null)
                 poolShareCards[i].setFont(stickyFont);
 
@@ -4174,6 +4178,7 @@ public static final Color BG_DISCARD_VOLUNTARY = Color.CYAN; // Light Blue (#ADD
             ipoShareCards[i] = new RailCard((net.sf.rails.game.Train) null, buySellGroup);
             ipoShareCards[i].addActionListener(this);
             ipoShareCards[i].setCompany(c); // Ensure metadata is present for UI Search
+            HexHighlightMouseListener.addMouseListener(ipoShareCards[i], gameUIManager.getORUIManager(), c, false);
             if (stickyFont != null)
                 ipoShareCards[i].setFont(stickyFont);
 
@@ -4192,6 +4197,7 @@ public static final Color BG_DISCARD_VOLUNTARY = Color.CYAN; // Light Blue (#ADD
                 treasuryShareCards[i] = new RailCard((net.sf.rails.game.Train) null, buySellGroup);
                 treasuryShareCards[i].addActionListener(this);
                 treasuryShareCards[i].setCompany(c); // Ensure metadata is present for UI Search
+                HexHighlightMouseListener.addMouseListener(treasuryShareCards[i], gameUIManager.getORUIManager(), c, false);
                 if (stickyFont != null)
                     treasuryShareCards[i].setFont(stickyFont);
 

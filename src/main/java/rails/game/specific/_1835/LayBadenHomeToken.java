@@ -41,8 +41,6 @@ public class LayBadenHomeToken extends LayBaseToken implements GuiTargetedAction
         return label;
     }
 
-    // --- START FIX ---
-    // UNIFIED "TOKEN" SIGNATURE (Gold / GoldenRod)
 
     @Override
     public Color getButtonColor() {
@@ -62,6 +60,30 @@ public class LayBadenHomeToken extends LayBaseToken implements GuiTargetedAction
     @Override
     public Color getHighlightTextColor() {
         return Color.BLACK;
+
+
+        
     }
-    // --- END FIX ---
+
+
+    @Override
+    protected boolean equalsAs(rails.game.action.PossibleAction pa, boolean asOption) {
+        // 1. Identity check
+        if (pa == this) return true;
+        
+        // 2. Cross-class serialization check
+        // If the engine reconstructed the action from the XML save file as a generic LayBaseToken,
+        // we manually verify the critical attributes match our forced Baden L6 prompt.
+        if (pa instanceof LayBaseToken) {
+            LayBaseToken other = (LayBaseToken) pa;
+            if (other.getType() == LayBaseToken.HOME_CITY && 
+                other.getChosenHex() != null && 
+                "L6".equals(other.getChosenHex().getId())) {
+                return true;
+            }
+        }
+        
+        // 3. Fallback to normal superclass check
+        return super.equalsAs(pa, asOption);
+    }
 }
