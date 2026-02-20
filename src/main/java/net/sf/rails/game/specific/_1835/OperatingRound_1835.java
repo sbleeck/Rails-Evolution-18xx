@@ -52,7 +52,7 @@ public class OperatingRound_1835 extends OperatingRound {
     // Tracks how many trains we have processed to distinguish new purchases from
     // old ones
     private final IntegerState pfrHandledTrainCount = IntegerState.create(this, "PfrHandledTrainCount", 0);
-protected final BooleanState badenHomeTokenCompleted = new BooleanState(this, "BadenHomeTokenCompleted");
+    protected final BooleanState badenHomeTokenCompleted = new BooleanState(this, "BadenHomeTokenCompleted");
 
     // Tracks which company actually triggered the PFR (e.g. M1) so we can calculate
     // relative turn order even if the engine auto-advances the pointer after the
@@ -96,11 +96,6 @@ protected final BooleanState badenHomeTokenCompleted = new BooleanState(this, "B
         // No-op for 1835.
         // We rely on the specific logic in resume() to restore state correctly.
     }
-
-
-
-
-
 
     @Override
     public boolean buyTrain(BuyTrain action) {
@@ -301,7 +296,8 @@ protected final BooleanState badenHomeTokenCompleted = new BooleanState(this, "B
         Player actionPlayer = (actionComp != null) ? actionComp.getPresident() : null;
 
         // --- CRITICAL FIX: ALWAYS patch the Excess List for DiscardTrain actions ---
-        // We force the company into this list to bypass false-negative validation failures.
+        // We force the company into this list to bypass false-negative validation
+        // failures.
         if (excessTrainCompanies == null) {
             excessTrainCompanies = new HashMap<>();
         }
@@ -388,8 +384,6 @@ protected final BooleanState badenHomeTokenCompleted = new BooleanState(this, "B
         return true;
     }
 
-   
-
     public void clearPfrTriggerFlag_AI() {
         this.needPrussianFormationCall.set(false);
     }
@@ -427,8 +421,6 @@ protected final BooleanState badenHomeTokenCompleted = new BooleanState(this, "B
         }
         return super.finishTurnSpecials();
     }
-
-
 
     private void forceCleanupGhosts() {
         for (PrivateCompany pc : companyManager.getAllPrivateCompanies()) {
@@ -486,7 +478,7 @@ protected final BooleanState badenHomeTokenCompleted = new BooleanState(this, "B
         return null;
     }
 
-@Override
+    @Override
     public boolean layBaseToken(LayBaseToken action) {
         PublicCompany company = action.getCompany();
 
@@ -524,18 +516,18 @@ protected final BooleanState badenHomeTokenCompleted = new BooleanState(this, "B
         if (result) {
             closePrivateIfSpecial(action.getSpecialProperty());
         }
-       // Baden Mandatory Token Logic
+        // Baden Mandatory Token Logic
         if (result && company.getId().equals("BA") && action.getChosenHex().getId().equals("L6")) {
-            
+
             log.info("OR1835: Baden Mandatory Token successfully laid on L6.");
             this.mandatoryBadenTokenLaid.set(true);
             this.badenHomeTokenCompleted.set(true);
 
-            // Check if this was an interruption (e.g., BY laid the tile) 
+            // Check if this was an interruption (e.g., BY laid the tile)
             if (isInterruption) {
                 awaitingBadenHomeToken.set(false);
                 PublicCompany originalCompany = interruptedCompany.value();
-                
+
                 if (originalCompany != null) {
                     log.info("Restoring control to interrupted company: {}", originalCompany.getId());
                     operatingCompany.set(originalCompany);
@@ -545,46 +537,41 @@ protected final BooleanState badenHomeTokenCompleted = new BooleanState(this, "B
                     // Restoration of Step for Original Company
                     setStep(GameDef.OrStep.LAY_TRACK);
 
-                    // Ensure transient token list for original company is clear to avoid state pollution
+                    // Ensure transient token list for original company is clear to avoid state
+                    // pollution
                     if (currentNormalTokenLays != null) {
                         currentNormalTokenLays.clear();
                     }
                 }
             } else {
-// Standard BA Turn or PfB Lay
+
+                // Standard BA Turn or PfB Lay
                 if (stepBefore == GameDef.OrStep.INITIAL) {
                     log.info("OR1835: Maintaining INITIAL step for native BA turn initialization.");
                     setStep(GameDef.OrStep.INITIAL);
                 } else {
                     setStep(GameDef.OrStep.LAY_TRACK);
-                    
-                    // Synergy Fix: If Baden is operating, the PfB lay and Home Token are "extra".
-                    // We reset the flags to ensure the standard turn actions are now offered.
-        // Synergy Fix: If Baden is operating, the PfB lay and Home Token are "extra".
-                    // We reset the flags to ensure the standard turn actions are now offered.
-                    BadenContext ctx = getBadenStatus();
-                    if (ctx.isBadenOperating) {
-                        log.info("OR1835: Resetting lay flags to allow BA's standard actions after L6 setup.");
-                        normalTileLaidThisTurn.set(false);
-                        normalTokenLaidThisTurn.set(false);
-                    }
-                    
+
+                    // If a normal tile was NOT consumed yet (e.g. PfB was used), we must ensure
+                    // the engine offers the standard tile lay now.
                     if (!normalTileLaidThisTurn.value()) {
+                        log.info("OR1835: Normal tile lay still available. Re-initializing lays.");
                         initNormalTileLays();
                     }
                 }
 
-                // Ensure this mandatory token does NOT consume the normal token lay entitlement.
+                // Ensure this mandatory token does NOT consume the normal token lay
+                // entitlement.
                 if (normalTokenLaidThisTurn.value()) {
-                     log.info("OR1835: Resetting normalTokenLaidThisTurn (Mandatory token is free/special).");
-                     normalTokenLaidThisTurn.set(false);
+                    log.info("OR1835: Resetting normalTokenLaidThisTurn (Mandatory token is free/special).");
+                    normalTokenLaidThisTurn.set(false);
                 }
             }
             return true;
         }
         return result;
     }
-    
+
     private void closePrivateIfSpecial(SpecialProperty sp) {
         if (sp == null)
             return;
@@ -1237,8 +1224,6 @@ protected final BooleanState badenHomeTokenCompleted = new BooleanState(this, "B
         // --- END FIX ---
     }
 
-
-
     @Override
     public boolean setPossibleActions() {
         // --- GUARD 1: Dead Company Check ---
@@ -1263,8 +1248,9 @@ protected final BooleanState badenHomeTokenCompleted = new BooleanState(this, "B
         // --- MASTER SEQUENCE: Baden L6 Station Selection ---
         BadenContext ctx = getBadenStatus();
 
-// Self-Heal: The base engine places a placeholder token on the preprinted hex.
-        // We must ONLY self-heal if the physical token is present AND a real tile has been laid.
+        // Self-Heal: The base engine places a placeholder token on the preprinted hex.
+        // We must ONLY self-heal if the physical token is present AND a real tile has
+        // been laid.
         if (ctx.hasL6Tile && ctx.baHasL6Token && !badenHomeTokenCompleted.value()) {
             log.info("Self-healing: Baden token found physically on laid L6 tile. Syncing state flags.");
             badenHomeTokenCompleted.set(true);
@@ -1272,10 +1258,9 @@ protected final BooleanState badenHomeTokenCompleted = new BooleanState(this, "B
         }
 
         // Prompt if: Not finished AND (Interrupted OR Baden active with tile)
-        boolean needsBadenL6Prompt = !badenHomeTokenCompleted.value() && 
-                                     (awaitingBadenHomeToken.value() || 
-                                     (ctx.isBadenOperating && ctx.hasL6Tile));
-
+        boolean needsBadenL6Prompt = !badenHomeTokenCompleted.value() &&
+                (awaitingBadenHomeToken.value() ||
+                        (ctx.isBadenOperating && ctx.hasL6Tile));
 
         if (needsBadenL6Prompt) {
             log.info("Forcing Baden L6 Station Selection Prompt. State mismatch detected.");
@@ -1289,9 +1274,37 @@ protected final BooleanState badenHomeTokenCompleted = new BooleanState(this, "B
             return true;
         }
 
-        // INITIAL Step Correction for Baden (Map is empty, go to LAY_TRACK)
-        if (ctx.isBadenOperating && getStep() == GameDef.OrStep.INITIAL && ctx.isL6Preprinted && !badenHomeTokenCompleted.value()) {
-            setStep(GameDef.OrStep.LAY_TRACK);
+
+GameDef.OrStep step = getStep();
+        PublicCompany company = operatingCompany.value();
+
+        // Restore the OLD brute-force bypass for the INITIAL step
+        if (step == GameDef.OrStep.INITIAL) {
+            initTurn();
+            if (ctx.isBadenOperating && !company.hasOperated()) {
+                if (ctx.hasL6Tile && !ctx.baHasL6Token) {
+                    setStep(GameDef.OrStep.LAY_TOKEN);
+                    boolean res = setPossibleActions();
+                    pruneGhostActions();
+                    return res;
+                }
+            }
+            nextStep();
+            boolean res = setPossibleActions();
+            pruneGhostActions();
+            return res;
+        }
+
+        // Restore the OLD brute-force bypass for the LAY_TRACK step
+        if (step == GameDef.OrStep.LAY_TRACK) {
+            if (ctx.isBadenOperating && !company.hasOperated() && ctx.isL6Preprinted) {
+                possibleActions.clear();
+                // Bypass superclass validation entirely. Force load actions directly.
+                possibleActions.addAll(getNormalTileLays(true));
+                possibleActions.addAll(getSpecialTileLays(true));
+                pruneGhostActions();
+                return true;
+            }
         }
 
         if (getStep() == GameDef.OrStep.DISCARD_TRAINS) {
@@ -1299,27 +1312,30 @@ protected final BooleanState badenHomeTokenCompleted = new BooleanState(this, "B
         }
 
         boolean result = super.setPossibleActions();
-        
-        // Final UI Guard: Baden cannot skip (Done) if L6 has tile but NO token [cite: 6, 8]
-        if (ctx.isBadenOperating && ctx.hasL6Tile && !ctx.baHasL6Token) {
-            doneAllowed.set(false);
-        }
-
         if (result && !possibleActions.isEmpty()) {
             pruneGhostActions();
         }
-
         return result;
+
     }
-// --- END FIX ---
 
 
-// --- START FIX ---
+@Override
+    protected boolean gameSpecificTileLayAllowed(PublicCompany company, MapHex hex, int orientation) {
+        // Explicit Immunity: PfB blocks L6 for normal track lays, 
+        // but Baden MUST be allowed to upgrade its home hex regardless of PfB status.
+        if ("BA".equals(company.getId()) && "L6".equals(hex.getId())) {
+            return true;
+        }
+        return super.gameSpecificTileLayAllowed(company, hex, orientation);
+    }
+
+
     @Override
     public boolean layTile(LayTile action) {
         forceCleanupGhosts();
         PublicCompany company = action.getCompany();
-        
+
         // Snapshots for PfB state restoration [cite: 10, 26]
         boolean wasNormalLaid = normalTileLaidThisTurn.value();
         GameDef.OrStep stepBefore = getStep();
@@ -1333,9 +1349,10 @@ protected final BooleanState badenHomeTokenCompleted = new BooleanState(this, "B
         // PfB/PF State Restoration Logic
         SpecialProperty actionSp = action.getSpecialProperty();
         boolean isSpecialPfBLay = false;
-        if (result && actionSp != null && actionSp.getOriginalCompany() != null) {
-            String ownerId = actionSp.getOriginalCompany().getId();
-            if ("PfB".equals(ownerId) || "PF".equals(ownerId)) {
+        if (result && actionSp != null) {
+            String ownerId = (actionSp.getOriginalCompany() != null) ? actionSp.getOriginalCompany().getId() : "";
+            String spString = actionSp.toString();
+            if ("PfB".equals(ownerId) || "PF".equals(ownerId) || spString.contains("PfB") || spString.contains("PF")) {
                 isSpecialPfBLay = true;
             }
         }
@@ -1370,11 +1387,12 @@ protected final BooleanState badenHomeTokenCompleted = new BooleanState(this, "B
         // --- REFINED TRIGGER: Fix for "cannot find symbol: hasToken" ---
         if (result && action.getChosenHex().getId().equals("L6")) {
             PublicCompany ba = companyManager.getPublicCompany("BA");
-            
-            // The crucial check: BA is floated, but the mandatory 1835 choice hasn't been completed.
+
+            // The crucial check: BA is floated, but the mandatory 1835 choice hasn't been
+            // completed.
             if (ba != null && ba.hasFloated() && !badenHomeTokenCompleted.value()) {
                 log.info("L6 Tile Lay: Reverting base engine auto-lay to force manual UI selection.");
-                
+
                 // 1. Revert Engine Auto-Lay using standard Rails movement
                 for (Stop s : action.getChosenHex().getStops()) {
                     for (BaseToken token : new ArrayList<>(s.getBaseTokens())) {
@@ -1384,7 +1402,7 @@ protected final BooleanState badenHomeTokenCompleted = new BooleanState(this, "B
                         }
                     }
                 }
-                
+
                 // 2. Trigger Interruption Sequence for Foreign Companies
                 if (!company.equals(ba)) {
                     interruptedCompany.set(company);
@@ -1405,14 +1423,16 @@ protected final BooleanState badenHomeTokenCompleted = new BooleanState(this, "B
             List<SpecialTileLay> specials = getSpecialProperties(SpecialTileLay.class);
             if (specials != null) {
                 for (SpecialTileLay sp : specials) {
-                    if (sp.isExercised()) continue;
+                    if (sp.isExercised())
+                        continue;
                     if (sp instanceof SpecialSingleTileLay) {
                         String loc = ((SpecialSingleTileLay) sp).getLocationNameString();
                         if (loc != null && loc.matches("M1[57]") && hasLaidExtraOBBTile.value()) {
                             continue;
                         }
                     }
-                    if (action.getSpecialProperty() == sp) continue;
+                    if (action.getSpecialProperty() == sp)
+                        continue;
                     hasUsableSpecial = true;
                     break;
                 }
@@ -1425,48 +1445,49 @@ protected final BooleanState badenHomeTokenCompleted = new BooleanState(this, "B
         return result;
     }
 
-
     /**
-     * Diagnostic helper class to snapshot the absolute "Baden Situation". [cite: 1, 2]
+     * Diagnostic helper class to snapshot the absolute "Baden Situation". [cite: 1,
+     * 2]
      */
     private class BadenContext {
         // Absolute Map & Company State (Permanent)
-        boolean baFloated;         // True if BA has started/floated [cite: 17]
-        boolean isL6Preprinted;    // True if NO tile has been laid yet (Map default) [cite: 4]
-        boolean hasL6Tile;         // True if a physical tile has been laid (by anyone) [cite: 18, 30]
-        boolean baHasL6Token;      // True strictly if BA owns a token on L6 
+        boolean baFloated; // True if BA has started/floated [cite: 17]
+        boolean isL6Preprinted; // True if NO tile has been laid yet (Map default) [cite: 4]
+        boolean hasL6Tile; // True if a physical tile has been laid (by anyone) [cite: 18, 30]
+        boolean baHasL6Token; // True strictly if BA owns a token on L6
 
         // Turn/Actor Context (Who is causing the check)
-        String activeCompanyId;    // The company currently operating
-        boolean isBadenOperating;  // True if BA is the active company
-        
+        String activeCompanyId; // The company currently operating
+        boolean isBadenOperating; // True if BA is the active company
+
         // PfB Status [cite: 10]
-        boolean pfbClosed;         // True if PfB is definitively closed [cite: 52]
-        boolean pfbOwnedByActive;  // True if active company president owns PfB
-        boolean pfbOwnedByBaden;   // True if BA's president owns PfB [cite: 22]
+        boolean pfbClosed; // True if PfB is definitively closed [cite: 52]
+        boolean pfbOwnedByActive; // True if active company president owns PfB
+        boolean pfbOwnedByBaden; // True if BA's president owns PfB [cite: 22]
 
         @Override
         public String toString() {
             return String.format(
-                "BadenContext [Active=%s, BA_Floated=%b, L6_Preprinted=%b, L6_HasTile=%b, " +
-                "BA_HasToken=%b, PfB_Closed=%b, Active_Owns_PfB=%b, BA_Owns_PfB=%b]",
-                activeCompanyId, baFloated, isL6Preprinted, hasL6Tile, 
-                baHasL6Token, pfbClosed, pfbOwnedByActive, pfbOwnedByBaden
-            );
+                    "BadenContext [Active=%s, BA_Floated=%b, L6_Preprinted=%b, L6_HasTile=%b, " +
+                            "BA_HasToken=%b, PfB_Closed=%b, Active_Owns_PfB=%b, BA_Owns_PfB=%b]",
+                    activeCompanyId, baFloated, isL6Preprinted, hasL6Tile,
+                    baHasL6Token, pfbClosed, pfbOwnedByActive, pfbOwnedByBaden);
         }
     }
 
     /**
-     * Scans the absolute map and permanent company state to determine the exact scenario for Baden.
-     * This is decoupled from transient Operating Round flags to prevent round-restart bugs[cite: 57].
+     * Scans the absolute map and permanent company state to determine the exact
+     * scenario for Baden.
+     * This is decoupled from transient Operating Round flags to prevent
+     * round-restart bugs[cite: 57].
      */
     private BadenContext getBadenStatus() {
         BadenContext ctx = new BadenContext();
-        
+
         // 1. Establish Actors
         PublicCompany currentOp = operatingCompany.value();
         PublicCompany ba = companyManager.getPublicCompany("BA");
-        
+
         ctx.activeCompanyId = (currentOp != null) ? currentOp.getId() : "NONE";
         ctx.isBadenOperating = "BA".equals(ctx.activeCompanyId);
         ctx.baFloated = (ba != null && ba.hasFloated());
@@ -1476,8 +1497,8 @@ protected final BooleanState badenHomeTokenCompleted = new BooleanState(this, "B
         if (l6 != null) {
             ctx.isL6Preprinted = l6.isPreprintedTileCurrent();
             ctx.hasL6Tile = !l6.isPreprintedTileCurrent();
-            
-boolean physicallyHasToken = false;
+
+            boolean physicallyHasToken = false;
             if (l6.getStops() != null) {
                 for (Stop s : l6.getStops()) {
                     if (s.getBaseTokens() != null) {
@@ -1490,7 +1511,7 @@ boolean physicallyHasToken = false;
                 }
             }
             ctx.baHasL6Token = physicallyHasToken;
-            
+
         } else {
             log.error("CRITICAL: Hex L6 not found on absolute map!");
         }
@@ -1500,23 +1521,18 @@ boolean physicallyHasToken = false;
         if (pfb != null) {
             ctx.pfbClosed = pfb.isClosed();
             Owner pfbOwner = pfb.getOwner();
-            
-            ctx.pfbOwnedByActive = (currentOp != null && currentOp.getPresident() != null && pfbOwner == currentOp.getPresident());
+
+            ctx.pfbOwnedByActive = (currentOp != null && currentOp.getPresident() != null
+                    && pfbOwner == currentOp.getPresident());
             ctx.pfbOwnedByBaden = (ba != null && ba.getPresident() != null && pfbOwner == ba.getPresident());
         } else {
-            ctx.pfbClosed = true; 
+            ctx.pfbClosed = true;
         }
 
         // 4. Central Diagnostic Logging
         log.info("Baden Diagnosis: " + ctx.toString());
-        
+
         return ctx;
     }
-
-
-
-    
-
-
 
 }

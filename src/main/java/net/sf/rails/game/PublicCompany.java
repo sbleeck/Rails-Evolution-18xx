@@ -2340,6 +2340,8 @@ public class PublicCompany extends RailsAbstractItem
         // TEMPORARY - 1837 S5 buyer must choose home hex
         if (homeHexes == null) return true;
 
+
+        
         for (MapHex homeHex : homeHexes) {
             if (homeCityNumber.value() == 0) {
                 // This applies to cases like 1830 Erie and 1856 THB.
