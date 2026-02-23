@@ -1133,19 +1133,18 @@ private boolean displayHexNames = false;
     private List<GUIHex> currentHighlightedGuiHexes = new ArrayList<>();
 
 // 3. Set highlights
-    public void setOwnerHighlight(List<GUIHex> guiHexes, String label) {
-
+public void setOwnerHighlight(List<GUIHex> guiHexes, String label) {
 
         if (currentHighlightedGuiHexes != null) {
             for (GUIHex h : currentHighlightedGuiHexes) {
-                h.setActiveOwnerHighlight(false, null);
+                h.setActiveOwnerHighlight(false, null, false);
             }
             currentHighlightedGuiHexes.clear();
         }
 
         if (guiHexes != null && !guiHexes.isEmpty()) {
             for (GUIHex h : guiHexes) {
-                h.setActiveOwnerHighlight(true, label);
+                h.setActiveOwnerHighlight(true, label, false);
                 currentHighlightedGuiHexes.add(h);
 
             }

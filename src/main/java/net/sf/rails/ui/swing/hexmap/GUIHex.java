@@ -119,8 +119,12 @@ public class GUIHex implements Observer {
         TOKEN_SELECTABLE(0.8, Color.RED),
         // Selected Hex (Construction red)
         SELECTED(0.8, Color.GREEN),
-        // Merged Purple Highlight (Active Owner)
-        HIGHLIGHT_PURPLE(0.8, new Color(128, 0, 128)),
+
+// Merged Purple Highlight (Active Owner)
+HIGHLIGHT_PURPLE(0.8, new Color(128, 0, 128)),
+// Dashed Purple Highlight (Portfolio Owner) - Opaque purple
+HIGHLIGHT_PORTFOLIO(0.8, new Color(128, 0, 128)),
+
         INVALIDS(0.9, Color.pink);
 
         private final double scale;
@@ -433,13 +437,44 @@ public class GUIHex implements Observer {
     public void paintMarks(Graphics2D g) {
         GUIGlobals.setRenderingHints(g);
 
-        if (state != State.NORMAL) {
+if (state != State.NORMAL) {
             Stroke oldStroke = g.getStroke();
-            g.setStroke(new BasicStroke((float) state.getStrokeWidth(dimensions.hexagon)));
-            g.setColor(state.getColor());
-            g.draw(state.getInnerHexagon(dimensions.hexagon, dimensions.center));
+            float strokeWidth = (float) state.getStrokeWidth(dimensions.hexagon);
+            Shape innerHex = state.getInnerHexagon(dimensions.hexagon, dimensions.center);
+            
+            
+            if (state == State.HIGHLIGHT_PORTFOLIO) {
+                // 1. Force-clear the stroke path to erase the stale white halo 
+                // from the persistent MarksLayer buffer.
+                java.awt.Composite oldComp = g.getComposite();
+                g.setComposite(java.awt.AlphaComposite.getInstance(java.awt.AlphaComposite.CLEAR));
+                g.setStroke(new BasicStroke(strokeWidth + 4.0f)); 
+                g.draw(innerHex);
+                g.setComposite(oldComp);
+
+                // 2. Draw strictly dashes. The gaps will now punch through to the map background.
+                float[] dashPattern = { 10.0f, 10.0f };
+                g.setStroke(new BasicStroke(strokeWidth, BasicStroke.CAP_BUTT, BasicStroke.JOIN_MITER, 10.0f, dashPattern, 0.0f));
+                g.setColor(state.getColor());
+                g.draw(innerHex);
+            } else if (state == State.HIGHLIGHT_PURPLE) {
+                
+                // Active company: Solid white halo first, then solid purple
+                g.setStroke(new BasicStroke(strokeWidth + 3.0f)); 
+                g.setColor(Color.WHITE);
+                g.draw(innerHex);
+                
+                g.setStroke(new BasicStroke(strokeWidth));
+                g.setColor(state.getColor());
+                g.draw(innerHex);
+            } else {
+                g.setStroke(new BasicStroke(strokeWidth));
+                g.setColor(state.getColor());
+                g.draw(innerHex);
+            }
             g.setStroke(oldStroke);
         }
+
 
         // highlight on top of tiles
         if (isHighlighted()) {
@@ -605,20 +640,13 @@ public class GUIHex implements Observer {
                 PublicCompany company = token.getParent();
                 drawBaseToken(g2, company, origin, dimensions.tokenDiameter);
             }
-          // check for temporary token
+            // check for temporary token
             if (upgrade instanceof TokenHexUpgrade && ((TokenHexUpgrade) upgrade).getAction() instanceof LayBaseToken) {
                 TokenHexUpgrade tokenUpgrade = (TokenHexUpgrade) upgrade;
-                // Only evaluate if the upgrade applies to the current stop in the loop
-                if (tokenUpgrade.getSelectedStop() == stop) {
-                    PublicCompany company = tokenUpgrade.getAction().getCompany();
-                    // Prevent ghost token: do not draw if the model already contains this company's token
-                    if (!stop.hasTokenOf(company)) {
-                        HexPoint origin = getTokenCenter(j++, stop);
-                        drawBaseToken(g2, company, origin, dimensions.tokenDiameter);
-                    }
-                }
+                HexPoint origin = getTokenCenter(j++, tokenUpgrade.getSelectedStop());
+                PublicCompany company = tokenUpgrade.getAction().getCompany();
+                drawBaseToken(g2, company, origin, dimensions.tokenDiameter);
             }
-            
         }
     }
 
@@ -1033,36 +1061,31 @@ isMajor = true;
      *               NORMAL.
      * @param label  The text to display (or null).
      */
-    public void setActiveOwnerHighlight(boolean active, String label) {
+public void setActiveOwnerHighlight(boolean active, String label, boolean isOperatingCompany) {
         // 1. Update Internal Fields
         this.activeOwnerLabel = label;
         this.activeOwnerHighlight = active;
 
         // 2. Handle the Highlight State
         if (active) {
-            setState(State.HIGHLIGHT_PURPLE);
+            if (isOperatingCompany) {
+                setState(State.HIGHLIGHT_PURPLE);
+            } else {
+                setState(State.HIGHLIGHT_PORTFOLIO);
+            }
 
             // CRITICAL FIX: Force a repaint of the marks (border) layer.
-            // Even if the state was *already* HIGHLIGHT_PURPLE (no change),
-            // we must ensure the map knows to redraw this area, specifically
-            // if the map background was just cleared or redrawn.
             hexMap.repaintMarks(getMarksDirtyBounds());
 
         } else {
-            // Only revert to normal if we are currently purple.
-            // We don't want to accidentally clear a 'SELECTED' or 'SELECTABLE' state
-            // if the UI Logic overlaps.
-            if (getState() == State.HIGHLIGHT_PURPLE) {
+            // Only revert to normal if we are currently purple or portfolio.
+            if (getState() == State.HIGHLIGHT_PURPLE || getState() == State.HIGHLIGHT_PORTFOLIO) {
                 setState(State.NORMAL);
             }
         }
 
         // 3. Trigger Token Layer Repaint (For the Label)
-        // We always do this because the label text might have changed
-        // even if the active state remained true.
         hexMap.repaintTokens(getBounds());
     }
-
-    // ...
 
 }

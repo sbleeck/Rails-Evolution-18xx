@@ -146,189 +146,6 @@ public class StartRoundWindow extends JFrame implements ActionListener, KeyListe
     }
 
 
-protected void initCells() {
-        int ni = round.getNumberOfStartItems();
-        int np = players.getNumberOfPlayers();
-        Font cellFont = new Font("SansSerif", Font.BOLD, currentFontSize);
-
-        cards = new RailCard[ni];
-        cardWrappers = new JPanel[ni];
-        playerInventoryPanels = new JPanel[np];
-        
-        basePrice = new Field[ni];
-        minBid = new Field[ni];
-        bidPerPlayer = new Field[ni][np];
-        itemStatus = new Field[ni];
-        
-        // Arrays for layout offsets
-        itemNameXOffset = new int[numberOfColumns];
-        if (showBasePrices) basePriceXOffset = new int[numberOfColumns];
-        if (includeBidding == StartRound.Bidding.ON_ITEMS) minBidXOffset = new int[numberOfColumns];
-        bidPerPlayerXOffset = new int[numberOfColumns]; // Always initialized to avoid nulls
-        
-        upperPlayerCaption = new Field[numberOfColumns][np];
-        lowerPlayerCaption = new Field[np];
-        playerBids = new Field[np];
-        playerFree = new Field[np];
-
-        int lastX = -1;
-
-        // 1. Setup Left Side (Market) Headers
-        for (int col = 0; col < numberOfColumns; col++) {
-            itemNameXOffset[col] = ++lastX;
-            addField(new Caption(LocalText.getText("ITEM")), itemNameXOffset[col], 0, 1, 1, WIDE_LEFT + WIDE_RIGHT + WIDE_BOTTOM);
-
-            if (showBasePrices) {
-                basePriceXOffset[col] = ++lastX;
-                addField(new Caption(LocalText.getText(includeBidding == StartRound.Bidding.ON_ITEMS ? "BASE_PRICE" : "PRICE")), 
-                        basePriceXOffset[col], 0, 1, 1, WIDE_BOTTOM);
-            }
-
-            if (includeBidding == StartRound.Bidding.ON_ITEMS) {
-                minBidXOffset[col] = ++lastX;
-                addField(new Caption(LocalText.getText("MINIMUM_BID")), minBidXOffset[col], 0, 1, 1, WIDE_BOTTOM + WIDE_RIGHT);
-            }
-
-            // If bidding is active, we display the bid matrix here on the left
-            if (includeBidding != StartRound.Bidding.NO) {
-                bidPerPlayerXOffset[col] = ++lastX;
-                // Add Player Headers for the Bid Matrix
-                for (int i = 0; i < np; i++) {
-                    upperPlayerCaption[col][i] = new Field(players.getPlayerByPosition(i).getPlayerNameModel());
-                    upperPlayerCaption[col][i].setFont(cellFont);
-                    addField(upperPlayerCaption[col][i], lastX, 0, 1, 1, WIDE_BOTTOM);
-                    if (i < np - 1) lastX++; // Increment X for next player column
-                }
-            }
-        }
-
-        // 2. Vertical Separator
-        int separatorX = ++lastX;
-        addField(new JSeparator(SwingConstants.VERTICAL), separatorX, 0, 1, ni + 5, WIDE_LEFT + WIDE_RIGHT);
-
-        // 3. Setup Right Side (Player Inventories)
-        int playerStartX = ++lastX;
-        playerCaptionXOffset = new int[]{playerStartX}; // Reuse existing field for referencing right side start
-
-        for (int i = 0; i < np; i++) {
-            // Player Name Header
-            Caption playerHeader = new Caption(players.getPlayerByPosition(i).getName());
-            playerHeader.setFont(cellFont);
-            addField(playerHeader, playerStartX + i, 0, 1, 1, WIDE_BOTTOM);
-
-            // Inventory Panel
-            playerInventoryPanels[i] = new JPanel();
-            playerInventoryPanels[i].setLayout(new BoxLayout(playerInventoryPanels[i], BoxLayout.Y_AXIS));
-            playerInventoryPanels[i].setBackground(Color.WHITE);
-            playerInventoryPanels[i].setBorder(BorderFactory.createLineBorder(Color.LIGHT_GRAY));
-            
-            gbc.gridx = playerStartX + i;
-            gbc.gridy = 1;
-            gbc.gridheight = ni; // Span the height of all items
-            gbc.fill = GridBagConstraints.BOTH;
-            gbc.weightx = 1.0; 
-            gbc.weighty = 1.0; 
-            statusPanel.add(playerInventoryPanels[i], gbc);
-        }
-
-        // 4. Create Items (Rows)
-        for (int i = 0; i < ni; i++) {
-            final StartItem si = round.getStartItem(i);
-            int col = multipleColumns ? si.getColumn() - 1 : 0;
-            int row = multipleColumns ? si.getRow() - 1 : i;
-            int yPos = row + 1; // Start at row 1 (below headers)
-
-            // Setup RailCard
-            cards[i] = new RailCard(si, itemGroup);
-            cards[i].addActionListener(this); 
-            cards[i].setScale(1.2); 
-            configureMapHighlighting(cards[i], si);
-
-            // Setup Wrapper
-            cardWrappers[i] = new JPanel(new GridLayout(1, 1)); 
-            cardWrappers[i].setBackground(COLOR_AVAILABLE); 
-            cardWrappers[i].setBorder(BorderFactory.createEtchedBorder());
-            cardWrappers[i].add(cards[i]);
-
-            final int cardIndex = i;
-            cardWrappers[i].addMouseListener(new MouseAdapter() {
-                @Override
-                public void mouseClicked(MouseEvent e) {
-                    if (cards[cardIndex].getState() != RailCard.State.DISABLED) {
-                        actionPerformed(new ActionEvent(cards[cardIndex], ActionEvent.ACTION_PERFORMED, "WrapperClick"));
-                    }
-                }
-            });
-            
-            // Add Wrapper to Left Side
-            gbc.gridx = itemNameXOffset[col];
-            gbc.gridy = yPos;
-            gbc.gridwidth = 1;
-            gbc.gridheight = 1;
-            gbc.weightx = 0.5;
-            gbc.weighty = 0.5; 
-            gbc.fill = GridBagConstraints.BOTH; 
-            gbc.insets = new Insets(1, 1, 1, 1);
-            statusPanel.add(cardWrappers[i], gbc);
-
-            // Add Price Field
-            if (showBasePrices) {
-                basePrice[i] = new Field(si.getBasePriceModel());
-                basePrice[i].setFont(cellFont);
-                addField(basePrice[i], basePriceXOffset[col], yPos, 1, 1, 0);
-            }
-            
-            // Add Min Bid Field
-            if (includeBidding == StartRound.Bidding.ON_ITEMS) {
-                minBid[i] = new Field(round.getMinimumBidModel(i));
-                minBid[i].setFont(cellFont);
-                addField(minBid[i], minBidXOffset[col], yPos, 1, 1, WIDE_RIGHT);
-            }
-
-            // Add Bid Matrix Fields (if bidding exists)
-            if (includeBidding != StartRound.Bidding.NO) {
-                for (int j = 0; j < np; j++) {
-                    bidPerPlayer[i][j] = new Field(round.getBidModel(i, players.getPlayerByPosition(j)));
-                    bidPerPlayer[i][j].setFont(cellFont);
-                    // Add starting at bidPerPlayerXOffset
-                    addField(bidPerPlayer[i][j], bidPerPlayerXOffset[col] + j, yPos, 1, 1, 0);
-                }
-            }
-            
-            itemStatus[i] = new Field(si.getStatusModel());
-        }
-
-        // 5. Setup Footers (Cash / Bids Summary)
-        int footerY = ni + 1;
-        
-        // Add Cash/Bid summary below the Players on the Right side? 
-        // Or keep it aligned? Let's put it below the Player Inventories on the Right.
-        
-        addField(new Caption(LocalText.getText("CASH")), playerStartX - 1, footerY + 1, 1, 1, WIDE_RIGHT);
-
-        for (int i = 0; i < np; i++) {
-            // Player Bids (Total Blocked)
-            if (includeBidding != StartRound.Bidding.NO) {
-                playerBids[i] = new Field(round.getBlockedCashModel(players.getPlayerByPosition(i)));
-                playerBids[i].setFont(cellFont);
-                addField(playerBids[i], playerStartX + i, footerY, 1, 1, WIDE_TOP);
-            }
-
-            // Player Free Cash
-            playerFree[i] = new Field(round.getFreeCashModel(players.getPlayerByPosition(i)));
-            playerFree[i].setFont(cellFont);
-            addField(playerFree[i], playerStartX + i, footerY + 1, 1, 1, 0);
-            
-            // Bottom Name Caption
-            lowerPlayerCaption[i] = new Field(players.getPlayerByPosition(i).getPlayerNameModel());
-            lowerPlayerCaption[i].setFont(cellFont);
-            addField(lowerPlayerCaption[i], playerStartX + i, footerY + 2, 1, 1, WIDE_TOP);
-        }
-
-        dummyButton = new ClickField("", "", "", this, itemGroup);
-        updateFonts(currentFontSize);
-    }
-
     private void addField(JComponent comp, int x, int y, int width, int height, int wideGapPositions) {
         gbc.gridx = x;
         gbc.gridy = y;
@@ -834,82 +651,134 @@ if (upperPlayerCaption[j][i] != null) {
         if (gameUIManager != null && gameUIManager.getORUIManager() != null) {
             net.sf.rails.ui.swing.hexmap.HexMap map = gameUIManager.getORUIManager().getMap();
             if (map != null) {
-                // --- START FIX ---
                 // setOwnerHighlight requires a List, and we must iterate over the map values
                 map.setOwnerHighlight(new java.util.ArrayList<net.sf.rails.ui.swing.hexmap.GUIHex>(), null);
 
                 for (net.sf.rails.ui.swing.hexmap.GUIHex guiHex : map.getGuiHexes().values()) {
-                    guiHex.setActiveOwnerHighlight(false, null);
+guiHex.setActiveOwnerHighlight(false, null, true);
                 }
-                // --- END FIX ---
             }
         }
     }
 
-    protected void updateMapHighlights() {
-        if (gameUIManager == null || gameUIManager.getORUIManager() == null)
-            return;
-        net.sf.rails.ui.swing.hexmap.HexMap map = gameUIManager.getORUIManager().getMap();
-        if (map == null)
-            return;
 
-        // --- START FIX ---
-        java.util.List<net.sf.rails.ui.swing.hexmap.GUIHex> hexesToHighlight = new java.util.ArrayList<>();
+    protected void updateMapHighlights() {
+if (gameUIManager == null || gameUIManager.getORUIManager() == null)
+return;
+net.sf.rails.ui.swing.hexmap.HexMap map = gameUIManager.getORUIManager().getMap();
+if (map == null)
+return;
+
+java.util.List<net.sf.rails.ui.swing.hexmap.GUIHex> hexesToHighlight = new java.util.ArrayList<>();
+        java.util.Map<net.sf.rails.ui.swing.hexmap.GUIHex, String> specificLabels = new java.util.HashMap<>();
 
         for (int i = 0; i < cards.length; i++) {
             if (cards[i] != null && (cards[i].getState() == RailCard.State.ACTIONABLE
                     || cards[i].getState() == RailCard.State.SELECTED)) {
                 StartItem si = round.getStartItem(i);
-                Certificate cert = si.getPrimary();
-                PublicCompany pubComp = null;
+                
+                java.util.List<Certificate> certs = new java.util.ArrayList<>();
+                if (si.getPrimary() != null) certs.add(si.getPrimary());
+                if (si.getSecondary() != null) certs.add(si.getSecondary());
 
-                if (cert instanceof PublicCertificate) {
-                    pubComp = ((PublicCertificate) cert).getCompany();
-                }
+                for (Certificate cert : certs) {
+                    PublicCompany pubComp = null;
 
-                if (pubComp != null) {
-                    for (MapHex hex : pubComp.getHomeHexes()) {
-                        net.sf.rails.ui.swing.hexmap.GUIHex guiHex = map.getHex(hex);
-                        if (guiHex != null) {
-                            guiHex.setActiveOwnerHighlight(true, pubComp.getId());
-                            hexesToHighlight.add(guiHex);
+                    if (cert instanceof PublicCertificate) {
+                        pubComp = ((PublicCertificate) cert).getCompany();
+                        if (pubComp == null && cert.getParent() instanceof PublicCompany) {
+                            pubComp = (PublicCompany) cert.getParent();
+                        }
+                    }
+
+                    if (pubComp != null) {
+                        for (MapHex hex : pubComp.getHomeHexes()) {
+                            net.sf.rails.ui.swing.hexmap.GUIHex guiHex = map.getHex(hex);
+                            if (guiHex != null) {
+                                hexesToHighlight.add(guiHex);
+                                specificLabels.put(guiHex, pubComp.getId());
+                            }
+                        }
+                    } else if (cert instanceof PrivateCompany) {
+                        PrivateCompany privComp = (PrivateCompany) cert;
+                        if (privComp.getBlockedHexes() != null) {
+                            for (MapHex hex : privComp.getBlockedHexes()) {
+                                net.sf.rails.ui.swing.hexmap.GUIHex guiHex = map.getHex(hex);
+                                if (guiHex != null) {
+                                    hexesToHighlight.add(guiHex);
+                                    specificLabels.put(guiHex, privComp.getId());
+                                }
+                            }
                         }
                     }
                 }
             }
         }
+        
+        // 1. Clear old highlights and register new base highlights generically
         map.setOwnerHighlight(hexesToHighlight, null);
-        // --- END FIX ---
+        
+        // 2. Overwrite the generic dotted state with the specific solid state (true)
+        for (java.util.Map.Entry<net.sf.rails.ui.swing.hexmap.GUIHex, String> entry : specificLabels.entrySet()) {
+            entry.getKey().setActiveOwnerHighlight(true, entry.getValue(), true);
+        }
+        
         map.repaintAll(new Rectangle(map.getSize()));
-    }
+
+
+
+}
+
+
 
     @Override
     public void updateStatus(boolean myTurn) {
+        clearMapHighlights();
       if (gameUIManager != null && gameUIManager.getGameManager() != null) {
             possibleActions = gameUIManager.getGameManager().getPossibleActions();
         }
 
-        // 0. Prevent NPE from base class calls if panels aren't ready
+// 0. Total UI Reset: Reset EVERY card in the array, not just those currently in the round.
+        // This ensures items removed from the packet are correctly cleared.
+        if (cards != null) {
+            for (int i = 0; i < cards.length; i++) {
+                if (cards[i] == null) continue;
+                cards[i].setState(RailCard.State.PASSIVE);
+                cards[i].clearPossibleActions();
+                if (cardWrappers[i] != null) {
+                    cardWrappers[i].setVisible(false);
+                    cardWrappers[i].setBackground(COLOR_AVAILABLE);
+                }
+            }
+        }
+
         if (playerInventoryPanels != null) {
-             for (JPanel panel : playerInventoryPanels) {
+            for (JPanel panel : playerInventoryPanels) {
                 if (panel != null) panel.removeAll();
             }
         }
 
-        // 1. Reset Map Highlights and Card States
-        clearMapHighlights();
-
         for (int i = 0; i < round.getNumberOfStartItems(); i++) {
             StartItem si = round.getStartItem(i);
             StartItemAction buyAction = null;
-            
+
             // IMPORTANT: VISUAL MOVEMENT LOGIC
             if (si.isSold()) {
                 // If sold, hide from Market (Left) and Move to Inventory (Right)
-                if (cardWrappers[i] != null) cardWrappers[i].setVisible(false);
-                if (showBasePrices && basePrice[i] != null) basePrice[i].setVisible(false);
-                
-                // If we have bidding matrix, hide those fields too? 
+
+if (cardWrappers[i] != null) {
+                    cardWrappers[i].removeAll(); 
+                    cardWrappers[i].setBorder(null); 
+                    cardWrappers[i].setOpaque(false);
+                    cardWrappers[i].setVisible(true); // Keep visible for matrix structure
+                }
+                if (showBasePrices && basePrice[i] != null) {
+                    basePrice[i].setText(""); // Clear text but keep field visible to hold layout
+                    basePrice[i].setVisible(true);
+                }
+
+ 
+                // If we have bidding matrix, hide those fields too?
                 // Usually better to leave them or clear them.
                 
                 Player owner = si.getBidder(); // In StartRound, bidder usually becomes owner
@@ -936,7 +805,6 @@ if (upperPlayerCaption[j][i] != null) {
                 cards[i].setState(RailCard.State.PASSIVE);
                 if (cardWrappers[i] != null) cardWrappers[i].setBackground(COLOR_AVAILABLE);
                 
-                configureMapHighlighting(cards[i], si);
             }
         }
 
@@ -944,6 +812,7 @@ if (upperPlayerCaption[j][i] != null) {
         if (playerInventoryPanels != null) {
             for (JPanel panel : playerInventoryPanels) {
                 if (panel != null) {
+                    panel.add(Box.createVerticalGlue()); // Push all items to the top
                     panel.revalidate();
                     panel.repaint();
                 }
@@ -990,8 +859,9 @@ if (upperPlayerCaption[j][i] != null) {
                 int j = action.getItemIndex();
                 int i = crossIndex[j];
                 
-                // Only interact with cards that are NOT sold (though sold ones shouldn't have actions anyway)
-                if (cardWrappers[i].isVisible()) {
+// Only highlight and set actions if the item is actually available
+                StartItem siCheck = round.getStartItem(i);
+                if (cardWrappers[i].isVisible() && !siCheck.isSold()) {
                     cards[i].setPossibleAction(action);
                     
                     if (cardWrappers[i] != null) {
@@ -1081,8 +951,8 @@ if (upperPlayerCaption[j][i] != null) {
                     BuyStartItem bsi = (BuyStartItem) action;
                     if (bsi.hasSharePriceToSet() && requestStartPrice(bsi))
                         return;
+selectedItemIndex = -1;
                     process(bsi);
-                    selectedItemIndex = -1;
                 } else {
                     // First click highlights and enables buttons
                     selectedItemIndex = clickedIndex;
@@ -1100,10 +970,218 @@ if (upperPlayerCaption[j][i] != null) {
         if (source instanceof ActionButton) {
             List<PossibleAction> actions = ((ActionButton) source).getPossibleActions();
             if (actions != null && !actions.isEmpty()) {
-                process(actions.get(0));
+            selectedItemIndex = -1;
+
+            process(actions.get(0));
             }
         }
-        // --- END FIX ---
     }
-// ... (rest of the method) ...
+
+
+// We are replacing the entire initCells method in StartRoundWindow.java
+
+// --- START FIX ---
+    protected void initCells() {
+        int ni = round.getNumberOfStartItems();
+        int np = players.getNumberOfPlayers();
+        int matrixRows = 10; // Enforce exactly 10 rows
+        Font cellFont = new Font("SansSerif", Font.BOLD, currentFontSize);
+
+        cards = new RailCard[ni];
+        cardWrappers = new JPanel[ni];
+        playerInventoryPanels = new JPanel[np];
+        
+        basePrice = new Field[ni];
+        minBid = new Field[ni];
+        bidPerPlayer = new Field[ni][np];
+        itemStatus = new Field[ni];
+        
+        itemNameXOffset = new int[numberOfColumns];
+        if (showBasePrices) basePriceXOffset = new int[numberOfColumns];
+        if (includeBidding == StartRound.Bidding.ON_ITEMS) minBidXOffset = new int[numberOfColumns];
+        bidPerPlayerXOffset = new int[numberOfColumns]; 
+        
+        upperPlayerCaption = new Field[numberOfColumns][np];
+        lowerPlayerCaption = new Field[np];
+        playerBids = new Field[np];
+        playerFree = new Field[np];
+
+        int lastX = -1;
+
+        // 1. Setup Market Headers (Row 0)
+        for (int col = 0; col < numberOfColumns; col++) {
+            itemNameXOffset[col] = ++lastX;
+            addField(new Caption(LocalText.getText("ITEM")), itemNameXOffset[col], 0, 1, 1, WIDE_LEFT + WIDE_RIGHT + WIDE_BOTTOM);
+
+            if (showBasePrices) {
+                basePriceXOffset[col] = ++lastX;
+                addField(new Caption(LocalText.getText(includeBidding == StartRound.Bidding.ON_ITEMS ? "BASE_PRICE" : "PRICE")), 
+                        basePriceXOffset[col], 0, 1, 1, WIDE_BOTTOM);
+            }
+
+            if (includeBidding == StartRound.Bidding.ON_ITEMS) {
+                minBidXOffset[col] = ++lastX;
+                addField(new Caption(LocalText.getText("MINIMUM_BID")), minBidXOffset[col], 0, 1, 1, WIDE_BOTTOM + WIDE_RIGHT);
+            }
+
+            if (includeBidding != StartRound.Bidding.NO) {
+                bidPerPlayerXOffset[col] = ++lastX;
+                for (int j = 0; j < np; j++) {
+                    upperPlayerCaption[col][j] = new Field(players.getPlayerByPosition(j).getPlayerNameModel());
+                    upperPlayerCaption[col][j].setFont(cellFont);
+                    addField(upperPlayerCaption[col][j], lastX, 0, 1, 1, WIDE_BOTTOM);
+                    if (j < np - 1) lastX++; 
+                }
+            }
+        }
+
+        // 2. Vertical Separator (Spans headers, matrix, and sponge)
+        int separatorX = ++lastX;
+        addField(new JSeparator(SwingConstants.VERTICAL), separatorX, 0, 1, matrixRows + 2, WIDE_LEFT + WIDE_RIGHT);
+
+        // 3. Setup Player Inventories (Right Side)
+        int playerStartX = ++lastX;
+        playerCaptionXOffset = new int[]{playerStartX}; 
+
+        for (int i = 0; i < np; i++) {
+            Caption playerHeader = new Caption(players.getPlayerByPosition(i).getName());
+            playerHeader.setFont(cellFont);
+            addField(playerHeader, playerStartX + i, 0, 1, 1, WIDE_BOTTOM);
+
+            playerInventoryPanels[i] = new JPanel();
+            playerInventoryPanels[i].setLayout(new BoxLayout(playerInventoryPanels[i], BoxLayout.Y_AXIS));
+            playerInventoryPanels[i].setBackground(Color.WHITE);
+            playerInventoryPanels[i].setBorder(BorderFactory.createLineBorder(Color.LIGHT_GRAY));
+            
+            gbc.gridx = playerStartX + i;
+            gbc.gridy = 1;
+            gbc.gridheight = matrixRows + 1; // Span 10 rows + the sponge row
+            gbc.fill = GridBagConstraints.BOTH;
+            gbc.weightx = 1.0; 
+            gbc.weighty = 1.0; // Stretches to fill the "grey block"
+            statusPanel.add(playerInventoryPanels[i], gbc);
+        }
+
+        // 4. Create Market Items (Rows 1 to ni)
+        boolean[][] rowOccupied = new boolean[numberOfColumns][matrixRows + 1];
+        for (int i = 0; i < ni; i++) {
+            final StartItem si = round.getStartItem(i);
+            int col = multipleColumns ? si.getColumn() - 1 : 0;
+            int row = multipleColumns ? si.getRow() - 1 : i;
+            int yPos = row + 1; 
+            if (yPos <= matrixRows) rowOccupied[col][yPos] = true;
+
+            cards[i] = new RailCard(si, itemGroup);
+            cards[i].addActionListener(this); 
+            cards[i].setScale(1.2); 
+            configureMapHighlighting(cards[i], si);
+
+            cardWrappers[i] = new JPanel(new GridLayout(1, 1)); 
+            cardWrappers[i].setBackground(COLOR_AVAILABLE); 
+            cardWrappers[i].setBorder(BorderFactory.createEtchedBorder());
+            cardWrappers[i].add(cards[i]);
+
+            final int cardIndex = i;
+            cardWrappers[i].addMouseListener(new MouseAdapter() {
+                @Override
+                public void mouseClicked(MouseEvent e) {
+                    if (cards[cardIndex].getState() != RailCard.State.DISABLED) {
+                        actionPerformed(new ActionEvent(cards[cardIndex], ActionEvent.ACTION_PERFORMED, "WrapperClick"));
+                    }
+                }
+            });
+            
+            gbc.gridx = itemNameXOffset[col];
+            gbc.gridy = yPos;
+            gbc.gridwidth = 1;
+            gbc.gridheight = 1;
+            gbc.weightx = 0.5;
+            gbc.weighty = 0.0; 
+            gbc.fill = GridBagConstraints.NONE; // Keep highlight tight
+            gbc.anchor = GridBagConstraints.NORTH;
+            gbc.insets = new Insets(1, 1, 1, 1);
+            statusPanel.add(cardWrappers[i], gbc);
+
+            if (showBasePrices) {
+                basePrice[i] = new Field(si.getBasePriceModel());
+                basePrice[i].setFont(cellFont);
+                addField(basePrice[i], basePriceXOffset[col], yPos, 1, 1, 0);
+            }
+            
+            if (includeBidding == StartRound.Bidding.ON_ITEMS) {
+                minBid[i] = new Field(round.getMinimumBidModel(i));
+                minBid[i].setFont(cellFont);
+                addField(minBid[i], minBidXOffset[col], yPos, 1, 1, WIDE_RIGHT);
+            }
+
+            if (includeBidding != StartRound.Bidding.NO) {
+                for (int j = 0; j < np; j++) {
+                    bidPerPlayer[i][j] = new Field(round.getBidModel(i, players.getPlayerByPosition(j)));
+                    bidPerPlayer[i][j].setFont(cellFont);
+                    addField(bidPerPlayer[i][j], bidPerPlayerXOffset[col] + j, yPos, 1, 1, 0);
+                }
+            }
+            itemStatus[i] = new Field(si.getStatusModel());
+        }
+
+        // 5. Fill Matrix Gaps with Spacers (Rows 1 to 10)
+        for (int col = 0; col < numberOfColumns; col++) {
+            for (int row = 1; row <= matrixRows; row++) {
+                if (!rowOccupied[col][row]) {
+                    JPanel spacer = new JPanel();
+                    spacer.setOpaque(false);
+                    spacer.setPreferredSize(new Dimension(10, 40)); 
+                    gbc.gridx = itemNameXOffset[col];
+                    gbc.gridy = row;
+                    gbc.gridwidth = 1;
+                    gbc.gridheight = 1;
+                    gbc.weightx = 0.0;
+                    gbc.weighty = 0.0;
+                    gbc.fill = GridBagConstraints.NONE;
+                    statusPanel.add(spacer, gbc);
+                }
+            }
+        }
+
+        // 6. The Sponge (Row 11) absorbs all extra height
+        int spongeY = matrixRows + 1;
+        gbc.gridx = 0;
+        gbc.gridy = spongeY;
+        gbc.gridwidth = playerStartX;
+        gbc.weighty = 1.0; 
+        gbc.fill = GridBagConstraints.VERTICAL;
+        statusPanel.add(Box.createVerticalGlue(), gbc);
+
+        // 7. Footers (Row 12+)
+        int footerY = matrixRows + 2;
+        addField(new Caption(LocalText.getText("CASH")), playerStartX - 1, footerY + 1, 1, 1, WIDE_RIGHT);
+
+        for (int i = 0; i < np; i++) {
+            if (includeBidding != StartRound.Bidding.NO) {
+                playerBids[i] = new Field(round.getBlockedCashModel(players.getPlayerByPosition(i)));
+                playerBids[i].setFont(cellFont);
+                addField(playerBids[i], playerStartX + i, footerY, 1, 1, WIDE_TOP);
+            }
+            playerFree[i] = new Field(round.getFreeCashModel(players.getPlayerByPosition(i)));
+            playerFree[i].setFont(cellFont);
+            addField(playerFree[i], playerStartX + i, footerY + 1, 1, 1, 0);
+            lowerPlayerCaption[i] = new Field(players.getPlayerByPosition(i).getPlayerNameModel());
+            lowerPlayerCaption[i].setFont(cellFont);
+            addField(lowerPlayerCaption[i], playerStartX + i, footerY + 2, 1, 1, WIDE_TOP);
+        }
+
+        // 8. Rectification Pass: override addField's default 0.5 weighty
+        for (Component comp : statusPanel.getComponents()) {
+            GridBagConstraints c = gb.getConstraints(comp);
+            if (c.gridy != spongeY && !(comp instanceof JPanel && c.gridheight > 1)) {
+                c.weighty = 0.0;
+                gb.setConstraints(comp, c);
+            }
+        }
+
+        dummyButton = new ClickField("", "", "", this, itemGroup);
+        updateFonts(currentFontSize);
+    }
+// --- END FIX ---
+
 }

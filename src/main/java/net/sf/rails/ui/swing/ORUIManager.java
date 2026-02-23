@@ -986,17 +986,6 @@ public class ORUIManager implements DialogOwner {
         for (MapHex hex : validHexes) {
             if (layTile.getType() == LayTile.GENERIC_EXCL_LOCATIONS && layTile.getLocations().contains(hex))
                 continue;
-
-            // Enforce location constraints for connected tile lays
-            // Prevents specific hex actions (like 1837 AB/BrB) from spawning duplicate upgrades globally
-            if (layTile.getType() != LayTile.GENERIC_EXCL_LOCATIONS 
-                    && layTile.getLocations() != null 
-                    && !layTile.getLocations().isEmpty() 
-                    && !layTile.getLocations().contains(hex)) {
-                continue;
-            }
-
-            
             GUIHex guiHex = map.getHex(hex);
             Set<TileHexUpgrade> upgrades = TileHexUpgrade.create(guiHex, graph.getReachableSides().get(hex),
                     graph.getPassableStations().get(hex), layTile, algo);
@@ -1283,16 +1272,17 @@ private void updateCompanyHighlights() {
 
 
 Player currentOwner = currentComp.getPresident();
-        // --- START FIX ---
         // Fix: In steps like MERGE, a company might momentarily lack a president.
         if (currentOwner == null) {
             map.setOwnerHighlight(null, null);
             return;
         }
         
-        List<GUIHex> hexesToHighlight = new ArrayList<>();
+       List<GUIHex> hexesToHighlight = new ArrayList<>();
         // Store specific labels for each hex
         Map<GUIHex, String> specificLabels = new HashMap<>();
+        // Store boolean if hex contains the active operating company
+        Map<GUIHex, Boolean> isActiveOperatingMap = new HashMap<>();
 
         net.sf.rails.game.MapManager mapManager = getRoot().getMapManager();
         net.sf.rails.game.CompanyManager companyManager = getRoot().getCompanyManager();
@@ -1318,18 +1308,30 @@ Player currentOwner = currentComp.getPresident();
                 MapHex liveHex = mapManager.getHex(hexId);
 
                 if (liveHex != null && liveHex.getStopsMap() != null) {
+                    boolean foundToken = false;
+                    boolean hasOperatingCompany = false;
+                    String hexLabel = null;
+
                     for (Stop stop : liveHex.getStopsMap().values()) {
                         
                         // Check for ANY player company on this stop
                         for (PublicCompany comp : playerCompanies) {
                              if (stop.hasTokenOf(comp)) {
-                                 // Found a match! Store the hex and the specific company ID
-                                 hexesToHighlight.add(guiHex);
-                                 specificLabels.put(guiHex, comp.getId());
-                                 break; // Done with this hex
+                                 foundToken = true;
+                                 if (comp.equals(currentComp)) {
+                                     hasOperatingCompany = true;
+                                     hexLabel = comp.getId(); // Prioritize operating company label
+                                 } else if (hexLabel == null) {
+                                     hexLabel = comp.getId(); // Set portfolio label if operating not found yet
+                                 }
                              }
                         }
-                        if (hexesToHighlight.contains(guiHex)) break;
+                    }
+                    
+                    if (foundToken) {
+                        hexesToHighlight.add(guiHex);
+                        specificLabels.put(guiHex, hexLabel);
+                        isActiveOperatingMap.put(guiHex, hasOperatingCompany);
                     }
                 }
             }
@@ -1338,14 +1340,15 @@ Player currentOwner = currentComp.getPresident();
         // 3. Activate Highlights (Pass NULL as label to avoid overwriting everything with one name)
         map.setOwnerHighlight(hexesToHighlight, null);
 
-        // 4. Apply Specific Labels individually
+        // 4. Apply Specific Labels and Active/Portfolio styles individually
         for (Map.Entry<GUIHex, String> entry : specificLabels.entrySet()) {
-            // Re-apply the active flag with the CORRECT specific label
-            entry.getKey().setActiveOwnerHighlight(true, entry.getValue());
+            GUIHex guiHex = entry.getKey();
+            boolean isOperating = isActiveOperatingMap.get(guiHex);
+            guiHex.setActiveOwnerHighlight(true, entry.getValue(), isOperating);
         }
         
         // 5. Force Repaint to show changes
-map.repaintAll(new Rectangle(map.getSize()));
+        map.repaintAll(new Rectangle(map.getSize()));
     }
 
 }
