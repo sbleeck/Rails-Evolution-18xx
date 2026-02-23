@@ -1,7 +1,6 @@
 package net.sf.rails.game.specific._1837;
 
 import com.google.common.collect.Lists;
-import net.sf.rails.common.GameOption;
 import net.sf.rails.game.PublicCompany;
 import net.sf.rails.game.RailsRoot;
 import net.sf.rails.game.financial.StockMarket;
@@ -9,14 +8,8 @@ import net.sf.rails.game.financial.StockSpace;
 import net.sf.rails.game.state.HashMapState;
 import net.sf.rails.game.state.Owner;
 
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 
-/**
- * @author Martin Brumm
- *
- */
 public class StockMarket_1837 extends StockMarket {
 
     private HashMapState<StockSpace, Integer> parSpaceUsers
@@ -24,14 +17,9 @@ public class StockMarket_1837 extends StockMarket {
 
     public StockMarket_1837(RailsRoot parent, String id) {
         super(parent, id);
-        // Explicitly set the chart type for the 1837 hexagonal market
         this.stockChartType = ChartType.HEXAGONAL;
     }
 
-    /**
-     * Return start prices as list of prices
-     * but no more that two on each space
-     */
     public List<Integer> getStartPrices() {
         List<Integer> prices = Lists.newArrayList();
         for (StockSpace space : startSpaces) {
@@ -45,132 +33,124 @@ public class StockMarket_1837 extends StockMarket {
     @Override
     public StockSpace getStartSpace(int price) {
         StockSpace space = super.getStartSpace(price);
-        if (canAddParSpaceUser(space)) {
-            return space;
-        } else {
-            return null;
-        }
+        return canAddParSpaceUser(space) ? space : null;
     }
 
-    /**
-     * Add 1 to the number of companies that have a given par price
-     * (whether this is allowed should have been checked first using canAddParSpaceUser())
-     * @param space The StartSpace of the given par price
-     */
-    public void addParSpaceUser (StockSpace space) {
-        if (parSpaceUsers.get(space) == null) {
-            parSpaceUsers.put (space, 1);
-        } else {
-            parSpaceUsers.put(space, parSpaceUsers.get(space) + 1);
-        }
+    public void addParSpaceUser(StockSpace space) {
+        Integer count = parSpaceUsers.get(space);
+        parSpaceUsers.put(space, (count == null) ? 1 : count + 1);
     }
 
-    /**
-     * Check if a new company can use a specific par price.
-     * In 1837, the maximum number of companies that can use a par price is 2.
-     * @param space The StartSpace of a given par price
-     * @return True if starting a company with that price is allowed
-     */
-    public boolean canAddParSpaceUser (StockSpace space) {
+    public boolean canAddParSpaceUser(StockSpace space) {
         Integer count = parSpaceUsers.get(space);
         return count == null || count < 2;
     }
 
-    /*----- Sell action interface methods -----*/
-
     public void payOut(PublicCompany company, boolean split) {
         if (!split) {
+            // Rule 10.7.4: 100% payout moves Right or Up-Right [cite: 726, 727]
             moveRightOrUp(company);
         } else {
-            moveRightandDown(company);
+            // Rule 10.7.4: 50% payout moves Down-Right [cite: 730]
+            moveDownRight(company);
         }
     }
 
-    public int spacesDownOnSale (int sharesSold, Owner seller) {
+    @Override
+    public int spacesDownOnSale(int sharesSold, Owner seller) {
+        // Rule 9.1: Every sale moves the price marker diagonally down and left [cite: 426]
         return 1;
     }
 
     @Override
     public void soldOut(PublicCompany company) {
-
-        if (GameOption.getValue(this, GameOption.VARIANT).matches("Basegame|1837-2ndEd.")
-                && company.getPresident().getPortfolioModel().getShares(company) > 4) {
-            //President has 5 shares (50%) or more, except in the Romoth variant
-            moveLeftAndUp(company);
+        // Rule 9.5: Rise diagonally up-right if director <= 40%, else up-left [cite: 478]
+        if (company.getPresident().getPortfolioModel().getShares(company) > 4) {
+            moveUpLeft(company);
         } else {
-            moveUp(company);
+            moveUpRight(company);
         }
     }
 
-    /*----- Execute share price moves. -----*/
-    // In principle, these should be internal (private) methods
+    /* Hexagonal Movement Logic for Even-Row (even-r) Pointy-Topped Grid */
 
-    private void moveRightandDown(PublicCompany company) {
-        StockSpace oldsquare = company.getCurrentSpace();
-        StockSpace newsquare = oldsquare;
-        int row = oldsquare.getRow();
-        int col = oldsquare.getColumn();
-
-        /* Drop the indicated number of rows */
-        int newrow = row + 1;
-        int newcol = col + 1;
-
-        /* Don't drop below the bottom of the chart */
-        if (getStockSpace(newrow, newcol) == null) {
-            
-            while (newrow >= numRows || getStockSpace(newrow, col) == null)
-                newrow--;
-            while (newcol >= numCols || getStockSpace(newrow, newcol) == null)
-                newcol--;
-        }
-
-        // Changed the "||" into "&&", because both movements must be possible
-        if ((newrow > row) && (newcol > col)) {
-            newsquare = getStockSpace(newrow, newcol);
-        }
-        
-        if (newsquare != null) {
-            prepareMove(company, oldsquare, newsquare);
-        }  
+    private void moveDownRight(PublicCompany company) {
+        StockSpace old = company.getCurrentSpace();
+        int r = old.getRow();
+        int c = old.getColumn();
+        int nr = r + 1;
+        int nc = (r % 2 == 0) ? c : c + 1;
+        StockSpace newsquare = getStockSpace(nr, nc);
+        if (newsquare != null) prepareMove(company, old, newsquare);
     }
 
-    private void moveLeftAndUp(PublicCompany company) {
-        StockSpace oldsquare = company.getCurrentSpace();
-        StockSpace newsquare = oldsquare;
-        int row = oldsquare.getRow();
-        int col = oldsquare.getColumn();
-        if ((row > 0) && (col > 0)){
-            newsquare = getStockSpace(row - 1, col -1);
-        }
-        if (newsquare != null) prepareMove(company, oldsquare, newsquare);
-        
+    private void moveDownLeft(PublicCompany company) {
+        StockSpace old = company.getCurrentSpace();
+        int r = old.getRow();
+        int c = old.getColumn();
+        int nr = r + 1;
+        int nc = (r % 2 == 0) ? c - 1 : c;
+        StockSpace newsquare = getStockSpace(nr, nc);
+        if (newsquare != null) prepareMove(company, old, newsquare);
+    }
+
+    private void moveUpLeft(PublicCompany company) {
+        StockSpace old = company.getCurrentSpace();
+        int r = old.getRow();
+        int c = old.getColumn();
+        int nr = r - 1;
+        int nc = (r % 2 == 0) ? c - 1 : c;
+        StockSpace newsquare = getStockSpace(nr, nc);
+        if (newsquare != null) prepareMove(company, old, newsquare);
+    }
+
+    private void moveUpRight(PublicCompany company) {
+        StockSpace old = company.getCurrentSpace();
+        int r = old.getRow();
+        int c = old.getColumn();
+        int nr = r - 1;
+        int nc = (r % 2 == 0) ? c : c + 1;
+        StockSpace newsquare = getStockSpace(nr, nc);
+        if (newsquare != null) prepareMove(company, old, newsquare);
+    }
+
+    public void moveDown(PublicCompany company) {
+        // Rule 9.1: Sales move diagonally down and to the left [cite: 426]
+        moveDownLeft(company);
     }
 
     @Override
     public void moveUp(PublicCompany company) {
-        StockSpace oldsquare = company.getCurrentSpace();
-        StockSpace newsquare = oldsquare;
-        int row = oldsquare.getRow();
-        int col = oldsquare.getColumn();
-        if (row > 0) {
-            newsquare = getStockSpace(row - 1, col);
-        } else if (upOrDownRight && col < numCols - 1) {
-            newsquare = getStockSpace(row + 1, col + 1);
-        }
-        if (newsquare != null) prepareMove(company, oldsquare, newsquare);
+        // Standard Up redirection to Up-Right for 1837 grid [cite: 727]
+        moveUpRight(company);
     }
 
     protected void moveRightOrUp(PublicCompany company) {
-        /* Ignore the amount for now */
-        StockSpace oldsquare = company.getCurrentSpace();
-        StockSpace newsquare = oldsquare;
-        int row = oldsquare.getRow();
-        int col = oldsquare.getColumn();
-        if (col < numCols - 1 && !oldsquare.isLeftOfLedge()
-                && (newsquare = getStockSpace(row, col + 1)) != null) {}
-        else if (row > 0
-                && (newsquare = getStockSpace(row - 1, col)) != null) {}
-        prepareMove(company, oldsquare, newsquare);
+        StockSpace old = company.getCurrentSpace();
+        int r = old.getRow();
+        int c = old.getColumn();
+        // Rule 10.7.4: Try Right first [cite: 726]
+        StockSpace newsquare = getStockSpace(r, c + 1);
+        // If blocked or ledge reached, move Up-Right [cite: 727]
+        if (newsquare == null || old.isLeftOfLedge()) {
+            int nr = r - 1;
+            int nc = (r % 2 == 0) ? c : c + 1;
+            newsquare = getStockSpace(nr, nc);
+        }
+        if (newsquare != null) prepareMove(company, old, newsquare);
     }
 
+    public void moveLeft(PublicCompany company) {
+        StockSpace old = company.getCurrentSpace();
+        int r = old.getRow();
+        int c = old.getColumn();
+        // Rule 10.7.4: Withholding moves Left. If not possible, Down-Left. [cite: 732, 733]
+        StockSpace newsquare = getStockSpace(r, c - 1);
+        if (newsquare == null) {
+            int nr = r + 1;
+            int nc = (r % 2 == 0) ? c - 1 : c;
+            newsquare = getStockSpace(nr, nc);
+        }
+        if (newsquare != null) prepareMove(company, old, newsquare);
+    }
 }

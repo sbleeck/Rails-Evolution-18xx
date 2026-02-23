@@ -47,9 +47,16 @@ public class StartRoundWindow_1837 extends StartRoundWindow {
             if (card == null) continue;
             
             if (si.isSold()) {
-                cardWrappers[i].setVisible(false);
-                if (showBasePrices && basePrice[i] != null) basePrice[i].setVisible(false);
-
+if (cardWrappers[i] != null) {
+                    cardWrappers[i].setVisible(true); // Maintain matrix structure
+                    cardWrappers[i].removeAll(); // Neutralize content
+                    cardWrappers[i].setBorder(null);
+                    cardWrappers[i].setOpaque(false);
+                }
+                if (showBasePrices && basePrice[i] != null) {
+                    basePrice[i].setText(""); // Clear text but hold the grid cell
+                    basePrice[i].setVisible(true);
+                }
                 Player owner = si.getBidder();
                 if (owner != null) {
                     card.setState(RailCard.State.PASSIVE); 
@@ -60,6 +67,10 @@ public class StartRoundWindow_1837 extends StartRoundWindow {
                 }
             } else {
                 cardWrappers[i].setVisible(true);
+
+                cardWrappers[i].setOpaque(true);
+                cardWrappers[i].setBackground(COLOR_AVAILABLE);
+                cardWrappers[i].setBorder(BorderFactory.createEtchedBorder());
                 if (showBasePrices && basePrice[i] != null) basePrice[i].setVisible(true);
 
                 if (card.getParent() != cardWrappers[i]) {
@@ -70,6 +81,7 @@ public class StartRoundWindow_1837 extends StartRoundWindow {
         
         for (JPanel panel : playerInventoryPanels) {
             if (panel != null) {
+                panel.add(Box.createVerticalGlue()); // Maintain constant height for bought items
                 panel.revalidate();
                 panel.repaint();
             }
@@ -94,20 +106,20 @@ public class StartRoundWindow_1837 extends StartRoundWindow {
             }
         }
     }
-
+// --- START FIX ---
     private void addField(JComponent comp, int x, int y, int width, int height, int gaps) {
         gbc.gridx = x;
         gbc.gridy = y;
         gbc.gridwidth = width;
         gbc.gridheight = height;
         gbc.weightx = 0.5;
-        gbc.weighty = 0.5;
+        gbc.weighty = 0.0; // Enforce zero weight to prevent items from stretching vertically
         gbc.fill = GridBagConstraints.BOTH;
         gbc.insets = new Insets((gaps & WIDE_TOP) > 0 ? 5 : 2, (gaps & WIDE_LEFT) > 0 ? 5 : 2, 
                                 (gaps & WIDE_BOTTOM) > 0 ? 5 : 2, (gaps & WIDE_RIGHT) > 0 ? 5 : 2);
         statusPanel.add(comp, gbc);
     }
-
+// --- END FIX ---
 
 
 
@@ -116,6 +128,7 @@ public class StartRoundWindow_1837 extends StartRoundWindow {
     protected void initCells() {
         int ni = round.getNumberOfStartItems();
         int np = players.getNumberOfPlayers();
+        int matrixRows = 10; // Forced static height for the market
         Font cellFont = new Font("SansSerif", Font.BOLD, currentFontSize);
 
         cards = new RailCard[ni];
@@ -151,7 +164,7 @@ public class StartRoundWindow_1837 extends StartRoundWindow {
         // 2. Vertical Separator between Items and Player Inventories
         int separatorX = ++lastX;
         // Height is dynamic: ni + headers + footers
-        addField(new JSeparator(SwingConstants.VERTICAL), separatorX, 0, 1, ni + 5, WIDE_LEFT + WIDE_RIGHT);
+addField(new JSeparator(SwingConstants.VERTICAL), separatorX, 0, 1, matrixRows + 5, WIDE_LEFT + WIDE_RIGHT);
 
         // 3. Setup Player Names and Inventory Panels
         int playerStartX = ++lastX;
@@ -169,10 +182,10 @@ public class StartRoundWindow_1837 extends StartRoundWindow {
             
             gbc.gridx = playerStartX + i;
             gbc.gridy = 1;
-            gbc.gridheight = ni; // Matches the number of items
-            gbc.fill = GridBagConstraints.BOTH;
+gbc.gridheight = matrixRows + 1; // Span the 10-row matrix and the sponge row
+//             gbc.fill = GridBagConstraints.BOTH;
             gbc.weightx = 1.0; 
-            gbc.weighty = 1.0; 
+            gbc.weighty = 10.0; 
             statusPanel.add(playerInventoryPanels[i], gbc);
         }
 
@@ -208,7 +221,7 @@ public class StartRoundWindow_1837 extends StartRoundWindow {
             gbc.gridwidth = 1;
             gbc.gridheight = 1;
             gbc.weightx = 0.5;
-            gbc.weighty = 0.5; // CRITICAL: Non-zero weighty prevents collapse
+            gbc.weighty = 0.0; // CRITICAL: Non-zero weighty prevents collapse
             gbc.fill = GridBagConstraints.BOTH; 
             gbc.anchor = GridBagConstraints.CENTER;
             gbc.insets = new Insets(1, 1, 1, 1);
@@ -222,10 +235,20 @@ public class StartRoundWindow_1837 extends StartRoundWindow {
             
             itemStatus[i] = new Field(si.getStatusModel());
         }
+            // 4b. Add a vertical sponge below row 10 to push all market items to the top
+        gbc.gridx = 0;
+        gbc.gridy = matrixRows + 1;
+        gbc.gridwidth = playerStartX;
+        gbc.weighty = 1.0; // This absorbs all extra vertical space
+        gbc.fill = GridBagConstraints.VERTICAL;
+        statusPanel.add(Box.createVerticalGlue(), gbc);
+
+
+
         
         // 5. Setup Footers (CASH / BIDS)
-        int footerY = ni + 1; // Position directly under the items
-        addField(new Caption(LocalText.getText("CASH")), playerStartX - 1, footerY + 1, 1, 1, WIDE_RIGHT);
+int footerY = matrixRows + 2; // Position footers below the sponge
+//         addField(new Caption(LocalText.getText("CASH")), playerStartX - 1, footerY + 1, 1, 1, WIDE_RIGHT);
 
         for (int i = 0; i < np; i++) {
             playerBids[i] = new Field(round.getBlockedCashModel(players.getPlayerByPosition(i)));

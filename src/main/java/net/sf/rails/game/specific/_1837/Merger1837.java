@@ -119,8 +119,7 @@ String id = minor.getId();
 
      // --- 5. SHARE EXCHANGE ---
         boolean isPriorityMinor = id.equals("S1") || id.equals("K1") || id.equals("U1");
-        net.sf.rails.game.financial.BankPortfolio ipo = net.sf.rails.game.financial.Bank.getIpo(gm);
-
+net.sf.rails.game.financial.BankPortfolio unavailable = net.sf.rails.game.financial.Bank.getUnavailable(gm.getRoot());
         List<PublicCertificate> minorCerts = minor.getCertificates();
         
         if (minorCerts != null && !minorCerts.isEmpty()) {
@@ -133,8 +132,7 @@ String id = minor.getId();
                 }
 
                 if (p != null) {
-                    mCert.moveTo(ipo);
-
+mCert.moveTo(unavailable);
                     PublicCertificate shareToGive = null;
                     boolean givePresident = isPriorityMinor && mCert.isPresidentShare();
 

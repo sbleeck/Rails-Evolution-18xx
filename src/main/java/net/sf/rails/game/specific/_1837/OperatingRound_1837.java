@@ -777,8 +777,7 @@ public class OperatingRound_1837 extends OperatingRound {
             playersToProcess.add(action.getPlayer());
         }
 
-        net.sf.rails.game.financial.BankPortfolio ipo = net.sf.rails.game.financial.Bank.getIpo(gameManager);
-
+net.sf.rails.game.financial.BankPortfolio unavailable = net.sf.rails.game.financial.Bank.getUnavailable(gameManager.getRoot());
         // 3. Execute Exchange (Just-In-Time Fetch)
         for (Player p : playersToProcess) {
             PortfolioModel pm = ((PortfolioOwner) p).getPortfolioModel();
@@ -803,9 +802,8 @@ public class OperatingRound_1837 extends OperatingRound {
                     targetPresidentShare = true;
                 }
 
-                // A. Surrender Minor Share to IPO
-                minorCert.moveTo(ipo);
-
+                // A. Surrender Minor Share to unavailable
+minorCert.moveTo(unavailable);
                 // B. Find Available Major Share (Anywhere except Player hands)
                 PublicCertificate newShare = null;
                 List<PublicCertificate> allMajorCerts = major.getCertificates();

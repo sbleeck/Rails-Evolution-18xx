@@ -12,7 +12,6 @@ public class FXHexStockChart extends Pane {
 
     private final StockMarket stockMarket;
     private final Group contentGroup;
-    // Define a fixed internal coordinate system
     private final double HEX_RADIUS = 40.0;
     private final double GAP = 2.0;
 
@@ -20,13 +19,11 @@ public class FXHexStockChart extends Pane {
         this.stockMarket = gameUIManager.getRoot().getStockMarket();
         this.contentGroup = new Group();
         
-        // 1. Set Background to White
         setStyle("-fx-background-color: white;");
 
         getChildren().add(contentGroup);
         initializeChart();
         
-        // 2. Add resizing listeners to scale the entire group
         widthProperty().addListener((obs, oldVal, newVal) -> scaleContent());
         heightProperty().addListener((obs, oldVal, newVal) -> scaleContent());
     }
@@ -35,14 +32,14 @@ public class FXHexStockChart extends Pane {
         int rows = stockMarket.getNumberOfRows();
         int cols = stockMarket.getNumberOfColumns();
 
-        // Flat-Topped Hex Geometry
-        double hexWidth = HEX_RADIUS * 2;
-        double hexHeight = Math.sqrt(3) * HEX_RADIUS;
+        // Pointy-Topped Hex Geometry
+        double hexWidth = Math.sqrt(3) * HEX_RADIUS;
+        double hexHeight = HEX_RADIUS * 2;
         
-        // Horizontal spacing: 3/4 of width (for flat-topped)
-        double horizSpacing = hexWidth * 0.75;
-        // Vertical spacing: Full height
-        double vertSpacing = hexHeight;
+        // Vertical spacing: 3/4 of height (for pointy-topped)
+        double vertSpacing = hexHeight * 0.75;
+        // Horizontal spacing: Full width
+        double horizSpacing = hexWidth;
 
         for (int r = 0; r <= rows; r++) {
             for (int c = 0; c <= cols; c++) {
@@ -51,19 +48,17 @@ public class FXHexStockChart extends Pane {
                 if (space != null) {
                     FXHexStockField hexField = new FXHexStockField(space);
                     
-                    // Calculate positions
                     double xPos = c * (horizSpacing + GAP);
                     double yPos = r * (vertSpacing + GAP);
 
-                    // Offset odd columns vertically
-                    if (c % 2 != 0) {
-                        yPos += (vertSpacing + GAP) / 2.0;
+                    // Offset odd rows horizontally (Standard Pointy-Topped / "even-r" or "odd-r")
+                    if (r % 2 != 0) {
+                        xPos += (horizSpacing + GAP) / 2.0;
                     }
 
                     hexField.setLayoutX(xPos);
                     hexField.setLayoutY(yPos);
                     
-                    // Fix the size of the field in the internal coordinate system
                     hexField.setPrefSize(hexWidth, hexHeight);
                     hexField.setMinSize(hexWidth, hexHeight);
                     hexField.setMaxSize(hexWidth, hexHeight);
@@ -75,7 +70,6 @@ public class FXHexStockChart extends Pane {
     }
 
     private void scaleContent() {
-        // Guard against zero-size or uninitialized bounds
         if (contentGroup.getBoundsInLocal().getWidth() == 0) return;
 
         double width = getWidth();
@@ -83,19 +77,15 @@ public class FXHexStockChart extends Pane {
         double contentWidth = contentGroup.getBoundsInLocal().getWidth();
         double contentHeight = contentGroup.getBoundsInLocal().getHeight();
 
-        // Calculate scale to fit, preserving aspect ratio
         double scaleX = width / contentWidth;
         double scaleY = height / contentHeight;
         double scaleFactor = Math.min(scaleX, scaleY);
         
-        // Safety clamp to prevent infinite scaling on minimization
         if (Double.isNaN(scaleFactor) || scaleFactor <= 0) scaleFactor = 1.0;
 
-        // Apply scale
         Scale scale = new Scale(scaleFactor, scaleFactor);
         contentGroup.getTransforms().setAll(scale);
         
-        // Center the content
         double scaledWidth = contentWidth * scaleFactor;
         double scaledHeight = contentHeight * scaleFactor;
         contentGroup.setTranslateX((width - scaledWidth) / 2);

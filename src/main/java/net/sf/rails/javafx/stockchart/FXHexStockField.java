@@ -35,7 +35,6 @@ public class FXHexStockField extends StackPane implements Observer {
         initialize();
         populate();
 
-        // Redraw hex geometry when the component size is set by the Chart
         widthProperty().addListener((o) -> updateHexShape());
         heightProperty().addListener((o) -> updateHexShape());
     }
@@ -69,33 +68,33 @@ public class FXHexStockField extends StackPane implements Observer {
         double h = getHeight();
         if (w <= 0 || h <= 0) return;
 
-        // Flat-Topped Hexagon Points (Scaled to fit w/h)
-        // 0: Top-Left, 1: Top-Right, 2: Right, 3: Bot-Right, 4: Bot-Left, 5: Left
-        double p0x = w * 0.25; double p0y = 0;
-        double p1x = w * 0.75; double p1y = 0;
-        double p2x = w;        double p2y = h / 2.0;
-        double p3x = w * 0.75; double p3y = h;
-        double p4x = w * 0.25; double p4y = h;
-        double p5x = 0;        double p5y = h / 2.0;
+        // Pointy-Topped Hexagon Points (Scaled to fit w/h)
+        // 0: Top, 1: Top-Right, 2: Bot-Right, 3: Bot, 4: Bot-Left, 5: Top-Left
+        double p0x = w / 2.0;  double p0y = 0;
+        double p1x = w;        double p1y = h * 0.25;
+        double p2x = w;        double p2y = h * 0.75;
+        double p3x = w / 2.0;  double p3y = h;
+        double p4x = 0;        double p4y = h * 0.75;
+        double p5x = 0;        double p5y = h * 0.25;
 
         hexagon.getPoints().setAll(
             p0x, p0y, p1x, p1y, p2x, p2y,
             p3x, p3y, p4x, p4y, p5x, p5y
         );
 
-        if (topLedge.isVisible()) topLedge.getPoints().setAll(p0x, p0y, p1x, p1y);
-        if (rightLedge.isVisible()) rightLedge.getPoints().setAll(p1x, p1y, p2x, p2y, p3x, p3y);
+        if (topLedge.isVisible()) topLedge.getPoints().setAll(p5x, p5y, p0x, p0y, p1x, p1y);
+        if (rightLedge.isVisible()) rightLedge.getPoints().setAll(p1x, p1y, p2x, p2y);
     }
 
     public void populate() {
         tokenPane.getChildren().clear();
 
-        // Price Text
         Text priceText = new Text(String.valueOf(model.getPrice()));
         priceText.setFill(Util.isDark(model.getColour()) ? Color.WHITE : Color.BLACK);
-        // Fixed font size; scale transform in Chart handles the zoom
         priceText.setStyle("-fx-font-weight: bold; -fx-font-size: 14px;");
-        priceText.setTranslateY(-getHeight() * 0.25); // Move text up
+        
+        // Adjust text position for pointy-topped orientation
+        priceText.setTranslateY(-getHeight() * 0.15); 
         tokenPane.getChildren().add(priceText);
 
         if (model.hasTokens()) {
@@ -108,15 +107,31 @@ public class FXHexStockField extends StackPane implements Observer {
                     comp.getId()
                 );
                 
-                // Scale token to 2/3 (0.66) of the hex dimension
-                token.prefWidthProperty().bind(widthProperty().multiply(0.66));
-                token.prefHeightProperty().bind(heightProperty().multiply(0.66));
-                
-                // Stacking offset
-                token.setTranslateX(i * 3);
-                token.setTranslateY(i * 3);
-                
-                tokenPane.getChildren().add(token);
+            // Strictly constrain the token size to 33% of hex width to ensure scannability.
+           double markerSize = 40.0; // Base internal size before scaling
+           token.setPrefSize(markerSize, markerSize);
+           token.setMinSize(markerSize, markerSize);
+           token.setMaxSize(markerSize, markerSize);
+           
+           // Bind sizing to hex dimensions at a 0.3 ratio for dynamic scaling
+           token.prefWidthProperty().bind(widthProperty().multiply(0.3));
+           token.prefHeightProperty().bind(heightProperty().multiply(0.3));
+           token.maxWidthProperty().bind(widthProperty().multiply(0.3));
+           token.maxHeightProperty().bind(heightProperty().multiply(0.3));
+           
+           // Shift tokens downward so they don't obscure the price text
+           token.setTranslateY(getHeight() * 0.2);
+           // --- END FIX ---
+           
+// Increase displacement to reduce overlap
+                // Base vertical offset to clear price text
+                double baseOffsetY = getHeight() * 0.20;
+                // Increase 'i' multiplier to stagger them further apart
+                token.setTranslateX(i * 12);
+                token.setTranslateY(baseOffsetY + (i * 12));
+           
+           tokenPane.getChildren().add(token);
+
             }
         }
     }
