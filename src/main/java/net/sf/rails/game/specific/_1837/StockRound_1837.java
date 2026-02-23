@@ -152,17 +152,19 @@ PublicCompany target = Merger1837.getMergeTarget(gameManager, company);
      * @param major ...into the related major company
      * @return True if the merge was successful
      */
-
-    protected boolean mergeCompanies(PublicCompany minor, PublicCompany major,
+protected boolean mergeCompanies(PublicCompany minor, PublicCompany major,
             boolean majorPresident, boolean autoMerge) {
-        Mergers.mergeCompanies(gameManager, minor, major, majorPresident, autoMerge);
+        
+        Merger1837.mergeMinor(gameManager, minor, major);
+
+        // Re-evaluate 1837 directorship to handle 10% exchange share shifts
+        Merger1837.fixDirectorship(gameManager, major);
 
         checkFlotation(major);
-
         hasActed.set(true);
-
         return true;
     }
+
 
     public boolean discardTrain(DiscardTrain action) {
 

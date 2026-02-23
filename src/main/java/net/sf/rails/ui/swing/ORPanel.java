@@ -790,10 +790,16 @@ public class ORPanel extends GridPanel
         }
 
         if (specialNotificationPanel != null) {
-specialNotificationPanel.removeAll();
+            specialNotificationPanel.removeAll();
             specialNotificationPanel.setVisible(false);
         }
 
+        if (specialPanel != null) {
+            specialPanel.removeAll();
+        }
+        if (specialContainer != null) {
+            specialContainer.setVisible(false);
+        }
 
         activePhase = 0;
     }
@@ -810,6 +816,11 @@ specialNotificationPanel.removeAll();
                 lblCompanyInfo.setBackground(Color.LIGHT_GRAY);
                 lblCompanyInfo.setForeground(Color.GRAY);
                 lblPhaseInstruction.setVisible(false); // Hide phase part in SR
+            }
+            if (lblPlayerInfo != null) {
+                lblPlayerInfo.setVisible(false);
+                lblPlayerInfo.setText("");
+                lblPlayerInfo.setBackground(Color.LIGHT_GRAY);
             }
 
             setStandardPanelsVisible(false);

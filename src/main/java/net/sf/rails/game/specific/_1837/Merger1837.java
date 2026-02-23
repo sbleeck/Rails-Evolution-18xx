@@ -81,17 +81,11 @@ String id = minor.getId();
         minor.setClosed();
 
         // --- 4. PLACE MAJOR TOKEN ---
-        // Check exclude list (e.g. S5 in Sd formation usually doesn't get a token if
-        // it's on the same hex?
-        // actually S5 is usually the exception. We pass 'true' to always place unless
-        // logic prevents it)
-        if (targetStop != null) {
-            // Special rule: S5 does not get a token in Sd formation (usually).
-            // We can handle this by checking if the major already has a token there, or
-            // passing a flag.
-            // For general robustness: Don't place if Major already has a token on this
-            // stop.
-
+        // Coal companies do not have physical tokens and do not trigger token placement for the Major
+        boolean isCoal = "Coal".equals(minor.getType().getId());
+        
+        if (!isCoal && targetStop != null) {
+       
             boolean alreadyHasToken = false;
             if (targetStop.getTokens() != null) {
                 for (BaseToken t : targetStop.getTokens()) {
@@ -122,15 +116,58 @@ String id = minor.getId();
             }
         }
 
-        // --- 5. SHARE EXCHANGE ---
-        if (owner != null) {
+
+     // --- 5. SHARE EXCHANGE ---
+        boolean isPriorityMinor = id.equals("S1") || id.equals("K1") || id.equals("U1");
+        net.sf.rails.game.financial.BankPortfolio ipo = net.sf.rails.game.financial.Bank.getIpo(gm);
+
+        List<PublicCertificate> minorCerts = minor.getCertificates();
+        
+        if (minorCerts != null && !minorCerts.isEmpty()) {
+            for (PublicCertificate mCert : minorCerts) {
+                Player p = null;
+                if (mCert.getOwner() instanceof Player) {
+                    p = (Player) mCert.getOwner();
+                } else if (owner != null) {
+                    p = owner; 
+                }
+
+                if (p != null) {
+                    mCert.moveTo(ipo);
+
+                    PublicCertificate shareToGive = null;
+                    boolean givePresident = isPriorityMinor && mCert.isPresidentShare();
+
+                    if (givePresident) {
+                        for (PublicCertificate cert : major.getCertificates()) {
+                            if (cert.isPresidentShare() && !(cert.getOwner() instanceof Player)) {
+                                shareToGive = cert;
+                                break;
+                            }
+                        }
+                    }
+
+                    if (shareToGive == null) {
+                        for (PublicCertificate cert : major.getCertificates()) {
+                            if (!cert.isPresidentShare() && !(cert.getOwner() instanceof Player)) {
+                                shareToGive = cert;
+                                break;
+                            }
+                        }
+                    }
+
+                    if (shareToGive != null) {
+                        shareToGive.moveTo(p);
+                        ReportBuffer.add(gm, "Exchanged " + id + " for " + major.getId() + " " + shareToGive.getShare() + "% share to " + p.getName());
+                    } else {
+                        log.error("CRITICAL: No share available for " + p.getName());
+                    }
+                }
+            }
+        } else if (owner != null) {
+            log.warn("1837_MERGER: Minor " + id + " has no certificates. Forcing exchange to President.");
             PublicCertificate shareToGive = null;
-
-            // Priority: Give President's Share to specific minors (S1 for Sd, K1 for KK, U1
-            // for Ug)
-            // Heuristic: If Minor ID ends in "1", try Pres Share first.
-            boolean isPriorityMinor = id.endsWith("1");
-
+            
             if (isPriorityMinor) {
                 for (PublicCertificate cert : major.getCertificates()) {
                     if (cert.isPresidentShare() && !(cert.getOwner() instanceof Player)) {
@@ -139,14 +176,9 @@ String id = minor.getId();
                     }
                 }
             }
-
-            // Fallback: Standard 10% share
             if (shareToGive == null) {
                 for (PublicCertificate cert : major.getCertificates()) {
-                    // Strict: 10%, Not owned by Player, Not owned by Recipient
-                    if (!cert.isPresidentShare() && cert.getShare() == 10
-                            && !(cert.getOwner() instanceof Player)
-                            && cert.getOwner() != owner) {
+                    if (!cert.isPresidentShare() && !(cert.getOwner() instanceof Player)) {
                         shareToGive = cert;
                         break;
                     }
@@ -155,12 +187,13 @@ String id = minor.getId();
 
             if (shareToGive != null) {
                 shareToGive.moveTo(owner);
-                ReportBuffer.add(gm, "Exchanged " + id + " for " + major.getId() + " " + shareToGive.getShare()
-                        + "% share to " + owner.getName());
+                ReportBuffer.add(gm, "Exchanged " + id + " for " + major.getId() + " " + shareToGive.getShare() + "% share to " + owner.getName());
             } else {
                 log.error("CRITICAL: No share available for " + owner.getName());
             }
         }
+
+        
     }
 
     /**
@@ -179,10 +212,15 @@ String id = minor.getId();
             }
         }
 
+        Player currentPrez = major.getPresident();
+        log.info("1837_DIRECTORSHIP: Evaluating " + major.getId() + ". Current: " + (currentPrez != null ? currentPrez.getName() : "None"));
+        for (Player p : shareCounts.keySet()) {
+            log.info("1837_DIRECTORSHIP: Player " + p.getName() + " holds " + shareCounts.get(p) + "%");
+        }
+
         // 2. Find Leader
         Player newPrez = null;
         int maxShare = -1;
-        Player currentPrez = major.getPresident();
 
         for (Map.Entry<Player, Integer> entry : shareCounts.entrySet()) {
             int share = entry.getValue();
@@ -201,6 +239,8 @@ String id = minor.getId();
         if (newPrez != null && !newPrez.equals(currentPrez)) {
             log.info("FixDirectorship: " + (currentPrez != null ? currentPrez.getName() : "None") + " -> "
                     + newPrez.getName());
+
+                    log.info("1837_DIRECTORSHIP: SHIFT DETECTED! " + (currentPrez != null ? currentPrez.getName() : "None") + " -> " + newPrez.getName());
 
             PublicCertificate presCert = null;
             for (PublicCertificate c : major.getCertificates()) {

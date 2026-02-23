@@ -95,13 +95,47 @@ public class NationalFormationRound extends Round {
         playerManager.setCurrentPlayer(p);
     }
 
-    private void processExchange(PublicCompany minor, PublicCompany major) {
+
+    private void processExchange(PublicCompany minor, PublicCompany major, ExchangeMinorAction action) {
         log.info("1837_NFR: Merging " + minor.getId() + " into " + major.getId());
 
-        // Use Merger1837 class for specific token and asset logic
+if (action.isFormation() && !major.hasFloated()) {
+            net.sf.rails.game.financial.StockMarket market = getRoot().getStockMarket();
+            net.sf.rails.game.financial.StockSpace parSpace = null;
+            
+            boolean isKK = "KK".equals(major.getId());
+            int targetPar = isKK ? 120 : 175;
+
+            for (net.sf.rails.game.financial.StockSpace ss : market.getStartSpaces()) {
+                if (ss.getPrice() == targetPar) {
+                    parSpace = ss;
+                    break;
+                }
+            }
+            if (parSpace == null) {
+                for (int r = 0; r < 50; r++) {
+                    for (int c = 0; c < 50; c++) {
+                        net.sf.rails.game.financial.StockSpace ss = market.getStockSpace(r, c);
+                        if (ss != null && ss.getPrice() == targetPar) {
+                            parSpace = ss;
+                            break;
+                        }
+                    }
+                    if (parSpace != null) break;
+                }
+            }
+            if (parSpace != null) major.setCurrentSpace(parSpace);
+            
+            // Inject starting capital!
+net.sf.rails.game.state.Currency.fromBank(isKK ? 840 : 875, major);
+
+            major.setFloated();
+        }
+
         Merger1837.mergeMinor(gameManager, minor, major);
         Merger1837.fixDirectorship(gameManager, (PublicCompany_1837) major);
     }
+
 
 
 public void start(PublicCompany_1837 national, boolean isTriggered, String reportName) {
@@ -110,11 +144,40 @@ public void start(PublicCompany_1837 national, boolean isTriggered, String repor
         this.discardStep.set(false);
 
         PhaseManager pm = getRoot().getPhaseManager();
-        boolean isForced = !national.hasStarted() && pm.hasReachedPhase(national.getForcedStartPhase());
+
+        boolean isForced = pm.hasReachedPhase(national.getForcedMergePhase()) 
+                           || (!national.hasStarted() && pm.hasReachedPhase(national.getForcedStartPhase()));
+
+
         if ("Sd".equals(national.getId()))
             isForced = true;
-        this.forcedStart.set(isForced);
 
+
+if ("KK".equals(national.getId())) {
+            boolean has4Plus1 = getRoot().getBank().getPool().getPortfolioModel().getTrainList().stream()
+                    .anyMatch(t -> t.getType().getName().equals("4+1"));
+            if (!has4Plus1) {
+                has4Plus1 = getRoot().getCompanyManager().getAllPublicCompanies().stream()
+                        .flatMap(c -> c.getPortfolioModel().getTrainList().stream())
+                        .anyMatch(t -> t.getType().getName().equals("4+1"));
+            }
+            if (has4Plus1) isForced = true;
+        }
+
+        
+this.forcedStart.set(isForced);
+// Suppress redundant engine-triggered NFR prompts if already declined in this OR
+        if (!isForced) {
+            Object interrupted = gameManager.getInterruptedRound();
+            if (interrupted instanceof OperatingRound_1837) {
+                OperatingRound_1837 or = (OperatingRound_1837) interrupted;
+                if (or.declinedNationals.contains(national.getId())) {
+                    log.info("1837_NFR: Skipping auto-triggered NFR because " + national.getId() + " was already declined.");
+                    finishRound();
+                    return;
+                }
+            }
+        }
         ReportBuffer.add(this, LocalText.getText("StartFormationRound", national.getId(), reportName));
         
         // Immediately check if the first minor is valid or if we need to skip/finish
@@ -127,6 +190,28 @@ public void start(PublicCompany_1837 national, boolean isTriggered, String repor
             PublicCompany_1837 target = minors.get(minorIndex.value());
             // If valid, pause here and wait for user input
             if (target != null && !target.isClosed() && target.getPresident() != null) {
+                // Auto-process mandatory formations (Phase 5) without prompting the user.
+                if (forcedStart.value()) {
+                    log.info("1837_NFR: Auto-processing forced exchange for " + target.getId());
+                    PublicCompany_1837 national = getNational();
+                    boolean isFormation = (minorIndex.value() == 0 && !national.hasStarted());
+                    
+                    ExchangeMinorAction ema = new ExchangeMinorAction(target, national, isFormation);
+                    
+                    if (isFormation) {
+                        national.start();
+
+                        String msg = LocalText.getText("START_MERGED_COMPANY", national.getId(),
+                                Bank.format(this, national.getIPOPrice()), national.getStartSpace());
+                        ReportBuffer.add(this, msg);
+                        DisplayBuffer.add(this, msg);
+                    }
+                    
+                    processExchange(target, national, ema);
+                    minorIndex.add(1);
+                    continue;
+                }
+                
                 return;
             }
             // Skip closed or invalid minor
@@ -180,16 +265,14 @@ public void start(PublicCompany_1837 national, boolean isTriggered, String repor
                 exchange.setButtonLabel(LocalText.getText("ExchangeMinorForShare", target.getId(), national.getId()));
             }
             possibleActions.add(exchange);
-
-            if (!forcedStart.value()) {
-                NullAction pass = new NullAction(getRoot(), NullAction.Mode.PASS);
+if (!forcedStart.value()) {
+                NullAction done = new NullAction(getRoot(), NullAction.Mode.DONE);
                 if (isFormation) {
-                    pass.setLabel(LocalText.getText("DeclineFormation"));
+                    done.setLabel(LocalText.getText("DeclineFormation"));
                 } else {
-                    pass.setLabel(LocalText.getText("KeepMinor", target.getId()));
+                    done.setLabel(LocalText.getText("KeepMinor", target.getId()));
                 }
-                possibleActions.add(pass);
-                possibleActions.add(new NullAction(getRoot(), NullAction.Mode.DONE));
+                possibleActions.add(done);
             }
             return true;
         }
@@ -205,21 +288,28 @@ public void start(PublicCompany_1837 national, boolean isTriggered, String repor
 
             if (ema.isFormation()) {
                 national.start();
-                floatCompany(national);
                 String msg = LocalText.getText("START_MERGED_COMPANY", national.getId(),
                         Bank.format(this, national.getIPOPrice()), national.getStartSpace());
                 ReportBuffer.add(this, msg);
                 DisplayBuffer.add(this, msg);
             }
 
-            processExchange(ema.getMinor(), national);
-            
+processExchange(ema.getMinor(), national, ema);
+
             minorIndex.add(1);
             advanceToNextValidMinorOrFinish();
             return true;
         }
 
         if (action instanceof NullAction) {
+
+// Register decline to prevent re-prompting in the same OR for ANY minor
+            if (gameManager.getInterruptedRound() instanceof OperatingRound_1837) {
+                ((OperatingRound_1837) gameManager.getInterruptedRound())
+                        .setNationalFormationDeclined(nationalId.value());
+            }
+
+
             // Case A: Director Declined Formation
             if (minorIndex.value() == 0 && !getNational().hasStarted()) {
                 log.info("1837_NFR: Formation DECLINED by " + currentPlayer.getName());

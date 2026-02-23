@@ -4241,34 +4241,19 @@ public static final Color BG_DISCARD_VOLUNTARY = Color.CYAN; // Light Blue (#ADD
                     hasDirectCompanyIncomeInOr ? c.getLastDividendModel() : c.getLastRevenueModel()) {
                 @Override
                 public void setText(String t) {
-                    int val = 0;
-                    net.sf.rails.game.round.RoundFacade rf = gameUIManager.getGameManager().getCurrentRound();
-                    
-                    if (rf instanceof net.sf.rails.game.OperatingRound) {
-                        net.sf.rails.game.OperatingRound or = (net.sf.rails.game.OperatingRound) rf;
-                        
-                        // 1. Get Total Revenue
-                        int total = c.getLastRevenue();
-                        
-                        // 2. Get Special (Fixed) Revenue
-                        int special = 0;
-                        if (hasDirectCompanyIncomeInOr) {
-                            special = or.getSpecialRevenueOnly(c);
-                        }
 
-                        // 3. Calculate Base (Route) Revenue by subtracting Fixed portion
-                        if (special > 0) {
-                            val = total - special;
-                        } else {
-                            val = or.getBaseRevenueOnly(c);
-                        }
-                    } else if (t != null && t.trim().length() > 0) {
-                        // Fallback for non-OR states
-                        try {
-                            val = Integer.parseInt(t.trim());
-                        } catch (Exception e) {
-                        }
+                    int val = 0;
+                    
+                    if (hasDirectCompanyIncomeInOr) {
+                        // 1837 Logic: Base Revenue = Total - Fixed
+                        val = c.getLastRevenue() - c.getLastDirectIncome();
+                    } else {
+                        // Standard Logic: Base Revenue = Total
+                        val = c.getLastRevenue();
                     }
+
+
+
 
                     // Existing formatting logic (Colors/Suffixes) applied to the specific Base value
                     if (val == 0 && (t == null || t.length() == 0)) {
@@ -4314,15 +4299,7 @@ public static final Color BG_DISCARD_VOLUNTARY = Color.CYAN; // Light Blue (#ADD
                         hasDirectCompanyIncomeInOr ? c.getLastDividendModel() : c.getLastRevenueModel()) {
                     @Override
                     public void setText(String t) {
-                        // --- START FIX ---
-                        int val = 0;
-                        net.sf.rails.game.round.RoundFacade rf = gameUIManager.getGameManager().getCurrentRound();
-
-                        if (rf instanceof net.sf.rails.game.OperatingRound) {
-                            net.sf.rails.game.OperatingRound or = (net.sf.rails.game.OperatingRound) rf;
-                            val = or.getSpecialRevenueOnly(c);
-
-                        }
+                       int val = c.getLastDirectIncome();
 
                         if (val == 0) {
                             super.setText("");
@@ -4330,7 +4307,7 @@ public static final Color BG_DISCARD_VOLUNTARY = Color.CYAN; // Light Blue (#ADD
                             String display = gameUIManager.format(val);
                             super.setText("<html><div align='right'><b>" + display + "</b></div></html>");
                         }
-                        // --- END FIX ---
+                        
                     }
                 };
 

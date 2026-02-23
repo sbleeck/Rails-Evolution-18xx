@@ -229,7 +229,8 @@ public class MapHex extends RailsModel implements RailsOwner, Configurable, Seri
     // Remark: this was a static field in Rails1.x, causing potential undo
     // problems
     private final HashMapState<PublicCompany, Stop> homes = HashMapState.create(this, "homes");
-
+// Local cache to retain all historically instantiated Stops on this hex to prevent AI registry leaks
+    private final Map<Integer, Stop> historicalStops = new HashMap<>();
     private final GenericState<PrivateCompany> blockingPrivateCompany = new GenericState<>(this, "blockingPrivateCompany");
 
     /**
@@ -354,6 +355,7 @@ public class MapHex extends RailsModel implements RailsOwner, Configurable, Seri
             Stop stop = Stop.create(this, station);
             stop.initStopParameters(station);
             stops.put(station, stop);
+            historicalStops.put(stop.getNumber(), stop);
         }
 
         // Deprecated but retained for backwards compatibility:
@@ -703,8 +705,17 @@ public class MapHex extends RailsModel implements RailsOwner, Configurable, Seri
             int stopNumber = stops.size();
             for (Station station : newTile.getStations()) {
                 if (stopsToNewStations.containsValue(station)) continue;
-                // New Station found without an existing Stop: create a new Stop
-                Stop stop = Stop.create(this, ++stopNumber, station);
+                
+                
+                ++stopNumber;
+                Stop stop = historicalStops.get(stopNumber);
+                if (stop == null) {
+                    stop = Stop.create(this, stopNumber, station);
+                    historicalStops.put(stopNumber, stop);
+                } else {
+                    stop.setStation(station);
+                }
+                
                 stop.initStopParameters(station);
                 stops.put (station, stop);
                 stopsToNewStations.put(stop, station);
@@ -830,23 +841,16 @@ public class MapHex extends RailsModel implements RailsOwner, Configurable, Seri
 
             for (Station station : newTile.getStations()) {
 
-                // ID Format: MapHexID + "/" + StationNumber (e.g. "G17/1")
-                String expectedStopId = this.getId() + "/" + station.getNumber();
-
-                Stop stop;
-
-                // Check global registry (Root) for the "Zombie" stop from previous tile
-                Item existingItem = getRoot().locate(expectedStopId);
-
-                if (existingItem instanceof Stop) {
-                    // REUSE: Update the existing stop. 
-                    // This preserves tokens and avoids "Root already contains item" crash.
-                    stop = (Stop) existingItem;
-                    stop.setStation(station); 
+int statNum = station.getNumber();
+                Stop stop = historicalStops.get(statNum);
+                
+                if (stop != null) {
+                    stop.setStation(station);
                 } else {
-                    // CREATE: New station slot.
                     stop = Stop.create(this, station);
+                    historicalStops.put(statNum, stop);
                 }
+                
                 
                 stops.put(station, stop);
             }

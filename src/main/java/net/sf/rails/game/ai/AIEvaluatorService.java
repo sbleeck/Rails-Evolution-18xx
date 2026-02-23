@@ -32,6 +32,7 @@ public class AIEvaluatorService {
 
     // Make sure aiLog is correctly initialized
     private static final Logger aiLog = LoggerFactory.getLogger("AI_Decision_Log");
+    private static final Logger log = LoggerFactory.getLogger(AIPlayer.class);
 
     public AIEvaluatorService() {
         // Constructor
@@ -126,8 +127,12 @@ public class AIEvaluatorService {
                     false // *** Pass false to delay population ***
             );
 
-            // --- 3. EXPLICITLY CLEAR CACHE ---
-            // (Cache clearing logic removed in previous step, remains removed)
+// --- 3. EXPLICITLY CLEAR CACHE ---
+            // The cache must be cleared so the adapter builds a new graph including the hypothetical tile,
+            // rather than evaluating the original state and returning a false delta of 0.
+            if (hypotheticalAdapter.getNetworkAdapterInternal() != null) {
+                hypotheticalAdapter.getNetworkAdapterInternal().clearGraphCache();
+            }
 
             // --- 4. SIMULATE TRAIN PURCHASE (if needed) ---
             if (hypotheticalAdapter.getTrains().isEmpty()) {
@@ -172,6 +177,20 @@ public class AIEvaluatorService {
             hypotheticalAdapter.initRevenueCalculator(true);
             int hypotheticalRevenueValue = hypotheticalAdapter.calculateRevenue();
 
+            // Targeted logging to intercept and analyze the Wien (G17) / Tile 427 upgrade
+            if ("G17".equals(hex.getId()) && "427".equals(newTile.getId())) {
+                aiLog.info("========== WIEN (G17) / TILE 427 SIMULATION ==========");
+                aiLog.info("Calculated Hypothetical Revenue: {}", hypotheticalRevenueValue);
+                if (initialAdapter != null) {
+                    initialAdapter.initRevenueCalculator(true);
+                    aiLog.info("Original Base Revenue: {}", initialAdapter.calculateRevenue());
+                }
+                aiLog.info("Trains executing calculation: {}", hypotheticalAdapter.getTrains());
+                aiLog.info("Simulated Hex Stops & Station Mapping: {}", hex.getStopsMap());
+                aiLog.info("=======================================================");
+            }
+
+
             aiLog.debug(">>> SIM: Calculated hypothetical revenue: {}", hypotheticalRevenueValue);
             return hypotheticalRevenueValue;
 
@@ -192,6 +211,13 @@ public class AIEvaluatorService {
                 aiLog.debug(">>> SIM: Hex {} state AFTER REVERT: Tile={}, Rot={}", hex.getId(),
                         (hex.getCurrentTile() != null ? hex.getCurrentTile().getId() : "null"),
                         hex.getCurrentTileRotation());
+
+                        // Flush the global cache again after the revert.
+                // Failing to do so leaves a "ghost graph" of the reverted tile in the engine,
+                // corrupting subsequent AI evaluations and human player revenue runs.
+                if (initialAdapter != null && initialAdapter.getNetworkAdapterInternal() != null) {
+                    initialAdapter.getNetworkAdapterInternal().clearGraphCache();
+                }
 
             } catch (Exception revertEx) {
                 // Log a critical error if reverting fails, as game state might be corrupted

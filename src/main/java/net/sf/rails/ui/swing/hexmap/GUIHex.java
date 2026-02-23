@@ -605,13 +605,20 @@ public class GUIHex implements Observer {
                 PublicCompany company = token.getParent();
                 drawBaseToken(g2, company, origin, dimensions.tokenDiameter);
             }
-            // check for temporary token
+          // check for temporary token
             if (upgrade instanceof TokenHexUpgrade && ((TokenHexUpgrade) upgrade).getAction() instanceof LayBaseToken) {
                 TokenHexUpgrade tokenUpgrade = (TokenHexUpgrade) upgrade;
-                HexPoint origin = getTokenCenter(j++, tokenUpgrade.getSelectedStop());
-                PublicCompany company = tokenUpgrade.getAction().getCompany();
-                drawBaseToken(g2, company, origin, dimensions.tokenDiameter);
+                // Only evaluate if the upgrade applies to the current stop in the loop
+                if (tokenUpgrade.getSelectedStop() == stop) {
+                    PublicCompany company = tokenUpgrade.getAction().getCompany();
+                    // Prevent ghost token: do not draw if the model already contains this company's token
+                    if (!stop.hasTokenOf(company)) {
+                        HexPoint origin = getTokenCenter(j++, stop);
+                        drawBaseToken(g2, company, origin, dimensions.tokenDiameter);
+                    }
+                }
             }
+            
         }
     }
 

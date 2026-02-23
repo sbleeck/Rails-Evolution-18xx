@@ -31,6 +31,13 @@ public String format(int amount) {
         // Remove 'M' as requested to declutter the UI
         result = result.replace("M", "");
         
+        // Remove 'K' as requested to declutter the UI
+        result = result.replace("K", "");
+        
+                // Remove '$' as requested to declutter the UI
+        result = result.replace("$", "");
+        
+
         // Move any minus to the front
         if (amount < 0) result = result.replaceFirst("(.+)-", "-$1");
         return result;

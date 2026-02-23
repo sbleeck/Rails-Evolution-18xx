@@ -70,7 +70,7 @@ public class OperatingRound_1837 extends OperatingRound {
         super(parent, id);
     }
 
-/**
+    /**
      * Logic to handle Voluntary Discard in 1837.
      * Call this INSTEAD of the standard train buying generation if the company is
      * at the limit.
@@ -80,25 +80,26 @@ public class OperatingRound_1837 extends OperatingRound {
 
         // 1. Iterate unique train types
         for (Train train : company.getPortfolioModel().getUniqueTrains()) {
-            List<Train> singleTrainList = new ArrayList<>();
-            singleTrainList.add(train);
-
-            DiscardTrainVoluntarily action = new DiscardTrainVoluntarily(company, singleTrainList);
-            
             // 2. Calculate Scrap Price
             int scrapPrice = train.getCost() / 2;
-            String priceStr = Bank.format(gameManager, scrapPrice);
-            
-            // --- START FIX ---
-            // 3. Clean Name: Remove the unique ID suffix (e.g., "3_1" -> "3")
-            // Regex matches an underscore followed by digits at the end of the string
-            String cleanName = train.getName().replaceAll("_\\d+$", "");
-            
-            // 4. Set final label: "Discard 3 (100)"
-            action.setLabel("Discard " + cleanName + " (" + priceStr + ")");
-            // --- END FIX ---
-            
-            possibleActions.add(action);
+
+            // Only allow discard if the company has enough cash to pay the scrap price
+            if (company.getCash() >= scrapPrice) {
+                List<Train> singleTrainList = new ArrayList<>();
+                singleTrainList.add(train);
+
+                DiscardTrainVoluntarily action = new DiscardTrainVoluntarily(company, singleTrainList);
+
+                String priceStr = Bank.format(gameManager, scrapPrice);
+
+                // 3. Clean Name: Remove the unique ID suffix (e.g., "3_1" -> "3")
+                String cleanName = train.getName().replaceAll("_\\d+$", "");
+
+                // 4. Set final label: "Discard 3 (100)"
+                action.setLabel("Discard " + cleanName + " (" + priceStr + ")");
+
+                possibleActions.add(action);
+            }
         }
 
         // Add the Skip/Pass Action
@@ -106,6 +107,7 @@ public class OperatingRound_1837 extends OperatingRound {
         done.setLabel("Done / Keep Trains");
         possibleActions.add(done);
     }
+
     /**
      * 1837 nationals may not lay their reserved tokens elsewhere
      * until formation is complete
@@ -173,7 +175,6 @@ public class OperatingRound_1837 extends OperatingRound {
         }
         return true;
     }
-
 
     @Override
     protected String validateSetRevenueAndDividend(SetDividend action) {
@@ -647,10 +648,9 @@ public class OperatingRound_1837 extends OperatingRound {
                 continue;
 
             // Execute Merge
-            // We pass false/false for forced/close because we handle assets manually if
-            // needed
-            // but the Rails Mergers generic usually handles standard asset transfer.
-            Mergers.mergeCompanies(gameManager, coal, major, false, false);
+            // Use 1837-specific merger to ensure exchange shares are transferred correctly
+            Merger1837.mergeMinor(gameManager, coal, major);
+            Merger1837.fixDirectorship(gameManager, major);
 
             // missing LocalText key: Use direct string construction
             ReportBuffer.add(this, "Company " + coal.getId() + " merged into " + major.getId() + " (" + reason + ")");
@@ -874,9 +874,11 @@ public class OperatingRound_1837 extends OperatingRound {
         return true;
     }
 
-    // ... existing code ...
-    // --- REPLACEMENT METHOD: triggerNationalFormation ---
-    private boolean triggerNationalFormation() {
+public boolean triggerNationalFormation() {
+        return triggerNationalFormation(null);
+    }
+
+    public boolean triggerNationalFormation(String triggeringTrain) {
         net.sf.rails.game.PhaseManager pm = getRoot().getPhaseManager();
 
         for (PublicCompany company : gameManager.getAllPublicCompanies()) {
@@ -885,12 +887,16 @@ public class OperatingRound_1837 extends OperatingRound {
                 if (!"National".equals(national.getType().getId()))
                     continue;
 
-                // --- : Check Declined List ---
-                if (declinedNationals.contains(national.getId())) {
-                    continue; // Do not ask again this turn
+                // Strict Target Filtering to prevent rogue NFR triggers mid-turn
+                if (triggeringTrain != null) {
+                    String nId = national.getId();
+                    if (triggeringTrain.equals("4") && !nId.equals("KK") && !nId.equals("Sd")) continue;
+                    if (triggeringTrain.equals("4E") && !nId.equals("Ug")) continue;
+                    if (triggeringTrain.equals("4+1") && !nId.equals("KK")) continue;
+                    if (triggeringTrain.equals("5") && !nId.equals("KK") && !nId.equals("Ug")) continue;
                 }
 
-                // REMOVED tempTriggeredCache check. Reliance on State variable only.
+                // Reliance on State variable only.
                 if (triggeredNationals.contains(national.getId())) {
                     continue; // Already handled
                 }
@@ -901,8 +907,8 @@ public class OperatingRound_1837 extends OperatingRound {
                 // Check Triggers
                 boolean start = !national.hasStarted() && pm.hasReachedPhase(national.getFormationStartPhase());
 
-                // Ug Logic (4E)
-                if (national.getId().equals("Ug") && !national.hasStarted()) {
+                // Ug Logic (4E) - Must continue prompting even after formation until Phase 5
+                if (national.getId().equals("Ug")) {
                     // Check Bank Pool
                     boolean has4E = getRoot().getBank().getPool().getPortfolioModel().getTrainList().stream()
                             .anyMatch(t -> t.getType().getName().equals("4E"));
@@ -921,17 +927,35 @@ public class OperatingRound_1837 extends OperatingRound {
                 boolean forcedStart = !national.hasStarted() && pm.hasReachedPhase(national.getForcedStartPhase());
                 boolean forcedMerge = !national.isComplete() && pm.hasReachedPhase(national.getForcedMergePhase());
 
+                if (national.getId().equals("KK") && !national.isComplete()) {
+                    boolean has4Plus1 = getRoot().getBank().getPool().getPortfolioModel().getTrainList().stream()
+                            .anyMatch(t -> t.getType().getName().equals("4+1"));
+                    if (!has4Plus1) {
+                        has4Plus1 = gameManager.getAllPublicCompanies().stream()
+                                .flatMap(c -> c.getPortfolioModel().getTrainList().stream())
+                                .anyMatch(t -> t.getType().getName().equals("4+1"));
+                    }
+                    if (has4Plus1) {
+                        forcedStart = true;
+                        forcedMerge = true;
+                    }
+                }
+// Trigger NFR immediately for all valid formations so it interrupts BEFORE train limits
+                boolean shouldTrigger = start || forcedStart || forcedMerge;
+
                 // If valid trigger found:
-                if (start || forcedStart || forcedMerge) {
+                if (shouldTrigger) {
+                    if (!forcedStart && !forcedMerge && declinedNationals.contains(national.getId())) {
+                        continue;
+                    }
                     log.debug("1837_FIX: Triggering NFR for " + national.getId());
 
                     triggeredNationals.add(national.getId());
 
-
-// Generate a unique ID to avoid "Root already contains item" exception
+                    // Generate a unique ID to avoid "Root already contains item" exception
                     String uniqueId = "NFR_" + national.getId() + "_" + System.currentTimeMillis();
                     NationalFormationRound nfr = new NationalFormationRound(gameManager, uniqueId);
-                    
+
                     gameManager.setInterruptedRound(this);
                     gameManager.setRound(nfr);
                     nfr.start(national, true, "Triggered");
@@ -1070,13 +1094,13 @@ public class OperatingRound_1837 extends OperatingRound {
     public void start() {
         processMandatoryExchanges();
 
-       // 1. Initial State Cleanup
+        // 1. Initial State Cleanup
         triggeredNationals.clear();
         declinedNationals.clear();
         skippedMinors.clear();
 
         // 2. INJECT MEMORY: Check if we inherited any skips from the previous CER
-if (gameManager instanceof GameManager_1837) {
+        if (gameManager instanceof GameManager_1837) {
             java.util.List<String> inherited = ((GameManager_1837) gameManager).popTempSkippedMinors();
             if (!inherited.isEmpty()) {
                 log.info("1837_LOGIC: Inherited skipped minors from CER: " + inherited);
@@ -1097,7 +1121,7 @@ if (gameManager instanceof GameManager_1837) {
         }
 
         // 4. Delegate or Start
-        if (anyExchangePossible && !gameManager.isReloading()) {
+        if (anyExchangePossible) {
             log.info("1837_LOGIC: Redirecting to CoalExchangeRound.");
             CoalExchangeRound cer = new CoalExchangeRound(gameManager, "CER_" + getId());
             gameManager.setInterruptedRound(this);
@@ -1172,10 +1196,10 @@ if (gameManager instanceof GameManager_1837) {
         if (result && action.getTrain() != null) {
             String trainName = action.getTrain().getType().getName();
 
-            // We restore '4' (KK) and '4E' (Ug) here.
-            if (trainName.equals("4") || trainName.equals("4E") || trainName.equals("5")) {
+            // We restore '4' (KK), '4E' (Ug), and '4+1' (KK Forced) here.
+            if (trainName.equals("4") || trainName.equals("4E") || trainName.equals("5") || trainName.equals("4+1")) {
                 log.debug("1837_FIX: Trigger Train (" + trainName + ") bought. Checking National Formation...");
-                triggerNationalFormation();
+triggerNationalFormation(trainName);
             }
 
             // Mandatory Coal Exchanges (Phase 5)
@@ -1307,7 +1331,7 @@ if (gameManager instanceof GameManager_1837) {
         // --- END FIX ---
     }
 
-@Override
+    @Override
     public boolean process(PossibleAction action) {
         // 1. Handle Special Phase Exchanges
         if (action instanceof ExchangeMinorAction) {
@@ -1317,8 +1341,8 @@ if (gameManager instanceof GameManager_1837) {
         // 2. Handle Voluntary Discard Logic (Payment)
         if (action instanceof DiscardTrainVoluntarily) {
             DiscardTrainVoluntarily dtv = (DiscardTrainVoluntarily) action;
-            
-            // The action was created with a single train in the list, so getSelectedTrain() 
+
+            // The action was created with a single train in the list, so getSelectedTrain()
             // (inherited from DiscardTrain) will return that train.
             Train train = dtv.getSelectedTrain();
 
@@ -1331,17 +1355,18 @@ if (gameManager instanceof GameManager_1837) {
                 if (cost > 0) {
                     PublicCompany company = operatingCompany.value();
                     Bank bank = Bank.get(this);
-                    
+
                     // Move cash from Company -> Bank
                     company.getPurse().getCurrency().move(company, cost, bank);
 
-                    ReportBuffer.add(this, LocalText.getText("PaysToBank", 
-                        company.getId(), 
-                        Bank.format(this, cost), 
-                        "voluntary surrender of " + train.getName()));
+                    ReportBuffer.add(this, LocalText.getText("PaysToBank",
+                            company.getId(),
+                            Bank.format(this, cost),
+                            "voluntary surrender of " + train.getName()));
                 }
             }
-            // Now delegate to super.process() which handles the actual removing of the train object
+            // Now delegate to super.process() which handles the actual removing of the
+            // train object
             return super.process(action);
         }
 
@@ -1357,7 +1382,6 @@ if (gameManager instanceof GameManager_1837) {
     private boolean hasExchangeableMinors(Player p) {
         if (p == null)
             return false;
-
 
         // Use generic Owner check to be safe
         if (p instanceof PortfolioOwner) {
@@ -1379,9 +1403,10 @@ if (gameManager instanceof GameManager_1837) {
 
                 PublicCompany target = Merger1837.getMergeTarget(gameManager, comp);
 
-                // If target is null, it's not an exchangeable minor/coal (handles SB, Sd, etc. automatically)
+                // If target is null, it's not an exchangeable minor/coal (handles SB, Sd, etc.
+                // automatically)
                 if (target != null && target.hasFloated() && comp.getPresident() == p) {
-                     return true;
+                    return true;
                 }
 
             }
@@ -1395,10 +1420,9 @@ if (gameManager instanceof GameManager_1837) {
     public void resume() {
         log.info("1837_TRACE: Resuming OperatingRound " + getId());
 
-
         // 1. Critical Logic: Check if the company closed during the NFR
         if (operatingCompany.value() != null && operatingCompany.value().isClosed()) {
-            log.warn("1837_LOGIC: Resuming OR but operating company " + operatingCompany.value().getId() 
+            log.warn("1837_LOGIC: Resuming OR but operating company " + operatingCompany.value().getId()
                     + " is CLOSED. Advancing turn.");
             finishTurn();
             if (gameManager.getCurrentRound() == this) {
@@ -1407,25 +1431,17 @@ if (gameManager instanceof GameManager_1837) {
             return;
         }
 
-        // 2. Transition Logic: If we are returning from an NFR that was triggered by a train buy,
-        // the PossibleActions list might still contain the BuyTrain action that started it.
+        // 2. Transition Logic: If we are returning from an NFR that was triggered by a
+        // train buy,
+        // the PossibleActions list might still contain the BuyTrain action that started
+        // it.
         // We must clear it and force the turn to finish to break the execution loop.
         if (getStep() == GameDef.OrStep.BUY_TRAIN) {
-            log.info("1837_LOGIC: Resuming from interruption during BuyTrain step. Finalizing turn.");
+log.info("1837_LOGIC: Resuming from interruption during BuyTrain step. Continuing turn.");
             possibleActions.clear();
-            finishTurn();
-
-            // 1. Correct the compilation error by using getCurrentRound()
-            // 2. Prevent legacy actions from overwriting the next round's list
-            if (gameManager.getCurrentRound() != this) {
-                return;
-            }
-            
-            // 3. Ensure the replayer has valid actions if we didn't transition
-            setPossibleActions(); 
+            setPossibleActions();
             return;
         }
-
 
         setPossibleActions();
     }

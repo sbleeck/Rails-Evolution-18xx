@@ -56,8 +56,37 @@ public class GameManager_1837 extends GameManager {
             if (doneThisRound.contains(nationalName))
                 continue;
             PublicCompany_1837 national = (PublicCompany_1837) companyManager.getPublicCompany(nationalName);
-            if (phaseManager.hasReachedPhase(national.getFormationStartPhase())
-                    && !NationalFormationRound.nationalIsComplete(national)) {
+
+            boolean canStart = phaseManager.hasReachedPhase(national.getFormationStartPhase());
+
+            if (nationalName.equals("Ug")) {
+                boolean has4E = getRoot().getBank().getPool().getPortfolioModel().getTrainList().stream()
+                        .anyMatch(t -> t.getType().getName().equals("4E"));
+                if (!has4E) {
+                    has4E = companyManager.getAllPublicCompanies().stream()
+                            .flatMap(c -> c.getPortfolioModel().getTrainList().stream())
+                            .anyMatch(t -> t.getType().getName().equals("4E"));
+                }
+                if (has4E)
+                    canStart = true;
+            }
+            boolean forced = phaseManager.hasReachedPhase(national.getForcedStartPhase())
+                    || phaseManager.hasReachedPhase(national.getForcedMergePhase());
+
+            if (nationalName.equals("KK") && !NationalFormationRound.nationalIsComplete(national)) {
+                boolean has4Plus1 = getRoot().getBank().getPool().getPortfolioModel().getTrainList().stream()
+                        .anyMatch(t -> t.getType().getName().equals("4+1"));
+                if (!has4Plus1) {
+                    has4Plus1 = companyManager.getAllPublicCompanies().stream()
+                            .flatMap(c -> c.getPortfolioModel().getTrainList().stream())
+                            .anyMatch(t -> t.getType().getName().equals("4+1"));
+                }
+                if (has4Plus1)
+                    forced = true;
+            }
+
+            if ((canStart || forced) && !NationalFormationRound.nationalIsComplete(national)) {
+
                 if (newPhaseId != null) {
                     if (newPhaseId.equals(national.getFormationStartPhase())
                             && NationalFormationRound.presidencyIsInPool(national)
@@ -185,7 +214,7 @@ public class GameManager_1837 extends GameManager {
 
         } else if (prevRound instanceof NationalFormationRound) {
             doneThisRound.add(((NationalFormationRound) prevRound).getNational().getId());
-Round interruptedRound = (Round) getInterruptedRound();
+            Round interruptedRound = (Round) getInterruptedRound();
 
             // If the NFR finished, check if a CER or another NFR is now due
             // before returning to the OR or SR.
@@ -206,7 +235,6 @@ Round interruptedRound = (Round) getInterruptedRound();
                     // Fallback for StockRound or other unexpected round types
                     interruptedRound.setPossibleActions();
                 }
-
 
             } else {
                 super.nextRound(previousSRorOR.value());

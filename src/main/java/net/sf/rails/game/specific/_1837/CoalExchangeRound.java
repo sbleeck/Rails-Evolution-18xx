@@ -170,9 +170,11 @@ PublicCompany target = Merger1837.getMergeTarget(gameManager, comp);
 
 if (action instanceof ExchangeMinorAction) {
             ExchangeMinorAction exc = (ExchangeMinorAction) action;
-            Mergers.mergeCompanies(gameManager, exc.getMinor(), exc.getTargetMajor(), false, false);
             
-            // --- START FIX: Detect Over Limit ---
+            Merger1837.mergeMinor(gameManager, exc.getMinor(), exc.getTargetMajor());
+            Merger1837.fixDirectorship(gameManager, exc.getTargetMajor());
+            
+            //  Detect Over Limit ---
             PublicCompany target = exc.getTargetMajor();
             if (target.getNumberOfTrains() > target.getCurrentTrainLimit()) {
                 log.info("1837_LOGIC: Company " + target.getId() + " is over train limit (" 
@@ -181,7 +183,6 @@ if (action instanceof ExchangeMinorAction) {
                 setPossibleActions(); // Will now generate discard buttons
                 return true;
             }
-            // --- END FIX ---
 
             if (!hasExchangeableMinors(gameManager.getCurrentPlayer())) {
                 advancePlayer();
