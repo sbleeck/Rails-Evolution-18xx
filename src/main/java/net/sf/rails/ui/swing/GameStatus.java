@@ -1584,23 +1584,21 @@ public static final Color BG_DISCARD_VOLUNTARY = Color.CYAN; // Light Blue (#ADD
         // 4. Compare and Recreate
         // Self-Healing: If component count is 0, the previous render failed/crashed.
         // Force recreation even if signature matches to recover from "Grey Screen".
-        if (!currentSignature.equals(previousDashboardSignature) || this.getComponentCount() == 0) {
+       if (!currentSignature.equals(previousDashboardSignature) || this.getComponentCount() == 0) {
             previousDashboardSignature = currentSignature;
             recreate();
-        } else {
-            // We must call initTurn to clear stale actions (e.g. K2) and attach new ones (e.g. K3).
-            
-            int currentActor = -1;
-            if (players != null && players.getCurrentPlayer() != null) {
-                currentActor = players.getCurrentPlayer().getIndex();
-            } else {
-                currentActor = this.actorIndex;
-            }
-            
-            // Re-run the turn logic to update button states (Active/Passive) without rebuilding components
-            initTurn(currentActor, true);
-            repaint();
         }
+            
+        int currentActor = -1;
+        if (players != null && players.getCurrentPlayer() != null) {
+            currentActor = players.getCurrentPlayer().getIndex();
+        } else {
+            currentActor = this.actorIndex;
+        }
+        
+        // Always run the turn logic to update button states (Active/Passive) and attach new actions
+        initTurn(currentActor, true);
+        repaint();
     }
 
     // Method 1: WITH 'Object o' (Handles Actions & Colors)
@@ -3156,15 +3154,22 @@ public static final Color BG_DISCARD_VOLUNTARY = Color.CYAN; // Light Blue (#ADD
                         setTreasuryCertButton(index, true, share);
                 }
             }
-            // initGameSpecificActions();
-            java.util.List<NullAction> nullActions = possibleActions.getType(NullAction.class);
-            if (nullActions != null) {
-                for (NullAction na : nullActions)
-                    (parent).setPassButton(na);
-            }
-            // This connects the 'BuyTrain' actions from the engine to the UI buttons.
             setTrainBuyingActions(possibleActions.getList());
         }
+            
+
+        // Unconditionally sync the Pass/Done button with the engine state
+        if (possibleActions != null) {
+            java.util.List<NullAction> nullActions = possibleActions.getType(NullAction.class);
+            if (nullActions != null) {
+                for (NullAction na : nullActions) {
+                    (parent).setPassButton(na);
+                }
+            }
+        }
+
+
+
 
         try {
             initGameSpecificActions();

@@ -57,7 +57,6 @@ public class NationalFormationRound extends Round {
     }
     // ---------------------------------------------------
 
-
     private List<PublicCompany_1837> getSortedMinors() {
         PublicCompany_1837 national = getNational();
         if (national == null)
@@ -69,9 +68,45 @@ public class NationalFormationRound extends Round {
                 list.add((PublicCompany_1837) c);
             }
         }
-        // Strict Sort by ID (K1, K2, K3) to ensure correct order of asking
-        Collections.sort(list, Comparator.comparing(PublicCompany::getId));
+
+// 1. Formation phase: strictly evaluate #1 minor first to trigger floatation.
+        if (!national.hasStarted()) {
+            list.sort(Comparator.comparing(PublicCompany::getId));
+            return list;
+        }
+
+        // 2. Post-formation rule: Clockwise starting from the National Director.
+        Player director = national.getPresident();
+        if (director == null) {
+            list.sort(Comparator.comparing(PublicCompany::getId));
+            return list;
+        }
+
+        List<Player> players = gameManager.getPlayers();
+        int directorIndex = players.indexOf(director);
+
+        // Sort based on seating distance from the current national director
+        list.sort((m1, m2) -> {
+            Player p1 = m1.getPresident();
+            Player p2 = m2.getPresident();
+            
+            if (p1 == null) return 1;
+            if (p2 == null) return -1;
+            
+            int i1 = players.indexOf(p1);
+            int i2 = players.indexOf(p2);
+            
+            int dist1 = (i1 >= directorIndex) ? (i1 - directorIndex) : (i1 + players.size() - directorIndex);
+            int dist2 = (i2 >= directorIndex) ? (i2 - directorIndex) : (i2 + players.size() - directorIndex);
+            
+            if (dist1 == dist2) {
+                return m1.getId().compareTo(m2.getId()); // Fallback to alphanumeric if co-owned
+            }
+            return Integer.compare(dist1, dist2);
+        });
+        
         return list;
+
     }
 
     /**
@@ -95,14 +130,13 @@ public class NationalFormationRound extends Round {
         playerManager.setCurrentPlayer(p);
     }
 
-
-    private void processExchange(PublicCompany minor, PublicCompany major, ExchangeMinorAction action) {
+    protected void processExchange(PublicCompany minor, PublicCompany major, ExchangeMinorAction action) {
         log.info("1837_NFR: Merging " + minor.getId() + " into " + major.getId());
 
-if (action.isFormation() && !major.hasFloated()) {
+        if (action.isFormation() && !major.hasFloated()) {
             net.sf.rails.game.financial.StockMarket market = getRoot().getStockMarket();
             net.sf.rails.game.financial.StockSpace parSpace = null;
-            
+
             boolean isKK = "KK".equals(major.getId());
             int targetPar = isKK ? 120 : 175;
 
@@ -121,13 +155,15 @@ if (action.isFormation() && !major.hasFloated()) {
                             break;
                         }
                     }
-                    if (parSpace != null) break;
+                    if (parSpace != null)
+                        break;
                 }
             }
-            if (parSpace != null) major.setCurrentSpace(parSpace);
-            
+            if (parSpace != null)
+                major.setCurrentSpace(parSpace);
+
             // Inject starting capital!
-net.sf.rails.game.state.Currency.fromBank(isKK ? 840 : 875, major);
+            net.sf.rails.game.state.Currency.fromBank(isKK ? 840 : 875, major);
 
             major.setFloated();
         }
@@ -136,24 +172,20 @@ net.sf.rails.game.state.Currency.fromBank(isKK ? 840 : 875, major);
         Merger1837.fixDirectorship(gameManager, (PublicCompany_1837) major);
     }
 
-
-
-public void start(PublicCompany_1837 national, boolean isTriggered, String reportName) {
+    public void start(PublicCompany_1837 national, boolean isTriggered, String reportName) {
         this.nationalId.set(national.getId());
         this.minorIndex.set(0);
         this.discardStep.set(false);
 
         PhaseManager pm = getRoot().getPhaseManager();
 
-        boolean isForced = pm.hasReachedPhase(national.getForcedMergePhase()) 
-                           || (!national.hasStarted() && pm.hasReachedPhase(national.getForcedStartPhase()));
-
+        boolean isForced = pm.hasReachedPhase(national.getForcedMergePhase())
+                || (!national.hasStarted() && pm.hasReachedPhase(national.getForcedStartPhase()));
 
         if ("Sd".equals(national.getId()))
             isForced = true;
 
-
-if ("KK".equals(national.getId())) {
+        if ("KK".equals(national.getId())) {
             boolean has4Plus1 = getRoot().getBank().getPool().getPortfolioModel().getTrainList().stream()
                     .anyMatch(t -> t.getType().getName().equals("4+1"));
             if (!has4Plus1) {
@@ -161,59 +193,67 @@ if ("KK".equals(national.getId())) {
                         .flatMap(c -> c.getPortfolioModel().getTrainList().stream())
                         .anyMatch(t -> t.getType().getName().equals("4+1"));
             }
-            if (has4Plus1) isForced = true;
+            if (has4Plus1)
+                isForced = true;
         }
 
-        
-this.forcedStart.set(isForced);
-// Suppress redundant engine-triggered NFR prompts if already declined in this OR
+        this.forcedStart.set(isForced);
+        // Suppress redundant engine-triggered NFR prompts if already declined in this
+        // OR
         if (!isForced) {
             Object interrupted = gameManager.getInterruptedRound();
             if (interrupted instanceof OperatingRound_1837) {
                 OperatingRound_1837 or = (OperatingRound_1837) interrupted;
                 if (or.declinedNationals.contains(national.getId())) {
-                    log.info("1837_NFR: Skipping auto-triggered NFR because " + national.getId() + " was already declined.");
+                    log.info("1837_NFR: Skipping auto-triggered NFR because " + national.getId()
+                            + " was already declined.");
                     finishRound();
                     return;
                 }
             }
         }
         ReportBuffer.add(this, LocalText.getText("StartFormationRound", national.getId(), reportName));
-        
+
         // Immediately check if the first minor is valid or if we need to skip/finish
         advanceToNextValidMinorOrFinish();
+    }
+
+    @Override
+    public void finishRound() {
+        super.finishRound();
     }
 
     private void advanceToNextValidMinorOrFinish() {
         List<PublicCompany_1837> minors = getSortedMinors();
         while (minorIndex.value() < minors.size()) {
             PublicCompany_1837 target = minors.get(minorIndex.value());
-            // If valid, pause here and wait for user input
+
             if (target != null && !target.isClosed() && target.getPresident() != null) {
-                // Auto-process mandatory formations (Phase 5) without prompting the user.
+                // Auto-process mandatory formations (Phase 5/4+1) without prompting the user.
                 if (forcedStart.value()) {
                     log.info("1837_NFR: Auto-processing forced exchange for " + target.getId());
                     PublicCompany_1837 national = getNational();
                     boolean isFormation = (minorIndex.value() == 0 && !national.hasStarted());
-                    
+
                     ExchangeMinorAction ema = new ExchangeMinorAction(target, national, isFormation);
-                    
+
                     if (isFormation) {
                         national.start();
-
                         String msg = LocalText.getText("START_MERGED_COMPANY", national.getId(),
                                 Bank.format(this, national.getIPOPrice()), national.getStartSpace());
                         ReportBuffer.add(this, msg);
                         DisplayBuffer.add(this, msg);
                     }
-                    
+
                     processExchange(target, national, ema);
                     minorIndex.add(1);
                     continue;
                 }
-                
+
+                // If not forced, pause here for user input
                 return;
             }
+
             // Skip closed or invalid minor
             minorIndex.add(1);
         }
@@ -222,19 +262,15 @@ this.forcedStart.set(isForced);
         if (isOverTrainLimit()) {
             discardStep.set(true);
             setCurrentPlayer(getNational().getPresident());
-        } else {
-            finishRound();
         }
+        // DO NOT call finishRound() here. Let setPossibleActions() return false,
+        // which allows the engine to safely close the round on its own schedule.
+        // The round must explicitly set its finished flag when all minors are
+        // processed.
+        finishRound();
     }
 
-@Override
-    protected void finishRound() {
-        // CRITICAL FIX: Pass 'this' (NFR) to GameManager.
-        // Do NOT pass the interrupted round, or GameManager will think the OR is done.
-        gameManager.nextRound(this);
-    }
-
-@Override
+    @Override
     public boolean setPossibleActions() {
         possibleActions.clear();
         PublicCompany_1837 national = getNational();
@@ -253,7 +289,7 @@ this.forcedStart.set(isForced);
         if (minorIndex.value() < minors.size()) {
             PublicCompany_1837 target = minors.get(minorIndex.value());
             Player owner = target.getPresident();
-            
+
             setCurrentPlayer(owner);
 
             boolean isFormation = (minorIndex.value() == 0 && !national.hasStarted());
@@ -265,7 +301,7 @@ this.forcedStart.set(isForced);
                 exchange.setButtonLabel(LocalText.getText("ExchangeMinorForShare", target.getId(), national.getId()));
             }
             possibleActions.add(exchange);
-if (!forcedStart.value()) {
+            if (!forcedStart.value()) {
                 NullAction done = new NullAction(getRoot(), NullAction.Mode.DONE);
                 if (isFormation) {
                     done.setLabel(LocalText.getText("DeclineFormation"));
@@ -276,7 +312,12 @@ if (!forcedStart.value()) {
             }
             return true;
         }
-
+        // 3. AUTO-CLOSE
+        // Failsafe: if we reach here and there are no valid minors left, ensure the
+        // round finishes.
+        if (minorIndex.value() >= minors.size() && !discardStep.value()) {
+            finishRound();
+        }
         return false;
     }
 
@@ -294,7 +335,7 @@ if (!forcedStart.value()) {
                 DisplayBuffer.add(this, msg);
             }
 
-processExchange(ema.getMinor(), national, ema);
+            processExchange(ema.getMinor(), national, ema);
 
             minorIndex.add(1);
             advanceToNextValidMinorOrFinish();
@@ -303,12 +344,11 @@ processExchange(ema.getMinor(), national, ema);
 
         if (action instanceof NullAction) {
 
-// Register decline to prevent re-prompting in the same OR for ANY minor
+            // Register decline to prevent re-prompting in the same OR for ANY minor
             if (gameManager.getInterruptedRound() instanceof OperatingRound_1837) {
                 ((OperatingRound_1837) gameManager.getInterruptedRound())
                         .setNationalFormationDeclined(nationalId.value());
             }
-
 
             // Case A: Director Declined Formation
             if (minorIndex.value() == 0 && !getNational().hasStarted()) {
@@ -336,10 +376,14 @@ processExchange(ema.getMinor(), national, ema);
             }
             return true;
         }
+        // 3. AUTO-CLOSE
+        // Failsafe to ensure the round closes if all minors are processed and no
+        // discard is needed.
+        if (!isOverTrainLimit()) {
+            finishRound();
+        }
 
         return false;
     }
-
-
 
 }

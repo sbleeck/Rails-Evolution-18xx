@@ -35,20 +35,18 @@ public class Merger1837 {
      */
     public static void mergeMinor(GameManager gm, PublicCompany minor, PublicCompany major) {
 
-String id = minor.getId();
+        String id = minor.getId();
         Player owner = minor.getPresident();
         log.info("Merging Minor: " + id + " into " + major.getId() + " (Owner: "
                 + (owner != null ? owner.getName() : "Bank/IPO") + ")");
 
-
         // Assets MUST be moved before the minor is modified or closed
         log.info("1837_MERGER: Commencing asset transfer for " + id);
-      // Use the standard engine method to move Cash, Trains, and Privates.
+        // Use the standard engine method to move Cash, Trains, and Privates.
         // It bypasses the "getTrains() is empty" bug by handling portfolios internally.
         major.transferAssetsFrom(minor);
         log.info("1837_MERGER: Assets (Trains, Cash, Privates) transferred via transferAssetsFrom().");
 
-        
         // --- 1. LOCATE HOME STOP (For Token Placement) ---
         MapHex homeHex = null;
         Stop targetStop = null;
@@ -69,8 +67,6 @@ String id = minor.getId();
             log.info("Transferred " + cash + " from " + id);
         }
 
-    
-
         // Move Privates
         List<net.sf.rails.game.PrivateCompany> privates = new ArrayList<>(minor.getPrivates());
         for (net.sf.rails.game.PrivateCompany p : privates) {
@@ -81,11 +77,12 @@ String id = minor.getId();
         minor.setClosed();
 
         // --- 4. PLACE MAJOR TOKEN ---
-        // Coal companies do not have physical tokens and do not trigger token placement for the Major
+        // Coal companies do not have physical tokens and do not trigger token placement
+        // for the Major
         boolean isCoal = "Coal".equals(minor.getType().getId());
-        
+
         if (!isCoal && targetStop != null) {
-       
+
             boolean alreadyHasToken = false;
             if (targetStop.getTokens() != null) {
                 for (BaseToken t : targetStop.getTokens()) {
@@ -116,23 +113,23 @@ String id = minor.getId();
             }
         }
 
-
-     // --- 5. SHARE EXCHANGE ---
+        // --- 5. SHARE EXCHANGE ---
         boolean isPriorityMinor = id.equals("S1") || id.equals("K1") || id.equals("U1");
-net.sf.rails.game.financial.BankPortfolio unavailable = net.sf.rails.game.financial.Bank.getUnavailable(gm.getRoot());
+        net.sf.rails.game.financial.BankPortfolio unavailable = net.sf.rails.game.financial.Bank
+                .getUnavailable(gm.getRoot());
         List<PublicCertificate> minorCerts = minor.getCertificates();
-        
+
         if (minorCerts != null && !minorCerts.isEmpty()) {
             for (PublicCertificate mCert : minorCerts) {
                 Player p = null;
                 if (mCert.getOwner() instanceof Player) {
                     p = (Player) mCert.getOwner();
                 } else if (owner != null) {
-                    p = owner; 
+                    p = owner;
                 }
 
                 if (p != null) {
-mCert.moveTo(unavailable);
+                    mCert.moveTo(unavailable);
                     PublicCertificate shareToGive = null;
                     boolean givePresident = isPriorityMinor && mCert.isPresidentShare();
 
@@ -156,7 +153,8 @@ mCert.moveTo(unavailable);
 
                     if (shareToGive != null) {
                         shareToGive.moveTo(p);
-                        ReportBuffer.add(gm, "Exchanged " + id + " for " + major.getId() + " " + shareToGive.getShare() + "% share to " + p.getName());
+                        ReportBuffer.add(gm, "Exchanged " + id + " for " + major.getId() + " " + shareToGive.getShare()
+                                + "% share to " + p.getName());
                     } else {
                         log.error("CRITICAL: No share available for " + p.getName());
                     }
@@ -165,7 +163,7 @@ mCert.moveTo(unavailable);
         } else if (owner != null) {
             log.warn("1837_MERGER: Minor " + id + " has no certificates. Forcing exchange to President.");
             PublicCertificate shareToGive = null;
-            
+
             if (isPriorityMinor) {
                 for (PublicCertificate cert : major.getCertificates()) {
                     if (cert.isPresidentShare() && !(cert.getOwner() instanceof Player)) {
@@ -185,22 +183,88 @@ mCert.moveTo(unavailable);
 
             if (shareToGive != null) {
                 shareToGive.moveTo(owner);
-                ReportBuffer.add(gm, "Exchanged " + id + " for " + major.getId() + " " + shareToGive.getShare() + "% share to " + owner.getName());
+                ReportBuffer.add(gm, "Exchanged " + id + " for " + major.getId() + " " + shareToGive.getShare()
+                        + "% share to " + owner.getName());
             } else {
                 log.error("CRITICAL: No share available for " + owner.getName());
             }
         }
 
-        
+    }
+
+
+    /**
+     * Centralized logic to determine if a company merges into another.
+     * STRICTLY checks IDs to avoid false positives (e.g. SB -> Sd).
+     */
+    public static PublicCompany getMergeTarget(GameManager gameManager, PublicCompany source) {
+        if (source == null)
+            return null;
+
+        String id = source.getId();
+        String targetId = null;
+
+        // 1. Explicit Coal Mappings (Exact Match)
+        switch (id) {
+            case "EPP":
+            case "RGTE":
+                targetId = "BK";
+                break;
+
+            case "EOD":
+            case "EKT":
+                targetId = "MS";
+                break;
+
+            case "MLB":
+                targetId = "CL";
+                break;
+
+            case "ZKB":
+            case "SPB":
+                targetId = "SB";
+                break;
+
+            case "LRB":
+            case "EHS":
+                targetId = "TH";
+                break;
+
+            case "BB":
+                targetId = "BH";
+                break;
+        }
+
+        // 2. National Minor Mappings (Strict Regex)
+        // Only matches S1-S5, K1-K3, U1-U3.
+        // Ignores "SB", "Sd", "KK", "Ug", "KA", etc.
+        if (targetId == null) {
+            if (id.matches("S[1-5]")) {
+                targetId = "Sd";
+            } else if (id.matches("K[1-3]")) {
+                targetId = "KK";
+            } else if (id.matches("U[1-3]")) {
+                targetId = "Ug";
+            }
+        }
+
+        if (targetId != null) {
+            return gameManager.getRoot().getCompanyManager().getPublicCompany(targetId);
+        }
+        return null;
+    }
+
+    public static void fixDirectorship(GameManager gm, PublicCompany major) {
+        fixDirectorship(gm, major, null, null, null);
     }
 
     /**
-     * Checks if the President needs to change based on current shareholdings.
-     * Swaps the President's Certificate and returns 20% worth of shares if a swap
-     * occurs.
+     * Overloaded to handle complex tie-breakers for 1837 national companies (e.g.,
+     * Ug).
      */
-    public static void fixDirectorship(GameManager gm, PublicCompany major) {
-
+    public static void fixDirectorship(GameManager gm, PublicCompany major, Map<Player, Integer> directorHistory,
+            Map<Player, Integer> ownerHistory, Player formerU1Owner) {
+        // --- END FIX ---
         // 1. Calculate Holdings
         Map<Player, Integer> shareCounts = new HashMap<>();
         for (PublicCertificate cert : major.getCertificates()) {
@@ -211,7 +275,8 @@ mCert.moveTo(unavailable);
         }
 
         Player currentPrez = major.getPresident();
-        log.info("1837_DIRECTORSHIP: Evaluating " + major.getId() + ". Current: " + (currentPrez != null ? currentPrez.getName() : "None"));
+        log.info("1837_DIRECTORSHIP: Evaluating " + major.getId() + ". Current: "
+                + (currentPrez != null ? currentPrez.getName() : "None"));
         for (Player p : shareCounts.keySet()) {
             log.info("1837_DIRECTORSHIP: Player " + p.getName() + " holds " + shareCounts.get(p) + "%");
         }
@@ -220,25 +285,91 @@ mCert.moveTo(unavailable);
         Player newPrez = null;
         int maxShare = -1;
 
+        // --- START FIX ---
+        // --- DELETE --- for (Map.Entry<Player, Integer> entry :
+        // shareCounts.entrySet()) {
+        // --- DELETE --- int share = entry.getValue();
+        // --- DELETE --- if (share > maxShare) {
+        // --- DELETE --- maxShare = share;
+        // --- DELETE --- newPrez = entry.getKey();
+        // --- DELETE --- } else if (share == maxShare) {
+        // --- DELETE --- // Tie: Incumbent wins
+        // --- DELETE --- if (currentPrez != null && entry.getKey().equals(currentPrez))
+        // {
+        // --- DELETE --- newPrez = currentPrez;
+        // --- DELETE --- }
+        // --- DELETE --- }
+        // --- DELETE --- }
+
+        List<Player> tiedPlayers = new ArrayList<>();
+
         for (Map.Entry<Player, Integer> entry : shareCounts.entrySet()) {
             int share = entry.getValue();
             if (share > maxShare) {
                 maxShare = share;
-                newPrez = entry.getKey();
+                tiedPlayers.clear();
+                tiedPlayers.add(entry.getKey());
             } else if (share == maxShare) {
-                // Tie: Incumbent wins
-                if (currentPrez != null && entry.getKey().equals(currentPrez)) {
+                tiedPlayers.add(entry.getKey());
+            }
+        }
+
+        if (tiedPlayers.size() == 1) {
+            newPrez = tiedPlayers.get(0);
+        } else if (tiedPlayers.size() > 1) {
+            // TIE BREAKER LOGIC
+            if ("Ug".equals(major.getId()) && directorHistory != null && ownerHistory != null
+                    && formerU1Owner != null) {
+                // Rule 1: Director of lowest-numbered minor
+                int lowestDir = 999;
+                for (Player p : tiedPlayers) {
+                    if (directorHistory.containsKey(p) && directorHistory.get(p) < lowestDir) {
+                        lowestDir = directorHistory.get(p);
+                        newPrez = p;
+                    }
+                }
+                if (newPrez == null) {
+                    // Rule 2: Owner of lowest-numbered minor
+                    int lowestOwn = 999;
+                    for (Player p : tiedPlayers) {
+                        if (ownerHistory.containsKey(p) && ownerHistory.get(p) < lowestOwn) {
+                            lowestOwn = ownerHistory.get(p);
+                            newPrez = p;
+                        }
+                    }
+                }
+                if (newPrez == null) {
+                    // Rule 3: Closest to left of former U1 owner
+                    List<Player> players = gm.getPlayers();
+                    int u1Index = players.indexOf(formerU1Owner);
+                    int minDistance = 999;
+                    for (Player p : tiedPlayers) {
+                        int pIndex = players.indexOf(p);
+                        int dist = (pIndex > u1Index) ? (pIndex - u1Index) : (pIndex + players.size() - u1Index);
+                        if (dist < minDistance) {
+                            minDistance = dist;
+                            newPrez = p;
+                        }
+                    }
+                }
+            } else {
+                // Standard tie-breaker: Incumbent wins
+                if (currentPrez != null && tiedPlayers.contains(currentPrez)) {
                     newPrez = currentPrez;
+                } else {
+                    newPrez = tiedPlayers.get(0); // Fallback
                 }
             }
         }
+        // --- END FIX ---
 
         // 3. Execute Swap
         if (newPrez != null && !newPrez.equals(currentPrez)) {
             log.info("FixDirectorship: " + (currentPrez != null ? currentPrez.getName() : "None") + " -> "
                     + newPrez.getName());
 
-                    log.info("1837_DIRECTORSHIP: SHIFT DETECTED! " + (currentPrez != null ? currentPrez.getName() : "None") + " -> " + newPrez.getName());
+            log.info("1837_DIRECTORSHIP: SHIFT DETECTED! " + (currentPrez != null ? currentPrez.getName() : "None")
+                    + " -> " + newPrez.getName());
 
             PublicCertificate presCert = null;
             for (PublicCertificate c : major.getCertificates()) {
@@ -285,51 +416,4 @@ mCert.moveTo(unavailable);
         }
     }
 
-    /**
-     * Centralized logic to determine if a company merges into another.
-     * STRICTLY checks IDs to avoid false positives (e.g. SB -> Sd).
-     */
-    public static PublicCompany getMergeTarget(GameManager gameManager, PublicCompany source) {
-        if (source == null) return null;
-        
-        String id = source.getId();
-        String targetId = null;
-
-        // 1. Explicit Coal Mappings (Exact Match)
-        switch (id) {
-            case "EPP": 
-            case "RGTE": targetId = "BK"; break;
-            
-            case "EOD": 
-            case "EKT":  targetId = "MS"; break;
-            
-            case "MLB":  targetId = "CL"; break;
-            
-            case "ZKB": 
-            case "SPB":  targetId = "SB"; break;
-            
-            case "LRB": 
-            case "EHS":  targetId = "TH"; break;
-            
-            case "BB":   targetId = "BH"; break;
-        }
-
-        // 2. National Minor Mappings (Strict Regex)
-        // Only matches S1-S5, K1-K3, U1-U3. 
-        // Ignores "SB", "Sd", "KK", "Ug", "KA", etc.
-        if (targetId == null) {
-            if (id.matches("S[1-5]")) {
-                targetId = "Sd";
-            } else if (id.matches("K[1-3]")) {
-                targetId = "KK"; 
-            } else if (id.matches("U[1-3]")) {
-                targetId = "Ug";
-            }
-        }
-
-        if (targetId != null) {
-            return gameManager.getRoot().getCompanyManager().getPublicCompany(targetId);
-        }
-        return null;
-    }
 }
