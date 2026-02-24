@@ -322,41 +322,58 @@ public class LayTile extends PossibleORAction implements Comparable<LayTile> {
         return hex.getTileCost();
     }
 
-    // TODO: Check for and add the missing attributes
+
+// TODO: Check for and add the missing attributes
     @Override
     protected boolean equalsAs(PossibleAction pa, boolean asOption) {
         // identity always true
         if (pa == this)
             return true;
         // super checks both class identity and super class attributes
-        if (!super.equalsAs(pa, asOption))
+        if (!super.equalsAs(pa, asOption)) {
+            if (this.chosenHexName != null && this.chosenHexName.equals("G17")) {
+                log.debug("LayTile MATCH FAIL [G17]: super.equalsAs failed.");
+            }
             return false;
+        }
 
         // check asOption attributes
         LayTile action = (LayTile) pa;
-        // boolean options = (this.locations == null || this.locations.isEmpty() ||
-        // this.locations.contains(action.chosenHex))
         boolean options = (this.locations == null || this.locations.isEmpty()
                 || this.locationNames.equals(action.locationNames))
                 && (this.tiles == null || this.tiles.isEmpty()
                         || Objects.equal(this.tiles, action.tiles)
-                                // || this.tiles.contains(action.getLaidTile()) )
-                                // && Objects.equal(this.type, action.type) // type is not always stored
                                 && Objects.equal(this.specialProperty, action.specialProperty));
-        ;
+
+        if (!options && this.chosenHexName != null && this.chosenHexName.equals("G17")) {
+            log.debug("LayTile MATCH FAIL [G17]: options check failed.");
+        }
 
         // finish if asOptions check
         if (asOption)
             return options;
 
-        // check asAction attributes
-        return options
-                && Objects.equal(this.laidTile, action.laidTile)
-                && Objects.equal(this.chosenHex, action.chosenHex)
-                && Objects.equal(this.orientation, action.orientation)
-                && Objects.equal(this.relaidBaseTokens, action.relaidBaseTokens);
+       // check asAction attributes
+        boolean laidTileMatch = Objects.equal(this.laidTile, action.laidTile);
+        boolean chosenHexMatch = Objects.equal(this.chosenHex, action.chosenHex);
+        
+        boolean orientationMatch = Objects.equal(this.orientation, action.orientation);
+        
+        // Symmetrical Tile Override: Force match for tiles that are mechanically identical in all orientations
+        if (!orientationMatch && laidTileMatch && this.laidTile != null) {
+            String tileId = this.laidTile.getId();
+            if ("427".equals(tileId) || "63".equals(tileId) || "435".equals(tileId)) {
+                orientationMatch = true;
+            }
+        }
 
+        boolean relaidTokensMatch = Objects.equal(this.relaidBaseTokens, action.relaidBaseTokens);
+
+        return options && laidTileMatch && chosenHexMatch && orientationMatch && relaidTokensMatch;
+        
     }
+
+
 
     // TODO: Check for and add the missing attributes
     @Override

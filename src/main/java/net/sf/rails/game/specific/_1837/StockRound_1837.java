@@ -31,6 +31,8 @@ public class StockRound_1837 extends StockRound {
     protected final BooleanState discardingTrains = new BooleanState(this,
             "discardingTrains");
     protected PublicCompany[] discardingCompanies;
+    protected final ArrayListState<String> triggeredNationals = new ArrayListState<>(this, "triggeredNationals");
+    protected final ArrayListState<String> declinedNationals = new ArrayListState<>(this, "declinedNationals");
 
     public StockRound_1837(GameManager parent, String id) {
         super(parent, id);
@@ -75,7 +77,7 @@ public class StockRound_1837 extends StockRound {
             if ("Minor".equals(type) || "Coal".equals(type)) {
 
                 // 3. Find Target
-PublicCompany target = Merger1837.getMergeTarget(gameManager, company);
+                PublicCompany target = Merger1837.getMergeTarget(gameManager, company);
                 // 4. Validate Merge Eligibility
                 // - Target must exist
                 // - Target must have floated (Rule: "Coal companies... if a corporation has
@@ -129,7 +131,6 @@ PublicCompany target = Merger1837.getMergeTarget(gameManager, company);
         return result;
     }
 
-
     /**
      * Merge a minor into an already started company.
      * 
@@ -152,9 +153,9 @@ PublicCompany target = Merger1837.getMergeTarget(gameManager, company);
      * @param major ...into the related major company
      * @return True if the merge was successful
      */
-protected boolean mergeCompanies(PublicCompany minor, PublicCompany major,
+    protected boolean mergeCompanies(PublicCompany minor, PublicCompany major,
             boolean majorPresident, boolean autoMerge) {
-        
+
         Merger1837.mergeMinor(gameManager, minor, major);
 
         // Re-evaluate 1837 directorship to handle 10% exchange share shifts
@@ -164,7 +165,6 @@ protected boolean mergeCompanies(PublicCompany minor, PublicCompany major,
         hasActed.set(true);
         return true;
     }
-
 
     public boolean discardTrain(DiscardTrain action) {
 
@@ -293,7 +293,8 @@ protected boolean mergeCompanies(PublicCompany minor, PublicCompany major,
     @Override
     public void finishRound() {
 
-        if (discardingTrains.value()) return;
+        if (discardingTrains.value())
+            return;
 
         super.finishRound();
     }
@@ -313,7 +314,7 @@ protected boolean mergeCompanies(PublicCompany minor, PublicCompany major,
             if (!"Minor".equals(type) && !"Coal".equals(type))
                 continue;
 
-            PublicCompany target =Merger1837.getMergeTarget(gameManager, comp);
+            PublicCompany target = Merger1837.getMergeTarget(gameManager, comp);
 
             boolean isPresident = (comp.getPresident() == p);
             boolean targetExists = (target != null);
@@ -336,9 +337,15 @@ protected boolean mergeCompanies(PublicCompany minor, PublicCompany major,
         return found;
     }
 
-
     @Override
     public void start() {
+        triggeredNationals.clear();
+        declinedNationals.clear();
+
+        if (triggerNationalFormation()) {
+            return;
+        }
+
         // Restore to standard Stock Round start.
         super.start();
 
@@ -346,7 +353,7 @@ protected boolean mergeCompanies(PublicCompany minor, PublicCompany major,
             discardingTrains.set(false);
         }
     }
- 
+
     @Override
     public boolean setPossibleActions() {
         // --- START FIX ---
@@ -370,7 +377,6 @@ protected boolean mergeCompanies(PublicCompany minor, PublicCompany major,
 
         return true;
     }
-
 
     @Override
     public boolean process(PossibleAction action) {
@@ -400,16 +406,13 @@ protected boolean mergeCompanies(PublicCompany minor, PublicCompany major,
         return super.process(action);
     }
 
-   
     @Override
     protected void finishTurn() {
         // Restore to standard Stock Round turn finish.
         super.finishTurn();
     }
 
-
-
-// ... (lines of unchanged context code) ...
+    // ... (lines of unchanged context code) ...
 
     // --- START FIX: Generate Discard Buttons ---
     protected boolean setTrainDiscardActions() {
@@ -419,20 +422,20 @@ protected boolean mergeCompanies(PublicCompany minor, PublicCompany major,
         }
 
         PublicCompany company = compWithExcessTrains.get(0);
-        
+
         for (Train train : company.getPortfolioModel().getUniqueTrains()) {
             Set<Train> singleTrainSet = new HashSet<>();
             singleTrainSet.add(train);
-            
+
             DiscardTrain action = new DiscardTrain(company, singleTrainSet);
             action.setLabel("Force Discard " + train.getName());
             possibleActions.add(action);
         }
 
-        // Fix 1: Remove broken GameAction. 
+        // Fix 1: Remove broken GameAction.
         // The ORPanel automatically provides Undo/Redo functionality.
         // We do not need to manually inject a FORCED_UNDO action here.
-        
+
         return true;
     }
     // --- END FIX ---
@@ -440,11 +443,11 @@ protected boolean mergeCompanies(PublicCompany minor, PublicCompany major,
     // --- START FIX: Helper to detect over-limit companies ---
     private void checkExcessTrains() {
         compWithExcessTrains.clear();
-        
+
         // Fix 2: Fetch Majors explicitly since getAllCompanies() is missing.
         // Only Major companies persist and have train limits in this phase.
         List<PublicCompany> companies = gameManager.getRoot().getCompanyManager().getPublicCompaniesByType("Major");
-        
+
         if (companies != null) {
             for (PublicCompany comp : companies) {
                 // Fix 3: Use getCurrentTrainLimit()
@@ -456,17 +459,92 @@ protected boolean mergeCompanies(PublicCompany minor, PublicCompany major,
 
         if (!compWithExcessTrains.isEmpty()) {
             discardingTrains.set(true);
-            setPossibleActions(); 
+            setPossibleActions();
         } else {
             discardingTrains.set(false);
         }
     }
     // --- END FIX ---
 
+    public void setNationalFormationDeclined(String nationalId) {
+        if (!declinedNationals.contains(nationalId)) {
+            declinedNationals.add(nationalId);
+        }
+    }
 
+    @Override
+    public void resume() {
+        if (triggerNationalFormation()) {
+            return;
+        }
+        setPossibleActions();
+    }
 
+ 
+    public boolean triggerNationalFormation() {
+        net.sf.rails.game.PhaseManager pm = getRoot().getPhaseManager();
+        String[] sequence = { "KK", "Ug" };
 
+        for (String targetId : sequence) {
+            PublicCompany company = getRoot().getCompanyManager().getPublicCompany(targetId);
+            if (!(company instanceof PublicCompany_1837))
+                continue;
 
+            PublicCompany_1837 national = (PublicCompany_1837) company;
+            if (!"National".equals(national.getType().getId()))
+                continue;
 
+            if (triggeredNationals.contains(national.getId())) {
+                continue;
+            }
 
+            boolean start = !national.hasStarted() && pm.hasReachedPhase(national.getFormationStartPhase());
+            boolean optionalMerge = (national.getPresident() != null) && !national.isComplete();
+
+            boolean shouldTrigger = false;
+
+            if (optionalMerge) {
+                shouldTrigger = true;
+            } else if (start) {
+                if (national.getId().equals("KK") && pm.hasReachedPhase("4")) {
+                    shouldTrigger = true;
+                } else if (national.getId().equals("Ug")) {
+                    boolean has4E = getRoot().getBank().getPool().getPortfolioModel().getTrainList().stream()
+                            .anyMatch(t -> t.getType().getName().equals("4E"));
+                    if (!has4E) {
+                        has4E = gameManager.getAllPublicCompanies().stream()
+                                .flatMap(c -> c.getPortfolioModel().getTrainList().stream())
+                                .anyMatch(t -> t.getType().getName().equals("4E"));
+                    }
+                    if (has4E)
+                        shouldTrigger = true;
+                }
+            }
+
+            if (shouldTrigger) {
+                if (declinedNationals.contains(national.getId())) {
+                    continue;
+                }
+                log.debug("1837_FIX: Triggering NFR for " + national.getId() + " in Stock Round");
+
+                triggeredNationals.add(national.getId());
+                String uniqueId = "NFR_" + national.getId() + "_" + System.currentTimeMillis();
+
+                if (national.getId().equals("KK")) {
+                    KKFormationRound kkRound = new KKFormationRound(gameManager, uniqueId);
+                    gameManager.setInterruptedRound(this);
+                    gameManager.setRound(kkRound);
+                    kkRound.start(national, true, "Triggered");
+                } else if (national.getId().equals("Ug")) {
+                    UgFormationRound ugRound = new UgFormationRound(gameManager, uniqueId);
+                    gameManager.setInterruptedRound(this);
+                    gameManager.setRound(ugRound);
+                    ugRound.start(national, true, "Triggered");
+                }
+
+                return true;
+            }
+        }
+        return false;
+    }
 }

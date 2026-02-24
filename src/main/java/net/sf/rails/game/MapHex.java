@@ -564,6 +564,10 @@ public class MapHex extends RailsModel implements RailsOwner, Configurable, Seri
      * @param action executed LayTile action
      */
     public void upgrade(LayTile action) {
+
+
+
+        
         Tile newTile = action.getLaidTile();
         HexSide newRotation = action.getLaidTile().getFixedOrientation();
         if (newRotation == null) newRotation = HexSide.get(action.getOrientation());

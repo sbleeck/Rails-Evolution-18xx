@@ -134,6 +134,15 @@ public class Merger1837 {
                     boolean givePresident = isPriorityMinor && mCert.isPresidentShare();
 
                     if (givePresident) {
+                    // 1. Prioritize Reserved Shares from the Unavailable Pool ("Thin Air")
+                    for (PublicCertificate cert : major.getCertificates()) {
+                        if (cert.isPresidentShare() && cert.getOwner() != null && cert.getOwner().equals(unavailable)) {
+                            shareToGive = cert;
+                            break;
+                        }
+                    }
+                    // 2. Fallback to IPO if missing
+                    if (shareToGive == null) {
                         for (PublicCertificate cert : major.getCertificates()) {
                             if (cert.isPresidentShare() && !(cert.getOwner() instanceof Player)) {
                                 shareToGive = cert;
@@ -141,7 +150,17 @@ public class Merger1837 {
                             }
                         }
                     }
+                }
 
+                if (shareToGive == null) {
+                    // 1. Prioritize Reserved 10% Shares from the Unavailable Pool ("Thin Air")
+                    for (PublicCertificate cert : major.getCertificates()) {
+                        if (!cert.isPresidentShare() && cert.getOwner() != null && cert.getOwner().equals(unavailable)) {
+                            shareToGive = cert;
+                            break;
+                        }
+                    }
+                    // 2. Fallback to IPO if missing
                     if (shareToGive == null) {
                         for (PublicCertificate cert : major.getCertificates()) {
                             if (!cert.isPresidentShare() && !(cert.getOwner() instanceof Player)) {
@@ -150,6 +169,7 @@ public class Merger1837 {
                             }
                         }
                     }
+                }
 
                     if (shareToGive != null) {
                         shareToGive.moveTo(p);
@@ -264,42 +284,50 @@ public class Merger1837 {
      */
     public static void fixDirectorship(GameManager gm, PublicCompany major, Map<Player, Integer> directorHistory,
             Map<Player, Integer> ownerHistory, Player formerU1Owner) {
-        // --- END FIX ---
-        // 1. Calculate Holdings
-        Map<Player, Integer> shareCounts = new HashMap<>();
+
+                // 1. Calculate Holdings deterministically based on seat order
+        Map<Player, Integer> shareCounts = new java.util.LinkedHashMap<>();
+        for (Player p : gm.getPlayers()) {
+            shareCounts.put(p, 0);
+        }
         for (PublicCertificate cert : major.getCertificates()) {
             if (cert.getOwner() instanceof Player) {
                 Player p = (Player) cert.getOwner();
-                shareCounts.put(p, shareCounts.getOrDefault(p, 0) + cert.getShare());
+                shareCounts.put(p, shareCounts.get(p) + cert.getShare());
             }
         }
 
         Player currentPrez = major.getPresident();
+        // If currentPrez is null (e.g., just formed), identify who actually holds the president certificate
+        if (currentPrez == null) {
+            for (PublicCertificate cert : major.getCertificates()) {
+                if (cert.isPresidentShare() && cert.getOwner() instanceof Player) {
+                    currentPrez = (Player) cert.getOwner();
+                    break;
+                }
+            }
+        }
+
+        // If NO ONE holds the President's share, the company has not floated and has no director.
+        // We must prevent 10% coal exchange holders from stealing the 20% President's share from the IPO.
+        if (currentPrez == null) {
+            log.info("1837_DIRECTORSHIP: No player holds the President's share for " + major.getId() + ". Skipping shift.");
+            return;
+        }
+
         log.info("1837_DIRECTORSHIP: Evaluating " + major.getId() + ". Current: "
                 + (currentPrez != null ? currentPrez.getName() : "None"));
         for (Player p : shareCounts.keySet()) {
-            log.info("1837_DIRECTORSHIP: Player " + p.getName() + " holds " + shareCounts.get(p) + "%");
+            if (shareCounts.get(p) > 0) {
+                log.info("1837_DIRECTORSHIP: Player " + p.getName() + " holds " + shareCounts.get(p) + "%");
+            }
         }
 
         // 2. Find Leader
         Player newPrez = null;
         int maxShare = -1;
 
-        // --- START FIX ---
-        // --- DELETE --- for (Map.Entry<Player, Integer> entry :
-        // shareCounts.entrySet()) {
-        // --- DELETE --- int share = entry.getValue();
-        // --- DELETE --- if (share > maxShare) {
-        // --- DELETE --- maxShare = share;
-        // --- DELETE --- newPrez = entry.getKey();
-        // --- DELETE --- } else if (share == maxShare) {
-        // --- DELETE --- // Tie: Incumbent wins
-        // --- DELETE --- if (currentPrez != null && entry.getKey().equals(currentPrez))
-        // {
-        // --- DELETE --- newPrez = currentPrez;
-        // --- DELETE --- }
-        // --- DELETE --- }
-        // --- DELETE --- }
+        
 
         List<Player> tiedPlayers = new ArrayList<>();
 
