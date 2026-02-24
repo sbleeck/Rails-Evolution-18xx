@@ -24,6 +24,7 @@ public class NationalFormationRound extends Round {
 
     protected final StringState nationalId = StringState.create(this, "nationalId");
     protected final BooleanState forcedStart = new BooleanState(this, "forcedStart");
+    protected final ArrayListState<String> sortedMinorIds = new ArrayListState<>(this, "sortedMinorIds");
 
     // Tracks which minor we are currently asking (0=K1, 1=K2, 2=K3)
     protected final IntegerState minorIndex = IntegerState.create(this, "MinorIndex", 0);
@@ -58,55 +59,68 @@ public class NationalFormationRound extends Round {
     // ---------------------------------------------------
 
     private List<PublicCompany_1837> getSortedMinors() {
+        List<PublicCompany_1837> list = new ArrayList<>();
+
+        // 1. Return the stable order if it has already been calculated
+        if (!sortedMinorIds.isEmpty()) {
+            for (int i = 0; i < sortedMinorIds.size(); i++) {
+                String id = sortedMinorIds.get(i);
+                PublicCompany c = companyManager.getPublicCompany(id);
+                if (c instanceof PublicCompany_1837) {
+                    list.add((PublicCompany_1837) c);
+                }
+            }
+            return list;
+        }
+
         PublicCompany_1837 national = getNational();
         if (national == null)
-            return new ArrayList<>();
+            return list;
 
-        List<PublicCompany_1837> list = new ArrayList<>();
+        List<PublicCompany_1837> minors = new ArrayList<>();
         for (PublicCompany c : national.getMinors()) {
             if (c instanceof PublicCompany_1837) {
-                list.add((PublicCompany_1837) c);
+                minors.add((PublicCompany_1837) c);
             }
         }
 
-// 1. Formation phase: strictly evaluate #1 minor first to trigger floatation.
+        // 2. Initial calculation: Formation phase uses alphanumeric order
         if (!national.hasStarted()) {
-            list.sort(Comparator.comparing(PublicCompany::getId));
-            return list;
-        }
+            minors.sort(Comparator.comparing(PublicCompany::getId));
+        } else {
+            // 3. Post-formation rule: Clockwise starting from the National Director
+            Player director = national.getPresident();
+            if (director != null) {
+                List<Player> players = gameManager.getPlayers();
+                int directorIndex = players.indexOf(director);
 
-        // 2. Post-formation rule: Clockwise starting from the National Director.
-        Player director = national.getPresident();
-        if (director == null) {
-            list.sort(Comparator.comparing(PublicCompany::getId));
-            return list;
-        }
+                minors.sort((m1, m2) -> {
+                    Player p1 = m1.getPresident();
+                    Player p2 = m2.getPresident();
+                    if (p1 == null)
+                        return 1;
+                    if (p2 == null)
+                        return -1;
 
-        List<Player> players = gameManager.getPlayers();
-        int directorIndex = players.indexOf(director);
+                    int i1 = players.indexOf(p1);
+                    int i2 = players.indexOf(p2);
 
-        // Sort based on seating distance from the current national director
-        list.sort((m1, m2) -> {
-            Player p1 = m1.getPresident();
-            Player p2 = m2.getPresident();
-            
-            if (p1 == null) return 1;
-            if (p2 == null) return -1;
-            
-            int i1 = players.indexOf(p1);
-            int i2 = players.indexOf(p2);
-            
-            int dist1 = (i1 >= directorIndex) ? (i1 - directorIndex) : (i1 + players.size() - directorIndex);
-            int dist2 = (i2 >= directorIndex) ? (i2 - directorIndex) : (i2 + players.size() - directorIndex);
-            
-            if (dist1 == dist2) {
-                return m1.getId().compareTo(m2.getId()); // Fallback to alphanumeric if co-owned
+                    int dist1 = (i1 >= directorIndex) ? (i1 - directorIndex) : (i1 + players.size() - directorIndex);
+                    int dist2 = (i2 >= directorIndex) ? (i2 - directorIndex) : (i2 + players.size() - directorIndex);
+
+                    if (dist1 == dist2) {
+                        return m1.getId().compareTo(m2.getId());
+                    }
+                    return Integer.compare(dist1, dist2);
+                });
             }
-            return Integer.compare(dist1, dist2);
-        });
-        
-        return list;
+        }
 
+        // 4. Persist the order to prevent index shifts during directorship changes
+        for (PublicCompany_1837 m : minors) {
+            sortedMinorIds.add(m.getId());
+        }
+        return minors;
     }
 
     /**

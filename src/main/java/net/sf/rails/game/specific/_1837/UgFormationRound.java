@@ -17,12 +17,11 @@ import org.slf4j.LoggerFactory;
 public class UgFormationRound extends NationalFormationRound {
     private static final Logger log = LoggerFactory.getLogger(UgFormationRound.class);
 
-    // --- START FIX ---
     // Persistent state memory to survive mid-round save/loads during PBEM
     protected final HashMapState<String, Integer> directorHistory = HashMapState.create(this, "directorHistory");
     protected final HashMapState<String, Integer> ownerHistory = HashMapState.create(this, "ownerHistory");
     protected final StringState formerU1Owner = StringState.create(this, "formerU1Owner");
-    // --- END FIX ---
+
 
     public UgFormationRound(GameManager parent, String id) {
         super(parent, id);
@@ -94,5 +93,25 @@ public class UgFormationRound extends NationalFormationRound {
 
         // Execute rule-compliant tie-breaker
         Merger1837.fixDirectorship(gameManager, major, pDirHistory, pOwnHistory, pU1Owner);
+    }
+
+
+    @Override
+    public void finishRound() {
+        log.info("1837_UG_NFR: Finalizing Ug directorship after all exchanges.");
+        PublicCompany major = getNational();
+        if (major != null && major.hasStarted()) {
+            Map<Player, Integer> pDirHistory = new HashMap<>();
+            Map<Player, Integer> pOwnHistory = new HashMap<>();
+            Player pU1Owner = null;
+
+            for (Player p : gameManager.getPlayers()) {
+                if (directorHistory.containsKey(p.getName())) pDirHistory.put(p, directorHistory.get(p.getName()));
+                if (ownerHistory.containsKey(p.getName())) pOwnHistory.put(p, ownerHistory.get(p.getName()));
+                if (p.getName().equals(formerU1Owner.value())) pU1Owner = p;
+            }
+            Merger1837.fixDirectorship(gameManager, major, pDirHistory, pOwnHistory, pU1Owner);
+        }
+        super.finishRound();
     }
 }
