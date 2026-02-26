@@ -337,16 +337,13 @@ public class StockRound_1837 extends StockRound {
         return found;
     }
 
+
     @Override
     public void start() {
         triggeredNationals.clear();
         declinedNationals.clear();
 
-        if (triggerNationalFormation()) {
-            return;
-        }
-
-        // Restore to standard Stock Round start.
+        // All start-of-round CER and NFR triggers are now securely handled by GameManager_1837.nextRound
         super.start();
 
         if (discardingTrains.value()) {
@@ -356,7 +353,6 @@ public class StockRound_1837 extends StockRound {
 
     @Override
     public boolean setPossibleActions() {
-        // --- START FIX ---
         if (compWithExcessTrains.isEmpty()) {
             discardingTrains.set(false);
             return super.setPossibleActions();
@@ -412,9 +408,7 @@ public class StockRound_1837 extends StockRound {
         super.finishTurn();
     }
 
-    // ... (lines of unchanged context code) ...
 
-    // --- START FIX: Generate Discard Buttons ---
     protected boolean setTrainDiscardActions() {
         if (compWithExcessTrains.isEmpty()) {
             discardingTrains.set(false);
@@ -438,9 +432,7 @@ public class StockRound_1837 extends StockRound {
 
         return true;
     }
-    // --- END FIX ---
 
-    // --- START FIX: Helper to detect over-limit companies ---
     private void checkExcessTrains() {
         compWithExcessTrains.clear();
 
@@ -464,7 +456,6 @@ public class StockRound_1837 extends StockRound {
             discardingTrains.set(false);
         }
     }
-    // --- END FIX ---
 
     public void setNationalFormationDeclined(String nationalId) {
         if (!declinedNationals.contains(nationalId)) {
@@ -472,79 +463,18 @@ public class StockRound_1837 extends StockRound {
         }
     }
 
+
+
+
     @Override
     public void resume() {
-        if (triggerNationalFormation()) {
-            return;
-        }
+        log.info("1837_TRACE: Resuming StockRound " + getId());
+
+        // Chain mid-turn cascading formations natively through GameManager
+        GameManager_1837 gm = (GameManager_1837) gameManager;
+        if (gm.checkAndRunKK(null, this, this)) return;
+        if (gm.checkAndRunUG(null, this, this)) return;
+
         setPossibleActions();
-    }
-
- 
-    public boolean triggerNationalFormation() {
-        net.sf.rails.game.PhaseManager pm = getRoot().getPhaseManager();
-        String[] sequence = { "KK", "Ug" };
-
-        for (String targetId : sequence) {
-            PublicCompany company = getRoot().getCompanyManager().getPublicCompany(targetId);
-            if (!(company instanceof PublicCompany_1837))
-                continue;
-
-            PublicCompany_1837 national = (PublicCompany_1837) company;
-            if (!"National".equals(national.getType().getId()))
-                continue;
-
-            if (triggeredNationals.contains(national.getId())) {
-                continue;
-            }
-
-            boolean start = !national.hasStarted() && pm.hasReachedPhase(national.getFormationStartPhase());
-            boolean optionalMerge = (national.getPresident() != null) && !national.isComplete();
-
-            boolean shouldTrigger = false;
-
-            if (optionalMerge) {
-                shouldTrigger = true;
-            } else if (start) {
-                if (national.getId().equals("KK") && pm.hasReachedPhase("4")) {
-                    shouldTrigger = true;
-                } else if (national.getId().equals("Ug")) {
-                    boolean has4E = getRoot().getBank().getPool().getPortfolioModel().getTrainList().stream()
-                            .anyMatch(t -> t.getType().getName().equals("4E"));
-                    if (!has4E) {
-                        has4E = gameManager.getAllPublicCompanies().stream()
-                                .flatMap(c -> c.getPortfolioModel().getTrainList().stream())
-                                .anyMatch(t -> t.getType().getName().equals("4E"));
-                    }
-                    if (has4E)
-                        shouldTrigger = true;
-                }
-            }
-
-            if (shouldTrigger) {
-                if (declinedNationals.contains(national.getId())) {
-                    continue;
-                }
-                log.debug("1837_FIX: Triggering NFR for " + national.getId() + " in Stock Round");
-
-                triggeredNationals.add(national.getId());
-                String uniqueId = "NFR_" + national.getId() + "_" + System.currentTimeMillis();
-
-                if (national.getId().equals("KK")) {
-                    KKFormationRound kkRound = new KKFormationRound(gameManager, uniqueId);
-                    gameManager.setInterruptedRound(this);
-                    gameManager.setRound(kkRound);
-                    kkRound.start(national, true, "Triggered");
-                } else if (national.getId().equals("Ug")) {
-                    UgFormationRound ugRound = new UgFormationRound(gameManager, uniqueId);
-                    gameManager.setInterruptedRound(this);
-                    gameManager.setRound(ugRound);
-                    ugRound.start(national, true, "Triggered");
-                }
-
-                return true;
-            }
-        }
-        return false;
     }
 }

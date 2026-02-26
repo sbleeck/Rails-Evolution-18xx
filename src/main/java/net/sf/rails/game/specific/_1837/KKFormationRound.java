@@ -46,8 +46,7 @@ public class KKFormationRound extends NationalFormationRound {
         // Execute asset transfer and standard individual exchange
         Merger1837.mergeMinor(gameManager, minor, major);
 
-        // Execute standard incumbent-wins directorship resolution
-        Merger1837.fixDirectorship(gameManager, major);
+      
     }
 
 

@@ -36,6 +36,11 @@ public class NationalFormationRound extends Round {
     protected final BooleanState nfrFinishedGuard = new BooleanState(this, "nfrFinishedGuard", false);
     protected Player currentPlayer;
 
+
+    protected final net.sf.rails.game.state.HashMapState<String, Integer> directorHistory = net.sf.rails.game.state.HashMapState.create(this, "directorHistory");
+    protected final net.sf.rails.game.state.HashMapState<String, Integer> ownerHistory = net.sf.rails.game.state.HashMapState.create(this, "ownerHistory");
+    protected final net.sf.rails.game.state.StringState formerMinor1Owner = net.sf.rails.game.state.StringState.create(this, "formerMinor1Owner");
+
     public NationalFormationRound(GameManager parent, String id) {
         super(parent, id);
     }
@@ -242,7 +247,6 @@ public class NationalFormationRound extends Round {
         }
 
         Merger1837.mergeMinor(gameManager, minor, major);
-        Merger1837.fixDirectorship(gameManager, (PublicCompany_1837) major);
     }
 
 
@@ -308,9 +312,130 @@ public class NationalFormationRound extends Round {
         nfrFinishedGuard.set(true);
         log.info("1837_NFR: finishRound initiated for " + nationalId.value());
 
+        PublicCompany_1837 national = getNational();
+        if (national != null && national.hasStarted()) {
+            resolveDirectorship(national);
+        }
+
         super.finishRound();
     }
 
+
+    protected void resolveDirectorship(PublicCompany_1837 major) {
+        log.info("1837_NFR: Resolving directorship for " + major.getId());
+        java.util.List<Player> players = gameManager.getPlayers();
+        Player currentDirector = major.getPresident();
+        int maxShares = 0;
+        
+        java.util.Map<Player, Integer> playerShares = new java.util.HashMap<>();
+        for (Player p : players) {
+            int shares = 0;
+            for (Object obj : p.getPortfolioModel().getCertificates()) {
+                if (obj instanceof net.sf.rails.game.financial.PublicCertificate) {
+                    net.sf.rails.game.financial.PublicCertificate cert = (net.sf.rails.game.financial.PublicCertificate) obj;
+                    if (cert.getCompany().equals(major)) {
+                        shares += cert.getShare();
+                    }
+                }
+            }
+            playerShares.put(p, shares);
+            if (shares > maxShares) maxShares = shares;
+        }
+
+        if (maxShares == 0) return;
+
+        java.util.List<Player> tiedPlayers = new java.util.ArrayList<>();
+        for (Player p : players) {
+            if (playerShares.get(p) == maxShares) {
+                tiedPlayers.add(p);
+            }
+        }
+
+        Player newDirector = currentDirector;
+
+        if (!tiedPlayers.contains(currentDirector) || tiedPlayers.size() > 1) {
+            newDirector = tiedPlayers.get(0); 
+            if (tiedPlayers.size() > 1) {
+                int lowestDirId = 999;
+                Player bestDir = null;
+                for (Player p : tiedPlayers) {
+                    if (directorHistory.containsKey(p.getName()) && directorHistory.get(p.getName()) < lowestDirId) {
+                        lowestDirId = directorHistory.get(p.getName());
+                        bestDir = p;
+                    }
+                }
+
+                if (bestDir != null) {
+                    newDirector = bestDir;
+                } else {
+                    int lowestOwnId = 999;
+                    Player bestOwn = null;
+                    for (Player p : tiedPlayers) {
+                        if (ownerHistory.containsKey(p.getName()) && ownerHistory.get(p.getName()) < lowestOwnId) {
+                            lowestOwnId = ownerHistory.get(p.getName());
+                            bestOwn = p;
+                        }
+                    }
+
+                    if (bestOwn != null) {
+                        newDirector = bestOwn;
+                    } else {
+                        Player m1Owner = null;
+                        for (Player p : players) {
+                            if (p.getName().equals(formerMinor1Owner.value())) m1Owner = p;
+                        }
+                        if (m1Owner != null) {
+                            int m1Idx = players.indexOf(m1Owner);
+                            int bestDist = 999;
+                            for (Player p : tiedPlayers) {
+                                int pIdx = players.indexOf(p);
+                                int dist = (pIdx >= m1Idx) ? (pIdx - m1Idx) : (pIdx + players.size() - m1Idx);
+                                if (dist < bestDist) {
+                                    bestDist = dist;
+                                    newDirector = p;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        if (newDirector != null && newDirector != currentDirector) {
+            log.info("1837_NFR: Directorship shifts to " + newDirector.getName());
+            net.sf.rails.game.financial.PublicCertificate dirCert = null;
+            for (net.sf.rails.game.financial.PublicCertificate pc : major.getCertificates()) {
+                if (pc.isPresidentShare()) {
+                    dirCert = pc;
+                    break;
+                }
+            }
+            if (dirCert != null && dirCert.getOwner() instanceof net.sf.rails.game.model.PortfolioOwner) {
+                net.sf.rails.game.model.PortfolioOwner oldOwner = (net.sf.rails.game.model.PortfolioOwner) dirCert.getOwner();
+                
+                int sharesToSwap = dirCert.getShare();
+                int swapped = 0;
+                java.util.List<net.sf.rails.game.financial.PublicCertificate> certsToMove = new java.util.ArrayList<>();
+                for (Object obj : new java.util.ArrayList<>(newDirector.getPortfolioModel().getCertificates())) {
+                    if (obj instanceof net.sf.rails.game.financial.PublicCertificate) {
+                        net.sf.rails.game.financial.PublicCertificate pc = (net.sf.rails.game.financial.PublicCertificate) obj;
+                        if (pc.getCompany().equals(major) && !pc.isPresidentShare()) {
+                            certsToMove.add(pc);
+                            swapped += pc.getShare();
+                            if (swapped >= sharesToSwap) break;
+                        }
+                    }
+                }
+
+                dirCert.moveTo(newDirector);
+                for (net.sf.rails.game.financial.PublicCertificate pc : certsToMove) {
+                    pc.moveTo(oldOwner);
+                }
+            }
+        }
+    }
+
+    
     private void advanceToNextValidMinorOrFinish() {
         List<PublicCompany_1837> minors = getSortedMinors();
         while (minorIndex.value() < minors.size()) {
@@ -475,7 +600,41 @@ public void start(PublicCompany_1837 national, boolean isTriggered, String repor
         this.minorIndex.set(0);
         this.discardStep.set(false);
 
-        // --- START FIX: Mandatory Trigger Override ---
+      if (directorHistory.isEmpty()) {
+            for (PublicCompany minor : national.getMinors()) {
+                if (minor.isClosed()) continue;
+                String minorId = minor.getId();
+                int minorNum = -1;
+                try {
+                    minorNum = Integer.parseInt(minorId.replaceAll("\\D", ""));
+                } catch (Exception e) { continue; }
+
+                Player dir = minor.getPresident();
+                if (dir != null) {
+                    if (!directorHistory.containsKey(dir.getName()) || directorHistory.get(dir.getName()) > minorNum) {
+                        directorHistory.put(dir.getName(), minorNum);
+                    }
+                    if (minorNum == 1) formerMinor1Owner.set(dir.getName());
+                }
+
+                for (Player p : gameManager.getPlayers()) {
+                    if (p instanceof net.sf.rails.game.model.PortfolioOwner) {
+                        net.sf.rails.game.model.PortfolioModel pm = ((net.sf.rails.game.model.PortfolioOwner) p).getPortfolioModel();
+                        for (Object obj : pm.getCertificates()) {
+                            if (obj instanceof net.sf.rails.game.financial.PublicCertificate) {
+                                net.sf.rails.game.financial.PublicCertificate cert = (net.sf.rails.game.financial.PublicCertificate) obj;
+                                if (cert.getCompany().equals(minor)) {
+                                    if (!ownerHistory.containsKey(p.getName()) || ownerHistory.get(p.getName()) > minorNum) {
+                                        ownerHistory.put(p.getName(), minorNum);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
         boolean isForced = false;
         if ("KK".equals(national.getId())) {
             isForced = getRoot().getBank().getPool().getPortfolioModel().getTrainList().stream()
@@ -494,9 +653,9 @@ public void start(PublicCompany_1837 national, boolean isTriggered, String repor
                         .anyMatch(t -> t.getType().getName().equals("5"));
             }
         }
-        // --- END FIX ---
 
         this.forcedStart.set(isForced);
+        
         
         // 3. Lock the Order before starting
         calculateAndLockClockwiseOrder(national);

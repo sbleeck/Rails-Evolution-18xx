@@ -538,20 +538,15 @@ public class GameUIManager implements DialogOwner {
                 return false;
             }
 
-            // 1. Race Condition "is not allowed"
-            // 2. Share Selling "must raise cash" (blocks AI)
-            // if (combinedMessage.contains("is not allowed") ||
-            // // combinedMessage.contains("must raise") ||
-            // combinedMessage.contains("Bank is broken") ||
-            // combinedMessage.contains("Correction activated") || // Suppress mode change
-            // notification
-            // // combinedMessage.contains("Starts at") || // Also catch "PR Starts at..."
-            // just in case
-            // combinedMessage.contains("PR exchanges")) { // <--- Added this
+           // Suppress Modals ---
+            if (combinedMessage.contains("Bank is broken") ||
+                    combinedMessage.contains("Correction activated") ||
+                    combinedMessage.toLowerCase().contains("must raise") ||
+                    combinedMessage.toLowerCase().contains("bankrupt")) {
 
-            // log.info("SUPPRESSED UI MESSAGE: {}", combinedMessage);
-            // return false;
-            // }
+                log.info("SUPPRESSED UI MESSAGE: {}", combinedMessage);
+                return false;
+            }
 
             setCurrentDialog(new MessageDialog(null, this,
                     (JFrame) activeWindow,

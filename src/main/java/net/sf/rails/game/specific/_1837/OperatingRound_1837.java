@@ -685,13 +685,15 @@ public class OperatingRound_1837 extends OperatingRound {
             }
 
         } else if (currentPhase.getId().equals("4")) {
-            // STRICT MEMORY CHECK: Redundant safety for Phase change logic.
-            if (!phase4Triggered.value()) {
+           if (!phase4Triggered.value()) {
                 log.debug("Phase 4 Transition Detected. Executing One-Time Triggers.");
                 phase4Triggered.set(true); // Mark memory: Undoable!
 
                 try {
-                    triggerNationalFormation(null);
+                    PublicCompany_1837 sd = (PublicCompany_1837) getRoot().getCompanyManager().getPublicCompany("Sd");
+                    if (sd != null && !sd.hasStarted()) {
+                        executeSdFormation(sd);
+                    }
                 } catch (Exception e) {
                     log.error("CRITICAL FAILURE in Phase 4 Trigger: " + e.getMessage());
                     e.printStackTrace();
@@ -997,7 +999,7 @@ public class OperatingRound_1837 extends OperatingRound {
         return super.layTile(action);
     }
 
-    @Override
+   @Override
     public void start() {
         processMandatoryExchanges();
 
@@ -1017,12 +1019,8 @@ public class OperatingRound_1837 extends OperatingRound {
             }
         }
 
-        // 3. Trigger National Formations (Post-Formation Optional Merges)
-        if (triggerNationalFormation(null)) {
-            return; // Engine halts this OR to process NFR. Will resume() when done.
-        }
-
-        startPostNFR();
+        // All start-of-round CER and NFR triggers are now securely handled by GameManager_1837.nextRound
+        super.start();
     }
 
     public void nextSpecialActionPlayer() {
@@ -1062,40 +1060,50 @@ public class OperatingRound_1837 extends OperatingRound {
         super.start();
     }
 
-    @Override
+@Override
     public boolean buyTrain(BuyTrain action) {
-
-log.info("1837_TRACE: buyTrain() invoked for train " + (action.getTrain() != null ? action.getTrain().getType().getName() : "null"));
+        log.info("1837_TRACE: buyTrain() invoked for train " + (action.getTrain() != null ? action.getTrain().getType().getName() : "null"));
         boolean result = super.buyTrain(action);
 
-        // Force UI Refresh immediately so the user sees the train they just bought.
-        // This prevents the "Invisible Scrap Buttons" bug.
         if (result && gameManager.getGameUIManager() != null && !gameManager.isReloading()) {
             gameManager.getGameUIManager().forceFullUIRefresh();
         }
 
-        // 2. Restore Triggers
         if (result && action.getTrain() != null) {
             String trainName = action.getTrain().getType().getName();
             log.info("1837_TRACE: Successfully processed buyTrain for: " + trainName);
 
-            // We restore '4' (KK), '4E' (Ug), and '4+1' (KK Forced) here.
-            if (trainName.equals("4") || trainName.equals("4E") || trainName.equals("5") || trainName.equals("4+1")) {
-                log.info("1837_TRACE: Trigger Train (" + trainName + ") bought. Checking National Formation...");
-                boolean nfrTriggered = triggerNationalFormation(trainName);
-                log.info("1837_TRACE: triggerNationalFormation returned: " + nfrTriggered);
+            if (trainName.equals("5")) {
+                processMandatoryExchanges();
             }
 
-            // Mandatory Coal Exchanges (Phase 5)
-            if (trainName.equals("5")) {
-                log.info("1837_TRACE: Train is 5. Processing mandatory coal exchanges...");
-                processMandatoryExchanges();
-                log.info("1837_TRACE: Completed mandatory coal exchanges.");
+            GameManager_1837 gm = (GameManager_1837) gameManager;
+
+            // 1. Force Compulsory Triggers immediately bypassing standard checks
+            if (trainName.equals("4+1") || trainName.equals("5")) {
+                PublicCompany_1837 kk = (PublicCompany_1837) getRoot().getCompanyManager().getPublicCompany("KK");
+                if (kk != null && !NationalFormationRound.nationalIsComplete(kk)) {
+                    gm.startNationalFormationRound("KK", null, this, this);
+                    return result;
+                }
             }
+            
+            if (trainName.equals("5")) {
+                PublicCompany_1837 ug = (PublicCompany_1837) getRoot().getCompanyManager().getPublicCompany("Ug");
+                if (ug != null && !NationalFormationRound.nationalIsComplete(ug)) {
+                    gm.startNationalFormationRound("Ug", null, this, this);
+                    return result;
+                }
+            }
+
+            // 2. Route to standard Optional Checks
+            if (gm.checkAndRunKK(null, this, this)) return result;
+            if (gm.checkAndRunUG(null, this, this)) return result;
         }
 
         return result;
     }
+
 
 
     @Override
@@ -1154,33 +1162,33 @@ log.info("1837_TRACE: buyTrain() invoked for train " + (action.getTrain() != nul
     @Override
     public boolean process(PossibleAction action) {
 
-// RELOAD BRUTE FORCE: Bypass validation for the Wien Tile 427 upgrade
+        // RELOAD BRUTE FORCE: Bypass validation for the Wien Tile 427 upgrade
         if (action instanceof LayTile) {
             LayTile lt = (LayTile) action;
             String hexName = (lt.getChosenHex() != null) ? lt.getChosenHex().getId() : "Unknown";
             String tileId = (lt.getLaidTile() != null) ? lt.getLaidTile().getId() : "None";
 
             if ("G17".equals(hexName) && "427".equals(tileId)) {
-log.warn("1837_RELOAD_TRACE: Entering Force-Execution for Wien (G17) Tile 427.");
+                log.warn("1837_RELOAD_TRACE: Entering Force-Execution for Wien (G17) Tile 427.");
                 // Fix: Access company ID through the company object
                 String compId = (lt.getCompany() != null) ? lt.getCompany().getId() : "Unknown";
                 log.info("1837_RELOAD_TRACE: Action Orientation: {}, Company: {}", lt.getOrientation(), compId);
                 try {
                     net.sf.rails.game.MapHex g17 = lt.getChosenHex();
-                    
+
                     // Log current state before forced mutation
-                    log.info("1837_RELOAD_TRACE: Pre-Upgrade State: Hex={}, CurrentTile={}, StopCount={}", 
-                        g17.getId(), g17.getCurrentTile().getId(), g17.getStops().size());
+                    log.info("1837_RELOAD_TRACE: Pre-Upgrade State: Hex={}, CurrentTile={}, StopCount={}",
+                            g17.getId(), g17.getCurrentTile().getId(), g17.getStops().size());
 
                     // Manually trigger the registry cleanup
                     cleanupZombieStops(g17);
-                    
+
                     // Forced execution: call the upgrade directly on the hex model
                     log.warn("1837_RELOAD_TRACE: Invoking hex.upgrade(action) directly...");
                     g17.upgrade(lt);
-                    
-                    log.info("1837_RELOAD_TRACE: Post-Upgrade State: Hex={}, NewTile={}, StopCount={}", 
-                        g17.getId(), g17.getCurrentTile().getId(), g17.getStops().size());
+
+                    log.info("1837_RELOAD_TRACE: Post-Upgrade State: Hex={}, NewTile={}, StopCount={}",
+                            g17.getId(), g17.getCurrentTile().getId(), g17.getStops().size());
 
                     return true; // Report success to the reloader to bypass the "PossibleActions" check
                 } catch (Exception e) {
@@ -1188,7 +1196,6 @@ log.warn("1837_RELOAD_TRACE: Entering Force-Execution for Wien (G17) Tile 427.")
                 }
             }
         }
-
 
         // 2. Handle Voluntary Discard Logic (Payment)
         if (action instanceof DiscardTrainVoluntarily) {
@@ -1266,9 +1273,8 @@ log.warn("1837_RELOAD_TRACE: Entering Force-Execution for Wien (G17) Tile 427.")
         return false;
     }
 
-    public void resume() {
+public void resume() {
         log.info("1837_TRACE: Resuming OperatingRound " + getId());
-
 
         // Inherit skipped minors memory during resume to prevent re-entry loops
         if (gameManager instanceof GameManager_1837) {
@@ -1283,19 +1289,11 @@ log.warn("1837_RELOAD_TRACE: Entering Force-Execution for Wien (G17) Tile 427.")
             }
         }
 
-        
-        // PRE-START INTERRUPTION RESUMPTION (e.g. returning from start-of-OR NFR)
-        if (operatingCompany.value() == null) {
-            if (triggerNationalFormation(null)) {
-                log.info("1837_LOGIC: Cascading to next pending start-of-OR National Formation.");
-                return;
-            }
-            log.info("1837_LOGIC: Start-of-OR Formations complete. Proceeding to standard start.");
-            startPostNFR();
-            return;
-        }
+        // Chain mid-turn cascading formations natively through GameManager
+        GameManager_1837 gm = (GameManager_1837) gameManager;
+        if (gm.checkAndRunKK(null, this, this)) return;
+        if (gm.checkAndRunUG(null, this, this)) return;
 
-        // 1. Critical Logic: Check if the company closed during the NFR
         if (operatingCompany.value() != null && operatingCompany.value().isClosed()) {
             log.warn("1837_LOGIC: Resuming OR but operating company " + operatingCompany.value().getId()
                     + " is CLOSED. Advancing turn.");
@@ -1306,41 +1304,14 @@ log.warn("1837_RELOAD_TRACE: Entering Force-Execution for Wien (G17) Tile 427.")
             return;
         }
 
-        // 2. Transition Logic: Check for cascading formations
-        if (triggerNationalFormation(null)) {
-            log.info("1837_LOGIC: Cascading to next pending National Formation.");
-            return;
-        }
-
-        // 3. Clear transient actions if resuming from Buy Train step
         if (getStep() == GameDef.OrStep.BUY_TRAIN) {
-            log.info("1837_LOGIC: Resuming from interruption during BuyTrain step. Continuing turn.");
             possibleActions.clear();
         }
 
         setPossibleActions();
     }
 
-    private void startPostNFR() {
-        boolean anyExchangePossible = false;
-        for (Player p : gameManager.getPlayers()) {
-            if (hasExchangeableMinors(p)) {
-                anyExchangePossible = true;
-                break;
-            }
-        }
 
-        if (anyExchangePossible) {
-            log.info("1837_LOGIC: Redirecting to CoalExchangeRound.");
-            CoalExchangeRound cer = new CoalExchangeRound(gameManager, "CER_" + getId());
-            gameManager.setInterruptedRound(this);
-            gameManager.setRound(cer);
-            cer.start();
-        } else {
-            log.debug("1837_LOGIC: Starting standard Operating Round.");
-            super.start();
-        }
-    }
 
     private void executeSdFormation(PublicCompany_1837 sd) {
         log.info("1837_LOGIC: Commencing Mandatory Sd Formation procedurally.");
@@ -1413,171 +1384,5 @@ log.warn("1837_RELOAD_TRACE: Entering Force-Execution for Wien (G17) Tile 427.")
             log.error("Error laying Bozen tile: " + e.getMessage());
         }
     }
-
-    public boolean triggerNationalFormation() {
-        return triggerNationalFormation(null);
-    }
-
-
-public boolean triggerNationalFormation(String triggeringTrain) {
-        net.sf.rails.game.PhaseManager pm = getRoot().getPhaseManager();
-log.info("1837_TRACE: triggerNationalFormation() started. Triggering train: " + triggeringTrain);
-        String[] sequence = { "Sd", "KK", "Ug" };
-
-        for (String targetId : sequence) {
-            PublicCompany company = getRoot().getCompanyManager().getPublicCompany(targetId);
-            if (!(company instanceof PublicCompany_1837))
-                continue;
-
-            PublicCompany_1837 national = (PublicCompany_1837) company;
-            if (!"National".equals(national.getType().getId()))
-                continue;
-
-            if (national.getId().equals("Sd")) {
-                boolean anySdMinorOpen = false;
-                if (national.getMinors() != null) {
-                    for (PublicCompany minor : national.getMinors()) {
-                        if (!minor.isClosed()) {
-                            anySdMinorOpen = true;
-                            break;
-                        }
-                    }
-                }
-                if (anySdMinorOpen && pm.hasReachedPhase("4")) {
-                    executeSdFormation(national);
-                }
-                continue;
-            }
-
-            if (triggeringTrain != null) {
-                String nId = national.getId();
-                if (triggeringTrain.equals("4") && !nId.equals("KK"))
-                    continue;
-                if (triggeringTrain.equals("4E") && !nId.equals("Ug"))
-                    continue;
-                if (triggeringTrain.equals("4+1") && !nId.equals("KK"))
-                    continue;
-                if (triggeringTrain.equals("5") && !nId.equals("KK") && !nId.equals("Ug"))
-                    continue;
-            }
-
-boolean start = !national.hasStarted() && pm.hasReachedPhase(national.getFormationStartPhase());
-            boolean forcedStart = !national.hasStarted() && pm.hasReachedPhase(national.getForcedStartPhase());
-            boolean forcedMerge = !national.isComplete() && pm.hasReachedPhase(national.getForcedMergePhase());
-            boolean optionalMerge = (national.getPresident() != null) && !national.isComplete();
-log.info("1837_TRACE: Evaluating " + national.getId() + ". Initial Flags -> start: " + start + ", forcedStart: " + forcedStart + ", forcedMerge: " + forcedMerge + ", optionalMerge: " + optionalMerge);
-
-if (national.getId().equals("Ug") && !national.isComplete()) {
-                    boolean has4E = getRoot().getBank().getPool().getPortfolioModel().getTrainList().stream()
-                        .anyMatch(t -> t.getType().getName().equals("4E"));
-
-                if (!has4E) {
-                    has4E = gameManager.getAllPublicCompanies().stream()
-                            .flatMap(c -> c.getPortfolioModel().getTrainList().stream())
-                            .anyMatch(t -> t.getType().getName().equals("4E"));
-                }
-                if (has4E)
-                    start = true;
-
-                // Force Ug if a 5 train exists anywhere
-                boolean has5 = getRoot().getBank().getPool().getPortfolioModel().getTrainList().stream()
-                        .anyMatch(t -> t.getType().getName().equals("5"));
-                if (!has5) {
-                    has5 = gameManager.getAllPublicCompanies().stream()
-                            .flatMap(c -> c.getPortfolioModel().getTrainList().stream())
-                            .anyMatch(t -> t.getType().getName().equals("5"));
-                }
-                if (has5) {
-                    log.info("1837_TRACE: Ug formation FORCED due to presence of 5 train.");
-                    forcedStart = true;
-                    forcedMerge = true;
-                }
-            }
-
-            if (national.getId().equals("KK") && !national.isComplete()) {
-                     boolean hasForcingTrain = getRoot().getBank().getPool().getPortfolioModel().getTrainList().stream()
-                        .anyMatch(t -> t.getType().getName().equals("4+1") || t.getType().getName().equals("5"));
-                if (!hasForcingTrain) {
-                    hasForcingTrain = gameManager.getAllPublicCompanies().stream()
-                            .flatMap(c -> c.getPortfolioModel().getTrainList().stream())
-                            .anyMatch(t -> t.getType().getName().equals("4+1") || t.getType().getName().equals("5"));
-                }
-
-                if (hasForcingTrain) {
-                    log.info("1837_TRACE: KK formation FORCED due to presence of 4+1 or 5 train.");
-                    forcedStart = true;
-                    forcedMerge = true;
-                }
-            }
-
-            boolean shouldTrigger = false;
-
-            if (forcedStart || forcedMerge) {
-                shouldTrigger = true;
-                // Compulsory overrides the "already asked" memory.
-                triggeredNationals.remove(national.getId());
-            } else if (start && triggeringTrain != null) {
-                String nId = national.getId();
-                if (nId.equals("KK") && (triggeringTrain.equals("4") || triggeringTrain.equals("4+1")
-                        || triggeringTrain.equals("5"))) {
-                    shouldTrigger = true;
-                } else if (nId.equals("Ug") && (triggeringTrain.equals("4E") || triggeringTrain.equals("5"))) {
-                    shouldTrigger = true;
-                }
-            } else if (optionalMerge && triggeringTrain == null) {
-                if (operatingCompany.value() == null) {
-                    shouldTrigger = true;
-                }
-            }
-
-            if (shouldTrigger) {
-                
-                // Evaluate optional triggers against the ignore lists
-                if (!forcedStart && !forcedMerge && triggeredNationals.contains(national.getId())) {
-                    log.info("1837_TRACE: " + national.getId() + " is already in triggeredNationals list (Optional). Skipping.");
-                    continue;
-                }
-
-                if (!forcedStart && !forcedMerge && declinedNationals.contains(national.getId())) {
-                    log.info("1837_TRACE: " + national.getId() + " formation declined previously. Skipping optional trigger.");
-                    continue;
-                }
-                log.info("1837_TRACE: Executing NFR Trigger for " + national.getId() + " (Forced: " + (forcedStart || forcedMerge) + ")");
-                
-                triggeredNationals.add(national.getId());
-
-                String uniqueId = "NFR_" + national.getId() + "_" + System.currentTimeMillis();
-                Round formationRound = null;
-
-                if (national.getId().equals("KK")) {
-                    KKFormationRound kkRound = new KKFormationRound(gameManager, uniqueId);
-                    formationRound = kkRound;
-                    gameManager.setInterruptedRound(this);
-                    gameManager.setRound(kkRound);
-                    kkRound.start(national, true, "Triggered");
-                } else if (national.getId().equals("Ug")) {
-                    UgFormationRound ugRound = new UgFormationRound(gameManager, uniqueId);
-                    formationRound = ugRound;
-                    gameManager.setInterruptedRound(this);
-                    gameManager.setRound(ugRound);
-                    ugRound.start(national, true, "Triggered");
-                }
-
-                return true;
-            }
-        }
-        return false;
-    }
-
-
-
-
-
-
-
-
-
-
-
 
 }

@@ -5,47 +5,123 @@ import net.sf.rails.game.*;
 import net.sf.rails.game.financial.*;
 import net.sf.rails.game.state.*;
 import rails.game.action.*;
+import net.sf.rails.common.LocalText;
 import java.awt.Color;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import net.sf.rails.game.round.RoundFacade;
 
 public class CoalExchangeRound extends Round implements GuiTargetedAction {
     private static final Logger log = LoggerFactory.getLogger(CoalExchangeRound.class);
 
+    // State variables for nested polling: Major -> Player (Clockwise from Director)
+    protected final StringState majorOrderStr = StringState.create(this, "CER_MajorOrder", "");
+    protected final IntegerState currentMajorIndex = IntegerState.create(this, "CER_MajorIdx", 0);
+    
     protected final IntegerState currentPlayerIndex = IntegerState.create(this, "CER_PlayerIdx", 0);
     protected final IntegerState playersProcessedCount = IntegerState.create(this, "CER_ProcessedCount", 0);
+    
     protected final ArrayListState<String> skippedMinors = new ArrayListState<>(this, "CER_Skipped");
-protected final GenericState<PublicCompany> companyOverLimit = new GenericState<>(this, "CER_CompOverLimit", null);
+    protected final GenericState<PublicCompany> companyOverLimit = new GenericState<>(this, "CER_CompOverLimit", null);
 
     public CoalExchangeRound(GameManager parent, String id) {
         super(parent, id);
     }
 
     public void start() {
-        currentPlayerIndex.set(0);
-        playersProcessedCount.set(0);
         skippedMinors.clear();
+        majorOrderStr.set("");
+        currentMajorIndex.set(0);
+        companyOverLimit.set(null);
+
+        // 1. Collect and sort all floated Majors by Operating Order (Share Price Descending)
+        List<PublicCompany> majors = getRoot().getCompanyManager().getPublicCompaniesByType("Major");
+        if (majors != null) {
+            List<PublicCompany> activeMajors = new ArrayList<>();
+            for (PublicCompany c : majors) {
+                if (!c.isClosed() && c.hasFloated()) {
+                    activeMajors.add(c);
+                }
+            }
+            activeMajors.sort((c1, c2) -> {
+                int p1 = c1.getCurrentSpace() != null ? c1.getCurrentSpace().getPrice() : 0;
+                int p2 = c2.getCurrentSpace() != null ? c2.getCurrentSpace().getPrice() : 0;
+                return Integer.compare(p2, p1); // Descending order
+            });
+            
+            StringBuilder sb = new StringBuilder();
+            for (int i = 0; i < activeMajors.size(); i++) {
+                sb.append(activeMajors.get(i).getId());
+                if (i < activeMajors.size() - 1) sb.append(",");
+            }
+            majorOrderStr.set(sb.toString());
+        }
+
+        log.info("1837_CER: Starting Coal Exchange Round.");
+        
+        List<String> majorList = getMajorList();
+        if (majorList.isEmpty()) {
+            finishRound();
+            return;
+        }
+
+        setupPlayerIndexForCurrentMajor();
         findNextActivePlayer();
+    }
+    
+    private List<String> getMajorList() {
+        if (majorOrderStr.value() == null || majorOrderStr.value().isEmpty()) return new ArrayList<>();
+        return Arrays.asList(majorOrderStr.value().split(","));
+    }
+
+    private void setupPlayerIndexForCurrentMajor() {
+        List<String> majorList = getMajorList();
+        if (currentMajorIndex.value() < majorList.size()) {
+            String currentMajorId = majorList.get(currentMajorIndex.value());
+            PublicCompany currentMajor = getRoot().getCompanyManager().getPublicCompany(currentMajorId);
+            
+            // Rule Implementation: Exchanges are made starting with the director and proceeding clockwise.
+            int startIdx = 0;
+            if (currentMajor != null && currentMajor.getPresident() != null) {
+                startIdx = gameManager.getPlayers().indexOf(currentMajor.getPresident());
+                if (startIdx == -1) startIdx = 0;
+            }
+            currentPlayerIndex.set(startIdx);
+            playersProcessedCount.set(0);
+        }
     }
 
     private void findNextActivePlayer() {
         List<Player> players = gameManager.getPlayers();
-        int count = playersProcessedCount.value();
-        int idx = currentPlayerIndex.value();
+        List<String> majorList = getMajorList();
 
-        while (count < players.size()) {
-            Player p = players.get(idx);
-            if (hasExchangeableMinors(p)) {
-                // --- START FIX: Proper player manager access ---
-                gameManager.getRoot().getPlayerManager().setCurrentPlayer(p);
-                // --- END FIX ---
-                setPossibleActions();
-                return;
+        // Outer Loop: Iterate through the Majors
+        while (currentMajorIndex.value() < majorList.size()) {
+            String currentMajorId = majorList.get(currentMajorIndex.value());
+            PublicCompany currentMajor = getRoot().getCompanyManager().getPublicCompany(currentMajorId);
+
+            // Inner Loop: Iterate through players starting from Director
+            while (playersProcessedCount.value() < players.size()) {
+                Player p = players.get(currentPlayerIndex.value());
+
+                if (hasExchangeableMinorsForMajor(p, currentMajor)) {
+                    log.info("1837_CER: Polling " + p.getName() + " for exchanges into " + currentMajorId);
+                    getRoot().getPlayerManager().setCurrentPlayer(p);
+                    setPossibleActions();
+                    return; // Halt and wait for user input
+                }
+
+                // Advance to next player
+                currentPlayerIndex.set((currentPlayerIndex.value() + 1) % players.size());
+                playersProcessedCount.add(1);
             }
-            idx = (idx + 1) % players.size();
-            count++;
+
+            // Finished polling all players for this Major. Advance to the next Major.
+            log.info("1837_CER: Finished polling for " + currentMajorId);
+            currentMajorIndex.add(1);
+            setupPlayerIndexForCurrentMajor();
         }
+
+        // If we exit the loops, no more exchanges are possible.
         finishRound();
     }
 
@@ -55,44 +131,47 @@ protected final GenericState<PublicCompany> companyOverLimit = new GenericState<
         Player p = gameManager.getCurrentPlayer();
         if (p == null) return false;
 
+        // 1. Mandatory Discard Resolution
         if (companyOverLimit.value() != null) {
             PublicCompany comp = companyOverLimit.value();
-            
-            // Only the President can discard (which should be the current player)
             if (comp.getPresident() != p) {
-                log.warn("State mismatch: Current player is not president of over-limit company.");
+                log.warn("1837_CER: State mismatch! Current player is not president of over-limit company.");
             }
 
-            // Generate Discard Actions (Standard DiscardTrain)
             for (Train train : comp.getPortfolioModel().getUniqueTrains()) {
                 Set<Train> singleTrainSet = new HashSet<>();
                 singleTrainSet.add(train);
-                // We use standard DiscardTrain here, not the Voluntary one (no cost/refund usually implied in forced merger cleanup)
-                // Rule check: In 1837 forced mergers, can they discard usually? Yes.
-                possibleActions.add(new DiscardTrain(comp, singleTrainSet));
+                DiscardTrain action = new DiscardTrain(comp, singleTrainSet);
+                action.setLabel("Force Discard " + train.getName());
+                possibleActions.add(action);
             }
             return true;
         }
 
+        // 2. Exchange Actions (Restricted to the current Major only)
+        List<String> majorList = getMajorList();
+        String currentMajorId = majorList.get(currentMajorIndex.value());
         Set<String> processed = new HashSet<>();
+
         for (PublicCertificate cert : p.getPortfolioModel().getCertificates()) {
             PublicCompany comp = cert.getCompany();
-            if (comp == null || comp.isClosed() || processed.contains(comp.getId())) continue;
-            if (skippedMinors.contains(comp.getId())) continue;
+            if (comp == null || comp.isClosed() || processed.contains(comp.getId()) || skippedMinors.contains(comp.getId())) continue;
 
             PublicCompany target = Merger1837.getMergeTarget(gameManager, comp);
-            if (target != null && target.hasFloated() && comp.getPresident() == p) {
-                possibleActions.add(new ExchangeMinorAction(comp, target, false));
+            if (target != null && target.getId().equals(currentMajorId) && comp.getPresident() == p) {
+                ExchangeMinorAction action = new ExchangeMinorAction(comp, target, false);
+                action.setButtonLabel(LocalText.getText("ExchangeMinorForShare", comp.getId(), target.getId()));
+                possibleActions.add(action);
                 processed.add(comp.getId());
             }
         }
 
         NullAction done = new NullAction(getRoot(), NullAction.Mode.DONE);
-        done.setLabel("Done / No Exchanges");
+        done.setLabel("Done / Skip " + currentMajorId);
         possibleActions.add(done);
+        
         return true;
     }
-
 
     private void advancePlayer() {
         currentPlayerIndex.set((currentPlayerIndex.value() + 1) % gameManager.getPlayers().size());
@@ -100,91 +179,75 @@ protected final GenericState<PublicCompany> companyOverLimit = new GenericState<
         findNextActivePlayer();
     }
 
-    // Access must be protected to match Round ---
     @Override
     protected void finishRound() {
+        log.info("1837_CER: Coal Exchange Round complete.");
         gameManager.nextRound(this);
     }
 
-
-    private boolean hasExchangeableMinors(Player p) {
-        if (p == null) return false;
+    private boolean hasExchangeableMinorsForMajor(Player p, PublicCompany majorTarget) {
+        if (p == null || majorTarget == null) return false;
+        
         for (PublicCertificate cert : p.getPortfolioModel().getCertificates()) {
             PublicCompany comp = cert.getCompany();
             if (comp == null || comp.isClosed() || skippedMinors.contains(comp.getId())) continue;
-PublicCompany target = Merger1837.getMergeTarget(gameManager, comp);
-            if (target != null && target.hasFloated() && comp.getPresident() == p) return true;
+            
+            PublicCompany target = Merger1837.getMergeTarget(gameManager, comp);
+            if (target != null && target.equals(majorTarget) && comp.getPresident() == p) {
+                return true;
+            }
         }
         return false;
     }
 
-    // --- GuiTargetedAction Implementation ---
-    // --- START FIX: Proper accessor names ---
     @Override public net.sf.rails.game.state.Owner getActor() { return gameManager.getCurrentPlayer(); }
     @Override public String getGroupLabel() { return "Minor Exchanges"; }
     @Override public String getButtonLabel() { return "Exchange"; }
     @Override public Color getButtonColor() { return Color.ORANGE; }
 
-
-
-    // ... (lines of unchanged context code) ...
     @Override
     public boolean process(PossibleAction action) {
         if (action instanceof DiscardTrain) {
             DiscardTrain discard = (DiscardTrain) action;
-            // Execute the discard (removes train from company)
-            // Note: DiscardTrain.execute() expects an OperatingRound usually, 
-            // but the base logic might work if we are careful. 
-            // Better to rely on a direct helper or ensure DiscardTrain works in Round.
-            // Actually, we should probably manually discard here to be safe, 
-            // or cast 'this' if DiscardTrain supports it. 
-            // DiscardTrain usually needs an OR to put trains in the Open Market or Scrap.
-            
-            // Implementation: Manual Discard to avoid class cast issues if DiscardTrain is rigid
             Train train = discard.getSelectedTrain();
             if (train != null) {
-                PublicCompany comp = discard.getCompany();
-                // Move train to Bank (Pool) or Scrap? 
-                // 1837 Rule: usually depends on phase, but generally to Bank Pool if not rusted.
-                // For safety, let's assume moving to Bank (Available)
-
                 train.getCard().discard();
+                PublicCompany comp = discard.getCompany();
 
-
-                // Re-evaluate Limit
                 if (comp.getNumberOfTrains() <= comp.getCurrentTrainLimit()) {
                     companyOverLimit.set(null);
-                    // Check if player has more exchanges or is done
-                    if (!hasExchangeableMinors(gameManager.getCurrentPlayer())) {
+                    
+                    List<String> majorList = getMajorList();
+                    String currentMajorId = majorList.get(currentMajorIndex.value());
+                    PublicCompany currentMajor = getRoot().getCompanyManager().getPublicCompany(currentMajorId);
+                    
+                    if (!hasExchangeableMinorsForMajor(gameManager.getCurrentPlayer(), currentMajor)) {
                         advancePlayer();
                     } else {
                         setPossibleActions();
                     }
                 } else {
-                    // Still over limit, regenerate discard buttons
                     setPossibleActions();
                 }
             }
             return true;
         }
 
-if (action instanceof ExchangeMinorAction) {
+        if (action instanceof ExchangeMinorAction) {
             ExchangeMinorAction exc = (ExchangeMinorAction) action;
-            
-            Merger1837.mergeMinor(gameManager, exc.getMinor(), exc.getTargetMajor());
-            Merger1837.fixDirectorship(gameManager, exc.getTargetMajor());
-            
-            //  Detect Over Limit ---
             PublicCompany target = exc.getTargetMajor();
+            
+            Merger1837.mergeMinor(gameManager, exc.getMinor(), target);
+            Merger1837.fixDirectorship(gameManager, target);
+            
             if (target.getNumberOfTrains() > target.getCurrentTrainLimit()) {
-                log.info("1837_LOGIC: Company " + target.getId() + " is over train limit (" 
-                        + target.getNumberOfTrains() + "/" + target.getCurrentTrainLimit() + "). Enforcing discard.");
+                log.info("1837_LOGIC: Company " + target.getId() + " over train limit. Enforcing discard.");
                 companyOverLimit.set(target);
-                setPossibleActions(); // Will now generate discard buttons
+                setPossibleActions(); 
                 return true;
             }
 
-            if (!hasExchangeableMinors(gameManager.getCurrentPlayer())) {
+            if (!hasExchangeableMinorsForMajor(gameManager.getCurrentPlayer(), target)) {
                 advancePlayer();
             } else {
                 setPossibleActions();
@@ -193,28 +256,23 @@ if (action instanceof ExchangeMinorAction) {
         }
 
         if (action instanceof NullAction) {
-            // We must explicitly mark current options as skipped to prevent loops
             Player p = gameManager.getCurrentPlayer();
+            List<String> majorList = getMajorList();
+            String currentMajorId = majorList.get(currentMajorIndex.value());
+            
             if (p != null) {
                 for (PublicCertificate cert : p.getPortfolioModel().getCertificates()) {
                     PublicCompany comp = cert.getCompany();
                     PublicCompany target = Merger1837.getMergeTarget(gameManager, comp);
-                    if (comp != null && target != null) {
+                    if (comp != null && target != null && target.getId().equals(currentMajorId)) {
                         skippedMinors.add(comp.getId());
                     }
                 }
             }
             advancePlayer();
-
             return true;
         }
+        
         return false;
     }
-
-
-
-
-
-
-
 }
