@@ -20,90 +20,33 @@ public class LinearRoundTracker extends JComponent {
     // --- STATIC PERSISTENCE (The Fix) ---
     // These must be static to survive the component being destroyed/re-created
     private static double persistentTrainX = -1;
-    private static List<PublicCompany> persistentTimeline = new ArrayList<>();
-    private static int persistentActiveIndex = -1;
 
     // Animation State
     private double currentTrainX = -1;
     private double targetTrainX = -1;
-    private final Timer animTimer;
 
     // Cached Data
     private List<PublicCompany> cachedTimeline = new ArrayList<>();
     private int cachedActiveIndex = -1;
 
+    // These must be static to survive the component being destroyed/re-created
+    private static double persistentTrainIndex = -1;
+    private static List<PublicCompany> persistentTimeline = new ArrayList<>();
+    private static int persistentActiveIndex = -1;
+
+    // Animation State
+    private double currentTrainIndex = -1;
+    private double targetTrainIndex = -1;
+    private final Timer animTimer;
+
     // Geometry
     private final int margin = 40;
-    private final int step = 40;
-
-    public LinearRoundTracker(GameUIManager gameUIManager, PublicCompany[] companies) {
-        super();
-        this.gameUIManager = gameUIManager;
-        this.companies = companies;
-        
-        setOpaque(false);
-        
-        // 1. Restore Train Position
-        if (persistentTrainX != -1) {
-            this.currentTrainX = persistentTrainX;
-            this.targetTrainX = persistentTrainX;
-        }
-        
-        // Initialize Animation Timer (60 FPS)
-        animTimer = new Timer(16, e -> stepAnimation());
-    }
-
-    public void updateState() {
-        // 1. Rebuild Timeline (Calculates new target)
-        rebuildTimeline();
-
-        double newTarget = -1;
-        if (cachedActiveIndex != -1) {
-            newTarget = margin + (cachedActiveIndex * step);
-        }
-
-        // 2. Initial Placement (if brand new and no history)
-        if (currentTrainX == -1 && newTarget != -1) {
-            currentTrainX = newTarget;
-            targetTrainX = newTarget;
-            persistentTrainX = newTarget;
-        }
-
-        // 3. Trigger Animation
-        if (newTarget != -1) {
-            if (Math.abs(newTarget - targetTrainX) > 0.1) {
-                targetTrainX = newTarget;
-                if (!animTimer.isRunning()) {
-                    animTimer.start();
-                }
-            }
-        }
-
-        repaint();
-    }
-
-    private void stepAnimation() {
-        double distance = targetTrainX - currentTrainX;
-
-        if (Math.abs(distance) < 0.5) {
-            currentTrainX = targetTrainX;
-            animTimer.stop();
-        } else {
-            double stepMove = distance * 0.1;
-            if (Math.abs(stepMove) < 1.0) {
-                stepMove = Math.signum(distance) * 1.0;
-            }
-            currentTrainX += stepMove;
-        }
-
-        // Sync Static
-        persistentTrainX = currentTrainX;
-        
-        repaint();
-    }
+    private int step = 40;
+    private int r = 13;
 
     private void rebuildTimeline() {
-        if (gameUIManager == null || gameUIManager.getGameManager() == null) return;
+        if (gameUIManager == null || gameUIManager.getGameManager() == null)
+            return;
 
         // --- STEP 0: RESTORE FROM STATIC MEMORY ---
         // If this is a new component (empty list) but we have history, load it.
@@ -128,12 +71,13 @@ public class LinearRoundTracker extends JComponent {
             cachedTimeline.clear();
             cachedActiveIndex = -1;
             PublicCompany activeComp = null;
-            
+
             if (roundObj instanceof OperatingRound) {
                 // Operating Round: Use Engine Order
                 OperatingRound or = (OperatingRound) roundObj;
                 List<PublicCompany> sorted = or.getOperatingCompanies();
-                if (sorted != null) cachedTimeline.addAll(sorted);
+                if (sorted != null)
+                    cachedTimeline.addAll(sorted);
                 activeComp = or.getOperatingCompany();
             } else {
                 // Stock Round: Predict Order
@@ -145,16 +89,20 @@ public class LinearRoundTracker extends JComponent {
                 Collections.sort(cachedTimeline, (c1, c2) -> {
                     boolean c1Minor = !c1.hasStockPrice();
                     boolean c2Minor = !c2.hasStockPrice();
-                    if (c1Minor && !c2Minor) return -1;
-                    if (!c1Minor && c2Minor) return 1;
-                    if (c1Minor) return Integer.compare(c1.getPublicNumber(), c2.getPublicNumber());
+                    if (c1Minor && !c2Minor)
+                        return -1;
+                    if (!c1Minor && c2Minor)
+                        return 1;
+                    if (c1Minor)
+                        return Integer.compare(c1.getPublicNumber(), c2.getPublicNumber());
 
                     int p1 = c1.getCurrentSpace() != null ? c1.getCurrentSpace().getPrice()
                             : (c1.getStartSpace() != null ? c1.getStartSpace().getPrice() : 0);
                     int p2 = c2.getCurrentSpace() != null ? c2.getCurrentSpace().getPrice()
                             : (c2.getStartSpace() != null ? c2.getStartSpace().getPrice() : 0);
 
-                    if (p1 != p2) return Integer.compare(p2, p1);
+                    if (p1 != p2)
+                        return Integer.compare(p2, p1);
                     return Integer.compare(c1.getPublicNumber(), c2.getPublicNumber());
                 });
             }
@@ -168,7 +116,7 @@ public class LinearRoundTracker extends JComponent {
                     }
                 }
             }
-            
+
             // --- STEP 3: UPDATE STATIC MEMORY ---
             // Save the valid state so the next instance can restore it
             persistentTimeline.clear();
@@ -185,60 +133,6 @@ public class LinearRoundTracker extends JComponent {
         super.removeNotify();
         if (animTimer != null && animTimer.isRunning()) {
             animTimer.stop();
-        }
-    }
-
-    @Override
-    protected void paintComponent(Graphics g) {
-        super.paintComponent(g);
-
-        if (cachedTimeline.isEmpty()) return;
-
-        Graphics2D g2 = (Graphics2D) g;
-        g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-
-        int r = 13;
-        int centerY = getHeight() - 3 - r; 
-
-        // 1. Connector Line
-        int lineLength = (cachedTimeline.size() > 1) ? (cachedTimeline.size() - 1) * step : 0;
-        g2.setColor(Color.GRAY);
-        g2.setStroke(new BasicStroke(2));
-        if (cachedTimeline.size() > 1) {
-            g2.draw(new Line2D.Double(margin, centerY, margin + lineLength, centerY));
-        }
-
-        // 2. Nodes
-        for (int i = 0; i < cachedTimeline.size(); i++) {
-            PublicCompany c = cachedTimeline.get(i);
-            int x = margin + (i * step);
-
-            boolean isPast = (cachedActiveIndex != -1 && i < cachedActiveIndex);
-            boolean isActive = (i == cachedActiveIndex);
-
-            Ellipse2D circle = new Ellipse2D.Double(x - r, centerY - r, 2 * r, 2 * r);
-
-            if (isPast) g2.setColor(Color.LIGHT_GRAY);
-            else g2.setColor(c.getBgColour());
-            g2.fill(circle);
-
-            g2.setColor(Color.BLACK);
-            g2.setStroke(new BasicStroke(isActive ? 3 : 1));
-            g2.draw(circle);
-
-            String code = c.getId();
-            g2.setFont(getFont().deriveFont(Font.BOLD, 10f));
-            FontMetrics fm = g2.getFontMetrics();
-
-            if (isPast) g2.setColor(Color.DARK_GRAY);
-            else g2.setColor(c.getFgColour());
-
-            g2.drawString(code, x - fm.stringWidth(code) / 2, centerY + fm.getAscent() / 2 - 2);
-        }
-
-        // 3. Train
-        if (currentTrainX != -1 && cachedActiveIndex != -1) {
-            drawTrain(g2, (int) currentTrainX, centerY - r - 1);
         }
     }
 
@@ -291,4 +185,149 @@ public class LinearRoundTracker extends JComponent {
         // Roof Accent
         g2.fillRect(left - 1, bottom - 19, 10, 2);
     }
+
+    public LinearRoundTracker(GameUIManager gameUIManager, PublicCompany[] companies) {
+        super();
+        this.gameUIManager = gameUIManager;
+        this.companies = companies;
+
+        setOpaque(false);
+
+        // 1. Restore Train Position
+        if (persistentTrainIndex != -1) {
+            this.currentTrainIndex = persistentTrainIndex;
+            this.targetTrainIndex = persistentTrainIndex;
+        }
+
+        // Initialize Animation Timer (60 FPS)
+        animTimer = new Timer(16, e -> stepAnimation());
+    }
+
+    public void updateState() {
+        // 1. Rebuild Timeline (Calculates new target)
+        rebuildTimeline();
+
+        // Physical layout calculation deferred to paintComponent.
+        double newTargetIndex = -1;
+        if (cachedActiveIndex != -1) {
+            newTargetIndex = cachedActiveIndex;
+        }
+
+        // 2. Initial Placement (if brand new and no history)
+        if (currentTrainIndex == -1 && newTargetIndex != -1) {
+            currentTrainIndex = newTargetIndex;
+            targetTrainIndex = newTargetIndex;
+            persistentTrainIndex = newTargetIndex;
+        }
+
+        // 3. Trigger Animation
+        if (newTargetIndex != -1) {
+            if (Math.abs(newTargetIndex - targetTrainIndex) > 0.01) {
+                targetTrainIndex = newTargetIndex;
+                if (!animTimer.isRunning()) {
+                    animTimer.start();
+                }
+            }
+        }
+
+        repaint();
+    }
+
+    private void stepAnimation() {
+        double distance = targetTrainIndex - currentTrainIndex;
+
+        if (Math.abs(distance) < 0.01) {
+            currentTrainIndex = targetTrainIndex;
+            animTimer.stop();
+        } else {
+            double stepMove = distance * 0.1;
+            if (Math.abs(stepMove) < 0.02) {
+                stepMove = Math.signum(distance) * 0.02;
+            }
+            currentTrainIndex += stepMove;
+        }
+
+        // Sync Static
+        persistentTrainIndex = currentTrainIndex;
+
+        repaint();
+    }
+
+    @Override
+    protected void paintComponent(Graphics g) {
+        super.paintComponent(g);
+
+        if (cachedTimeline.isEmpty())
+            return;
+
+        Graphics2D g2 = (Graphics2D) g;
+        g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+
+        // Calculate dynamic step based on actual width at rendering time
+        int numNodes = cachedTimeline.size();
+        int effectiveStep = 40; // Default
+        if (numNodes > 1) {
+            int availableWidth = getWidth() - (margin * 2);
+            if (availableWidth > 0) {
+                int requiredWidth = (numNodes - 1) * 40;
+                if (requiredWidth > availableWidth) {
+                    effectiveStep = availableWidth / (numNodes - 1);
+                }
+            }
+        }
+
+        // Calculate dynamic radius based on the current effective step
+        int effectiveR = Math.max(8, (int) (13 * (effectiveStep / 40.0)));
+        int centerY = getHeight() - 3 - effectiveR;
+
+        // 1. Connector Line
+        int lineLength = (cachedTimeline.size() > 1) ? (cachedTimeline.size() - 1) * effectiveStep : 0;
+        g2.setColor(Color.GRAY);
+        g2.setStroke(new BasicStroke(2));
+        if (cachedTimeline.size() > 1) {
+            g2.draw(new Line2D.Double(margin, centerY, margin + lineLength, centerY));
+        }
+
+        // 2. Nodes
+        for (int i = 0; i < cachedTimeline.size(); i++) {
+            PublicCompany c = cachedTimeline.get(i);
+            int x = margin + (i * effectiveStep);
+
+            boolean isPast = (cachedActiveIndex != -1 && i < cachedActiveIndex);
+            boolean isActive = (i == cachedActiveIndex);
+
+            Ellipse2D circle = new Ellipse2D.Double(x - effectiveR, centerY - effectiveR, 2 * effectiveR,
+                    2 * effectiveR);
+
+            if (isPast)
+                g2.setColor(Color.LIGHT_GRAY);
+            else
+                g2.setColor(c.getBgColour());
+            g2.fill(circle);
+
+            g2.setColor(Color.BLACK);
+            g2.setStroke(new BasicStroke(isActive ? 3 : 1));
+            g2.draw(circle);
+
+            String code = c.getId();
+            // Scale font size slightly if nodes are small
+            float fontSize = (effectiveR < 10) ? 8f : 10f;
+            g2.setFont(getFont().deriveFont(Font.BOLD, fontSize));
+            FontMetrics fm = g2.getFontMetrics();
+
+            if (isPast)
+                g2.setColor(Color.DARK_GRAY);
+            else
+                g2.setColor(c.getFgColour());
+
+            g2.drawString(code, x - fm.stringWidth(code) / 2, centerY + fm.getAscent() / 2 - 2);
+        }
+
+        // 3. Train
+        if (currentTrainIndex != -1 && cachedActiveIndex != -1) {
+            int trainX = margin + (int) (currentTrainIndex * effectiveStep);
+            drawTrain(g2, trainX, centerY - effectiveR - 1);
+        }
+    }
+
 }

@@ -7,7 +7,7 @@ import net.sf.rails.game.financial.StockMarket;
 import net.sf.rails.game.financial.StockSpace;
 import net.sf.rails.ui.swing.GameUIManager;
 
-// --- START FIX ---
+
 public class FXHexStockChart extends Pane {
 
     private final StockMarket stockMarket;
@@ -41,6 +41,9 @@ public class FXHexStockChart extends Pane {
         // Horizontal spacing: Full width
         double horizSpacing = hexWidth;
 
+// Calculate the maximum negative X shift introduced by the shear transformation
+        double maxLeftwardShear = rows * (horizSpacing + GAP) / 2.0;
+
         for (int r = 0; r <= rows; r++) {
             for (int c = 0; c <= cols; c++) {
                 StockSpace space = stockMarket.getStockSpace(r, c);
@@ -48,13 +51,10 @@ public class FXHexStockChart extends Pane {
                 if (space != null) {
                     FXHexStockField hexField = new FXHexStockField(space);
                     
-                    double xPos = c * (horizSpacing + GAP);
+                    // Apply maxLeftwardShear to shift the entire grid rightwards, preventing negative X coordinates
+                    double xPos = maxLeftwardShear + c * (horizSpacing + GAP) - (r * (horizSpacing + GAP) / 2.0);
                     double yPos = r * (vertSpacing + GAP);
 
-                    // Offset odd rows horizontally (Standard Pointy-Topped / "even-r" or "odd-r")
-                    if (r % 2 != 0) {
-                        xPos += (horizSpacing + GAP) / 2.0;
-                    }
 
                     hexField.setLayoutX(xPos);
                     hexField.setLayoutY(yPos);
@@ -77,8 +77,10 @@ public class FXHexStockChart extends Pane {
         double contentWidth = contentGroup.getBoundsInLocal().getWidth();
         double contentHeight = contentGroup.getBoundsInLocal().getHeight();
 
-        double scaleX = width / contentWidth;
-        double scaleY = height / contentHeight;
+// Introduce a 5% padding margin to prevent edge clipping (strokes, ledges)
+        double padding = 0.95;
+        double scaleX = (width * padding) / contentWidth;
+        double scaleY = (height * padding) / contentHeight;
         double scaleFactor = Math.min(scaleX, scaleY);
         
         if (Double.isNaN(scaleFactor) || scaleFactor <= 0) scaleFactor = 1.0;
@@ -92,4 +94,3 @@ public class FXHexStockChart extends Pane {
         contentGroup.setTranslateY((height - scaledHeight) / 2);
     }
 }
-// --- END FIX ---

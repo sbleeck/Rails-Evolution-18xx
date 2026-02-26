@@ -109,8 +109,8 @@ public class OperatingRound extends Round implements Observer {
 
     protected transient PossibleAction selectedAction;
 
-    protected transient PossibleAction savedAction;
-
+    protected final GenericState<PossibleAction> savedAction = new GenericState<>(this, "savedAction");
+    
     protected GameDef.OrStep[] steps = new GameDef.OrStep[] {
             GameDef.OrStep.INITIAL, GameDef.OrStep.LAY_TRACK,
             GameDef.OrStep.LAY_TOKEN, GameDef.OrStep.CALC_REVENUE,
@@ -222,11 +222,9 @@ public class OperatingRound extends Round implements Observer {
     // [REPLACE the entire 'resume' method with this]
 
 
-    // --- BEGIN FIX: OperatingRound.java (resume method) ---
     @Override
     public void resume() {
 
-        // (FORCED CLEANUP) ---
         // CRITICAL: Ensure all transient/runtime lists are clean BEFORE processing any
         // saved actions.
         if (this.currentNormalTokenLays != null)
@@ -234,29 +232,35 @@ public class OperatingRound extends Round implements Observer {
         if (this.currentSpecialTokenLays != null)
             this.currentSpecialTokenLays.clear();
 
-        // Call the cleanup hook. 
-        // 1835 will override this to be empty, while standard games use the default logic.
-        resetTransientStateOnLoad();
 
-        // Fix for Double-Execution/PFR Recursion:
-        PossibleAction actionToProcess = savedAction;
-        savedAction = null;
+        // Call the cleanup hook ONLY if reloading to avoid destroying live OR state
+        if (gameManager.isReloading()) {
+            resetTransientStateOnLoad();
+        }
 
+// Fix for Double-Execution: Retrieve the saved action
+        PossibleAction actionToProcess = savedAction.value();
+        
         if (actionToProcess instanceof BuyTrain) {
-            buyTrain((BuyTrain) actionToProcess);
+            // Execute the purchase. Validation will now see the raised cash in Stefan's wallet.
+            boolean success = buyTrain((BuyTrain) actionToProcess);
+            if (!success) {
+                log.error("Automatic Train Purchase failed during resume for action: {}", actionToProcess);
+                setPossibleActions(); 
+            }
         } else if (actionToProcess instanceof RepayLoans) {
             executeRepayLoans((RepayLoans) actionToProcess);
         } else if (actionToProcess == null) {
-            setPossibleActions(); // In case it wouldn't otherwise happen
+            setPossibleActions(); 
         }
 
-        wasInterrupted.set(true);
+        savedAction.set(null); // Clear AFTER successful execution
+        wasInterrupted.set(true); // CRITICAL: Signal the UI to refresh after sub-round
 
         guiHints.setVisibilityHint(GuiDef.Panel.STOCK_MARKET, false);
         guiHints.setVisibilityHint(GuiDef.Panel.STATUS, true);
         guiHints.setActivePanel(GuiDef.Panel.MAP);
     }
-// --- END FIX ---
 
 
     protected void finishOR() {
@@ -298,7 +302,6 @@ public class OperatingRound extends Round implements Observer {
                 actionCompany = ((RelayTokenAction) action).getCompany();
             }
 
-            // --- FIX: EXPLICITLY EXCLUDE DiscardTrain ---
             // The subclass (OperatingRound_1835) must handle the swap for discards
             // to preserve the return-to-origin logic.
             if (actionCompany != null
@@ -1045,7 +1048,6 @@ boolean companySwitched = handleClosedOperatingCompany();
             if (!companySwitched) {
                 playerManager.setCurrentPlayer(operatingCompany.value().getPresident());
 
-                // --- START FIX ---
                 // Previously, this logic reset to INITIAL if no trains were bought.
                 // This broke Voluntary Discards (1837) where a player discards TO buy a train.
                 // We must ensure we stay in the BUY_TRAIN step.
@@ -1057,7 +1059,6 @@ boolean companySwitched = handleClosedOperatingCompany();
                 // } else {
                 //    stepObject.set(GameDef.OrStep.BUY_TRAIN);
                 // }
-                // --- END FIX ---
             }
         } else {
              // If more discards are needed, ensure we stay/enter the correct step
@@ -1089,7 +1090,6 @@ protected boolean processGameSpecificDiscard(DiscardTrain action, boolean moreDi
 // ... (lines of unchanged context code) ...
 
     public boolean checkForExcessTrains() {
-        // --- START FIX ---
         // System.out.println(">>> DEBUG: checkForExcessTrains() STARTED");
         excessTrainCompanies = new HashMap<>();
         Player player;
@@ -1118,12 +1118,10 @@ protected boolean processGameSpecificDiscard(DiscardTrain action, boolean moreDi
         boolean result = !excessTrainCompanies.isEmpty();
         // System.out.println(">>> DEBUG: checkForExcessTrains() RESULT: " + result);
         return result;
-        // --- END FIX ---
     }
 
 
     protected void setTrainsToDiscard() {
-        // --- START FIX ---
 
                 // System.out.println(">>> DEBUG: setTrainsToDiscard() STARTED");
 // 1. CRITICAL: Refresh the excess map immediately.
@@ -1169,10 +1167,8 @@ protected boolean processGameSpecificDiscard(DiscardTrain action, boolean moreDi
             }
         }
         // System.out.println(">>> DEBUG: setTrainsToDiscard() FINISHED (No actions created)");
-        // --- END FIX ---
     }
 
-// ... (rest of the class) ...
 
     
     /*
@@ -1477,8 +1473,7 @@ protected boolean processGameSpecificDiscard(DiscardTrain action, boolean moreDi
                 // Start a share selling round
                 int cashToBeRaisedByPresident = remainder - presCash;
 
-                savedAction = action;
-
+savedAction.set(action);
                 gameManager.startShareSellingRound(
                         operatingCompany.value().getPresident(),
                         cashToBeRaisedByPresident, operatingCompany.value(),
@@ -3131,8 +3126,8 @@ protected boolean processGameSpecificDiscard(DiscardTrain action, boolean moreDi
             // Relax validation: If we are resuming a saved action (e.g. returning from
             // emergency share selling), we allow the purchase even if the step logic
             // (like PFR triggers) has shifted the state temporarily.
-            if (getStep() != GameDef.OrStep.BUY_TRAIN && savedAction == null) {
-                errMsg = LocalText.getText("WrongActionNoTrainBuyingCost");
+if (getStep() != GameDef.OrStep.BUY_TRAIN && savedAction.value() == null) {
+                        errMsg = LocalText.getText("WrongActionNoTrainBuyingCost");
                 break;
             }
 
@@ -3193,8 +3188,8 @@ protected boolean processGameSpecificDiscard(DiscardTrain action, boolean moreDi
                 // via startShareSellingRound if they have enough assets.
 
                 if (willBankruptcyOccur(company, cashToRaise)) {
-                    DisplayBuffer.add(this, LocalText.getText("YouMustRaiseCashButCannot",
-                            Bank.format(this, cashToRaise)));
+                    // DisplayBuffer.add(this, LocalText.getText("YouMustRaiseCashButCannot",
+                    //         Bank.format(this, cashToRaise)));
                     if (GameDef.getParmAsBoolean(this, GameDef.Parm.EMERGENCY_COMPANY_BANKRUPTCY)) {
                         company.setBankrupt();
                         gameManager.registerCompanyBankruptcy(company);
@@ -3252,7 +3247,6 @@ protected boolean processGameSpecificDiscard(DiscardTrain action, boolean moreDi
                                         cashText);
                             }
                             ReportBuffer.add(this, message);
-                            DisplayBuffer.add(this, message);
 
                             // Transfer the sold certificates (select specific certs to move)
                             List<PublicCertificate> certsToMove = new ArrayList<>();
@@ -3407,7 +3401,7 @@ protected boolean processGameSpecificDiscard(DiscardTrain action, boolean moreDi
 
         // --- Handle Emergency Share Selling (if required for president) ---
         if (presidentMustSellShares) {
-            savedAction = action; // Save the current action state
+savedAction.set(action); // Save the current action state
 
             ReportBuffer.add(this, LocalText.getText("PlayerMustRaiseCash",
                     currentPlayer.getId(), // Use correct variable
@@ -5004,7 +4998,6 @@ protected boolean processGameSpecificDiscard(DiscardTrain action, boolean moreDi
     public void cleanup() {
     }
 
-    // --- BEGIN FIX: OperatingRound.java ---
     /**
      * Resets transient flags and safety sets the operating company to the first available one.
      * This is primarily used during load to ensure a valid state before processing actions.

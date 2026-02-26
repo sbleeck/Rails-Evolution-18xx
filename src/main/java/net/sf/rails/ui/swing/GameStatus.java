@@ -4420,7 +4420,43 @@ public static final Color BG_DISCARD_VOLUNTARY = Color.CYAN; // Light Blue (#ADD
         f.setOpaque(true);
         addField(f, compNameCol, playerCashYOffset, 1, 1, 0, true);
         for (int i = 0; i < np; i++) {
-            f = playerCash[i] = new Field(players.getPlayerByPosition(i).getWallet());
+
+
+            final int playerIndex = i; 
+            f = playerCash[i] = new Field(players.getPlayerByPosition(i).getWallet()) {
+                @Override
+                public void setText(String t) {
+                    boolean isDebt = false;
+                    try {
+                        if (gameUIManager != null && gameUIManager.getGameManager() != null) {
+                            net.sf.rails.game.round.RoundFacade currentRound = gameUIManager.getGameManager().getCurrentRound();
+                            if (currentRound instanceof net.sf.rails.game.financial.ShareSellingRound) {
+                                net.sf.rails.game.financial.ShareSellingRound ssr = (net.sf.rails.game.financial.ShareSellingRound) currentRound;
+                                Player thisPlayer = players.getPlayerByPosition(playerIndex);
+                                
+                                // Fix: Use getCurrentPlayer() instead of getSellingPlayer()
+                                if (ssr.getCurrentPlayer() != null && ssr.getCurrentPlayer().equals(thisPlayer)) {
+                                    int toRaise = ssr.getRemainingCashToRaise();
+                                    if (toRaise > 0) {
+                                        this.setForeground(Color.RED);
+                                        // Display debt as negative cash for UX
+                                        super.setText(gameUIManager.format(-toRaise));
+                                        isDebt = true;
+                                    }
+                                }
+                            }
+                        }
+                    } catch (Exception e) { 
+                        // Fail gracefully and revert to standard display
+                    }
+                    
+                    if (!isDebt) {
+                        this.setForeground(Color.BLACK);
+                        super.setText(t);
+                    }
+                }
+            };
+
             f.setBorder(BORDER_THIN);
             Font currentFont = f.getFont();
             f.setFont(currentFont.deriveFont(Font.BOLD, currentFont.getSize()));

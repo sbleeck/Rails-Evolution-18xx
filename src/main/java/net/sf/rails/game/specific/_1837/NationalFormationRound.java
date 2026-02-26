@@ -238,7 +238,7 @@ public class NationalFormationRound extends Round {
                 }
             }
             if (parSpace != null)
-                major.setCurrentSpace(parSpace);
+                market.correctStockPrice(major, parSpace);
 
             // Inject starting capital!
             net.sf.rails.game.state.Currency.fromBank(isKK ? 840 : 875, major);
@@ -456,7 +456,7 @@ public class NationalFormationRound extends Round {
                         String msg = LocalText.getText("START_MERGED_COMPANY", national.getId(),
                                 Bank.format(this, national.getIPOPrice()), national.getStartSpace());
                         ReportBuffer.add(this, msg);
-                        DisplayBuffer.add(this, msg);
+                        // DisplayBuffer.add(this, msg);
                     }
 
                     processExchange(target, national, ema);
@@ -671,8 +671,19 @@ public void start(PublicCompany_1837 national, boolean isTriggered, String repor
             net.sf.rails.game.financial.StockMarket market = getRoot().getStockMarket();
             net.sf.rails.game.financial.StockSpace parSpace = null;
 
-            boolean isKK = "KK".equals(major.getId());
-            int targetPar = isKK ? 120 : 175;
+          int targetPar = 175; // Default for Ug
+            int startingCapital = 875;
+            
+            if ("KK".equals(major.getId())) {
+                targetPar = 120;
+                startingCapital = 840;
+            } else if ("Sd".equals(major.getId())) {
+                targetPar = 142;
+                startingCapital = 710;
+            }
+
+            log.info("1837_NFR_LOG: {} starting formation | Par: {} | Capital: {}", major.getId(), targetPar, startingCapital);
+
 
             for (net.sf.rails.game.financial.StockSpace ss : market.getStartSpaces()) {
                 if (ss.getPrice() == targetPar) {
@@ -694,10 +705,10 @@ public void start(PublicCompany_1837 national, boolean isTriggered, String repor
                 }
             }
             if (parSpace != null)
-                major.setCurrentSpace(parSpace);
+                market.correctStockPrice(major, parSpace);
 
             // Inject starting capital!
-            net.sf.rails.game.state.Currency.fromBank(isKK ? 840 : 875, major);
+net.sf.rails.game.state.Currency.fromBank(startingCapital, major);
             major.setFloated();
             log.info("1837_NFR: " + major.getId() + " successfully floated with Par " + targetPar + " and received capital.");
         }

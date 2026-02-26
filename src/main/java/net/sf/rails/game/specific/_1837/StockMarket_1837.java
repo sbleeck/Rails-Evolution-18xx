@@ -153,4 +153,88 @@ public class StockMarket_1837 extends StockMarket {
         }
         if (newsquare != null) prepareMove(company, old, newsquare);
     }
+
+
+    
+private StockSpace getSpaceByPrice(int targetPrice) {
+        for (int r = 0; r < getNumberOfRows(); r++) {
+            for (int c = 0; c < getNumberOfColumns(); c++) {
+                StockSpace ss = getStockSpace(r, c);
+                if (ss != null && ss.getPrice() == targetPrice) {
+                    return ss;
+                }
+            }
+        }
+        return null;
+    }
+
+
+    
+@Override
+    public void start(PublicCompany company, StockSpace price) {
+// --- START FIX ---
+        if ("Sd".equals(company.getId())) {
+            org.slf4j.LoggerFactory.getLogger(StockMarket_1837.class)
+                    .warn("1837_DIAGNOSTIC_SD: start() called. Active token dropping at price: " 
+                    + (price != null ? price.getPrice() : "null"));
+            
+            if (price != null && price.getPrice() == 120) {
+                org.slf4j.LoggerFactory.getLogger(StockMarket_1837.class)
+                    .error("1837_DIAGNOSTIC_SD: WARNING! Sd token is dropping at 120 instead of 142.");
+            }
+        }
+// --- END FIX ---
+        super.start(company, price);
+    }
+
+    @Override
+    public void finishConfiguration(RailsRoot root) {
+        super.finishConfiguration(root);
+        
+        // Strip the ghost token at boot time.
+        // Executing the state mutation prior to action replay bypasses validator 
+        // hash desynchronization, while legally triggering UI initial state updates.
+        PublicCompany sd = root.getCompanyManager().getPublicCompany("Sd");
+        if (sd != null && sd.getStartSpace() != null) {
+            try {
+                java.lang.reflect.Field field = net.sf.rails.game.financial.StockSpace.class.getDeclaredField("fixedStartPrices");
+                field.setAccessible(true);
+                @SuppressWarnings("unchecked")
+                java.util.List<PublicCompany> fixedStartPrices = (java.util.List<PublicCompany>) field.get(sd.getStartSpace());
+                if (fixedStartPrices != null) {
+                    boolean removed = fixedStartPrices.remove(sd);
+                    org.slf4j.LoggerFactory.getLogger(StockMarket_1837.class)
+                            .info("1837_BOOT_FIX: Erased Sd ghost token from par space: " + removed);
+                }
+            } catch (Exception e) {
+                org.slf4j.LoggerFactory.getLogger(StockMarket_1837.class)
+                        .error("1837_BOOT_FIX: Failed to erase Sd ghost token", e);
+            }
+        }
+    }
+
+
+@Override
+    public void correctStockPrice(PublicCompany company, StockSpace target) {
+// --- START FIX ---
+        String companyId = company.getId();
+        int targetPrice = (target != null) ? target.getPrice() : -1;
+        String targetId = (target != null) ? target.getId() : "null";
+        StockSpace current = company.getCurrentSpace();
+        int currentPrice = (current != null) ? current.getPrice() : -1;
+
+        org.slf4j.LoggerFactory.getLogger(StockMarket_1837.class)
+                .info("1837_TRACE: correctStockPrice() for {} | Current: {} ({}) | Target: {} ({})", 
+                      companyId, currentPrice, (current != null ? current.getId() : "null"), targetPrice, targetId);
+                
+        if ("Sd".equals(companyId)) {
+            if (targetPrice == 120) {
+                org.slf4j.LoggerFactory.getLogger(StockMarket_1837.class)
+                        .error("1837_ALERT: Sd is being corrected to 120 (KK Par) instead of 142! Verification required.");
+            }
+        }
+// --- END FIX ---
+        super.correctStockPrice(company, target);
+    }
+
 }

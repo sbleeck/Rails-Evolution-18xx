@@ -403,13 +403,8 @@
         </Shares>
     </Company>
     <Company name="Sd" longname="Südbahn" type="National" tokens="5" foundingCompany="S1"
-             available="no" fgColour="FFFFFF" bgColour="FF5400">
-        <IfVariant value="Basegame,1837-2ndEd.">
-                <Attributes startspace="K4"/>
-        </IfVariant>
-        <IfVariant value="Romoth">
-                <Attributes startspace="I4"/>
-        </IfVariant>
+             available="no" startspace="K4" fgColour="FFFFFF" bgColour="FF5400">
+    
         <Formation minors="S1,S2,S3,S4,S5" startMinor="S1" forcedMergePhase="4"/>
         <Home hex="G17" city="4" mapDisplay="no"/>
         <Capitalisation type="part" shares="5"/>

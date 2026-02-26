@@ -514,8 +514,8 @@ public class OperatingRound_1880 extends OperatingRound {
     public void resume() {
         guiHints.setActivePanel(GuiDef.Panel.MAP);
         guiHints.setCurrentRoundType(getClass());
-        if (savedAction instanceof BuyTrain) {
-            BuyTrain action = (BuyTrain) savedAction;
+if (savedAction.value() instanceof BuyTrain) {
+            BuyTrain action = (BuyTrain) savedAction.value();
 
             // We are here because this player couldn't pay for a train.
             Player player = playerManager.getPlayerByName(action.getPlayerName());

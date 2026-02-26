@@ -685,7 +685,7 @@ public class OperatingRound_1837 extends OperatingRound {
             }
 
         } else if (currentPhase.getId().equals("4")) {
-           if (!phase4Triggered.value()) {
+            if (!phase4Triggered.value()) {
                 log.debug("Phase 4 Transition Detected. Executing One-Time Triggers.");
                 phase4Triggered.set(true); // Mark memory: Undoable!
 
@@ -714,14 +714,27 @@ public class OperatingRound_1837 extends OperatingRound {
         String minorId = minor.getId();
 
         // 1. Formation: Par & Float ONLY (No Flush)
-        boolean isK1Formation = action.isFormation() || "K1".equals(minorId);
-        boolean isU1Formation = action.isFormation() || "U1".equals(minorId);
+        boolean isFormationTrigger = action.isFormation() || "K1".equals(minorId) || "U1".equals(minorId)
+                || "S1".equals(minorId);
 
-        if ((isK1Formation || isU1Formation) && !major.hasFloated()) {
+        if (isFormationTrigger && !major.hasFloated()) {
 
             StockMarket market = getRoot().getStockMarket();
             net.sf.rails.game.financial.StockSpace parSpace = null;
-            int targetPar = isK1Formation ? 120 : 175;
+
+            int targetPar = 175; // Default for Ug
+            int startingCapital = 875;
+            if ("KK".equals(major.getId())) {
+                targetPar = 120;
+                startingCapital = 840;
+            } else if ("Sd".equals(major.getId())) {
+                targetPar = 142;
+                startingCapital = 710;
+            }
+
+            org.slf4j.LoggerFactory.getLogger(OperatingRound_1837.class)
+                    .info("1837_FORMATION: {} forming | Target Par: {} | Capital: {}", major.getId(), targetPar,
+                            startingCapital);
 
             for (net.sf.rails.game.financial.StockSpace ss : market.getStartSpaces()) {
                 if (ss.getPrice() == targetPar) {
@@ -742,9 +755,10 @@ public class OperatingRound_1837 extends OperatingRound {
                         break;
                 }
             }
-            if (parSpace != null)
-                major.setCurrentSpace(parSpace);
-            Currency.fromBank(isK1Formation ? 840 : 875, major);
+            if (parSpace != null) {
+                market.correctStockPrice(major, parSpace);
+            }
+            net.sf.rails.game.state.Currency.fromBank(startingCapital, major);
 
             if (!major.hasFloated()) {
                 major.setFloated();
@@ -999,7 +1013,7 @@ public class OperatingRound_1837 extends OperatingRound {
         return super.layTile(action);
     }
 
-   @Override
+    @Override
     public void start() {
         processMandatoryExchanges();
 
@@ -1019,7 +1033,8 @@ public class OperatingRound_1837 extends OperatingRound {
             }
         }
 
-        // All start-of-round CER and NFR triggers are now securely handled by GameManager_1837.nextRound
+        // All start-of-round CER and NFR triggers are now securely handled by
+        // GameManager_1837.nextRound
         super.start();
     }
 
@@ -1060,9 +1075,10 @@ public class OperatingRound_1837 extends OperatingRound {
         super.start();
     }
 
-@Override
+    @Override
     public boolean buyTrain(BuyTrain action) {
-        log.info("1837_TRACE: buyTrain() invoked for train " + (action.getTrain() != null ? action.getTrain().getType().getName() : "null"));
+        log.info("1837_TRACE: buyTrain() invoked for train "
+                + (action.getTrain() != null ? action.getTrain().getType().getName() : "null"));
         boolean result = super.buyTrain(action);
 
         if (result && gameManager.getGameUIManager() != null && !gameManager.isReloading()) {
@@ -1087,7 +1103,7 @@ public class OperatingRound_1837 extends OperatingRound {
                     return result;
                 }
             }
-            
+
             if (trainName.equals("5")) {
                 PublicCompany_1837 ug = (PublicCompany_1837) getRoot().getCompanyManager().getPublicCompany("Ug");
                 if (ug != null && !NationalFormationRound.nationalIsComplete(ug)) {
@@ -1097,14 +1113,14 @@ public class OperatingRound_1837 extends OperatingRound {
             }
 
             // 2. Route to standard Optional Checks
-            if (gm.checkAndRunKK(null, this, this)) return result;
-            if (gm.checkAndRunUG(null, this, this)) return result;
+            if (gm.checkAndRunKK(null, this, this))
+                return result;
+            if (gm.checkAndRunUG(null, this, this))
+                return result;
         }
 
         return result;
     }
-
-
 
     @Override
     public boolean setPossibleActions() {
@@ -1273,7 +1289,7 @@ public class OperatingRound_1837 extends OperatingRound {
         return false;
     }
 
-public void resume() {
+    public void resume() {
         log.info("1837_TRACE: Resuming OperatingRound " + getId());
 
         // Inherit skipped minors memory during resume to prevent re-entry loops
@@ -1291,8 +1307,10 @@ public void resume() {
 
         // Chain mid-turn cascading formations natively through GameManager
         GameManager_1837 gm = (GameManager_1837) gameManager;
-        if (gm.checkAndRunKK(null, this, this)) return;
-        if (gm.checkAndRunUG(null, this, this)) return;
+        if (gm.checkAndRunKK(null, this, this))
+            return;
+        if (gm.checkAndRunUG(null, this, this))
+            return;
 
         if (operatingCompany.value() != null && operatingCompany.value().isClosed()) {
             log.warn("1837_LOGIC: Resuming OR but operating company " + operatingCompany.value().getId()
@@ -1310,8 +1328,6 @@ public void resume() {
 
         setPossibleActions();
     }
-
-
 
     private void executeSdFormation(PublicCompany_1837 sd) {
         log.info("1837_LOGIC: Commencing Mandatory Sd Formation procedurally.");
@@ -1331,7 +1347,8 @@ public void resume() {
         }
 
         if (parSpace != null) {
-            sd.setCurrentSpace(parSpace);
+
+            market.correctStockPrice(sd, parSpace);
 
             PublicCompany s1 = getRoot().getCompanyManager().getPublicCompany("S1");
             boolean s1OwnedByPlayer = (s1 != null && s1.getPresident() instanceof Player);

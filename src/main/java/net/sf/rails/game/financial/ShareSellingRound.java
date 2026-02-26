@@ -520,6 +520,10 @@ public class ShareSellingRound extends StockRound {
         return true;
     }
 
+    public Player getCurrentPlayer() {
+        return sellingPlayer;
+    }
+
     private void declareBankruptcy () {
         String message = LocalText.getText("YouMustRaiseCashButCannot",
                 currentPlayer,
