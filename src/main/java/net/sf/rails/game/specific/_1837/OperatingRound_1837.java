@@ -948,25 +948,6 @@ public class OperatingRound_1837 extends OperatingRound {
         }
     }
 
-    @Override
-    public String getRevenueDisplayString(PublicCompany company) {
-        try {
-            RevenueAdapter ra = RevenueAdapter.createRevenueAdapter(getRoot(), company,
-                    getRoot().getPhaseManager().getCurrentPhase());
-            if (ra != null) {
-                ra.initRevenueCalculator(true);
-                int total = ra.calculateRevenue();
-                int mine = ra.getSpecialRevenue();
-                if (mine > 0) {
-                    int route = total - mine;
-                    return Bank.format(this, route) + " + " + Bank.format(this, mine);
-                }
-            }
-        } catch (Exception e) {
-            log.error("Error generating revenue display string", e);
-        }
-        return super.getRevenueDisplayString(company);
-    }
 
     @Override
     public int getBaseRevenueOnly(PublicCompany company) {
@@ -984,19 +965,6 @@ public class OperatingRound_1837 extends OperatingRound {
         return total - ra.getSpecialRevenue();
     }
 
-    @Override
-    public int getSpecialRevenueOnly(PublicCompany company) {
-        RevenueAdapter ra = RevenueAdapter.createRevenueAdapter(getRoot(), company, Phase.getCurrent(this));
-        if (ra == null)
-            return 0;
-        try {
-            ra.initRevenueCalculator(true);
-            ra.calculateRevenue();
-            return ra.getSpecialRevenue();
-        } catch (Exception e) {
-            return 0;
-        }
-    }
 
     @Override
     public void finishRound() {
@@ -1322,11 +1290,9 @@ public class OperatingRound_1837 extends OperatingRound {
             return;
         }
 
-        if (getStep() == GameDef.OrStep.BUY_TRAIN) {
-            possibleActions.clear();
-        }
-
-        setPossibleActions();
+// Delegate to the base class to handle the automatic train transfer and standard UI refresh
+        super.resume();
+        
     }
 
     private void executeSdFormation(PublicCompany_1837 sd) {
@@ -1402,4 +1368,71 @@ public class OperatingRound_1837 extends OperatingRound {
         }
     }
 
+
+
+    @Override
+    public String getRevenueDisplayString(PublicCompany company) {
+// --- START FIX ---
+        log.info("1837_REVENUE_TRACE: getRevenueDisplayString called for company: {}, hasTrains: {}, type: {}",
+                company.getId(), company.hasTrains(), company.getType().getId());
+
+        // Guard against trainless companies to prevent stale adapter math
+        if (!company.hasTrains() && !"Coal".equals(company.getType().getId())) {
+            log.info("1837_REVENUE_TRACE: {} has no trains and is not Coal. Returning 0.", company.getId());
+            return Bank.format(this, 0);
+        }
+
+        try {
+            RevenueAdapter ra = RevenueAdapter.createRevenueAdapter(getRoot(), company,
+                    getRoot().getPhaseManager().getCurrentPhase());
+            if (ra != null) {
+                ra.initRevenueCalculator(true);
+                int total = ra.calculateRevenue();
+                int mine = ra.getSpecialRevenue();
+                
+                log.info("1837_REVENUE_TRACE: {} adapter calculated total: {}, mine: {}", company.getId(), total, mine);
+
+                // Prevent negative route revenue from stale adapter states
+                if (mine > 0 && total >= mine) {
+                    int route = total - mine;
+                    return Bank.format(this, route) + " + " + Bank.format(this, mine);
+                } else if (total > 0) {
+                    return Bank.format(this, total);
+                }
+            }
+        } catch (Exception e) {
+            log.error("Error generating revenue display string", e);
+        }
+        return super.getRevenueDisplayString(company);
+// --- END FIX ---
+    }
+
+
+
+    @Override
+    public int getSpecialRevenueOnly(PublicCompany company) {
+// --- START FIX ---
+        log.info("1837_REVENUE_TRACE: getSpecialRevenueOnly called for company: {}, hasTrains: {}",
+                company.getId(), company.hasTrains());
+
+        // Guard against trainless majors
+        if (!company.hasTrains() && !"Coal".equals(company.getType().getId())) {
+            log.info("1837_REVENUE_TRACE: {} has no trains. Returning 0 special revenue.", company.getId());
+            return 0;
+        }
+
+        RevenueAdapter ra = RevenueAdapter.createRevenueAdapter(getRoot(), company, Phase.getCurrent(this));
+        if (ra == null)
+            return 0;
+        try {
+            ra.initRevenueCalculator(true);
+            ra.calculateRevenue();
+            int mine = ra.getSpecialRevenue();
+            log.info("1837_REVENUE_TRACE: {} special revenue calculated as: {}", company.getId(), mine);
+            return mine;
+        } catch (Exception e) {
+            return 0;
+        }
+// --- END FIX ---
+    }
 }

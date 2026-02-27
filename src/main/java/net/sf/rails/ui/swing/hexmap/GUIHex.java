@@ -120,10 +120,10 @@ public class GUIHex implements Observer {
         // Selected Hex (Construction red)
         SELECTED(0.8, Color.GREEN),
 
-// Merged Purple Highlight (Active Owner)
-HIGHLIGHT_PURPLE(0.8, new Color(128, 0, 128)),
-// Dashed Purple Highlight (Portfolio Owner) - Opaque purple
-HIGHLIGHT_PORTFOLIO(0.8, new Color(128, 0, 128)),
+        // Merged Purple Highlight (Active Owner)
+        HIGHLIGHT_PURPLE(0.8, new Color(128, 0, 128)),
+        // Dashed Purple Highlight (Portfolio Owner) - Opaque purple
+        HIGHLIGHT_PORTFOLIO(0.8, new Color(128, 0, 128)),
 
         INVALIDS(0.9, Color.pink);
 
@@ -437,33 +437,34 @@ HIGHLIGHT_PORTFOLIO(0.8, new Color(128, 0, 128)),
     public void paintMarks(Graphics2D g) {
         GUIGlobals.setRenderingHints(g);
 
-if (state != State.NORMAL) {
+        if (state != State.NORMAL) {
             Stroke oldStroke = g.getStroke();
             float strokeWidth = (float) state.getStrokeWidth(dimensions.hexagon);
             Shape innerHex = state.getInnerHexagon(dimensions.hexagon, dimensions.center);
-            
-            
+
             if (state == State.HIGHLIGHT_PORTFOLIO) {
-                // 1. Force-clear the stroke path to erase the stale white halo 
+                // 1. Force-clear the stroke path to erase the stale white halo
                 // from the persistent MarksLayer buffer.
                 java.awt.Composite oldComp = g.getComposite();
                 g.setComposite(java.awt.AlphaComposite.getInstance(java.awt.AlphaComposite.CLEAR));
-                g.setStroke(new BasicStroke(strokeWidth + 4.0f)); 
+                g.setStroke(new BasicStroke(strokeWidth + 4.0f));
                 g.draw(innerHex);
                 g.setComposite(oldComp);
 
-                // 2. Draw strictly dashes. The gaps will now punch through to the map background.
+                // 2. Draw strictly dashes. The gaps will now punch through to the map
+                // background.
                 float[] dashPattern = { 10.0f, 10.0f };
-                g.setStroke(new BasicStroke(strokeWidth, BasicStroke.CAP_BUTT, BasicStroke.JOIN_MITER, 10.0f, dashPattern, 0.0f));
+                g.setStroke(new BasicStroke(strokeWidth, BasicStroke.CAP_BUTT, BasicStroke.JOIN_MITER, 10.0f,
+                        dashPattern, 0.0f));
                 g.setColor(state.getColor());
                 g.draw(innerHex);
             } else if (state == State.HIGHLIGHT_PURPLE) {
-                
+
                 // Active company: Solid white halo first, then solid purple
-                g.setStroke(new BasicStroke(strokeWidth + 3.0f)); 
+                g.setStroke(new BasicStroke(strokeWidth + 3.0f));
                 g.setColor(Color.WHITE);
                 g.draw(innerHex);
-                
+
                 g.setStroke(new BasicStroke(strokeWidth));
                 g.setColor(state.getColor());
                 g.draw(innerHex);
@@ -474,7 +475,6 @@ if (state != State.NORMAL) {
             }
             g.setStroke(oldStroke);
         }
-
 
         // highlight on top of tiles
         if (isHighlighted()) {
@@ -489,85 +489,83 @@ if (state != State.NORMAL) {
 
     }
 
-
     public void paintTokensAndText(Graphics2D g) {
 
-    GUIGlobals.setRenderingHints(g);
+        GUIGlobals.setRenderingHints(g);
 
-    try {
-        paintStationTokens(g);
-        paintOffStationTokens(g);
+        try {
+            paintStationTokens(g);
+            paintOffStationTokens(g);
 
-        if (!isTilePainted())
-            return;
+            if (!isTilePainted())
+                return;
 
-        if (getHex().getTileCost() > 0) {
-            FontMetrics fontMetrics = g.getFontMetrics();
-            g.drawString(
-                    Bank.format(getHex(), getHex().getTileCost()),
-                    dimensions.rectBound.x
-                            + (dimensions.rectBound.width
-                                    - fontMetrics.stringWidth(Integer.toString(getHex().getTileCost())))
-                                    * 3 / 5,
-                    dimensions.rectBound.y
-                            + ((fontMetrics.getHeight() + dimensions.rectBound.height) * 9 / 15));
-        }
+            if (getHex().getTileCost() > 0) {
+                FontMetrics fontMetrics = g.getFontMetrics();
+                g.drawString(
+                        Bank.format(getHex(), getHex().getTileCost()),
+                        dimensions.rectBound.x
+                                + (dimensions.rectBound.width
+                                        - fontMetrics.stringWidth(Integer.toString(getHex().getTileCost())))
+                                        * 3 / 5,
+                        dimensions.rectBound.y
+                                + ((fontMetrics.getHeight() + dimensions.rectBound.height) * 9 / 15));
+            }
 
-        Map<PublicCompany, Stop> homes = getHex().getHomes();
+            Map<PublicCompany, Stop> homes = getHex().getHomes();
 
-        if (homes != null) {
-            for (PublicCompany company : homes.keySet()) {
-                if (company.isClosed())
-                    continue;
+            if (homes != null) {
+                for (PublicCompany company : homes.keySet()) {
+                    if (company.isClosed())
+                        continue;
 
-                // Only draw the company name if there isn't yet a token of that company
-                if (hex.hasTokenOfCompany(company))
-                    continue;
-                // Do not draw if hex is never blocked for token lays
-                if (hex.getBlockedForTokenLays() == MapHex.BlockedToken.NEVER)
-                    continue;
+                    // Only draw the company name if there isn't yet a token of that company
+                    if (hex.hasTokenOfCompany(company))
+                        continue;
+                    // Do not draw if hex is never blocked for token lays
+                    if (hex.getBlockedForTokenLays() == MapHex.BlockedToken.NEVER)
+                        continue;
 
-                Stop homeCity = homes.get(company);
-                if (homeCity.getRelatedStation() == null) { // not yet decided where the token will be
-                    // find a free slot
-                    Set<Stop> stops = getHex().getStops();
-                    for (Stop stop : stops) {
-                        if (stop.hasTokenSlotsLeft()) {
-                            homeCity = stop;
-                            break;
+                    Stop homeCity = homes.get(company);
+                    if (homeCity.getRelatedStation() == null) { // not yet decided where the token will be
+                        // find a free slot
+                        Set<Stop> stops = getHex().getStops();
+                        for (Stop stop : stops) {
+                            if (stop.hasTokenSlotsLeft()) {
+                                homeCity = stop;
+                                break;
+                            }
+                        }
+                    }
+
+                    if (homeCity != null) {
+                        // check the number of tokens laid there already
+                        HexPoint p = getTokenCenter(1, homeCity);
+                        if (company.isDisplayHomeHex()) {
+                            drawHome(g, company, p);
                         }
                     }
                 }
-                
-                if (homeCity != null) {
-                    // check the number of tokens laid there already
-                    HexPoint p = getTokenCenter(1, homeCity);
-                    if (company.isDisplayHomeHex()) {
-                        drawHome(g, company, p);
-                    }
-                }
             }
+
+        } catch (java.util.ConcurrentModificationException e) {
+            // Abort painting for this frame if the map model is being updated concurrently
+            // by the main thread during a game load
+            return;
         }
 
-    } catch (java.util.ConcurrentModificationException e) {
-        // Abort painting for this frame if the map model is being updated concurrently by the main thread during a game load
-        return;
+        // Fügt die Logik zum Zeichnen des Custom Overlay Textes hinzu, falls vorhanden
+        if (customOverlayText != null) {
+            drawString(g, customOverlayText, 0, 0); // Zeichnet den Text zentriert
+        }
+
+        // If an active owner label is set, draw it using standard text
+        // (The purple BORDER is handled by paintMarks via the State enum now)
+        if (activeOwnerLabel != null) {
+            drawString(g, activeOwnerLabel, 0, 0);
+        }
+
     }
-
-    // Fügt die Logik zum Zeichnen des Custom Overlay Textes hinzu, falls vorhanden
-    if (customOverlayText != null) {
-        drawString(g, customOverlayText, 0, 0); // Zeichnet den Text zentriert
-    }
-
-    // If an active owner label is set, draw it using standard text
-    // (The purple BORDER is handled by paintMarks via the State enum now)
-    if (activeOwnerLabel != null) {
-        drawString(g, activeOwnerLabel, 0, 0);
-    }
-
-}
-
-
 
     public void setCustomOverlayText(String text) {
         String safeText = (text == null) ? "" : text;
@@ -680,72 +678,69 @@ if (state != State.NORMAL) {
 
     }
 
-
-
     private void drawHome(Graphics2D g2, PublicCompany co, HexPoint origin) {
-// 1. Branch logic: Check if this is a Major or National company
-boolean isMajor = false;
-if (co.getType() != null) {
-String typeName = co.getType().getId();
-if (typeName != null && (typeName.equals("Major") || typeName.equals("National"))) {
-isMajor = true;
-}
-}
+        // 1. Branch logic: Check if this is a Major or National company
+        boolean isMajor = false;
+        if (co.getType() != null) {
+            String typeName = co.getType().getId();
+            if (typeName != null && (typeName.equals("Major") || typeName.equals("National"))) {
+                isMajor = true;
+            }
+        }
 
-    // 2. Keep Minors and Coal companies completely intact
-    if (!isMajor) {
-        GUIToken.drawTokenText(co.getId(), g2, Color.BLACK, origin, dimensions.tokenDiameter);
-        return;
+        // 2. Keep Minors and Coal companies completely intact
+        if (!isMajor) {
+            GUIToken.drawTokenText(co.getId(), g2, Color.BLACK, origin, dimensions.tokenDiameter);
+            return;
+        }
+
+        // 3. Draw the "empty ring" style for non-active Majors
+        double diameter = dimensions.tokenDiameter;
+        double radius = diameter / 2.0;
+        double x = origin.getX() - radius;
+        double y = origin.getY() - radius;
+
+        Color oldColor = g2.getColor();
+        Stroke oldStroke = g2.getStroke();
+        Font oldFont = g2.getFont();
+
+        java.awt.geom.Ellipse2D.Double circle = new java.awt.geom.Ellipse2D.Double(x, y, diameter, diameter);
+
+        // Black border (outer outline)
+        g2.setColor(Color.BLACK);
+        g2.setStroke(new BasicStroke(4.0f));
+        g2.draw(circle);
+
+        // Company colored ring inside the black border
+        g2.setColor(co.getBgColour());
+        g2.setStroke(new BasicStroke(2.0f));
+        g2.draw(circle);
+
+        // Setup Text
+        g2.setFont(new Font("SansSerif", Font.BOLD, (int) (diameter * 0.45)));
+        FontMetrics fm = g2.getFontMetrics();
+        String text = co.getId();
+        int textWidth = fm.stringWidth(text);
+        int textHeight = fm.getAscent();
+
+        float textX = (float) (origin.getX() - textWidth / 2.0);
+        float textY = (float) (origin.getY() + textHeight / 2.0 - fm.getDescent());
+
+        // Draw solid white background box for text (cuts through the ring)
+        int padding = 2;
+        java.awt.geom.Rectangle2D.Double textBox = new java.awt.geom.Rectangle2D.Double(textX - padding,
+                textY - textHeight, textWidth + padding * 2, textHeight + fm.getDescent());
+        g2.setColor(Color.WHITE);
+        g2.fill(textBox);
+
+        // Draw core text
+        g2.setColor(Color.BLACK);
+        g2.drawString(text, textX, textY);
+
+        g2.setColor(oldColor);
+        g2.setStroke(oldStroke);
+        g2.setFont(oldFont);
     }
-
-    // 3. Draw the "empty ring" style for non-active Majors
-    double diameter = dimensions.tokenDiameter;
-    double radius = diameter / 2.0;
-    double x = origin.getX() - radius;
-    double y = origin.getY() - radius;
-
-    Color oldColor = g2.getColor();
-    Stroke oldStroke = g2.getStroke();
-    Font oldFont = g2.getFont();
-
-    java.awt.geom.Ellipse2D.Double circle = new java.awt.geom.Ellipse2D.Double(x, y, diameter, diameter);
-
-    // Black border (outer outline)
-    g2.setColor(Color.BLACK);
-    g2.setStroke(new BasicStroke(4.0f)); 
-    g2.draw(circle);
-
-    // Company colored ring inside the black border
-    g2.setColor(co.getBgColour());
-    g2.setStroke(new BasicStroke(2.0f)); 
-    g2.draw(circle);
-
-    // Setup Text
-    g2.setFont(new Font("SansSerif", Font.BOLD, (int)(diameter * 0.45))); 
-    FontMetrics fm = g2.getFontMetrics();
-    String text = co.getId();
-    int textWidth = fm.stringWidth(text);
-    int textHeight = fm.getAscent();
-
-    float textX = (float) (origin.getX() - textWidth / 2.0);
-    float textY = (float) (origin.getY() + textHeight / 2.0 - fm.getDescent());
-
-    // Draw solid white background box for text (cuts through the ring)
-    int padding = 2;
-    java.awt.geom.Rectangle2D.Double textBox = new java.awt.geom.Rectangle2D.Double(textX - padding, textY - textHeight, textWidth + padding * 2, textHeight + fm.getDescent());
-    g2.setColor(Color.WHITE);
-    g2.fill(textBox);
-
-    // Draw core text
-    g2.setColor(Color.BLACK);
-    g2.drawString(text, textX, textY);
-
-    g2.setColor(oldColor);
-    g2.setStroke(oldStroke);
-    g2.setFont(oldFont);
-}
-
-
 
     private void drawBonusToken(Graphics2D g2, BonusToken bt, HexPoint origin) {
         GUIToken token = new GUIToken(Color.BLACK, Color.WHITE, "+" + bt.getValue(),
@@ -759,9 +754,11 @@ isMajor = true;
 
         HexPoint tokenCenter;
         if (positionCode != 0) {
-            // FIXME: Check if we need both x and y
-            // or only y as in Rails1.x
+
+            
+
             double initial = TILE_GRID_SCALE * dimensions.zoomFactor;
+
             double r = MapOrientation.DEG30 * (positionCode / (double) 50);
             tokenCenter = new HexPoint(0, initial).rotate(r);
         } else {
@@ -772,8 +769,19 @@ isMajor = true;
         double delta_x = 0, delta_y = 0;
         switch (stop.getSlots()) {
             case 2:
-                delta_x = (-0.5 + currentToken) * CITY_SIZE * dimensions.zoomFactor;
+            int curveHint = Math.abs(positionCode) % 10;
+                if (curveHint >= 6 && curveHint <= 9) {
+                    // Use trigonometry to split the tokens diagonally. 
+                    double splitAngle = Math.toRadians(120.0);
+                    double offset = (-0.5 + currentToken) * CITY_SIZE * dimensions.zoomFactor;
+                    delta_x = offset * Math.cos(splitAngle);
+                    delta_y = offset * Math.sin(splitAngle);
+                } else {
+                    delta_x = (-0.5 + currentToken) * CITY_SIZE * dimensions.zoomFactor;
+                }
+
                 break;
+
             case 3:
                 if (currentToken < 2) {
                     delta_x = (-0.5 + currentToken) * CITY_SIZE * dimensions.zoomFactor;
@@ -1061,7 +1069,7 @@ isMajor = true;
      *               NORMAL.
      * @param label  The text to display (or null).
      */
-public void setActiveOwnerHighlight(boolean active, String label, boolean isOperatingCompany) {
+    public void setActiveOwnerHighlight(boolean active, String label, boolean isOperatingCompany) {
         // 1. Update Internal Fields
         this.activeOwnerLabel = label;
         this.activeOwnerHighlight = active;

@@ -1086,19 +1086,34 @@ public class OperatingRound_1835 extends OperatingRound {
         log.info("Refreshed Operating Companies. New Count: " + this.operatingCompanies.size());
     }
 
-    @Override
+@Override
     public void resume() {
-        // 1. Standard Resume Logic
+
+        // 1. Clear Transient Flags
         if (pfrTriggeredThisOR.value()) {
             pfrTriggeredThisOR.set(false);
             needPrussianFormationCall.set(false);
         }
-        super.resume();
 
-        // 2. SURGICAL FIX:
-        // Check if we need to patch the list (M2 closed, Prussia open but missing).
-        // This modifies the list in-place without disturbing other companies.
+        // 2. SURGICAL FIX (Must run first):
+        // Patch the operating list before resuming (e.g., insert Prussia if M2 closed).
         surgicalPrussiaFix();
+
+        // 3. Closed Company Check:
+        // If the active company closed during the interruption (e.g., M1 merged during PFR),
+        // we must advance the pointer safely before evaluating any actions.
+        if (operatingCompany.value() != null && operatingCompany.value().isClosed()) {
+            log.warn("1835_LOGIC: Resuming OR but operating company {} is CLOSED. Advancing turn.", operatingCompany.value().getId());
+            handleClosedOperatingCompany();
+            if (gameManager.getCurrentRound() == this) {
+                setPossibleActions();
+            }
+            return;
+        }
+
+        // 4. Delegate to Base Class:
+        // This natively handles the pendingTrainName auto-buy and the UI refresh flag.
+        super.resume();
     }
 
     @Override

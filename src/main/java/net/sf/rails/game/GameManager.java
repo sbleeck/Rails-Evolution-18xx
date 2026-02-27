@@ -2430,10 +2430,10 @@ public class GameManager extends RailsManager implements Configurable, Owner {
         DisplayBuffer.add(this, message);
 
         // House Rule: End game immediately instead of attempting player elimination
-        // (Rule 5.5.4.13)
         String warningMsg = "Game Over by Bankruptcy (House Rule):\n" +
-                "Strict 1835 rules would eliminate the player and continue the game.\n" +
-                "This implementation ends the game here for stability.";
+                "Some games might eliminate the player and continue the game.\n" +
+                "However, this is stupid.\n" +
+                "This implementation ends the game here.";
 
         ReportBuffer.add(this, warningMsg);
 

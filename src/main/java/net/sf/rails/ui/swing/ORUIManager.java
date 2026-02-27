@@ -986,6 +986,17 @@ public class ORUIManager implements DialogOwner {
         for (MapHex hex : validHexes) {
             if (layTile.getType() == LayTile.GENERIC_EXCL_LOCATIONS && layTile.getLocations().contains(hex))
                 continue;
+
+                        // Enforce location constraints for connected tile lays
+            // Prevents specific hex actions (like 1837 AB/BrB) from spawning duplicate upgrades globally
+            if (layTile.getType() != LayTile.GENERIC_EXCL_LOCATIONS 
+                    && layTile.getLocations() != null 
+                    && !layTile.getLocations().isEmpty() 
+                    && !layTile.getLocations().contains(hex)) {
+                continue;
+            }
+
+
             GUIHex guiHex = map.getHex(hex);
             Set<TileHexUpgrade> upgrades = TileHexUpgrade.create(guiHex, graph.getReachableSides().get(hex),
                     graph.getPassableStations().get(hex), layTile, algo);
@@ -996,6 +1007,9 @@ public class ORUIManager implements DialogOwner {
             hexUpgrades.putAll(guiHex, upgrades);
         }
     }
+
+
+
 
     private void addLocatedTileLays(LayTile layTile) {
         if (layTile.getLocations() != null) {

@@ -1427,7 +1427,7 @@ public static final Color BG_DISCARD_VOLUNTARY = Color.CYAN; // Light Blue (#ADD
                 net.sf.rails.game.Train train = trainList.get(t);
 
                 // Use RailCard logic to set content
-                cf.setTrain(train);
+                 if (cf != null) cf.setTrain(train);
                 // FIX: Explicitly set Component Name as safety for ID matching
                 cf.setName(train.getName());
 
@@ -3613,10 +3613,11 @@ public static final Color BG_DISCARD_VOLUNTARY = Color.CYAN; // Light Blue (#ADD
 
             // Explicitly define lbl here to fix "cannot find symbol"
             javax.swing.JLabel lbl = (poolTrainInfoLabels != null) ? poolTrainInfoLabels[slotIndex] : null;
-
-            cf.setTrain(representative); // Use RailCard logic
-            cf.setCustomLabel(getAbbreviatedTrainName(cleanName));
-
+if (cf != null) {
+                cf.setTrain(representative); // Use RailCard logic
+                cf.setCustomLabel(getAbbreviatedTrainName(cleanName));
+            }
+            
             // Set Label: (Count) / Price
             int cost = representative.getType().getCost();
             if (lbl != null) {
@@ -4247,11 +4248,19 @@ public static final Color BG_DISCARD_VOLUNTARY = Color.CYAN; // Light Blue (#ADD
                 @Override
                 public void setText(String t) {
 
-                    int val = 0;
+int val = 0;
                     
                     if (hasDirectCompanyIncomeInOr) {
                         // 1837 Logic: Base Revenue = Total - Fixed
-                        val = c.getLastRevenue() - c.getLastDirectIncome();
+                        int totalRev = c.getLastRevenue();
+                        int fixedRev = c.getLastDirectIncome();
+                        
+                        // SANITY CHECK: The engine sometimes fails to clear LastDirectIncome 
+                        // when a company skips its revenue phase (e.g. no trains).
+                        if (totalRev == 0 || fixedRev > totalRev) {
+                            fixedRev = 0; 
+                        }
+                        val = totalRev - fixedRev;
                     } else {
                         // Standard Logic: Base Revenue = Total
                         val = c.getLastRevenue();
@@ -4302,9 +4311,15 @@ public static final Color BG_DISCARD_VOLUNTARY = Color.CYAN; // Light Blue (#ADD
 
                 f = compDirectRevenue[i] = new Field(
                         hasDirectCompanyIncomeInOr ? c.getLastDividendModel() : c.getLastRevenueModel()) {
-                    @Override
+@Override
                     public void setText(String t) {
                        int val = c.getLastDirectIncome();
+                       int totalRev = c.getLastRevenue();
+                       
+                       // SANITY CHECK: Suppress stale fixed income
+                       if (totalRev == 0 || val > totalRev) {
+                           val = 0;
+                       }
 
                         if (val == 0) {
                             super.setText("");
@@ -4312,7 +4327,6 @@ public static final Color BG_DISCARD_VOLUNTARY = Color.CYAN; // Light Blue (#ADD
                             String display = gameUIManager.format(val);
                             super.setText("<html><div align='right'><b>" + display + "</b></div></html>");
                         }
-                        
                     }
                 };
 

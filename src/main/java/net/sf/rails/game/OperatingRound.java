@@ -110,7 +110,8 @@ public class OperatingRound extends Round implements Observer {
     protected transient PossibleAction selectedAction;
 
     protected final GenericState<PossibleAction> savedAction = new GenericState<>(this, "savedAction");
-    
+ protected final GenericState<String> pendingTrainName = new GenericState<>(this, "pendingTrainName");
+
     protected GameDef.OrStep[] steps = new GameDef.OrStep[] {
             GameDef.OrStep.INITIAL, GameDef.OrStep.LAY_TRACK,
             GameDef.OrStep.LAY_TOKEN, GameDef.OrStep.CALC_REVENUE,
@@ -233,29 +234,43 @@ public class OperatingRound extends Round implements Observer {
             this.currentSpecialTokenLays.clear();
 
 
-        // Call the cleanup hook ONLY if reloading to avoid destroying live OR state
-        if (gameManager.isReloading()) {
-            resetTransientStateOnLoad();
-        }
-
 // Fix for Double-Execution: Retrieve the saved action
         PossibleAction actionToProcess = savedAction.value();
-        
-        if (actionToProcess instanceof BuyTrain) {
-            // Execute the purchase. Validation will now see the raised cash in Stefan's wallet.
-            boolean success = buyTrain((BuyTrain) actionToProcess);
-            if (!success) {
-                log.error("Automatic Train Purchase failed during resume for action: {}", actionToProcess);
-                setPossibleActions(); 
+        // DO NOT clear savedAction yet; validation inside buyTrain relies on it.
+
+// 1. Check for a pending train by ID string
+        String targetName = pendingTrainName.value();
+        log.info("LIFECYCLE: resume() invoked. pendingTrainName retrieved as: [{}]", targetName != null ? targetName : "NULL");
+
+        if (targetName != null) {
+            
+            // Re-generate current valid actions
+            possibleActions.clear();
+            setBuyableTrains();
+            
+            boolean found = false;
+            for (PossibleAction pa : possibleActions.getList()) {
+                if (pa instanceof BuyTrain) {
+                    BuyTrain bt = (BuyTrain) pa;
+                    if (targetName.equals(bt.getTrain().getName())) {
+                        buyTrain(bt); // Validation now passes since cash is present
+                        found = true;
+                        break;
+                    }
+                }
             }
-        } else if (actionToProcess instanceof RepayLoans) {
-            executeRepayLoans((RepayLoans) actionToProcess);
-        } else if (actionToProcess == null) {
+            if (!found) log.error("Auto-purchase failed: Train {} not found in pool.", targetName);
+
+        } else if (savedAction.value() instanceof RepayLoans) {
+            executeRepayLoans((RepayLoans) savedAction.value());
+        } else {
             setPossibleActions(); 
         }
 
-        savedAction.set(null); // Clear AFTER successful execution
-        wasInterrupted.set(true); // CRITICAL: Signal the UI to refresh after sub-round
+        // 2. Clear states and signal UI refresh
+        savedAction.set(null); 
+        pendingTrainName.set(null);
+        wasInterrupted.set(true); // <--- UNCOMMENTED: Trigger UI sync
 
         guiHints.setVisibilityHint(GuiDef.Panel.STOCK_MARKET, false);
         guiHints.setVisibilityHint(GuiDef.Panel.STATUS, true);
@@ -3126,8 +3141,9 @@ savedAction.set(action);
             // Relax validation: If we are resuming a saved action (e.g. returning from
             // emergency share selling), we allow the purchase even if the step logic
             // (like PFR triggers) has shifted the state temporarily.
-if (getStep() != GameDef.OrStep.BUY_TRAIN && savedAction.value() == null) {
-                        errMsg = LocalText.getText("WrongActionNoTrainBuyingCost");
+if (getStep() != GameDef.OrStep.BUY_TRAIN && pendingTrainName.value() == null && savedAction.value() == null) {
+
+            errMsg = LocalText.getText("WrongActionNoTrainBuyingCost");
                 break;
             }
 
@@ -3401,7 +3417,17 @@ if (getStep() != GameDef.OrStep.BUY_TRAIN && savedAction.value() == null) {
 
         // --- Handle Emergency Share Selling (if required for president) ---
         if (presidentMustSellShares) {
-savedAction.set(action); // Save the current action state
+
+            if (train != null) {
+                pendingTrainName.set(train.getName()); // Save ID as persistent string
+                log.info("LIFECYCLE: pendingTrainName SET to [{}] for company [{}]", pendingTrainName.value(), company.getId());
+            } else {
+                log.warn("LIFECYCLE: WARNING - train was null during emergency trigger!");
+            }
+
+if (train != null) {
+                pendingTrainName.set(train.getName()); // Save ID as persistent string
+            }
 
             ReportBuffer.add(this, LocalText.getText("PlayerMustRaiseCash",
                     currentPlayer.getId(), // Use correct variable
