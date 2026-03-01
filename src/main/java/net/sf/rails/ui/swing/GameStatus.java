@@ -72,7 +72,7 @@ public class GameStatus extends GridPanel {
     private final Dimension DIM_TRAIN = new Dimension(40, 20);
 
     public static final Color BG_BUY_ACTIVE = new Color(144, 238, 144); // Light Green (#90EE90) - Standard "Buy"\
-public static final Color BG_DISCARD_VOLUNTARY = Color.CYAN; // Light Blue (#ADD8E6)
+    public static final Color BG_DISCARD_VOLUNTARY = Color.CYAN; // Light Blue (#ADD8E6)
     // for Special Actions
     private final Color BG_SELL_ALERT = new Color(250, 128, 114); // Salmon Pink (#FA8072) - Shares Sell
     public static final Color BG_CARD_PASSIVE = new Color(255, 255, 240); // Beige (Must be static for static method
@@ -148,6 +148,9 @@ public static final Color BG_DISCARD_VOLUNTARY = Color.CYAN; // Light Blue (#ADD
     protected int compCashXOffset, compCashYOffset;
     protected Field[] compRevenue;
     protected int compRevenueXOffset, compRevenueYOffset;
+    // Universal Revenue Split Columns
+    protected Field[] compRetained;
+    protected int compRetainedXOffset, compRetainedYOffset;
     protected Field[] compTrains;
     protected int compTrainsXOffset, compTrainsYOffset;
     protected JPanel[] compTokens;
@@ -374,12 +377,6 @@ public static final Color BG_DISCARD_VOLUNTARY = Color.CYAN; // Light Blue (#ADD
     protected javax.swing.JLabel newTrainInfoLabel;
     protected javax.swing.JLabel[] futureTrainInfoLabels;
 
-    /**
-     * Next Field is needed for the direct payment of Income and display of sum
-     * during an OR for a Company, that is not linked to a share.
-     */
-    private Field[] compDirectRevenue;
-    private int compDirectRevXOffset, compDirectRevYOffset;
 
     protected Caption[] upperPlayerCaption;
     protected Caption treasurySharesCaption;
@@ -531,9 +528,12 @@ public static final Color BG_DISCARD_VOLUNTARY = Color.CYAN; // Light Blue (#ADD
             bondsInTreasury = new Field[nc];
             bondsInTreasuryButton = new ClickField[nc];
         }
+
         compCash = new Field[nc];
         compCashButton = new ClickField[nc];
-        compRevenue = new Field[nc];
+        compRevenue = new Field[nc]; // This becomes "Dividend"
+        compRetained = new Field[nc]; // New "Retained" column
+
         compTrains = new Field[nc];
         compTrainsButtonPanel = new JPanel[nc];
         compSubTrainButtons = new RailCard[nc][MAX_TRAIN_SLOTS];
@@ -541,8 +541,7 @@ public static final Color BG_DISCARD_VOLUNTARY = Color.CYAN; // Light Blue (#ADD
 
         if (hasRights)
             rights = new Field[nc];
-        if (hasDirectCompanyIncomeInOr)
-            compDirectRevenue = new Field[nc];
+compRetained = new Field[nc];
 
         playerCash = new Field[np];
         playerCashButton = new ClickField[np];
@@ -574,18 +573,18 @@ public static final Color BG_DISCARD_VOLUNTARY = Color.CYAN; // Light Blue (#ADD
             parPriceYOffset = lastY;
         }
 
-        compCashXOffset = ++lastX;
-        compCashYOffset = lastY;
-        compRevenueXOffset = ++lastX;
-        compRevenueYOffset = lastY;
-        if (hasDirectCompanyIncomeInOr) {
-            compDirectRevXOffset = ++lastX;
-            compDirectRevYOffset = lastY;
-        }
+        // New Sequence: Treasury -> Trains -> Dividend -> Retained -> Markers
+        compCashXOffset = ++lastX; 
         compTrainsXOffset = ++lastX;
-        compTrainsYOffset = lastY;
+        compRevenueXOffset = ++lastX;
+        compRetainedXOffset = ++lastX;
         compTokensXOffset = ++lastX;
-        compTokensYOffset = lastY;
+        
+        // Ensure all Y offsets point to the same row
+        compCashYOffset = compTrainsYOffset = compRevenueYOffset = 
+        compRetainedYOffset = compTokensYOffset = lastY;
+        
+
         if (compCanBuyPrivates) {
             compPrivatesXOffset = ++lastX;
             compPrivatesYOffset = lastY;
@@ -1209,7 +1208,18 @@ public static final Color BG_DISCARD_VOLUNTARY = Color.CYAN; // Light Blue (#ADD
                 // minor
                 if (options.size() > 1 || actions.get(0).getClass().getSimpleName().equals("StartCompany_18EU")) {
                     if (startCompany) {
-                        RadioButtonDialog dialog = new RadioButtonDialog(
+                        StartCompany scAction = (StartCompany) actions.get(0);
+                        int currentCash = gameUIManager.getCurrentPlayer().getCashValue();
+
+                        // Dynamically fetch the actual float percentage for this specific game/company
+                        int floatPct = 60; // Fallback
+                        if (scAction.getCompany() != null) {
+                            floatPct = scAction.getCompany().getFloatPercentage();
+                        }
+
+                        scAction.setUiContext(currentCash, floatPct);
+
+                        net.sf.rails.ui.swing.elements.StartPriceGridDialog dialog = new net.sf.rails.ui.swing.elements.StartPriceGridDialog(
                                 GameUIManager.COMPANY_START_PRICE_DIALOG,
                                 gameUIManager,
                                 parent,
@@ -1217,7 +1227,8 @@ public static final Color BG_DISCARD_VOLUNTARY = Color.CYAN; // Light Blue (#ADD
                                 LocalText.getText("WHICH_START_PRICE",
                                         playerName,
                                         companyName),
-                                options.toArray(new String[0]), -1);
+                                options.toArray(new String[0]), -1, scAction);
+
                         gameUIManager.setCurrentDialog(dialog, actions.get(0));
                         parent.disableButtons();
                         return;
@@ -1245,12 +1256,15 @@ public static final Color BG_DISCARD_VOLUNTARY = Color.CYAN; // Light Blue (#ADD
                 } else {
                     chosenAction = buyActions.get(index);
                     ((BuyCertificate) chosenAction).setNumberBought(buyAmounts.get(index));
-                //     // "Un-set" the share size for Pool buys to force StockRound to detect ambiguity.
-                // // If we leave the default (e.g. 10), StockRound assumes it's a deliberate choice (Replay) and skips the dialog.
-                // // By setting it to 0, validSizes.contains(0) fails, triggering the StockRound dialog.
-                // if (((BuyCertificate) chosenAction).getFromPortfolio() == pool) {
-                //     ((BuyCertificate) chosenAction).setSharePerCertificate(0);
-                // }
+                    // // "Un-set" the share size for Pool buys to force StockRound to detect
+                    // ambiguity.
+                    // // If we leave the default (e.g. 10), StockRound assumes it's a deliberate
+                    // choice (Replay) and skips the dialog.
+                    // // By setting it to 0, validSizes.contains(0) fails, triggering the
+                    // StockRound dialog.
+                    // if (((BuyCertificate) chosenAction).getFromPortfolio() == pool) {
+                    // ((BuyCertificate) chosenAction).setSharePerCertificate(0);
+                    // }
                 }
             } else if (actions.get(0) instanceof CashCorrectionAction) {
                 // Delegate to GameUIManagers
@@ -1427,7 +1441,8 @@ public static final Color BG_DISCARD_VOLUNTARY = Color.CYAN; // Light Blue (#ADD
                 net.sf.rails.game.Train train = trainList.get(t);
 
                 // Use RailCard logic to set content
-                 if (cf != null) cf.setTrain(train);
+                if (cf != null)
+                    cf.setTrain(train);
                 // FIX: Explicitly set Component Name as safety for ID matching
                 cf.setName(train.getName());
 
@@ -1584,19 +1599,20 @@ public static final Color BG_DISCARD_VOLUNTARY = Color.CYAN; // Light Blue (#ADD
         // 4. Compare and Recreate
         // Self-Healing: If component count is 0, the previous render failed/crashed.
         // Force recreation even if signature matches to recover from "Grey Screen".
-       if (!currentSignature.equals(previousDashboardSignature) || this.getComponentCount() == 0) {
+        if (!currentSignature.equals(previousDashboardSignature) || this.getComponentCount() == 0) {
             previousDashboardSignature = currentSignature;
             recreate();
         }
-            
+
         int currentActor = -1;
         if (players != null && players.getCurrentPlayer() != null) {
             currentActor = players.getCurrentPlayer().getIndex();
         } else {
             currentActor = this.actorIndex;
         }
-        
-        // Always run the turn logic to update button states (Active/Passive) and attach new actions
+
+        // Always run the turn logic to update button states (Active/Passive) and attach
+        // new actions
         initTurn(currentActor, true);
         repaint();
     }
@@ -2445,49 +2461,107 @@ public static final Color BG_DISCARD_VOLUNTARY = Color.CYAN; // Light Blue (#ADD
                     newTrainQtyLabels[i].setVisible(false);
             }
 
-            // 3. FUTURE TRAINS (Unchanged logic, just ensure we skip ipoSlot types)
-            int futSlot = 0;
-            for (int i = currentIndex; i < types.size() && futSlot < MAX_FUTURE_SLOTS; i++) {
-                net.sf.rails.game.TrainCardType tct = types.get(i);
-                String tctName = tct.getId().replaceAll("_\\d+$", "");
+            
+            // 3. FUTURE TRAINS (Dynamic Category Lookahead)
+java.util.List<net.sf.rails.game.TrainCardType> allFuture = new java.util.ArrayList<>();
+java.util.Map<String, java.util.List<net.sf.rails.game.TrainCardType>> futureByCategory = new java.util.HashMap<>();
 
-                boolean alreadyShown = false;
-                for (int k = 0; k < ipoSlot; k++) {
-                    if (newTrainButtons[k].getName() != null && newTrainButtons[k].getName().equals(tctName)) {
-                        alreadyShown = true;
-                        break;
-                    }
-                }
-                if (alreadyShown)
-                    continue;
+        for (net.sf.rails.game.TrainCardType tct : types) {
+            if (tct.isAvailable()) continue; // Skip active trains
 
-                RailCard btn = futureTrainButtons[futSlot];
-                javax.swing.JLabel lbl = futureTrainInfoLabels[futSlot];
-                futSlot++;
-
-                // ... (standard future render code) ...
-                int cost = 0;
-                if (!tct.getPotentialTrainTypes().isEmpty())
-                    cost = tct.getPotentialTrainTypes().get(0).getCost();
-
-                if (btn != null) {
-                    btn.reset();
-                    btn.setCustomLabel(getAbbreviatedTrainName(tctName));
-                    btn.setName(tctName);
-                    btn.setBackground(BG_CARD_PASSIVE);
-                    btn.setBorder(BorderFactory.createCompoundBorder(
-                            BorderFactory.createLineBorder(Color.BLACK, 1),
-                            BorderFactory.createEmptyBorder(1, 1, 1, 1)));
-                    btn.setVisible(true);
-                }
-                if (lbl != null) {
-                    String qtyStr = tct.hasInfiniteQuantity() ? "\u221E" : "(" + tct.getQuantity() + ")";
-                    lbl.setText("<html><center>" + qtyStr + "<br>" +
-                            "<font color='#000080'><b>" + (cost > 0 ? gameUIManager.format(cost) : "") + "</b></font>" +
-                            "</center></html>");
-                    lbl.setVisible(true);
+            String tctName = tct.getId().replaceAll("_\\d+$", "");
+            
+            // Skip if already shown in IPO
+            boolean alreadyShown = false;
+            for (int k = 0; k < ipoSlot; k++) {
+                if (newTrainButtons[k].getName() != null && newTrainButtons[k].getName().equals(tctName)) {
+                    alreadyShown = true;
+                    break;
                 }
             }
+            if (alreadyShown) continue;
+
+            // Group by Category
+            String category = "default";
+            if (!tct.getPotentialTrainTypes().isEmpty()) {
+                String cat = tct.getPotentialTrainTypes().get(0).getCategory();
+                if (cat != null && !cat.isEmpty()) {
+                    category = cat;
+                }
+            }
+
+            allFuture.add(tct);
+            futureByCategory.computeIfAbsent(category, k -> new java.util.ArrayList<>()).add(tct);
+        }
+
+        // Select trains to display
+        java.util.List<net.sf.rails.game.TrainCardType> displayFuture = new java.util.ArrayList<>();
+        
+        // A. Guarantee the cheapest from each category
+        for (java.util.List<net.sf.rails.game.TrainCardType> catList : futureByCategory.values()) {
+            catList.sort((t1, t2) -> {
+                int c1 = (!t1.getPotentialTrainTypes().isEmpty()) ? t1.getPotentialTrainTypes().get(0).getCost() : 0;
+                int c2 = (!t2.getPotentialTrainTypes().isEmpty()) ? t2.getPotentialTrainTypes().get(0).getCost() : 0;
+                return Integer.compare(c1, c2);
+            });
+            if (!catList.isEmpty()) {
+                net.sf.rails.game.TrainCardType guaranteed = catList.get(0);
+                displayFuture.add(guaranteed);
+                allFuture.remove(guaranteed);
+            }
+        }
+
+        // B. Fill remaining slots with the absolute cheapest remaining
+        allFuture.sort((t1, t2) -> {
+            int c1 = (!t1.getPotentialTrainTypes().isEmpty()) ? t1.getPotentialTrainTypes().get(0).getCost() : 0;
+            int c2 = (!t2.getPotentialTrainTypes().isEmpty()) ? t2.getPotentialTrainTypes().get(0).getCost() : 0;
+            return Integer.compare(c1, c2);
+        });
+
+        while (displayFuture.size() < MAX_FUTURE_SLOTS && !allFuture.isEmpty()) {
+            displayFuture.add(allFuture.remove(0));
+        }
+
+        // C. Final sort for the UI (Cheapest first)
+        displayFuture.sort((t1, t2) -> {
+            int c1 = (!t1.getPotentialTrainTypes().isEmpty()) ? t1.getPotentialTrainTypes().get(0).getCost() : 0;
+            int c2 = (!t2.getPotentialTrainTypes().isEmpty()) ? t2.getPotentialTrainTypes().get(0).getCost() : 0;
+            return Integer.compare(c1, c2);
+        });
+
+        // Render Future Trains
+        int futSlot = 0;
+        for (net.sf.rails.game.TrainCardType tct : displayFuture) {
+            if (futSlot >= MAX_FUTURE_SLOTS) break;
+            
+            String tctName = tct.getId().replaceAll("_\\d+$", "");
+            RailCard btn = futureTrainButtons[futSlot];
+            javax.swing.JLabel lbl = futureTrainInfoLabels[futSlot];
+            futSlot++;
+
+            int cost = 0;
+            if (!tct.getPotentialTrainTypes().isEmpty())
+                cost = tct.getPotentialTrainTypes().get(0).getCost();
+
+            if (btn != null) {
+                btn.reset();
+                btn.setCustomLabel(getAbbreviatedTrainName(tctName));
+                btn.setName(tctName);
+                btn.setBackground(BG_CARD_PASSIVE);
+                btn.setBorder(BorderFactory.createCompoundBorder(
+                        BorderFactory.createLineBorder(Color.BLACK, 1),
+                        BorderFactory.createEmptyBorder(1, 1, 1, 1)));
+                btn.setVisible(true);
+            }
+            if (lbl != null) {
+                String qtyStr = tct.hasInfiniteQuantity() ? "\u221E" : "(" + tct.getQuantity() + ")";
+                lbl.setText("<html><center>" + qtyStr + "<br>" +
+                        "<font color='#000080'><b>" + (cost > 0 ? gameUIManager.format(cost) : "") + "</b></font>" +
+                        "</center></html>");
+                lbl.setVisible(true);
+            }
+        }
+
             // Clear unused future slots
             for (; futSlot < MAX_FUTURE_SLOTS; futSlot++) {
                 if (futureTrainButtons[futSlot] != null)
@@ -2609,7 +2683,7 @@ public static final Color BG_DISCARD_VOLUNTARY = Color.CYAN; // Light Blue (#ADD
             setIPOCertButton(i, false);
             setPoolCertButton(i, false);
 
-// Update Company Name background (ALWAYS STANDARD, never yellow)
+            // Update Company Name background (ALWAYS STANDARD, never yellow)
             if (compNameCaption[i] != null) {
                 // Ensure XML-defined colors are used for all companies
                 compNameCaption[i].setBackground(c.getBgColour());
@@ -2709,7 +2783,8 @@ public static final Color BG_DISCARD_VOLUNTARY = Color.CYAN; // Light Blue (#ADD
                 int price = c.getParPrice();
 
                 // Display if we have a valid price (>0) and shares are available.
-                // We intentionally ignore the global 'hasParPrices' flag here because 1837 sets it to false,
+                // We intentionally ignore the global 'hasParPrices' flag here because 1837 sets
+                // it to false,
                 // effectively hiding these valid fixed prices otherwise.
                 if (price > 0 && hasSharesInIPO) {
                     ipoParLabels[i].setText(gameUIManager.format(price));
@@ -2786,12 +2861,7 @@ public static final Color BG_DISCARD_VOLUNTARY = Color.CYAN; // Light Blue (#ADD
                 compRevenue[i].setBackground(bgRow);
                 compRevenue[i].setOpaque(true);
             }
-            // Update Background for Fixed Income Column (1837)
-            // CRITICAL: This must be INSIDE the loop, where 'bgRow' is defined.
-            if (hasDirectCompanyIncomeInOr && compDirectRevenue[i] != null) {
-                compDirectRevenue[i].setBackground(bgRow);
-                compDirectRevenue[i].setOpaque(true);
-            }
+
 
             if (compTokens[i] != null) {
                 compTokens[i].setBackground(bgRow); // Apply Mauve/Yellow/Gray
@@ -3156,7 +3226,6 @@ public static final Color BG_DISCARD_VOLUNTARY = Color.CYAN; // Light Blue (#ADD
             }
             setTrainBuyingActions(possibleActions.getList());
         }
-            
 
         // Unconditionally sync the Pass/Done button with the engine state
         if (possibleActions != null) {
@@ -3167,9 +3236,6 @@ public static final Color BG_DISCARD_VOLUNTARY = Color.CYAN; // Light Blue (#ADD
                 }
             }
         }
-
-
-
 
         try {
             initGameSpecificActions();
@@ -3369,16 +3435,13 @@ public static final Color BG_DISCARD_VOLUNTARY = Color.CYAN; // Light Blue (#ADD
         // set them up as passive cards.
         if (!clickable) {
             for (RailCard cf : futureTrainButtons) {
-                if (cf.isVisible()) {
+                if (cf != null && cf.isVisible()) {
                     // Restore passive look
-                    if (cf != null && cf.isVisible()) {
-                        // Restore passive look
-                        cf.clearPossibleActions();
-                        cf.setBackground(BG_CARD_PASSIVE);
-                        cf.setBorder(BorderFactory.createCompoundBorder(
-                                BorderFactory.createLineBorder(Color.BLACK, 1),
-                                BorderFactory.createEmptyBorder(1, 1, 1, 1)));
-                    }
+                    cf.clearPossibleActions();
+                    cf.setBackground(BG_CARD_PASSIVE);
+                    cf.setBorder(BorderFactory.createCompoundBorder(
+                            BorderFactory.createLineBorder(Color.BLACK, 1),
+                            BorderFactory.createEmptyBorder(1, 1, 1, 1)));
                 }
             }
             return;
@@ -3613,11 +3676,11 @@ public static final Color BG_DISCARD_VOLUNTARY = Color.CYAN; // Light Blue (#ADD
 
             // Explicitly define lbl here to fix "cannot find symbol"
             javax.swing.JLabel lbl = (poolTrainInfoLabels != null) ? poolTrainInfoLabels[slotIndex] : null;
-if (cf != null) {
+            if (cf != null) {
                 cf.setTrain(representative); // Use RailCard logic
                 cf.setCustomLabel(getAbbreviatedTrainName(cleanName));
             }
-            
+
             // Set Label: (Count) / Price
             int cost = representative.getType().getCost();
             if (lbl != null) {
@@ -3807,12 +3870,15 @@ if (cf != null) {
 
         if (compCanHoldOwnShares)
             certInTreasuryXOffset = col++;
+
+
         compCashXOffset = col++;
-        compRevenueXOffset = col++;
-        if (hasDirectCompanyIncomeInOr)
-            compDirectRevXOffset = col++;
         compTrainsXOffset = col++;
+        compRevenueXOffset = col++;
+        compRetainedXOffset = col++;
         compTokensXOffset = col++;
+
+
         if (compCanBuyPrivates)
             compPrivatesXOffset = col++;
         if (hasCompanyLoans)
@@ -3951,32 +4017,39 @@ if (cf != null) {
         f.setPreferredSize(DIM_STD);
         addField(f, compCashXOffset, 1, 1, 1, 0, true);
 
-        f = new Caption(LocalText.getText("REVENUE"));
-        f.setBorder(BORDER_THIN);
-        f.setBackground(BG_HEADER);
-        f.setOpaque(true);
-        f.setPreferredSize(DIM_STD);
-        addField(f, compRevenueXOffset, 1, 1, 1, 0, true);
-        // Enable Header for Direct (Fixed) Income if active (1837)
-        if (hasDirectCompanyIncomeInOr) {
-            f = new Caption("Fixed"); // Or "Coal" or LocalText.getText("FIXED_INCOME")
-            f.setBorder(BORDER_THIN);
-            f.setPreferredSize(DIM_STD);
-            addField(f, compDirectRevXOffset, 1, 1, 1, 0, true);
-        }
 
+        // 1. Trains Header
         f = new Caption(LocalText.getText("TRAINS"));
         f.setBorder(BORDER_THIN);
         f.setBackground(BG_HEADER);
         f.setOpaque(true);
         f.setPreferredSize(DIM_TRAIN);
         addField(f, compTrainsXOffset, 1, 1, 1, 0, true);
+
+        // 2. Dividend Header
+        f = new Caption("Dividend");
+        f.setBorder(BORDER_THIN);
+        f.setBackground(BG_HEADER);
+        f.setOpaque(true);
+        f.setPreferredSize(DIM_STD);
+        addField(f, compRevenueXOffset, 1, 1, 1, 0, true);
+
+        // 3. Retained Header
+        f = new Caption("Retained");
+        f.setBorder(BORDER_THIN);
+        f.setBackground(BG_HEADER);
+        f.setOpaque(true);
+        f.setPreferredSize(DIM_STD);
+        addField(f, compRetainedXOffset, 1, 1, 1, 0, true);
+
+        // 4. Markers Header
         f = new Caption(LocalText.getText("TOKENS"));
         f.setBorder(BORDER_THIN);
         f.setBackground(BG_HEADER);
         f.setOpaque(true);
         f.setPreferredSize(DIM_TOKENS);
         addField(f, compTokensXOffset, 1, 1, 1, 0, true);
+
         if (compCanBuyPrivates) {
             f = new Caption(LocalText.getText("PRIVATES"));
             f.setBorder(BORDER_THIN);
@@ -4122,7 +4195,8 @@ if (cf != null) {
                 playerShareCards[i][j] = new RailCard((net.sf.rails.game.Train) null, buySellGroup);
                 playerShareCards[i][j].setCompany(c); // Tell the card it belongs to Company 'c'
                 playerShareCards[i][j].addActionListener(this);
-                HexHighlightMouseListener.addMouseListener(playerShareCards[i][j], gameUIManager.getORUIManager(), c, false);
+                HexHighlightMouseListener.addMouseListener(playerShareCards[i][j], gameUIManager.getORUIManager(), c,
+                        false);
                 if (stickyFont != null)
                     playerShareCards[i][j].setFont(stickyFont);
 
@@ -4203,7 +4277,8 @@ if (cf != null) {
                 treasuryShareCards[i] = new RailCard((net.sf.rails.game.Train) null, buySellGroup);
                 treasuryShareCards[i].addActionListener(this);
                 treasuryShareCards[i].setCompany(c); // Ensure metadata is present for UI Search
-                HexHighlightMouseListener.addMouseListener(treasuryShareCards[i], gameUIManager.getORUIManager(), c, false);
+                HexHighlightMouseListener.addMouseListener(treasuryShareCards[i], gameUIManager.getORUIManager(), c,
+                        false);
                 if (stickyFont != null)
                     treasuryShareCards[i].setFont(stickyFont);
 
@@ -4240,150 +4315,12 @@ if (cf != null) {
             f = compCashButton[i] = new ClickField(compCash[i].getText(), CASH_CORRECT_CMD, "", this, buySellGroup);
             addField(f, compCashXOffset, y, 1, 1, 0, false);
 
-
-            // REVENUE COLUMN: Display ONLY the Route Revenue (Base).
-            // We explicitly calculate (Total - Special) to ensure Fixed Mine revenue is excluded.
-            f = compRevenue[i] = new Field(
-                    hasDirectCompanyIncomeInOr ? c.getLastDividendModel() : c.getLastRevenueModel()) {
-                @Override
-                public void setText(String t) {
-
-int val = 0;
-                    
-                    if (hasDirectCompanyIncomeInOr) {
-                        // 1837 Logic: Base Revenue = Total - Fixed
-                        int totalRev = c.getLastRevenue();
-                        int fixedRev = c.getLastDirectIncome();
-                        
-                        // SANITY CHECK: The engine sometimes fails to clear LastDirectIncome 
-                        // when a company skips its revenue phase (e.g. no trains).
-                        if (totalRev == 0 || fixedRev > totalRev) {
-                            fixedRev = 0; 
-                        }
-                        val = totalRev - fixedRev;
-                    } else {
-                        // Standard Logic: Base Revenue = Total
-                        val = c.getLastRevenue();
-                    }
-
-
-
-
-                    // Existing formatting logic (Colors/Suffixes) applied to the specific Base value
-                    if (val == 0 && (t == null || t.length() == 0)) {
-                        super.setText("");
-                        return;
-                    }
-
-                    String suffix = " +";
-                    String color = "black";
-                    try {
-                        Object rawAlloc = c.getLastRevenueAllocation();
-                        if (val != 0 && rawAlloc != null) {
-                            String alloc = rawAlloc.toString();
-                            if (alloc.contains("Withhold")) {
-                                suffix = " -";
-                                color = "#FF0000";
-                            } else if (alloc.contains("Split")) {
-                                suffix = " \u00B1";
-                                color = "#000000ff";
-                            }
-                        }
-                    } catch (Exception e) {
-                    }
-
-                    // Use Bank.format for currency consistency or raw integer as preferred
-                    String display = gameUIManager.format(val);
-                    super.setText("<html><div align='right'><font color='" + color + "'><b>" + display + suffix
-                            + "</b></font></div></html>");
-                }
-            };
-
-            
-            f.setBackground(isOperating ? BG_OPERATING : (!isActive ? BG_INACTIVE : BG_MAUVE));
-            f.setOpaque(true);
-            f.setBorder(bDet);
-            f.setPreferredSize(new Dimension(60, 25));
-            addField(f, compRevenueXOffset, y, 1, 1, 0, visible);
-
-            // DIRECT INCOME COLUMN (1837 Fixed Coal Income)
-            if (hasDirectCompanyIncomeInOr) {
-
-                f = compDirectRevenue[i] = new Field(
-                        hasDirectCompanyIncomeInOr ? c.getLastDividendModel() : c.getLastRevenueModel()) {
-@Override
-                    public void setText(String t) {
-                       int val = c.getLastDirectIncome();
-                       int totalRev = c.getLastRevenue();
-                       
-                       // SANITY CHECK: Suppress stale fixed income
-                       if (totalRev == 0 || val > totalRev) {
-                           val = 0;
-                       }
-
-                        if (val == 0) {
-                            super.setText("");
-                        } else {
-                            String display = gameUIManager.format(val);
-                            super.setText("<html><div align='right'><b>" + display + "</b></div></html>");
-                        }
-                    }
-                };
-
-                f.setBackground(isOperating ? BG_OPERATING : (!isActive ? BG_INACTIVE : BG_MAUVE));
-                f.setOpaque(true);
-                f.setBorder(bDet);
-                f.setPreferredSize(new Dimension(50, 25));
-
-                // TOOLTIP LOGIC: Show Private Company details for Coal Companies
-                // Look up the PrivateCompany definition that matches this PublicCompany's ID
-                net.sf.rails.game.PrivateCompany associatedPrivate = null;
-                if (gameUIManager != null && gameUIManager.getRoot() != null) {
-                    for (net.sf.rails.game.PrivateCompany pc : gameUIManager.getRoot().getCompanyManager()
-                            .getAllPrivateCompanies()) {
-                        if (pc.getId().equals(c.getId())) {
-                            associatedPrivate = pc;
-                            break;
-                        }
-                    }
-                }
-
-                if (associatedPrivate != null) {
-                    String info = associatedPrivate.getInfoText();
-                    if (info != null && !info.toLowerCase().startsWith("<html>")) {
-                        info = "<html>" + info + "</html>";
-                    }
-
-                    f.setToolTipText(info);
-                    if (compNameCaption[i] != null) {
-                        compNameCaption[i].setToolTipText(info);
-                    }
-                }
-
-                addField(f, compDirectRevXOffset, y, 1, 1, 0, visible);
-            }
-
-            // f.setBackground(isOperating ? BG_OPERATING : (!isActive ? BG_INACTIVE :
-            // BG_MAUVE));
-            // f.setOpaque(true);
-            // f.setBorder(bDet);
-            // f.setPreferredSize(new Dimension(60, 25));
-            // addField(f, compRevenueXOffset, y, 1, 1, 0, visible);
-
-            // 2. USE NEW BUTTON PANEL
-            // SPACING: Changed hgap from 0 to 4 to match "Future" box spacing
-            // ALIGNMENT: FlowLayout.CENTER handles horizontal, the GridBag constraints
-            // handle vertical
-
-            // CENTERED TRAINS: Use GridBagLayout instead of FlowLayout.
-            // FlowLayout aligns to Top; GridBag defaults to Center.
+         // 1. TRAINS PANEL (Now 2nd column)
             compTrainsButtonPanel[i] = new JPanel(new GridBagLayout());
-
             compTrainsButtonPanel[i].setBorder(bDet);
             compTrainsButtonPanel[i].setBackground(isOperating ? BG_OPERATING : (!isActive ? BG_INACTIVE : BG_MAUVE));
             compTrainsButtonPanel[i].setOpaque(true);
 
-            // Setup constraints for horizontal flow with gap
             GridBagConstraints gbcT = new GridBagConstraints();
             gbcT.gridy = 0;
             gbcT.anchor = GridBagConstraints.CENTER;
@@ -4391,17 +4328,56 @@ int val = 0;
             compSubTrainButtons[i] = new RailCard[MAX_TRAIN_SLOTS];
             for (int t = 0; t < MAX_TRAIN_SLOTS; t++) {
                 RailCard cf = createTrainButton();
-
                 compSubTrainButtons[i][t] = cf;
-                // Add 3px gap to match Future trains, except on the last item
                 gbcT.insets = new Insets(0, 0, 0, (t == MAX_TRAIN_SLOTS - 1) ? 0 : 3);
                 compTrainsButtonPanel[i].add(cf, gbcT);
-
             }
-
-            // Add the panel to the grid (Visible = true)
             addField(compTrainsButtonPanel[i], compTrainsXOffset, y, 1, 1, 0, visible);
-            compTokens[i] = new JPanel(new GridBagLayout());
+
+            // 2. DIVIDEND FIELD
+            f = compRevenue[i] = new Field(c.getLastRevenueModel()) {
+                @Override
+                public void setText(String t) {
+                    if (c.getLastRevenue() == 0 && c.getLastDirectIncome() == 0) { super.setText(""); return; }
+                    super.setText("<html><div align='right'><b>" + gameUIManager.format(c.getDividendRevenue()) + "</b></div></html>");
+                }
+            };
+            f.setBackground(isOperating ? BG_OPERATING : (!isActive ? BG_INACTIVE : BG_MAUVE));
+            f.setOpaque(true);
+            f.setBorder(bDet);
+            f.setPreferredSize(new Dimension(60, 25));
+            addField(f, compRevenueXOffset, y, 1, 1, 0, visible);
+
+            // 3. RETAINED FIELD
+            f = compRetained[i] = new Field(c.getLastRevenueModel()) {
+                @Override
+                public void setText(String t) {
+                    if (c.getLastRevenue() == 0 && c.getLastDirectIncome() == 0) { super.setText(""); return; }
+                    super.setText("<html><div align='right'><b>" + gameUIManager.format(c.getRetainedRevenue()) + "</b></div></html>");
+                }
+            };
+            f.setBackground(isOperating ? BG_OPERATING : (!isActive ? BG_INACTIVE : BG_MAUVE));
+            f.setOpaque(true);
+            f.setBorder(bDet);
+            f.setPreferredSize(new Dimension(60, 25));
+            
+            // Restore Coal Mine tooltip logic for Retained column
+            net.sf.rails.game.PrivateCompany coalMine = null;
+            if (gameUIManager != null && gameUIManager.getRoot() != null) {
+                for (net.sf.rails.game.PrivateCompany pc : gameUIManager.getRoot().getCompanyManager().getAllPrivateCompanies()) {
+                    if (pc.getId().equals(c.getId())) { coalMine = pc; break; }
+                }
+            }
+            if (coalMine != null) {
+                String info = coalMine.getInfoText();
+                if (info != null) {
+                    if (!info.toLowerCase().startsWith("<html>")) info = "<html>" + info + "</html>";
+                    f.setToolTipText(info);
+                }
+            }
+            addField(f, compRetainedXOffset, y, 1, 1, 0, visible);
+
+            // 4. MARKERS/TOKENS PANEL (Now 5th column)
             compTokens[i] = new JPanel(new FlowLayout(FlowLayout.CENTER, 2, 0));
             compTokens[i].setOpaque(true);
             compTokens[i].setBackground(isOperating ? BG_OPERATING : (!isActive ? BG_INACTIVE : BG_MAUVE));
@@ -4410,6 +4386,7 @@ int val = 0;
             updateCompanyTokenDisplay(i, c, compTokens[i]);
             addField(compTokens[i], compTokensXOffset, y, 1, 1, 0, visible);
 
+            
             if (compCanBuyPrivates) {
                 // Use FlowLayout to stack multiple privates horizontally if necessary
                 compPrivatesPanel[i] = new JPanel(new FlowLayout(FlowLayout.CENTER, 2, 0));
@@ -4435,19 +4412,19 @@ int val = 0;
         addField(f, compNameCol, playerCashYOffset, 1, 1, 0, true);
         for (int i = 0; i < np; i++) {
 
-
-            final int playerIndex = i; 
+            final int playerIndex = i;
             f = playerCash[i] = new Field(players.getPlayerByPosition(i).getWallet()) {
                 @Override
                 public void setText(String t) {
                     boolean isDebt = false;
                     try {
                         if (gameUIManager != null && gameUIManager.getGameManager() != null) {
-                            net.sf.rails.game.round.RoundFacade currentRound = gameUIManager.getGameManager().getCurrentRound();
+                            net.sf.rails.game.round.RoundFacade currentRound = gameUIManager.getGameManager()
+                                    .getCurrentRound();
                             if (currentRound instanceof net.sf.rails.game.financial.ShareSellingRound) {
                                 net.sf.rails.game.financial.ShareSellingRound ssr = (net.sf.rails.game.financial.ShareSellingRound) currentRound;
                                 Player thisPlayer = players.getPlayerByPosition(playerIndex);
-                                
+
                                 // Fix: Use getCurrentPlayer() instead of getSellingPlayer()
                                 if (ssr.getCurrentPlayer() != null && ssr.getCurrentPlayer().equals(thisPlayer)) {
                                     int toRaise = ssr.getRemainingCashToRaise();
@@ -4460,10 +4437,10 @@ int val = 0;
                                 }
                             }
                         }
-                    } catch (Exception e) { 
+                    } catch (Exception e) {
                         // Fail gracefully and revert to standard display
                     }
-                    
+
                     if (!isDebt) {
                         this.setForeground(Color.BLACK);
                         super.setText(t);
@@ -4511,8 +4488,8 @@ int val = 0;
         playerPrivatesPanel = new JPanel[np];
         for (int i = 0; i < np; i++) {
             if (playerPrivatesPanel[i] == null) {
-                  playerPrivatesPanel[i] = new JPanel();
-                }
+                playerPrivatesPanel[i] = new JPanel();
+            }
             playerPrivatesPanel[i].setLayout(new BoxLayout(playerPrivatesPanel[i], BoxLayout.Y_AXIS));
             playerPrivatesPanel[i].setBorder(BORDER_THIN);
             gbc.weightx = 1.0;
@@ -4925,7 +4902,6 @@ int val = 0;
                 if (card != null) {
                     card.addPossibleAction(pa);
 
-       
                     // CONSUME THE SIGNATURE
                     // A. Background
                     card.setBackground(gta.getHighlightBackgroundColor());
@@ -4935,7 +4911,6 @@ int val = 0;
 
                     // C. Text
                     card.setForeground(gta.getHighlightTextColor());
- 
 
                     card.setEnabled(true);
                     card.setVisible(true);

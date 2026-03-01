@@ -586,8 +586,8 @@
 		<Track from="city1" gauge="normal" to="side3"/>
 	</Tile>
 	<Tile colour="brown" id="432" name="432">
-		<Station id="city1" position="101" slots="2" type="City" value="40"/>
-		<Station id="city2" position="401" slots="2" type="City" value="40"/>
+		<Station id="city1" position="108" slots="2" type="City" value="40"/>
+		<Station id="city2" position="408" slots="2" type="City" value="40"/>
 		<Track from="city1" gauge="normal" to="city2"/>
 		<Track from="city1" gauge="normal" to="side0"/>
 		<Track from="city1" gauge="normal" to="side1"/>

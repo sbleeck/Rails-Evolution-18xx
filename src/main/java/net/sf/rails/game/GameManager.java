@@ -336,6 +336,39 @@ public class GameManager extends RailsManager implements Configurable, Owner {
     protected final GenericState<Map<String, Integer>> currentRoundPayouts = new GenericState<>(
             this, "currentRoundPayouts");
 
+
+            /**
+     * Tracks ChangeStack indices where rounds begin.
+     * Must NOT be a State variable, so it survives UNDO and allows "Next Round" navigation.
+     */
+    private final TreeSet<Integer> roundBoundaries = new TreeSet<>();
+
+    public void markRoundBoundary() {
+        if (getRoot() == null || getRoot().getStateManager() == null) return;
+        ChangeStack changeStack = getRoot().getStateManager().getChangeStack();
+        if (changeStack != null) {
+            roundBoundaries.add(changeStack.getCurrentIndex());
+        }
+    }
+
+   
+    private void truncateRoundBoundaries(int currentIndex) {
+        roundBoundaries.tailSet(currentIndex, false).clear();
+    }
+
+public Integer getRoundStart(int currentIndex) {
+        return roundBoundaries.floor(currentIndex);
+    }
+
+    public Integer getPreviousRoundIndex(int currentIndex) {
+        return roundBoundaries.lower(currentIndex);
+    }
+
+    public Integer getNextRoundIndex(int currentIndex) {
+        return roundBoundaries.higher(currentIndex);
+    }
+
+
     /**
      * Flag used to track if any CorrectionModeAction is currently active (e.g.,
      * Cash, Train).
@@ -1018,6 +1051,7 @@ public class GameManager extends RailsManager implements Configurable, Owner {
         // ++ END TIME MANAGEMENT ++
 
         beginStartRound();
+        markRoundBoundary();
     }
 
     public boolean isDynamicOperatingOrder() {
@@ -1709,6 +1743,9 @@ public class GameManager extends RailsManager implements Configurable, Owner {
             if (result && !(action instanceof GameAction) && !(startGameAction)) {
                 changeStack.close(action);
 
+                // Overwrite timeline: clear future boundaries that are no longer valid
+                truncateRoundBoundaries(changeStack.getCurrentIndex());
+
                 // Autosave logic
                 RoundFacade roundAfter = getCurrentRound();
                 Object actorAfter = getCurrentPlayer();
@@ -1718,6 +1755,9 @@ public class GameManager extends RailsManager implements Configurable, Owner {
                 }
 
                 boolean roundChanged = (roundBefore != roundAfter);
+                if (roundChanged) {
+                    markRoundBoundary();
+                }
                 boolean actorChanged = (actorBefore == null && actorAfter != null) ||
                         (actorBefore != null && !actorBefore.equals(actorAfter));
 
@@ -2347,81 +2387,7 @@ public class GameManager extends RailsManager implements Configurable, Owner {
         ((OperatingRound) getCurrentRound()).nextStep();
     }
 
-    /**
-     * NOTE: this is provisional, incomplete and not used yet.
-     * Calculate the total value of sellable shares in an emergency case,
-     * taking the pool limit into account.<br>
-     * Note: the complex 1841 rules cannot easily be included here,
-     * these probably will need a subclass.
-     * 
-     * @param company     The company possibly holding shares.
-     * @param cashToRaise A required cash value (an emergency train price).
-     *                    If zero, just the total share value is returned.
-     * @return The potential yield of selling treasury shares.
-     */
-    protected int getSellableSharesValue(PublicCompany company, int cashToRaise,
-            boolean dumpAllowed) {
 
-        if (company == null || !company.hasStarted() || company.isClosed())
-            return 0;
-
-        int value = 0;
-        PortfolioModel pool = getRoot().getBank().getPool().getPortfolioModel();
-
-        // Note every company's pool space in number of shares.
-        Map<PublicCompany, Integer> poolSpace = new HashMap<>();
-        for (PublicCompany comp : getAllPublicCompanies()) {
-            poolSpace.put(comp,
-                    getParmAsInt(GameDef.Parm.POOL_SHARE_LIMIT) / comp.getShareUnit()
-                            - pool.getShares(comp));
-        }
-
-        // Treasury shares
-        if (company.canHoldOwnShares()) {
-            // Other companies (as in 1841) not yet considered.
-            PortfolioModel portfolio = company.getPortfolioModel();
-            int numberAvailable = portfolio.getShares(company);
-            int numberToSell = 0;
-            if (numberAvailable > 0) {
-                int sharePrice = company.getCurrentSpace().getPrice();
-
-                // If a required cash value is specified, restrict the
-                // number to sell to just the required minimum.
-                if (cashToRaise > 0) {
-                    // For now, assume that all treasury certs are single shares.
-                    // Calculate how many certs we should sell.
-                    while (++numberToSell * sharePrice < cashToRaise
-                            && numberToSell < numberAvailable) {
-                    }
-                } else {
-                    // Count all shares
-                    numberToSell = numberAvailable;
-                }
-                // Don't exceed the 50% pool limit
-                int space = poolSpace.get(company);
-                numberToSell = Math.min(numberToSell, space);
-                value += numberToSell * sharePrice;
-                // Subtract from pool space
-                poolSpace.put(company, space - numberToSell);
-            }
-        }
-
-        Player player = company.getPresident();
-
-        value += player.getCash();
-        /*
-         * if (player != null) {
-         * Map<PublicCompany, PublicCertificate> certsMap =
-         * for (PublicCompany comp : certsMap.keySet()) {
-         * for (PublicCertificate cert : certsMap.get (comp))
-         * }
-         * }
-         */
-
-        return value;
-    }
-
-    // ... (lines of unchanged context code) ...
     public void registerPlayerBankruptcy(Player player) {
         endedByBankruptcy.set(true);
         String message = LocalText.getText("PlayerIsBankrupt",
@@ -3165,11 +3131,7 @@ public class GameManager extends RailsManager implements Configurable, Owner {
      * }
      */
 
-    // --------------------------------------------
-    // Register certificates and trains to prevent double income in one round.
-    // Used by 1837. (Not yet by 1835)
-    // --------------------------------------------
-
+   
     /**
      * Registry of exchanged certificates to be denied income
      * because their precursors produced revenue in the same OR.
@@ -3403,6 +3365,12 @@ public PossibleAction getNextActionFromLog() {
         possibleActions.clear();
         getCurrentRound().setPossibleActions();
         changeStack.close(action);
+
+        RoundFacade roundAfter = getCurrentRound();
+        if (roundBefore != roundAfter) {
+            markRoundBoundary();
+        }
+
 
         if (!isGameOver())
             setCorrectionActions();

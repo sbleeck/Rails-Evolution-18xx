@@ -16,25 +16,8 @@ Three variants have been implemented:
 	- Clemens
 	- Snake
 
-The following options are possible:
-	
-	- Bayern floats at values 50% or 20% default=50%
-	- LDIncome values can be 20M or 30M default is 30M
-	- MinorsRequireFloatedBY type=toggle default=no
-	- PrussianReservedIgnored ( Ignores reserved shares at determining sold out status
-	after prussian formation round) type=toggle default=no
-	- AllowSeparateSalesAtSamePrice type=toggle default=yes
-	
-From 08/2022 share selling is strictly limited to whole certificates.
-So it is no longer possible to sell 30% in one action while having one 20% and one 10% certificate
-(it can still be done with two actions in the same turn, and at the same price).
-This change was needed to fix some bugs, and also it has much simplified the selling code.
-
-However, it also violates German rule 3.3.7, and for that reason it can be reset
-for a whole game by disabling a new GameOption named AllowSeparateSalesAtSamePrice (see above).
-Another option is to select the Special|AdjustSharePrice menu option, by
-which the price token can be moved one square down. This option is *only*
-available *immediately* after any second (or third, etc.) sale of shares of one company.
+no options have been implemented for the variants, but the game will automatically adjust to the selected variant, based on the game options chosen at game start.
+this is so that the game can be played in a champioship with no differences
 		</Description>
 		<Players minimum="3" maximum="7"/>
 	</Game>
@@ -44,7 +27,7 @@ available *immediately* after any second (or third, etc.) sale of shares of one 
 
 
 <Game name="1837">
-		<Note>under costruction</Note>
+		<Note>fully playable</Note>
 		<Description> 1837 - Austria
 			(c) 1994 Leonhard Orgler (self-published)
 
@@ -59,11 +42,7 @@ available *immediately* after any second (or third, etc.) sale of shares of one 
 			Major (if started) or National company,
 			- Privates (mountain railways) worth is zero.
 
-			Known limitations:
-			- Token laying involving backtracking must be done in Correction mode.
-			- If the U3 president rejects folding into Ug, the other U3 share
-			owner cannot fold that second share.
-		</Description>
+			</Description>
 		<Players minimum = "3" maximum = "7" />
 	</Game>
 

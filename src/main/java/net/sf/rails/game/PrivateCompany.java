@@ -21,7 +21,6 @@ import org.slf4j.LoggerFactory;
 
 import com.google.common.collect.ImmutableSet;
 
-
 // FIXME: Move static field numberOfPrivateCompanies to CompanyManager
 
 public class PrivateCompany extends RailsOwnableItem<PrivateCompany> implements Company, Certificate, Closeable {
@@ -30,9 +29,8 @@ public class PrivateCompany extends RailsOwnableItem<PrivateCompany> implements 
 
     public static final String TYPE_TAG = "Private";
     public static final String REVENUE = "revenue";
-    //used by getUpperPrice and getLowerPrice to signal no limit
+    // used by getUpperPrice and getLowerPrice to signal no limit
     public static final int NO_PRICE_LIMIT = -1;
-
 
     // FIXME: See above, this has to be fixed
     protected static int numberOfPrivateCompanies = 0;
@@ -82,8 +80,8 @@ public class PrivateCompany extends RailsOwnableItem<PrivateCompany> implements 
     protected boolean tradeableToCompany = true;
     protected boolean tradeableToPlayer = false;
 
-    private final PortfolioSet<SpecialProperty> specialProperties =
-            PortfolioSet.create(this, "specialProperties", SpecialProperty.class);
+    private final PortfolioSet<SpecialProperty> specialProperties = PortfolioSet.create(this, "specialProperties",
+            SpecialProperty.class);
 
     // used for Company interface
     private String longName;
@@ -111,7 +109,7 @@ public class PrivateCompany extends RailsOwnableItem<PrivateCompany> implements 
     public String getName() {
         return getLongName();
     }
-    
+
     @Override
     public void configureFromXML(Tag tag) throws ConfigurationException {
         /* Configure private company features */
@@ -122,25 +120,28 @@ public class PrivateCompany extends RailsOwnableItem<PrivateCompany> implements 
             basePrice = tag.getAttributeAsInteger("basePrice", 0);
 
             // sfy 1889 changed to IntegerArray
-revenue = tag.getAttributeAsIntegerList("revenue");
+            revenue = tag.getAttributeAsIntegerList("revenue");
 
-            // Fix: Fallback for single integer values if list parsing fails (e.g. revenue="5")
+            // Fix: Fallback for single integer values if list parsing fails (e.g.
+            // revenue="5")
             if (revenue == null || revenue.isEmpty()) {
                 // Try reading as a single integer
                 int singleRev = tag.getAttributeAsInteger("revenue", -999);
                 revenue = new ArrayList<>();
-                
+
                 if (singleRev != -999) {
                     revenue.add(singleRev);
-                    // log.info("PrivateCompany {}: Revenue parsed as single integer: {}", getId(), revenue);
+                    // log.info("PrivateCompany {}: Revenue parsed as single integer: {}", getId(),
+                    // revenue);
                 } else {
-                    // log.warn("PrivateCompany {}: Revenue attribute missing or invalid. Defaulting to [0].", getId());
+                    // log.warn("PrivateCompany {}: Revenue attribute missing or invalid. Defaulting
+                    // to [0].", getId());
                     revenue.add(0);
                 }
             } else {
                 // log.info("PrivateCompany {}: Revenue parsed as list: {}", getId(), revenue);
             }
-            
+
             // pld: adding revenue to info text
             infoText += "<br>Revenue: ";
             for (int i = 0; i < revenue.size(); i++) {
@@ -158,8 +159,7 @@ revenue = tag.getAttributeAsIntegerList("revenue");
             // Blocked hexes (until bought by a company)
             Tag blockedTag = tag.getChild("Blocking");
             if (blockedTag != null) {
-                blockedHexesString =
-                        blockedTag.getAttributeAsString("hex");
+                blockedHexesString = blockedTag.getAttributeAsString("hex");
                 infoText += "<br>Blocking: " + blockedHexesString;
 
                 // add triggerable to unblock
@@ -169,8 +169,7 @@ revenue = tag.getAttributeAsIntegerList("revenue");
                             if (getOwner() instanceof Company) {
                                 PrivateCompany.this.unblockHexes();
                             }
-                        }
-                );
+                        });
             }
 
             // Extra info text(usually related to extra-share special properties)
@@ -180,7 +179,6 @@ revenue = tag.getAttributeAsIntegerList("revenue");
                 String[] infoParms = infoTag.getAttributeAsString("parm", "").split(",");
                 infoText += "<br>" + LocalText.getText(infoKey, (Object[]) infoParms);
             }
-
 
             // SpecialProperties
             parentInfoText += SpecialProperty.configure(this, tag);
@@ -249,14 +247,10 @@ revenue = tag.getAttributeAsIntegerList("revenue");
                         tradeableToCompany = tradeableTag.getAttributeAsBoolean("toCompany");
 
                         if (tradeableToCompany) {
-                            upperPrice =
-                                    tradeableTag.getAttributeAsInteger("upperPrice", upperPrice);
-                            lowerPrice =
-                                    tradeableTag.getAttributeAsInteger("lowerPrice", lowerPrice);
-                            lowerPriceFactor =
-                                    tradeableTag.getAttributeAsFloat("lowerPriceFactor", lowerPriceFactor);
-                            upperPriceFactor =
-                                    tradeableTag.getAttributeAsFloat("upperPriceFactor", upperPriceFactor);
+                            upperPrice = tradeableTag.getAttributeAsInteger("upperPrice", upperPrice);
+                            lowerPrice = tradeableTag.getAttributeAsInteger("lowerPrice", lowerPrice);
+                            lowerPriceFactor = tradeableTag.getAttributeAsFloat("lowerPriceFactor", lowerPriceFactor);
+                            upperPriceFactor = tradeableTag.getAttributeAsFloat("upperPriceFactor", upperPriceFactor);
                         }
                     }
 
@@ -266,19 +260,17 @@ revenue = tag.getAttributeAsIntegerList("revenue");
                         tradeableToPlayer = tradeableTag.getAttributeAsBoolean("toPlayer");
 
                         if (tradeableToPlayer) {
-                            upperPlayerPrice =
-                                    tradeableTag.getAttributeAsInteger("upperPrice", upperPlayerPrice);
-                            lowerPlayerPrice =
-                                    tradeableTag.getAttributeAsInteger("lowerPrice", lowerPlayerPrice);
-                            lowerPlayerPriceFactor =
-                                    tradeableTag.getAttributeAsFloat("lowerPriceFactor", lowerPlayerPriceFactor);
-                            upperPlayerPriceFactor =
-                                    tradeableTag.getAttributeAsFloat("upperPriceFactor", upperPlayerPriceFactor);
+                            upperPlayerPrice = tradeableTag.getAttributeAsInteger("upperPrice", upperPlayerPrice);
+                            lowerPlayerPrice = tradeableTag.getAttributeAsInteger("lowerPrice", lowerPlayerPrice);
+                            lowerPlayerPriceFactor = tradeableTag.getAttributeAsFloat("lowerPriceFactor",
+                                    lowerPlayerPriceFactor);
+                            upperPlayerPriceFactor = tradeableTag.getAttributeAsFloat("upperPriceFactor",
+                                    upperPlayerPriceFactor);
                         }
                     }
                 }
             }
-            //end: br
+            // end: br
 
         } catch (Exception e) {
             throw new ConfigurationException("Configuration error for Private "
@@ -323,7 +315,8 @@ revenue = tag.getAttributeAsIntegerList("revenue");
         }
 
         // start: br
-        //if {upper,lower}PriceFactor is set but {upper,lower}Price is not, calculate the right value
+        // if {upper,lower}PriceFactor is set but {upper,lower}Price is not, calculate
+        // the right value
         if (upperPrice == NO_PRICE_LIMIT && upperPriceFactor != NO_PRICE_LIMIT) {
 
             if (basePrice == 0) {
@@ -344,7 +337,6 @@ revenue = tag.getAttributeAsIntegerList("revenue");
         }
         // end: br
     }
-
 
     /**
      * @return Private Company Number
@@ -367,7 +359,7 @@ revenue = tag.getAttributeAsIntegerList("revenue");
         return revenue;
     }
 
-    //  start: sfy 1889: new method
+    // start: sfy 1889: new method
     public int getRevenueByPhase(Phase phase) {
         // Fix: Robust handling for missing phase steps or index mismatches
         if (revenue == null || revenue.isEmpty()) {
@@ -393,18 +385,20 @@ revenue = tag.getAttributeAsIntegerList("revenue");
     @Override
     public void setClosed() {
 
-        if (isClosed()) return;
-        //        if (!isCloseable()) return;  /* moved hat to call in closeAllPrivates, to allow other closing actions */
+        if (isClosed())
+            return;
+        // if (!isCloseable()) return; /* moved hat to call in closeAllPrivates, to
+        // allow other closing actions */
 
         closed.set(true);
 
         unblockHexes();
 
-Owner scrapHeap = getRoot().getBank().getScrapHeap();
+        Owner scrapHeap = getRoot().getBank().getScrapHeap();
         if (getOwner() != scrapHeap) {
             moveTo(scrapHeap);
         }
-        
+
         ReportBuffer.add(this, LocalText.getText("PrivateCloses", getId()));
 
         // For 1856: buyable tokens still owned by the private will now
@@ -426,7 +420,8 @@ Owner scrapHeap = getRoot().getBank().getScrapHeap();
     /* start sfy 1889 */
     public boolean isCloseable() {
 
-        if ((preventClosingConditions == null) || preventClosingConditions.isEmpty()) return true;
+        if ((preventClosingConditions == null) || preventClosingConditions.isEmpty())
+            return true;
 
         if (preventClosingConditions.contains("doesNotClose")) {
             // log.debug("Private Company {} does not close (unconditional).", getId());
@@ -434,7 +429,8 @@ Owner scrapHeap = getRoot().getBank().getScrapHeap();
         }
         if (preventClosingConditions.contains("ifOwnedByPlayer")
                 && getOwner() instanceof Player) {
-            // log.debug("Private Company {} does not close, as it is owned by a player.", getId());
+            // log.debug("Private Company {} does not close, as it is owned by a player.",
+            // getId());
             return false;
         }
         return true;
@@ -499,11 +495,13 @@ Owner scrapHeap = getRoot().getBank().getScrapHeap();
 
     public void checkClosingIfExercised(boolean endOfTurn) {
 
-        if (isClosed() || endOfTurn != closeAtEndOfTurn) return;
+        if (isClosed() || endOfTurn != closeAtEndOfTurn)
+            return;
 
         if (closeIfAllExercised) {
             for (SpecialProperty sp : specialProperties) {
-                if (!sp.isExercised()) return;
+                if (!sp.isExercised())
+                    return;
             }
             // log.debug("CloseIfAll: closing {}", getId());
             setClosed();
@@ -567,7 +565,8 @@ Owner scrapHeap = getRoot().getBank().getScrapHeap();
     }
 
     /**
-     * @return Returns whether or not the company can be bought by a player (from another player)
+     * @return Returns whether or not the company can be bought by a player (from
+     *         another player)
      */
     // Not yet used
     public boolean tradeableToPlayer() {

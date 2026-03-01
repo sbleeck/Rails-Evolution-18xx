@@ -516,8 +516,54 @@ public class GUIHex implements Observer {
 
             if (homes != null) {
                 for (PublicCompany company : homes.keySet()) {
+
+
+                    // 1. Permanent Coal Value Rendering (Independent of company status)
+                    boolean isCoal = company.getType() != null && "Coal".equals(company.getType().getId());
+                    if (isCoal) {
+                        Stop homeCity = homes.get(company);
+                        if (homeCity != null && homeCity.getRelatedStation() == null) {
+                            for (Stop stop : getHex().getStops()) {
+                                if (stop.hasTokenSlotsLeft()) {
+                                    homeCity = stop;
+                                    break;
+                                }
+                            }
+                        }
+
+                        int val = 0;
+                        try {
+                            if (getHex().hasValuesPerPhase()) {
+                                val = getHex().getCurrentValueForPhase(hexMap.getPhase());
+                            }
+                            if (val == 0 && homeCity != null && homeCity.getRelatedStation() != null) {
+                                val = homeCity.getRelatedStation().getValue();
+                            }
+                            if (val == 0) {
+                                net.sf.rails.game.PrivateCompany pc = hexMap.getMapManager().getRoot().getCompanyManager().getPrivateCompany(company.getId());
+                                if (pc != null) {
+                                    java.util.List<Integer> revList = pc.getRevenue();
+                                    if (revList != null && !revList.isEmpty()) {
+                                        String phaseName = (hexMap.getPhase() != null) ? hexMap.getPhase().getId() : "null";
+                                        if (revList.size() > 1 && !phaseName.equals("null") && phaseName.compareTo("5") >= 0) {
+                                            val = revList.get(1);
+                                        } else {
+                                            val = revList.get(0);
+                                        }
+                                    }
+                                }
+                            }
+                        } catch (Exception e) {}
+
+                        if (val > 0 && homeCity != null) {
+                            HexPoint origin = getTokenCenter(1, homeCity); 
+                            drawCoalMineValue(g, company.getId(), origin, val);
+                        }
+                    }
+
                     if (company.isClosed())
                         continue;
+
 
                     // Only draw the company name if there isn't yet a token of that company
                     if (hex.hasTokenOfCompany(company))
@@ -542,7 +588,7 @@ public class GUIHex implements Observer {
                         // check the number of tokens laid there already
                         HexPoint p = getTokenCenter(1, homeCity);
                         if (company.isDisplayHomeHex()) {
-                            drawHome(g, company, p);
+drawHome(g, company, p, homeCity);
                         }
                     }
                 }
@@ -666,7 +712,8 @@ public class GUIHex implements Observer {
         }
     }
 
-    private void drawBaseToken(Graphics2D g2, PublicCompany co, HexPoint center, double diameter) {
+
+private void drawBaseToken(Graphics2D g2, PublicCompany co, HexPoint center, double diameter) {
 
         GUIToken token = new GUIToken(
                 co.getFgColour(), co.getBgColour(), co.getId(), center, diameter);
@@ -678,19 +725,25 @@ public class GUIHex implements Observer {
 
     }
 
-    private void drawHome(Graphics2D g2, PublicCompany co, HexPoint origin) {
-        // 1. Branch logic: Check if this is a Major or National company
+   private void drawHome(Graphics2D g2, PublicCompany co, HexPoint origin, Stop homeCity) {
+        // 1. Branch logic: Check if this is a Major, National, or Coal company
         boolean isMajor = false;
+        boolean isCoal = false;
         if (co.getType() != null) {
             String typeName = co.getType().getId();
-            if (typeName != null && (typeName.equals("Major") || typeName.equals("National"))) {
-                isMajor = true;
+            if (typeName != null) {
+                if (typeName.equals("Major") || typeName.equals("National")) {
+                    isMajor = true;
+                } else if (typeName.equals("Coal")) {
+                    isCoal = true;
+                }
             }
         }
 
-        // 2. Keep Minors and Coal companies completely intact
+        // 2. Keep Minors and Coal companies completely intact for their main text
         if (!isMajor) {
             GUIToken.drawTokenText(co.getId(), g2, Color.BLACK, origin, dimensions.tokenDiameter);
+
             return;
         }
 
@@ -740,6 +793,74 @@ public class GUIHex implements Observer {
         g2.setColor(oldColor);
         g2.setStroke(oldStroke);
         g2.setFont(oldFont);
+    }
+
+    private void drawCoalMineValue(Graphics2D g2, String compId, HexPoint origin, int value) {
+        double zoom = dimensions.zoomFactor;
+        double xOffset = 0;
+        double yOffset = 0;
+        
+        switch (compId) {
+            case "RGTE":
+            case "EOD":
+            case "EKT":
+            case "MLB":
+                yOffset = -18 * zoom;
+                break;
+            case "EPP":
+            case "ZKB":
+            case "SPB":
+            case "LRB":
+            case "BB":
+                yOffset = 18 * zoom;
+                break;
+            case "EHS":
+                xOffset = -22 * zoom;
+                break;
+            default:
+                yOffset = 18 * zoom;
+                break;
+        }
+        
+        double centerX = origin.getX() + xOffset;
+        double centerY = origin.getY() + yOffset;
+        
+        String text = String.valueOf(value);
+        Font oldFont = g2.getFont();
+        Color oldColor = g2.getColor();
+        Stroke oldStroke = g2.getStroke();
+        
+        int fontSize = (int) Math.round(11 * zoom);
+        if (fontSize < 8) fontSize = 8;
+        g2.setFont(new Font("SansSerif", Font.BOLD, fontSize));
+        
+        FontMetrics fm = g2.getFontMetrics();
+        int textWidth = fm.stringWidth(text);
+        int textHeight = fm.getAscent();
+        
+        int boxWidth = Math.max((int)(16 * zoom), textWidth + (int)(6 * zoom));
+        int boxHeight = textHeight + (int)(4 * zoom);
+        
+        double boxX = centerX - boxWidth / 2.0;
+        double boxY = centerY - boxHeight / 2.0;
+        
+        // Draw black square
+        g2.setColor(Color.BLACK);
+        g2.fill(new java.awt.geom.Rectangle2D.Double(boxX, boxY, boxWidth, boxHeight));
+        
+        // Draw white border
+        g2.setColor(Color.WHITE);
+        g2.setStroke(new BasicStroke(1.0f));
+        g2.draw(new java.awt.geom.Rectangle2D.Double(boxX, boxY, boxWidth, boxHeight));
+        
+        // Draw text
+        float textX = (float) (centerX - textWidth / 2.0);
+        float textY = (float) (centerY + textHeight / 2.0 - fm.getDescent());
+        g2.drawString(text, textX, textY);
+        
+        g2.setFont(oldFont);
+        g2.setColor(oldColor);
+        g2.setStroke(oldStroke);
     }
 
     private void drawBonusToken(Graphics2D g2, BonusToken bt, HexPoint origin) {

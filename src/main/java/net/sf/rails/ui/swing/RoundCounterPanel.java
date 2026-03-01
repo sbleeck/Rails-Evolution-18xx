@@ -74,19 +74,33 @@ public class RoundCounterPanel extends JPanel {
             phaseMaxOrs = gameUIManager.getGameManager().getNumberOfOperatingRounds();
 
             var phase = gameUIManager.getRoot().getPhaseManager().getCurrentPhase();
-            String phaseName = phase.toText().toLowerCase();
+           
+            java.util.List<String> allowedColors = phase.getTileColours();
+            currentPhaseColor = Color.WHITE; // Default fallback
 
-
-            if (phaseName.contains("1")) {
-                currentPhaseColor = Color.YELLOW;
-            } else if (phaseName.contains("2")) {
-                currentPhaseColor = Color.decode("#00B400");
-            } else if (phaseName.contains("3")) {
-                currentPhaseColor = Color.decode("#8B4513");
-            } else {
-                currentPhaseColor = Color.WHITE;
+            if (allowedColors != null) {
+                boolean yellow = false, green = false, brown = false, gray = false;
+                
+                for (String s : allowedColors) {
+                    String c = s.toLowerCase();
+                    if (c.contains("yellow")) yellow = true;
+                    else if (c.contains("green")) green = true;
+                    else if (c.contains("brown")) brown = true;
+                    else if (c.contains("gray") || c.contains("grey")) gray = true;
+                }
+                
+                // Prioritize the highest available color
+                if (gray) {
+                    currentPhaseColor = Color.LIGHT_GRAY;
+                } else if (brown) {
+                    currentPhaseColor = new Color(139, 69, 19); // Standard Brown
+                } else if (green) {
+                    currentPhaseColor = Color.decode("#00B400"); // RoundCounter's specific Green
+                } else if (yellow) {
+                    currentPhaseColor = Color.YELLOW;
+                }
             }
-
+            
         }
 
         // 1. Get Phase Limits

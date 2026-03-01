@@ -54,6 +54,7 @@ import net.sf.rails.ui.swing.elements.DialogOwner;
 import net.sf.rails.ui.swing.elements.MessageDialog;
 import net.sf.rails.ui.swing.elements.NonModalDialog;
 import net.sf.rails.ui.swing.elements.RadioButtonDialog;
+import net.sf.rails.ui.swing.elements.StartPriceGridDialog;
 import net.sf.rails.util.Util;
 import rails.game.action.*;
 import rails.game.correct.TrainCorrectionAction;
@@ -570,9 +571,13 @@ public class GameUIManager implements DialogOwner {
         }
 
         currentRound = railsRoot.getGameManager().getCurrentRound();
-        currentRoundName = currentRound.toString();
-        currentRoundType = currentRound.getClass();
-        
+        if (currentRound != null) {
+            currentRoundName = currentRound.toString();
+            currentRoundType = currentRound.getClass();
+        } else {
+currentRoundName = "Game Start";
+            currentRoundType = null;
+        }
 
         // Derive previous types
         if (previousRound != null) {
@@ -599,9 +604,9 @@ public class GameUIManager implements DialogOwner {
             }
         }
 
-        if (currentRound != previousRound) {
+ if (currentRound != previousRound && currentRoundType != null) {
             if (StartRound.class.isAssignableFrom(currentRoundType)) {
-                startRound = (StartRound) currentRound;
+                                startRound = (StartRound) currentRound;
                 if (startRoundWindow == null) {
                     String startRoundWindowClassName = getClassName(GuiDef.ClassName.START_ROUND_WINDOW);
                     try {
@@ -961,8 +966,9 @@ public class GameUIManager implements DialogOwner {
 
             } else if (COMPANY_START_PRICE_DIALOG.equals(key)) {
 
-                RadioButtonDialog dialog = (RadioButtonDialog) currentDialog;
+                // RadioButtonDialog dialog = (RadioButtonDialog) currentDialog;
                 StartCompany action = (StartCompany) currentDialogAction;
+                StartPriceGridDialog dialog = (StartPriceGridDialog) currentDialog;
 
                 int index = dialog.getSelectedOption();
                 if (index >= 0) {
@@ -1015,7 +1021,8 @@ public class GameUIManager implements DialogOwner {
                 action.setNumberTaken(action.getMinNumber() + selected);
 
             } else if (ADJUST_SHARE_PRICE_DIALOG.equals(key)) {
-                RadioButtonDialog dialog = (RadioButtonDialog) currentDialog;
+                // RadioButtonDialog dialog = (RadioButtonDialog) currentDialog;
+                StartPriceGridDialog dialog = (StartPriceGridDialog) currentDialog;
                 AdjustSharePrice action = (AdjustSharePrice) currentDialogAction;
                 EnumSet<AdjustSharePrice.Direction> directions = action.getDirections();
                 int selected = dialog.getSelectedOption();
@@ -1034,6 +1041,8 @@ public class GameUIManager implements DialogOwner {
 
     }
 
+
+    
     protected void autoSave(String newPlayer) {
         lastSavedFilename = savePrefix + "_" + saveDateTimeFormat.format(new Date()) + "_" + newPlayer + "."
                 + saveExtension;

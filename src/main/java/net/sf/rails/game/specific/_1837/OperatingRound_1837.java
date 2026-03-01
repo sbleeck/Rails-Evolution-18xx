@@ -1171,6 +1171,26 @@ public class OperatingRound_1837 extends OperatingRound {
                     log.warn("1837_RELOAD_TRACE: Invoking hex.upgrade(action) directly...");
                     g17.upgrade(lt);
 
+                    // Post-upgrade recovery: Find tokens left on zombie stops and return them to the charter
+                    PublicCompany kk = getRoot().getCompanyManager().getPublicCompany("KK");
+                    if (kk != null) {
+                        int recovered = 0;
+                        for (BaseToken token : kk.getAllBaseTokens()) {
+                            if (token.isPlaced() && token.getOwner() instanceof Stop) {
+                                Stop stop = (Stop) token.getOwner();
+                                // Identify if the token is stuck on an old G17 stop that is no longer part of the hex
+                                if (stop.getHex() != null && "G17".equals(stop.getHex().getId())) {
+                                    if (!g17.getStops().contains(stop)) {
+                                        log.info("1837_TOKEN_RECOVERY: Recovering KK token from zombie stop {}", stop.getId());
+                                        token.moveTo(kk);
+                                        recovered++;
+                                    }
+                                }
+                            }
+                        }
+                        log.info("1837_TOKEN_RECOVERY: Returned {} tokens to KK charter.", recovered);
+                    }
+
                     log.info("1837_RELOAD_TRACE: Post-Upgrade State: Hex={}, NewTile={}, StopCount={}",
                             g17.getId(), g17.getCurrentTile().getId(), g17.getStops().size());
 
@@ -1372,13 +1392,9 @@ public class OperatingRound_1837 extends OperatingRound {
 
     @Override
     public String getRevenueDisplayString(PublicCompany company) {
-// --- START FIX ---
-        log.info("1837_REVENUE_TRACE: getRevenueDisplayString called for company: {}, hasTrains: {}, type: {}",
-                company.getId(), company.hasTrains(), company.getType().getId());
 
         // Guard against trainless companies to prevent stale adapter math
         if (!company.hasTrains() && !"Coal".equals(company.getType().getId())) {
-            log.info("1837_REVENUE_TRACE: {} has no trains and is not Coal. Returning 0.", company.getId());
             return Bank.format(this, 0);
         }
 
@@ -1390,7 +1406,6 @@ public class OperatingRound_1837 extends OperatingRound {
                 int total = ra.calculateRevenue();
                 int mine = ra.getSpecialRevenue();
                 
-                log.info("1837_REVENUE_TRACE: {} adapter calculated total: {}, mine: {}", company.getId(), total, mine);
 
                 // Prevent negative route revenue from stale adapter states
                 if (mine > 0 && total >= mine) {
@@ -1404,20 +1419,15 @@ public class OperatingRound_1837 extends OperatingRound {
             log.error("Error generating revenue display string", e);
         }
         return super.getRevenueDisplayString(company);
-// --- END FIX ---
     }
 
 
 
     @Override
     public int getSpecialRevenueOnly(PublicCompany company) {
-// --- START FIX ---
-        log.info("1837_REVENUE_TRACE: getSpecialRevenueOnly called for company: {}, hasTrains: {}",
-                company.getId(), company.hasTrains());
 
         // Guard against trainless majors
         if (!company.hasTrains() && !"Coal".equals(company.getType().getId())) {
-            log.info("1837_REVENUE_TRACE: {} has no trains. Returning 0 special revenue.", company.getId());
             return 0;
         }
 
@@ -1428,11 +1438,9 @@ public class OperatingRound_1837 extends OperatingRound {
             ra.initRevenueCalculator(true);
             ra.calculateRevenue();
             int mine = ra.getSpecialRevenue();
-            log.info("1837_REVENUE_TRACE: {} special revenue calculated as: {}", company.getId(), mine);
             return mine;
         } catch (Exception e) {
             return 0;
         }
-// --- END FIX ---
     }
 }

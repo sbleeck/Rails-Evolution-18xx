@@ -970,10 +970,20 @@ selectedItemIndex = -1;
         if (source instanceof ActionButton) {
             List<PossibleAction> actions = ((ActionButton) source).getPossibleActions();
             if (actions != null && !actions.isEmpty()) {
-            selectedItemIndex = -1;
-
-            process(actions.get(0));
+            
+                PossibleAction action = actions.get(0);
+            
+            // Intercept BuyStartItem from the "Buy" button to ensure the price dialog opens
+            if (action instanceof BuyStartItem) {
+                BuyStartItem bsi = (BuyStartItem) action;
+                if (bsi.hasSharePriceToSet() && requestStartPrice(bsi)) {
+                    return; // Dialog will handle the process() call
+                }
             }
+            
+            selectedItemIndex = -1;
+            process(action);
+        }
         }
     }
 

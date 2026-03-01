@@ -127,7 +127,8 @@ public class ORPanel extends GridPanel
     // Sidebar Elements
     private JLabel companyLogo;
     private JLabel lblCash;
-    private JLabel lblRevenue;
+    private JLabel lblRoute;
+    private JLabel lblFixed;
 
     private TokenDisplayPanel tokenDisplay;
     private TrainDisplayPanel trainDisplay;
@@ -269,23 +270,23 @@ public class ORPanel extends GridPanel
         return phase;
     }
 
-// ... (lines of unchanged context code) ...
+    // ... (lines of unchanged context code) ...
     private void distributeStandardActions(List<PossibleAction> actions) {
         boolean doneActionFound = false;
         PossibleAction donePa = null;
-        
+
         // --- START FIX ---
         // 1. DEDUPLICATION SET
         java.util.Set<String> addedSpecialLabels = new java.util.HashSet<>();
-        
+
         // 2. CONSTANTS (Normalized Labels)
-        final String LBL_TILE  = "EXTRA TILE BUILD";
+        final String LBL_TILE = "EXTRA TILE BUILD";
         final String LBL_TOKEN = "EXTRA TOKEN";
 
         for (PossibleAction pa : actions) {
             // IGNORE LIST: Structural actions that should never be special buttons
-            if (pa instanceof CorrectionModeAction || 
-                pa instanceof GameAction) { 
+            if (pa instanceof CorrectionModeAction ||
+                    pa instanceof GameAction) {
                 continue;
             }
 
@@ -294,50 +295,53 @@ public class ORPanel extends GridPanel
             // --- A. UseSpecialProperty (The Menu/Trigger) ---
             if (pa instanceof UseSpecialProperty) {
                 String text = pa.getButtonLabel().toLowerCase();
-                if (text.contains("tile")) labelToAdd = LBL_TILE;
-                else if (text.contains("token")) labelToAdd = LBL_TOKEN;
-                else labelToAdd = pa.getButtonLabel().trim();
-            } 
-            
+                if (text.contains("tile"))
+                    labelToAdd = LBL_TILE;
+                else if (text.contains("token"))
+                    labelToAdd = LBL_TOKEN;
+                else
+                    labelToAdd = pa.getButtonLabel().trim();
+            }
+
             // --- B. LayTile (The Execution) ---
             else if (pa instanceof LayTile) {
-                 LayTile lt = (LayTile) pa;
-                 // ONLY show if it has a linked SpecialProperty object or explicit extra flag
-                 if (lt.getSpecialProperty() != null || pa.toString().contains("extra=true")) {
-                     labelToAdd = LBL_TILE; 
-                 }
+                LayTile lt = (LayTile) pa;
+                // ONLY show if it has a linked SpecialProperty object or explicit extra flag
+                if (lt.getSpecialProperty() != null || pa.toString().contains("extra=true")) {
+                    labelToAdd = LBL_TILE;
+                }
             }
-            
+
             // --- C. LayBaseToken (The Execution) ---
             else if (pa instanceof LayBaseToken) {
-                 LayBaseToken lbt = (LayBaseToken) pa;
-                 
-                 // STRICT FILTER BASED ON DEBUG ANALYSIS:
-                 // 1. Check for attached SpecialProperty (Debug confirmed Type 2 has SP=true)
-                 boolean hasSpecialProp = (lbt.getSpecialProperty() != null);
-                 
-                 // 2. Check for explicit "extra=true" flag
-                 boolean isExplicitlyExtra = pa.toString().contains("extra=true");
+                LayBaseToken lbt = (LayBaseToken) pa;
 
-                 // 3. Check for Special Types, BUT EXCLUDE TYPE 1 (Home City/Normal)
-                 // Type 0 = Generic, Type 1 = Home/Normal. Both are ignored.
-                 // Any other Type (2+) is considered special.
-                 boolean isSpecialType = (lbt.getType() != LayBaseToken.GENERIC && lbt.getType() != 1);
+                // STRICT FILTER BASED ON DEBUG ANALYSIS:
+                // 1. Check for attached SpecialProperty (Debug confirmed Type 2 has SP=true)
+                boolean hasSpecialProp = (lbt.getSpecialProperty() != null);
 
-                 if (hasSpecialProp || isExplicitlyExtra || isSpecialType) {
-                     labelToAdd = LBL_TOKEN;
-                 }
+                // 2. Check for explicit "extra=true" flag
+                boolean isExplicitlyExtra = pa.toString().contains("extra=true");
+
+                // 3. Check for Special Types, BUT EXCLUDE TYPE 1 (Home City/Normal)
+                // Type 0 = Generic, Type 1 = Home/Normal. Both are ignored.
+                // Any other Type (2+) is considered special.
+                boolean isSpecialType = (lbt.getType() != LayBaseToken.GENERIC && lbt.getType() != 1);
+
+                if (hasSpecialProp || isExplicitlyExtra || isSpecialType) {
+                    labelToAdd = LBL_TOKEN;
+                }
             }
-            
+
             // --- D. CATCH-ALL (The Safety Net) ---
-            else if (!(pa instanceof SetDividend) && 
-                     !(pa instanceof BuyTrain) && 
-                     !(pa instanceof NullAction) && 
-                     !(pa instanceof LayTile) &&       
-                     !(pa instanceof LayToken) &&      
-                     !(pa instanceof LayBaseToken)) {  
-                 
-                 labelToAdd = pa.getButtonLabel().toUpperCase();
+            else if (!(pa instanceof SetDividend) &&
+                    !(pa instanceof BuyTrain) &&
+                    !(pa instanceof NullAction) &&
+                    !(pa instanceof LayTile) &&
+                    !(pa instanceof LayToken) &&
+                    !(pa instanceof LayBaseToken)) {
+
+                labelToAdd = pa.getButtonLabel().toUpperCase();
             }
 
             // --- E. ADD BUTTON (Deduplicated) ---
@@ -365,7 +369,7 @@ public class ORPanel extends GridPanel
                 NullAction.Mode mode = ((NullAction) pa).getMode();
                 if (mode == NullAction.Mode.DONE || mode == NullAction.Mode.PASS) {
                     setupButton(btnDone, pa);
-                    bindActionHotkey(btnDone, pa); 
+                    bindActionHotkey(btnDone, pa);
 
                     donePa = pa;
                     doneActionFound = true;
@@ -377,9 +381,7 @@ public class ORPanel extends GridPanel
         }
 
     }
-// ... (rest of the method) ...
-
-
+    // ... (rest of the method) ...
 
     private void updatePhaseSpecifics() {
 
@@ -403,42 +405,42 @@ public class ORPanel extends GridPanel
     }
 
     private void addSpecialNotificationButton(String text, PossibleAction sourceAction) {
-        if (specialNotificationPanel == null) return;
-        
+        if (specialNotificationPanel == null)
+            return;
+
         specialNotificationPanel.setVisible(true);
 
         ActionButton b = new ActionButton(RailsIcon.INFO); // Use Info icon or null
         b.setText(text);
-        b.setIcon(null); 
+        b.setIcon(null);
         b.setHorizontalAlignment(SwingConstants.CENTER);
         b.setAlignmentX(Component.CENTER_ALIGNMENT);
         b.setPreferredSize(new Dimension(SIDEBAR_WIDTH - 20, BTN_HEIGHT));
         b.setMaximumSize(new Dimension(SIDEBAR_WIDTH - 20, BTN_HEIGHT));
-        
+
         // --- STYLING ---
         // High Visibility Gold/Orange
         Color bg = new Color(255, 193, 7); // Amber/Gold
         Color fg = Color.BLACK;
-        
+
         // Force UI to ignore "Disabled" greying out
         b.setUI(new javax.swing.plaf.basic.BasicButtonUI());
         b.setBackground(bg);
         b.setForeground(fg);
         b.setFont(new Font("SansSerif", Font.BOLD, 12));
-        
+
         b.setOpaque(true);
         b.setContentAreaFilled(true);
         b.setBorderPainted(true);
-        
+
         // Thick border to indicate "Special"
         b.setBorder(BorderFactory.createCompoundBorder(
                 BorderFactory.createLineBorder(new Color(184, 134, 11), 2), // Dark Goldenrod
-                BorderFactory.createEmptyBorder(2, 2, 2, 2)
-        ));
+                BorderFactory.createEmptyBorder(2, 2, 2, 2)));
 
         // Functionally disabled (not clickable)
-        b.setEnabled(false); 
-        
+        b.setEnabled(false);
+
         // Optional: Add tooltip to explain
         if (sourceAction != null) {
             b.setToolTipText(sourceAction.toString());
@@ -952,12 +954,40 @@ public class ORPanel extends GridPanel
 
         // 6. Phase 3 (Revenue)
         phase3Panel = createPhasePanel("3. Revenue");
-        lblRevenue = new JLabel("0", SwingConstants.CENTER);
-        // Manually apply the readout styling since we aren't using the helper method
-        lblRevenue.setFont(new Font("SansSerif", Font.BOLD, 22));
-        lblRevenue.setAlignmentX(Component.CENTER_ALIGNMENT);
 
-        phase3Panel.add(lblRevenue);
+        JPanel revDisplayPanel = new JPanel(new GridLayout(1, 2, 5, 0));
+        revDisplayPanel.setOpaque(false);
+        revDisplayPanel.setMaximumSize(new Dimension(SIDEBAR_WIDTH - 10, 45));
+
+        JPanel divBox = new JPanel();
+        divBox.setLayout(new BoxLayout(divBox, BoxLayout.Y_AXIS));
+        divBox.setOpaque(false);
+        JLabel lblDivTitle = new JLabel("Route", SwingConstants.CENTER); // Changed
+        lblDivTitle.setAlignmentX(Component.CENTER_ALIGNMENT);
+        lblDivTitle.setFont(new Font("SansSerif", Font.PLAIN, 10));
+        lblRoute = new JLabel("0", SwingConstants.CENTER);
+        lblRoute.setAlignmentX(Component.CENTER_ALIGNMENT);
+        lblRoute.setFont(new Font("SansSerif", Font.BOLD, 18));
+        divBox.add(lblDivTitle);
+        divBox.add(lblRoute);
+
+        JPanel retBox = new JPanel();
+        retBox.setLayout(new BoxLayout(retBox, BoxLayout.Y_AXIS));
+        retBox.setOpaque(false);
+        JLabel lblRetTitle = new JLabel("Fixed", SwingConstants.CENTER); // Changed
+        lblRetTitle.setAlignmentX(Component.CENTER_ALIGNMENT);
+        lblRetTitle.setFont(new Font("SansSerif", Font.PLAIN, 10));
+        lblFixed = new JLabel("0", SwingConstants.CENTER);
+        lblFixed.setAlignmentX(Component.CENTER_ALIGNMENT);
+        lblFixed.setFont(new Font("SansSerif", Font.BOLD, 18));
+        retBox.add(lblRetTitle);
+        retBox.add(lblFixed);
+
+        revDisplayPanel.add(divBox);
+        revDisplayPanel.add(retBox);
+
+        phase3Panel.add(Box.createVerticalStrut(5));
+        phase3Panel.add(revDisplayPanel);
 
         // Use GridLayout to force exactly equal 1/3 widths for the 3 buttons
         JPanel revBtnRow = new JPanel(new GridLayout(1, 3, 5, 0)); // 1 row, 3 cols, 5px gap
@@ -1010,7 +1040,7 @@ public class ORPanel extends GridPanel
         sidebarPanel.add(Box.createVerticalStrut(5));
 
         // 8. Footer (Done Button)
-       // Change Footer to Vertical Box to hold Done + Notifications tightly together
+        // Change Footer to Vertical Box to hold Done + Notifications tightly together
         footerPanel = new JPanel();
         footerPanel.setLayout(new BoxLayout(footerPanel, BoxLayout.Y_AXIS));
         footerPanel.setOpaque(false);
@@ -1031,14 +1061,13 @@ public class ORPanel extends GridPanel
         specialNotificationPanel.setLayout(new BoxLayout(specialNotificationPanel, BoxLayout.Y_AXIS));
         specialNotificationPanel.setOpaque(false);
         specialNotificationPanel.setVisible(false);
-        
+
         // Small gap between Done and Notification
-        footerPanel.add(Box.createVerticalStrut(4)); 
+        footerPanel.add(Box.createVerticalStrut(4));
         footerPanel.add(specialNotificationPanel);
 
         sidebarPanel.add(footerPanel);
         sidebarPanel.add(Box.createVerticalStrut(5));
-
 
         add(sidebarPanel);
     }
@@ -1328,32 +1357,23 @@ public class ORPanel extends GridPanel
     public void revenueUpdate(int best, int special, boolean finalRes) {
         SwingUtilities.invokeLater(() -> {
 
-            try {
-                if (lblRevenue != null) {
-                    // --- START FIX ---
-                    // Delegate display formatting to the OperatingRound (e.g., "30 + 30")
-                    // This keeps logic out of the Panel.
-                    RoundFacade rf = orUIManager.getGameUIManager().getCurrentRound();
-                    if (rf instanceof OperatingRound) {
-                        lblRevenue.setText(((OperatingRound) rf).getRevenueDisplayString(orComp));
-                    } else {
-                        lblRevenue.setText(format(best));
-                    }
-                    // --- END FIX ---
-                }
+            if (lblRoute != null) {
+                int routeRev = best - special;
+                if (routeRev < 0)
+                    routeRev = 0;
+                lblRoute.setText(format(routeRev));
+            }
+            if (lblFixed != null) {
+                lblFixed.setText(format(special));
+            }
 
-                if (isRevenueValueToBeSet) {
-                    // --- START FIX ---
-                    // Pass the 'special' value (Mine Revenue) from the calculator to the button.
-                    setRevenue(orCompIndex, best, special);
-                    // --- END FIX ---
-                }
+            if (isRevenueValueToBeSet) {
+                // Pass the 'special' value (Mine Revenue) from the calculator to the button.
+                setRevenue(orCompIndex, best, special);
+            }
 
-                if (finalRes && isDisplayCurrentRoutes()) {
-                    revenueAdapter.drawOptimalRunAsPath(orUIManager.getMap());
-                }
-            } catch (Exception e) {
-                log.error("Error in revenueUpdate UI update", e);
+            if (finalRes && isDisplayCurrentRoutes()) {
+                revenueAdapter.drawOptimalRunAsPath(orUIManager.getMap());
             }
 
         });
@@ -1795,14 +1815,20 @@ public class ORPanel extends GridPanel
             tokenDisplay.setTokens(available, orComp);
         }
 
-        if (lblRevenue != null) {
-            // Use the smart display string instead of raw LastRevenue
-            RoundFacade rf = orUIManager.getGameUIManager().getCurrentRound();
-            if (rf instanceof OperatingRound) {
-                lblRevenue.setText(((OperatingRound) rf).getRevenueDisplayString(orComp));
-            } else {
-                lblRevenue.setText(format(orComp.getLastRevenue()));
-            }
+        if (lblRoute != null && lblFixed != null) {
+            int totalRev = orComp.getLastRevenue();
+            int fixedRev = orComp.getLastDirectIncome();
+
+            // Stale Data Guard
+            if (!orComp.canHaveFixedIncome())
+                fixedRev = 0;
+            if (totalRev == 0 || fixedRev > totalRev)
+                fixedRev = 0;
+
+            int routeRev = totalRev - fixedRev;
+
+            lblRoute.setText(format(routeRev));
+            lblFixed.setText(format(fixedRev));
         }
 
         if (trainDisplay != null)
@@ -1932,57 +1958,57 @@ public class ORPanel extends GridPanel
         Color textColor = Color.BLACK;
         String cmd = "SpecialAction";
 
-Company highlightTarget = null;
+        Company highlightTarget = null;
 
-    // 1. Extract Visual Signature via Interface
-    if (action instanceof GuiTargetedAction) {
-        GuiTargetedAction gta = (GuiTargetedAction) action;
-        label = gta.getButtonLabel();
-        
-        if (gta.getTarget() instanceof Company) {
-            highlightTarget = (Company) gta.getTarget();
+        // 1. Extract Visual Signature via Interface
+        if (action instanceof GuiTargetedAction) {
+            GuiTargetedAction gta = (GuiTargetedAction) action;
+            label = gta.getButtonLabel();
+
+            if (gta.getTarget() instanceof Company) {
+                highlightTarget = (Company) gta.getTarget();
+            }
+
+            // CONSUME THE SIGNATURE
+            bgColor = gta.getHighlightBackgroundColor();
+            borderColor = gta.getHighlightBorderColor();
+            textColor = gta.getHighlightTextColor();
+        } else if (action instanceof NullAction) {
+            label = ((NullAction) action).getMode() == NullAction.Mode.PASS ? "Decline" : "Done";
+            bgColor = UITheme.ACTION_SKIP;
+            borderColor = bgColor.darker();
+            textColor = Color.WHITE;
+        } else if (action instanceof LayBaseToken) {
+            highlightTarget = ((LayBaseToken) action).getCompany();
         }
 
-        // CONSUME THE SIGNATURE
-        bgColor = gta.getHighlightBackgroundColor();
-        borderColor = gta.getHighlightBorderColor();
-        textColor = gta.getHighlightTextColor();
-    } else if (action instanceof NullAction) {
-        label = ((NullAction) action).getMode() == NullAction.Mode.PASS ? "Decline" : "Done";
-        bgColor = UITheme.ACTION_SKIP;
-        borderColor = bgColor.darker();
-        textColor = Color.WHITE;
-    } else if (action instanceof LayBaseToken) {
-        highlightTarget = ((LayBaseToken) action).getCompany();
-    }
+        // 2. Create Button
+        ActionButton btn = createSidebarButton(label, cmd);
 
-    // 2. Create Button
-    ActionButton btn = createSidebarButton(label, cmd);
+        // HTML Formatting to match RailCard text style if needed
+        if (!label.toLowerCase().startsWith("<html>")) {
+            btn.setText("<html><center>" + label + "</center></html>");
+        } else {
+            btn.setText(label);
+        }
 
-    // HTML Formatting to match RailCard text style if needed
-    if (!label.toLowerCase().startsWith("<html>")) {
-        btn.setText("<html><center>" + label + "</center></html>");
-    } else {
-        btn.setText(label);
-    }
+        btn.setPossibleAction(action);
+        btn.setEnabled(true);
+        btn.setAlignmentX(Component.CENTER_ALIGNMENT);
+        // Allow button to be taller to fit the HTML content
+        btn.setMaximumSize(new Dimension(SIDEBAR_WIDTH - 20, 60));
+        bindActionHotkey(btn, action);
 
-    btn.setPossibleAction(action);
-    btn.setEnabled(true);
-    btn.setAlignmentX(Component.CENTER_ALIGNMENT);
-    // Allow button to be taller to fit the HTML content
-    btn.setMaximumSize(new Dimension(SIDEBAR_WIDTH - 20, 60));
-    bindActionHotkey(btn, action);
+        // Attach HexHighlightMouseListener based on specific Company type
+        if (highlightTarget instanceof PublicCompany) {
+            net.sf.rails.ui.swing.hexmap.HexHighlightMouseListener.addMouseListener(
+                    btn, orUIManager, (PublicCompany) highlightTarget, false);
+        } else if (highlightTarget instanceof PrivateCompany) {
+            net.sf.rails.ui.swing.hexmap.HexHighlightMouseListener.addMouseListener(
+                    btn, orUIManager, (PrivateCompany) highlightTarget, false);
+        }
 
-// Attach HexHighlightMouseListener based on specific Company type
-if (highlightTarget instanceof PublicCompany) {
-net.sf.rails.ui.swing.hexmap.HexHighlightMouseListener.addMouseListener(
-btn, orUIManager, (PublicCompany) highlightTarget, false);
-} else if (highlightTarget instanceof PrivateCompany) {
-net.sf.rails.ui.swing.hexmap.HexHighlightMouseListener.addMouseListener(
-btn, orUIManager, (PrivateCompany) highlightTarget, false);
-}
-
-    // 3. APPLY "RAILCARD" STYLING (Flattened)
+        // 3. APPLY "RAILCARD" STYLING (Flattened)
 
         // 3. APPLY "RAILCARD" STYLING (Flattened)
 
