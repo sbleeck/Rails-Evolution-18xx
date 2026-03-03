@@ -676,7 +676,7 @@ drawHome(g, company, p, homeCity);
         g2d.setStroke(oldStroke);
     }
 
-    private void paintStationTokens(Graphics2D g2) {
+private void paintStationTokens(Graphics2D g2) {
         for (Stop stop : getHex().getStops()) {
             int j = 0;
             for (BaseToken token : stop.getBaseTokens()) {
@@ -684,13 +684,19 @@ drawHome(g, company, p, homeCity);
                 PublicCompany company = token.getParent();
                 drawBaseToken(g2, company, origin, dimensions.tokenDiameter);
             }
+// --- START FIX ---
             // check for temporary token
             if (upgrade instanceof TokenHexUpgrade && ((TokenHexUpgrade) upgrade).getAction() instanceof LayBaseToken) {
                 TokenHexUpgrade tokenUpgrade = (TokenHexUpgrade) upgrade;
-                HexPoint origin = getTokenCenter(j++, tokenUpgrade.getSelectedStop());
-                PublicCompany company = tokenUpgrade.getAction().getCompany();
-                drawBaseToken(g2, company, origin, dimensions.tokenDiameter);
+                if (tokenUpgrade.getSelectedStop() == stop) {
+                    PublicCompany company = tokenUpgrade.getAction().getCompany();
+                    if (!stop.hasTokenOf(company)) {
+                        HexPoint origin = getTokenCenter(j++, stop);
+                        drawBaseToken(g2, company, origin, dimensions.tokenDiameter);
+                    }
+                }
             }
+// --- END FIX ---
         }
     }
 

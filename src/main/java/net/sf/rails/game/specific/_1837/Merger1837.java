@@ -311,17 +311,10 @@ public class Merger1837 {
         // If NO ONE holds the President's share, the company has not floated and has no director.
         // We must prevent 10% coal exchange holders from stealing the 20% President's share from the IPO.
         if (currentPrez == null) {
-            log.info("1837_DIRECTORSHIP: No player holds the President's share for " + major.getId() + ". Skipping shift.");
             return;
         }
 
-        log.info("1837_DIRECTORSHIP: Evaluating " + major.getId() + ". Current: "
-                + (currentPrez != null ? currentPrez.getName() : "None"));
-        for (Player p : shareCounts.keySet()) {
-            if (shareCounts.get(p) > 0) {
-                log.info("1837_DIRECTORSHIP: Player " + p.getName() + " holds " + shareCounts.get(p) + "%");
-            }
-        }
+
 
         // 2. Find Leader
         Player newPrez = null;
@@ -393,11 +386,7 @@ public class Merger1837 {
 
         // 3. Execute Swap
         if (newPrez != null && !newPrez.equals(currentPrez)) {
-            log.info("FixDirectorship: " + (currentPrez != null ? currentPrez.getName() : "None") + " -> "
-                    + newPrez.getName());
 
-            log.info("1837_DIRECTORSHIP: SHIFT DETECTED! " + (currentPrez != null ? currentPrez.getName() : "None")
-                    + " -> " + newPrez.getName());
 
             PublicCertificate presCert = null;
             for (PublicCertificate c : major.getCertificates()) {

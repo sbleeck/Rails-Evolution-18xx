@@ -556,18 +556,6 @@ if (upperPlayerCaption[j][i] != null) {
             }
         });
 
-        // Bind Enter Key to Pass Button
-        inputMap.put(KeyStroke.getKeyStroke(KeyEvent.VK_ENTER, 0), "triggerPass");
-        actionMap.put("triggerPass", new AbstractAction() {
-            private static final long serialVersionUID = 1L;
-
-            public void actionPerformed(ActionEvent e) {
-                if (passButton != null && passButton.isEnabled()) {
-                    passButton.doClick();
-                }
-            }
-        });
-        // --- END FIX ---
     }
 
     // We are modifying StartRoundWindow.java

@@ -490,7 +490,6 @@ public Integer getRoundStart(int currentIndex) {
                     p.getTimeBankModel().value(),
                     amount);
         } catch (Exception e) {
-            log.warn("Failed to trigger UI Time Flash (Direct Call Failed)", e);
         }
     }
 
@@ -643,8 +642,7 @@ public Integer getRoundStart(int currentIndex) {
                     player.getId().trim().equalsIgnoreCase(opName.trim())) {
 
                 startTime = (int) (startTime * opMult);
-                log.info("TIME: Applied Operator Bonus (x{}) to player '{}'",
-                        opMult, player.getId());
+
             }
 
             player.getTimeBankModel().set(startTime);
@@ -1526,17 +1524,15 @@ public Integer getRoundStart(int currentIndex) {
 
     public boolean process(PossibleAction action) {
 
-        // --- START DEBUG INSTRUMENTATION ---
-        if (action != null) {
-            String actionHash = Integer.toHexString(System.identityHashCode(action));
-            log.info(String.format("GM: process() INVOKED. Action: %s | Hash: %s", action.toString(), actionHash));
+        // // --- START DEBUG INSTRUMENTATION ---
+        // if (action != null) {
+        //     String actionHash = Integer.toHexString(System.identityHashCode(action));
             
-            // Log what the engine *thought* was possible before this move
-            debugLogPossibleActions();
-        } else {
-            log.info("GM: process() INVOKED with NULL action.");
-        }
-        // --- END DEBUG INSTRUMENTATION ---
+        //     // Log what the engine *thought* was possible before this move
+        //     debugLogPossibleActions();
+        // } else {
+        // }
+        // // --- END DEBUG INSTRUMENTATION ---
 
         // EMERGENCY OVERRIDE: Check for "FORCE_SKIP" signal
         if (action != null && action.toString().contains("FORCE_SKIP")) {
@@ -3748,7 +3744,6 @@ public void logAction(PossibleAction action, int moveNumber) {
         // number, we ignore it.
         if (action == lastLoggedAction && moveNumber == lastLoggedMoveNumber) {
             // INSTRUMENTATION: Explicitly log that a duplicate was suppressed
-            log.info("GM: logAction() SUPPRESSED DUPLICATE: " + action.toString() + " (Move #" + moveNumber + ")");
             return;
         }
         lastLoggedAction = action;
@@ -3951,19 +3946,19 @@ public void logAction(PossibleAction action, int moveNumber) {
 
                 entry = actionString;
             }
-            // Unified Console Output: Single source for Move #, Actor, and Action details
-            if (Util.hasValue(entry)) {
-                StringBuilder sb = new StringBuilder();
-                // Use the provided moveNumber to allow replay overrides
-                sb.append("Move #").append(moveNumber).append(" ");
-                sb.append("[").append(currentLogPrefix).append("] : ");
-                sb.append(entry);
-                sb.append(action.isAIAction() ? " [AI]" : " [Human]");
-                if (isReloading()) {
-                    sb.append(" [loaded]");
-                }
-                log.info(sb.toString());
-            }
+            // // Unified Console Output: Single source for Move #, Actor, and Action details
+            // if (Util.hasValue(entry)) {
+            //     StringBuilder sb = new StringBuilder();
+            //     // Use the provided moveNumber to allow replay overrides
+            //     sb.append("Move #").append(moveNumber).append(" ");
+            //     sb.append("[").append(currentLogPrefix).append("] : ");
+            //     sb.append(entry);
+            //     sb.append(action.isAIAction() ? " [AI]" : " [Human]");
+            //     if (isReloading()) {
+            //         sb.append(" [loaded]");
+            //     }
+            //     log.info(sb.toString());
+            // }
 
             // --- 4. SMART APPEND LOGIC ---
             String currentHistory = statusMessageState.value();
@@ -4006,29 +4001,28 @@ public void logAction(PossibleAction action, int moveNumber) {
 
 
 private void debugLogPossibleActions() {
-        if (possibleActions == null || possibleActions.getList() == null || possibleActions.getList().isEmpty()) {
-            log.info("DEBUG_STATE: PossibleActions list is EMPTY/NULL.");
-            return;
-        }
+//         if (possibleActions == null || possibleActions.getList() == null || possibleActions.getList().isEmpty()) {
+//             return;
+//         }
 
-        StringBuilder sb = new StringBuilder();
-        sb.append("\n=== GM STATE: Current PossibleActions List ===\n");
-        int count = 0;
-        for (PossibleAction pa : possibleActions.getList()) {
-            // Filter out CorrectionModeAction entries from the log output
-            if (pa.toString().contains("CorrectionModeAction")) {
-                continue;
-            }
+//         StringBuilder sb = new StringBuilder();
+//         sb.append("\n=== GM STATE: Current PossibleActions List ===\n");
+//         int count = 0;
+//         for (PossibleAction pa : possibleActions.getList()) {
+//             // Filter out CorrectionModeAction entries from the log output
+//             if (pa.toString().contains("CorrectionModeAction")) {
+//                 continue;
+//             }
             
-            String hash = Integer.toHexString(System.identityHashCode(pa));
-            sb.append(String.format(" [%d] Class: %-20s | Hash: %s | Str: %s\n", 
-                count++, 
-                pa.getClass().getSimpleName(), 
-                hash, 
-                pa.toString()));
-        }
-        sb.append("==============================================\n");
-        log.info(sb.toString());
+//             String hash = Integer.toHexString(System.identityHashCode(pa));
+//             sb.append(String.format(" [%d] Class: %-20s | Hash: %s | Str: %s\n", 
+//                 count++, 
+//                 pa.getClass().getSimpleName(), 
+//                 hash, 
+//                 pa.toString()));
+//         }
+//         sb.append("==============================================\n");
+//         log.info(sb.toString());
     }
 
 

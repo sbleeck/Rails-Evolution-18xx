@@ -87,6 +87,24 @@ private static final Logger log = LoggerFactory.getLogger(GlobalHotkeyManager.cl
             return true;
         }
 
+// 6. ENTER ('Smart Confirm' / 'Discard Train')
+        if (!isCtrlDown && !e.isAltDown() && !e.isShiftDown() && keyCode == KeyEvent.VK_ENTER) {
+            if (focusOwner != null) {
+                // Guard 1: Yield to Text Fields (e.g. Chat or input boxes)
+                if (focusOwner instanceof JTextComponent && ((JTextComponent) focusOwner).isEditable()) {
+                    return false; 
+                }
+                // Guard 2: Yield if focus is inside a Modal/Dialog (e.g. Confirmation Popup)
+                java.awt.Window activeWindow = javax.swing.SwingUtilities.getWindowAncestor(focusOwner);
+                if (activeWindow instanceof javax.swing.JDialog) {
+                    return false;
+                }
+            }
+            // We are in the main window. Intercept and route to smart handler so 'Done' is default.
+            triggerEnter();
+            return true;
+        }
+
 
         // 7. L ('Buy IPO Train') - SINGLE SHOT MODE
         // We only trigger if the key was previously released. 
@@ -132,6 +150,26 @@ private static final Logger log = LoggerFactory.getLogger(GlobalHotkeyManager.cl
 
     private void triggerAI() {
         gameUIManager.performAIMove();
+    }
+
+    private void triggerEnter() {
+        RoundFacade round = gameUIManager.getCurrentRound();
+        
+        // 1. Operating Round: Delegate to ORPanel handler (Scoring algorithm for Discards)
+        if (round instanceof OperatingRound) {
+            ORWindow orWindow = gameUIManager.orWindow;
+            if (orWindow != null && orWindow.isVisible() && orWindow.getORPanel() != null) {
+                orWindow.getORPanel().handleEnterPress();
+                return;
+            }
+        }
+        
+        // 2. Fallback: Status Window Pass/Done Button
+        if (gameUIManager.getStatusWindow() != null && 
+            gameUIManager.getStatusWindow().passButton != null && 
+            gameUIManager.getStatusWindow().passButton.isEnabled()) {
+            gameUIManager.getStatusWindow().passButton.doClick();
+        }
     }
 
     private void triggerEscape() {

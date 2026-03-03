@@ -314,47 +314,7 @@ private void setupGlobalHotkeys() {
         InputMap inputMap = rootPane.getInputMap(JComponent.WHEN_IN_FOCUSED_WINDOW);
         ActionMap actionMap = rootPane.getActionMap();
         
-        String CONFIRM_KEY = "smartConfirmAction";
 
-        inputMap.put(KeyStroke.getKeyStroke(KeyEvent.VK_ENTER, 0), CONFIRM_KEY);
-
-        actionMap.put(CONFIRM_KEY, new AbstractAction() {
-            public void actionPerformed(ActionEvent e) {
-                // 1. FOCUS GUARD
-                Component focusOwner = KeyboardFocusManager.getCurrentKeyboardFocusManager().getFocusOwner();
-                
-                // --- START FIX ---
-                // REFINED GUARD LOGIC
-                boolean shouldDelegate = false;
-
-                if (focusOwner != null) {
-                    // A. Always yield to Text Fields (Chat, Input)
-                    if (focusOwner instanceof javax.swing.text.JTextComponent) {
-                        shouldDelegate = true;
-                    }
-                    // B. Only yield to Buttons if they are ALIVE (Enabled & Visible)
-                    else if (focusOwner instanceof javax.swing.AbstractButton) {
-                        if (focusOwner.isEnabled() && focusOwner.isVisible()) {
-                            shouldDelegate = true;
-                            log.info("ORWINDOW: Delegating Enter to ENABLED button: " + ((javax.swing.AbstractButton)focusOwner).getText());
-                        } else {
-                            log.info("ORWINDOW: Ignoring focus on DISABLED/INVISIBLE button. Taking over.");
-                            shouldDelegate = false;
-                        }
-                    }
-                }
-
-                if (shouldDelegate) {
-                    return; // Let Swing handle it
-                }
-                // --- END FIX ---
-
-                // 2. EXECUTE ORPANEL LOGIC
-                if (orPanel != null) {
-                    orPanel.handleEnterPress();
-                }
-            }
-        });
 
         // SPACE KEY: toggle through visuals
         String SHOW_NUMBERS_KEY = "showNumbersAction";

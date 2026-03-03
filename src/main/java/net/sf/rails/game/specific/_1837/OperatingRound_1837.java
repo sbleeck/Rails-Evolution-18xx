@@ -372,7 +372,6 @@ public class OperatingRound_1837 extends OperatingRound {
         // check).
         // In 1837, exercising this right waives the terrain cost.
         if (isTileLayAllowed(company, hex, -1)) {
-            log.debug("OR_1837: Waiving cost for hex " + hex.getId() + " due to Mountain Railway rights.");
             return 0;
         }
 
@@ -443,9 +442,6 @@ public class OperatingRound_1837 extends OperatingRound {
     protected void prepareRevenueAndDividendAction() {
         PublicCompany company = operatingCompany.value();
 
-        // DEBUG: Unconditional proof that the method is running
-        log.debug("OR_1837 DEBUG: prepareRevenueAndDividendAction START for " + company.getId());
-
         // There is only revenue if there are any trains
         if (companyHasRunningTrains(false)) {
 
@@ -461,8 +457,7 @@ public class OperatingRound_1837 extends OperatingRound {
                 for (Train t : company.getPortfolioModel().getTrainList()) {
                     if (t.getName().contains("G")) {
                         hasGTrains = true;
-                        log.debug("OR_1837 DEBUG: G-Train detected: " + t.getName());
-                        break;
+                          break;
                     }
                 }
             }
@@ -473,14 +468,11 @@ public class OperatingRound_1837 extends OperatingRound {
             int revenueToUse = company.getLastRevenue();
             int directIncomeToUse = company.getLastDirectIncome();
 
-            log.debug(
-                    "OR_1837 DEBUG: Initial Values -> Revenue=" + revenueToUse + ", Direct(Mine)=" + directIncomeToUse);
 
             // We force this if it's a G-Train owner (Major) OR a Mandatory Split (Minor).
             // We removed the checks for "== 0" to ensure we ALWAYS get the correct Mine
             // split.
             if (isMandatorySplit || hasGTrains) {
-                log.debug("OR_1837 DEBUG: forcing RevenueAdapter calculation...");
                 try {
                     RevenueAdapter ra = RevenueAdapter.createRevenueAdapter(getRoot(), company,
                             getRoot().getPhaseManager().getCurrentPhase());
@@ -489,13 +481,10 @@ public class OperatingRound_1837 extends OperatingRound {
                         revenueToUse = ra.calculateRevenue();
                         directIncomeToUse = ra.getSpecialRevenue(); // Capture 1837 Mine Revenue logic
 
-                        log.debug("OR_1837 DEBUG: Recalculation Result -> Total=" + revenueToUse + ", Mine="
-                                + directIncomeToUse);
+
                     } else {
-                        log.warn("OR_1837 DEBUG: RevenueAdapter was NULL");
                     }
                 } catch (Exception e) {
-                    log.error("OR_1837 DEBUG: Failed to calculate revenue", e);
                 }
             }
 
@@ -525,10 +514,8 @@ public class OperatingRound_1837 extends OperatingRound {
                     directIncomeToUse, // Fixed/Mine Revenue (goes to Treasury)
                     true, allowedRevenueActions, defaultAllocation));
 
-            log.debug("OR_1837 DEBUG: Action Added. DirectIncome param = " + directIncomeToUse);
 
         } else {
-            log.debug("OR_1837 DEBUG: No running trains for " + company.getId());
         }
     }
 
@@ -686,7 +673,6 @@ public class OperatingRound_1837 extends OperatingRound {
 
         } else if (currentPhase.getId().equals("4")) {
             if (!phase4Triggered.value()) {
-                log.debug("Phase 4 Transition Detected. Executing One-Time Triggers.");
                 phase4Triggered.set(true); // Mark memory: Undoable!
 
                 try {
@@ -695,14 +681,12 @@ public class OperatingRound_1837 extends OperatingRound {
                         executeSdFormation(sd);
                     }
                 } catch (Exception e) {
-                    log.error("CRITICAL FAILURE in Phase 4 Trigger: " + e.getMessage());
                     e.printStackTrace();
                 }
             }
 
         } else if (currentPhase.getId().equals("5")) {
 
-            // --- PHASE 5 LOGIC ---
             // Compilable version using standard getters
 
         }
@@ -852,26 +836,12 @@ public class OperatingRound_1837 extends OperatingRound {
             }
         }
 
-        // 4. Cleanup
-
-        // // Rule: Trains must be transferred to the new Major (KK, Ug, etc.) before
-        // the minor is closed.
-        // if (minor.hasTrains()) {
-        // List<Train> trains = new ArrayList<>(minor.getTrains());
-        // for (Train t : trains) {
-        // t.moveTo(major.getPortfolioModel());
-        // log.debug("Transferred train " + t.getName() + " from " + minor.getId() + "
-        // to
-        // " + major.getId());
-        // }
-        // }
+        
 
         Merger1837.mergeMinor(gameManager, minor, major);
         Merger1837.fixDirectorship(gameManager, major);
 
         if (major.getNumberOfTrains() > major.getCurrentTrainLimit()) {
-            log.warn("LIMIT ENFORCEMENT: " + major.getId() + " has "
-                    + major.getNumberOfTrains() + "/" + major.getCurrentTrainLimit() + " trains.");
 
             // Rails uses BUY_TRAIN step for discard resolution when over limit
             setStep(GameDef.OrStep.BUY_TRAIN);
@@ -889,7 +859,6 @@ public class OperatingRound_1837 extends OperatingRound {
         return true;
     }
 
-    // ... existing code ...
     public void setNationalFormationDeclined(String nationalId) {
         if (!declinedNationals.contains(nationalId)) {
             declinedNationals.add(nationalId);
@@ -937,14 +906,12 @@ public class OperatingRound_1837 extends OperatingRound {
 
                     // If result is not null/false, we actually removed something
                     if (result != null && !Boolean.FALSE.equals(result)) {
-                        log.debug("Auto-Fix: Successfully removed zombie item: " + suspectUri);
                     }
                 } catch (Exception innerEx) {
                     // Ignore invocation errors (e.g. key missing)
                 }
             }
         } catch (Exception e) {
-            log.error("Auto-Fix Failed: Reflection error during cleanup.", e);
         }
     }
 
@@ -994,7 +961,6 @@ public class OperatingRound_1837 extends OperatingRound {
         if (gameManager instanceof GameManager_1837) {
             java.util.List<String> inherited = ((GameManager_1837) gameManager).popTempSkippedMinors();
             if (!inherited.isEmpty()) {
-                log.info("1837_LOGIC: Inherited skipped minors from CER: " + inherited);
                 for (String minorId : inherited) {
                     skippedMinors.add(minorId);
                 }
@@ -1010,7 +976,6 @@ public class OperatingRound_1837 extends OperatingRound {
         List<Player> players = gameManager.getPlayers();
         int start = specialActionCurrentIndex.value();
 
-        log.debug("1837_DEBUG: nextSpecialActionPlayer starting from index " + start);
 
         // Start checking from the *next* player
         int checkIndex = (start == -1) ? 0 : (start + 1) % players.size();
@@ -1024,7 +989,6 @@ public class OperatingRound_1837 extends OperatingRound {
             // If they don't, we silently continue to the next player.
             if (hasExchangeableMinors(p)) {
 
-                log.info("1837_LOGIC: Stopping at " + p.getName() + " (Has Actions)");
                 specialActionCurrentIndex.set(checkIndex);
                 specialActionPhase.set(true);
                 getRoot().getPlayerManager().setCurrentPlayer(p);
@@ -1037,7 +1001,6 @@ public class OperatingRound_1837 extends OperatingRound {
         }
 
         // If we get here, we looped through everyone and found NO ONE with an action.
-        log.info("1837_LOGIC: Phase Complete. No players have exchanges.");
         specialActionPhase.set(false);
         specialActionPhaseFinished.set(true);
         super.start();
@@ -1045,8 +1008,6 @@ public class OperatingRound_1837 extends OperatingRound {
 
     @Override
     public boolean buyTrain(BuyTrain action) {
-        log.info("1837_TRACE: buyTrain() invoked for train "
-                + (action.getTrain() != null ? action.getTrain().getType().getName() : "null"));
         boolean result = super.buyTrain(action);
 
         if (result && gameManager.getGameUIManager() != null && !gameManager.isReloading()) {
@@ -1055,7 +1016,6 @@ public class OperatingRound_1837 extends OperatingRound {
 
         if (result && action.getTrain() != null) {
             String trainName = action.getTrain().getType().getName();
-            log.info("1837_TRACE: Successfully processed buyTrain for: " + trainName);
 
             if (trainName.equals("5")) {
                 processMandatoryExchanges();
@@ -1104,7 +1064,6 @@ public class OperatingRound_1837 extends OperatingRound {
                 cleanupZombieStops(g17);
             }
         } catch (Exception e) {
-            log.warn("Proactive G17 cleanup failed: " + e.getMessage());
         }
 
         // 1. Mandatory Discard Logic
@@ -1153,22 +1112,15 @@ public class OperatingRound_1837 extends OperatingRound {
             String tileId = (lt.getLaidTile() != null) ? lt.getLaidTile().getId() : "None";
 
             if ("G17".equals(hexName) && "427".equals(tileId)) {
-                log.warn("1837_RELOAD_TRACE: Entering Force-Execution for Wien (G17) Tile 427.");
                 // Fix: Access company ID through the company object
                 String compId = (lt.getCompany() != null) ? lt.getCompany().getId() : "Unknown";
-                log.info("1837_RELOAD_TRACE: Action Orientation: {}, Company: {}", lt.getOrientation(), compId);
                 try {
                     net.sf.rails.game.MapHex g17 = lt.getChosenHex();
-
-                    // Log current state before forced mutation
-                    log.info("1837_RELOAD_TRACE: Pre-Upgrade State: Hex={}, CurrentTile={}, StopCount={}",
-                            g17.getId(), g17.getCurrentTile().getId(), g17.getStops().size());
 
                     // Manually trigger the registry cleanup
                     cleanupZombieStops(g17);
 
                     // Forced execution: call the upgrade directly on the hex model
-                    log.warn("1837_RELOAD_TRACE: Invoking hex.upgrade(action) directly...");
                     g17.upgrade(lt);
 
                     // Post-upgrade recovery: Find tokens left on zombie stops and return them to the charter
@@ -1181,22 +1133,17 @@ public class OperatingRound_1837 extends OperatingRound {
                                 // Identify if the token is stuck on an old G17 stop that is no longer part of the hex
                                 if (stop.getHex() != null && "G17".equals(stop.getHex().getId())) {
                                     if (!g17.getStops().contains(stop)) {
-                                        log.info("1837_TOKEN_RECOVERY: Recovering KK token from zombie stop {}", stop.getId());
                                         token.moveTo(kk);
                                         recovered++;
                                     }
                                 }
                             }
                         }
-                        log.info("1837_TOKEN_RECOVERY: Returned {} tokens to KK charter.", recovered);
                     }
 
-                    log.info("1837_RELOAD_TRACE: Post-Upgrade State: Hex={}, NewTile={}, StopCount={}",
-                            g17.getId(), g17.getCurrentTile().getId(), g17.getStops().size());
 
                     return true; // Report success to the reloader to bypass the "PossibleActions" check
                 } catch (Exception e) {
-                    log.error("1837_RELOAD_CRITICAL: Forced upgrade failed for G17!", e);
                 }
             }
         }
@@ -1278,13 +1225,11 @@ public class OperatingRound_1837 extends OperatingRound {
     }
 
     public void resume() {
-        log.info("1837_TRACE: Resuming OperatingRound " + getId());
 
         // Inherit skipped minors memory during resume to prevent re-entry loops
         if (gameManager instanceof GameManager_1837) {
             java.util.List<String> inherited = ((GameManager_1837) gameManager).popTempSkippedMinors();
             if (!inherited.isEmpty()) {
-                log.info("1837_LOGIC: Inherited skipped minors from CER during resume: " + inherited);
                 for (String minorId : inherited) {
                     if (!skippedMinors.contains(minorId)) {
                         skippedMinors.add(minorId);
@@ -1301,8 +1246,7 @@ public class OperatingRound_1837 extends OperatingRound {
             return;
 
         if (operatingCompany.value() != null && operatingCompany.value().isClosed()) {
-            log.warn("1837_LOGIC: Resuming OR but operating company " + operatingCompany.value().getId()
-                    + " is CLOSED. Advancing turn.");
+
             finishTurn();
             if (gameManager.getCurrentRound() == this) {
                 setPossibleActions();
@@ -1316,7 +1260,6 @@ public class OperatingRound_1837 extends OperatingRound {
     }
 
     private void executeSdFormation(PublicCompany_1837 sd) {
-        log.info("1837_LOGIC: Commencing Mandatory Sd Formation procedurally.");
 
         net.sf.rails.game.financial.StockMarket market = getRoot().getStockMarket();
         net.sf.rails.game.financial.StockSpace parSpace = null;
@@ -1340,11 +1283,9 @@ public class OperatingRound_1837 extends OperatingRound {
             boolean s1OwnedByPlayer = (s1 != null && s1.getPresident() instanceof Player);
 
             if (s1OwnedByPlayer) {
-                log.info("1837_LOGIC: S1 is player-owned. Sd floats and receives 710K capital.");
                 net.sf.rails.game.state.Currency.fromBank(710, sd);
                 sd.setFloated();
             } else {
-                log.warn("1837_LOGIC: S1 is unowned. Minors will close, but Sd does NOT float.");
             }
 
             for (PublicCompany minor : gameManager.getAllPublicCompanies()) {
@@ -1384,7 +1325,6 @@ public class OperatingRound_1837 extends OperatingRound {
                 hex.upgrade(action);
             }
         } catch (Exception e) {
-            log.error("Error laying Bozen tile: " + e.getMessage());
         }
     }
 
@@ -1416,7 +1356,6 @@ public class OperatingRound_1837 extends OperatingRound {
                 }
             }
         } catch (Exception e) {
-            log.error("Error generating revenue display string", e);
         }
         return super.getRevenueDisplayString(company);
     }

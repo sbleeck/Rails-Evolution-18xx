@@ -1050,15 +1050,6 @@ public class StatusWindow extends JFrame implements ActionListener, ActionPerfor
 
         // --- 1. System Hotkeys (Required for basic functionality/Moderator) ---
 
-        // RETURN (Enter): Retained only for the Stock Round Pass/Done button logic
-        inputMap.put(KeyStroke.getKeyStroke(KeyEvent.VK_ENTER, 0), CONFIRM_ACTION_KEY);
-        actionMap.put(CONFIRM_ACTION_KEY, confirmAction);
-
-        // RETURN (Enter) and 'P': Map to the Pass/Done button
-        inputMap.put(KeyStroke.getKeyStroke(KeyEvent.VK_ENTER, 0), CONFIRM_ACTION_KEY);
-        inputMap.put(KeyStroke.getKeyStroke(KeyEvent.VK_P, 0), CONFIRM_ACTION_KEY);
-        actionMap.put(CONFIRM_ACTION_KEY, confirmAction);
-
         // --- 4. Font Scaling Hotkeys (+ / -) ---
         String FONT_INC = "fontIncrease";
         String FONT_DEC = "fontDecrease";

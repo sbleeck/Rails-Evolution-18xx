@@ -90,8 +90,8 @@ public class ORPanel extends GridPanel
     public ActionButton btnTileSkip, btnTileConfirm;
     public ActionButton btnTokenSkip, btnTokenConfirm;
     public ActionButton buttonOC, button1, button2, button3; // Legacy placeholders
+private JLabel focusLight;
 
-    // --- STATE ---
     private GameAction currentUndoAction;
     private GameAction currentRedoAction;
     public ActionButton currentDefaultButton;
@@ -219,6 +219,17 @@ public class ORPanel extends GridPanel
         initButtonPanel(); // Legacy init
         setupHotkeys();
         setVisible(true);
+
+        KeyboardFocusManager.getCurrentKeyboardFocusManager().addPropertyChangeListener("focusOwner", evt -> {
+            if (focusLight != null && orWindow != null) {
+                Component owner = KeyboardFocusManager.getCurrentKeyboardFocusManager().getFocusOwner();
+                boolean hasFocus = owner != null && javax.swing.SwingUtilities.isDescendingFrom(owner, orWindow);
+                focusLight.setForeground(hasFocus ? new java.awt.Color(34, 139, 34) : java.awt.Color.RED);
+                focusLight.setText(hasFocus ? "●" : "●");
+            }
+        });
+
+
     }
 
     /**
@@ -1056,6 +1067,13 @@ public class ORPanel extends GridPanel
         // Add Done Button
         footerPanel.add(btnDone);
 
+        focusLight = new JLabel("● Focus Initializing", SwingConstants.CENTER);
+        focusLight.setFont(new Font("SansSerif", Font.BOLD, 11));
+        focusLight.setForeground(Color.GRAY);
+        focusLight.setAlignmentX(Component.CENTER_ALIGNMENT);
+        footerPanel.add(Box.createVerticalStrut(6));
+        footerPanel.add(focusLight);
+
         // 9. Special Notifications (Attached directly below Done)
         specialNotificationPanel = new JPanel();
         specialNotificationPanel.setLayout(new BoxLayout(specialNotificationPanel, BoxLayout.Y_AXIS));
@@ -1846,32 +1864,6 @@ public class ORPanel extends GridPanel
         InputMap inputMap = this.getInputMap(JComponent.WHEN_IN_FOCUSED_WINDOW);
         ActionMap actionMap = this.getActionMap();
 
-        inputMap.put(KeyStroke.getKeyStroke(KeyEvent.VK_S, 0), "cycleHexCW");
-        actionMap.put("cycleHexCW", new AbstractAction() {
-            public void actionPerformed(ActionEvent e) {
-                cycleHexes(1);
-            }
-        });
-
-        inputMap.put(KeyStroke.getKeyStroke(KeyEvent.VK_D, 0), "cycleHexACW");
-        actionMap.put("cycleHexACW", new AbstractAction() {
-            public void actionPerformed(ActionEvent e) {
-                if (!cycleableHexes.isEmpty())
-                    cycleHexes(-1);
-                else if (btnDone != null && btnDone.isEnabled())
-                    btnDone.doClick();
-            }
-        });
-
-        inputMap.put(KeyStroke.getKeyStroke(KeyEvent.VK_SPACE, 0), "doneAction");
-        actionMap.put("doneAction", new AbstractAction() {
-            public void actionPerformed(ActionEvent e) {
-                if (btnDone != null && btnDone.isEnabled()) {
-                    btnDone.doClick();
-                } else {
-                }
-            }
-        });
     }
 
     @Override
@@ -2083,7 +2075,7 @@ public class ORPanel extends GridPanel
             if (pa instanceof NullAction) {
                 formattedData = "Logical " + ((NullAction) pa).getMode() + " (Stopper/Pass)";
             } else if (rawData.contains(",")) {
-                // Format comma-separated lists (like BuyTrain) into a vertical list
+                // Format comma-separatepublic ActionButton buttonOC, button1, button2, button3; // Legacy placeholdersd lists (like BuyTrain) into a vertical list
                 formattedData = "- " + rawData.replace(", ", "\n                     | - ");
             } else {
                 formattedData = rawData;
@@ -2098,22 +2090,22 @@ public class ORPanel extends GridPanel
 
     public void updateDynamicActions(List<PossibleAction> actions) {
 
-        // --- START DEBUG INSTRUMENTATION ---
-        log.info("\nORPanel: updateDynamicActions() RECEIVED " + (actions == null ? "null" : actions.size())
-                + " actions.");
-        if (actions != null) {
-            for (int i = 0; i < actions.size(); i++) {
-                PossibleAction pa = actions.get(i);
-                // Filter out CorrectionModeAction entries from the UI log output
-                if (pa.toString().contains("CorrectionModeAction")) {
-                    continue;
-                }
-                String hash = Integer.toHexString(System.identityHashCode(pa));
-                log.info(String.format("   UI Action[%d]: Class: %-20s | Hash: %s | Str: %s",
-                        i, pa.getClass().getSimpleName(), hash, pa.toString()));
-            }
-        }
-        // --- END DEBUG INSTRUMENTATION ---
+        // // --- START DEBUG INSTRUMENTATION ---
+        // log.info("\nORPanel: updateDynamicActions() RECEIVED " + (actions == null ? "null" : actions.size())
+        //         + " actions.");
+        // if (actions != null) {
+        //     for (int i = 0; i < actions.size(); i++) {
+        //         PossibleAction pa = actions.get(i);
+        //         // Filter out CorrectionModeAction entries from the UI log output
+        //         if (pa.toString().contains("CorrectionModeAction")) {
+        //             continue;
+        //         }
+        //         String hash = Integer.toHexString(System.identityHashCode(pa));
+        //         log.info(String.format("   UI Action[%d]: Class: %-20s | Hash: %s | Str: %s",
+        //                 i, pa.getClass().getSimpleName(), hash, pa.toString()));
+        //     }
+        // }
+        // // --- END DEBUG INSTRUMENTATION ---
 
         try {
 
@@ -2302,7 +2294,6 @@ public class ORPanel extends GridPanel
      */
     public boolean clickPassButton() {
         if (directPassButton != null && directPassButton.isShowing() && directPassButton.isEnabled()) {
-            // log.info("DEBUG ORPANEL: directPassButton clicked via Global Manager");
             directPassButton.doClick();
             return true;
         }
@@ -2315,7 +2306,6 @@ public class ORPanel extends GridPanel
 
     // --- START FIX ---
     public void handleEnterPress() {
-        log.info("ORPANEL: handleEnterPress() called.");
 
         // 1. Check Special Panel (Discards, etc)
         if (specialContainer != null && specialContainer.isVisible()) {
@@ -2347,10 +2337,8 @@ public class ORPanel extends GridPanel
 
         // 4. Default Fallback
         if (btnDone != null && btnDone.isVisible() && btnDone.isEnabled()) {
-            log.info("ORPANEL: Clicking Default 'Done' Button.");
             btnDone.doClick();
         } else {
-            log.info("ORPANEL: No valid button found to click.");
         }
     }
 
@@ -2429,7 +2417,6 @@ public class ORPanel extends GridPanel
                 }
 
                 // LOGGING
-                // log.info("ORPANEL SCANNER: Saw '" + text + "' -> Score: " + score);
 
                 if (score > bestScore) {
                     bestScore = score;
@@ -2439,7 +2426,6 @@ public class ORPanel extends GridPanel
         }
 
         if (bestCandidate != null) {
-            log.info("ORPANEL: Auto-Clicking '" + bestCandidate.getText() + "' (Score: " + bestScore + ")");
             bestCandidate.doClick();
             return true;
         }
@@ -2449,10 +2435,8 @@ public class ORPanel extends GridPanel
     @Override
     protected boolean processKeyBinding(KeyStroke ks, KeyEvent e, int condition, boolean pressed) {
         if (e.getKeyCode() == KeyEvent.VK_ENTER) {
-            log.info("DEBUG ORPANEL: processKeyBinding checking ENTER. Condition: " + condition + ", Pressed: "
-                    + pressed);
+
             boolean result = super.processKeyBinding(ks, e, condition, pressed);
-            log.info("DEBUG ORPANEL: Result: " + result);
             return result;
         }
         return super.processKeyBinding(ks, e, condition, pressed);
