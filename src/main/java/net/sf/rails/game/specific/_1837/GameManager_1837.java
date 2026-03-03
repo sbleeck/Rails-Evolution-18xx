@@ -279,8 +279,6 @@ log.info("1837_TRACE: Starting CER with ID: " + cerId);
                             if (validNa.getMode() == rails.game.action.NullAction.Mode.SKIP ||
                                     validNa.getMode() == rails.game.action.NullAction.Mode.PASS) {
 
-                                log.info("1837_FIX: Normalizing NullAction " + incoming.getMode() +
-                                        " -> " + validNa.getMode() + " for " + action.getPlayerName());
                                 return super.process(validNa);
                             }
                         }
