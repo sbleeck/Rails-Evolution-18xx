@@ -1151,20 +1151,17 @@ protected boolean processGameSpecificDiscard(DiscardTrain action, boolean moreDi
         // 2. Clear previous buttons (standard cleanup)
         possibleActions.clear();
 
-// System.out.println(">>> still here");
 
         // 1. Lock the turn
         doneAllowed.set(false);
 
         // 2. Clear previous buttons to prevent UI ghosting
         possibleActions.clear();
-        // System.out.println(">>> DEBUG: possibleActions cleared.");
 
         List<Player> nextPlayers = getRoot().getPlayerManager().getNextPlayers(true);
 
         for (Player player : nextPlayers) {
             if (excessTrainCompanies.containsKey(player)) {
-                System.out.println(">>> DEBUG: Player " + player.getName() + " must discard.");
 
                 getRoot().getPlayerManager().setCurrentPlayer(player);
                 List<PublicCompany> comps = excessTrainCompanies.get(player);
@@ -1172,16 +1169,12 @@ protected boolean processGameSpecificDiscard(DiscardTrain action, boolean moreDi
                 for (PublicCompany comp : comps) {
                     if (comp.getPortfolioModel().getNumberOfTrains() == 0) continue;
 
-                    System.out.println(">>> DEBUG: Creating discard buttons for " + comp.getId());
-                    
-                    // Use the helper in Round.java (ensure visibility is protected/public)
                     generateGroupedDiscardActions(comp); 
                     
                     return;
                 }
             }
         }
-        // System.out.println(">>> DEBUG: setTrainsToDiscard() FINISHED (No actions created)");
     }
 
 

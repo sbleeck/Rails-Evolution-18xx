@@ -290,11 +290,43 @@ public class StockRound_1837 extends StockRound {
         checkExcessTrains();
     }
 
-    @Override
+@Override
     public void finishRound() {
 
         if (discardingTrains.value())
             return;
+
+        // 1837 Fix: National railways (Sd, kk, Ug) formed mid-game lack the 'started' flag 
+        // due to ghost token circumventions, causing the core engine to skip their sold-out checks.
+        // We explicitly process them here before delegating to the core engine.
+        for (PublicCompany comp : gameManager.getAllPublicCompanies()) {
+            if (comp.isClosed() || !comp.hasFloated()) continue;
+            
+            if ("National".equals(comp.getType().getId()) && !comp.hasStarted()) {
+                PortfolioModel ipo = net.sf.rails.game.financial.Bank.getIpo(gameManager).getPortfolioModel();
+                PortfolioModel pool = net.sf.rails.game.financial.Bank.getPool(gameManager).getPortfolioModel();
+                
+                boolean noIpo = true;
+                for (Object obj : ipo.getCertificates()) {
+                    if (obj instanceof PublicCertificate && ((PublicCertificate) obj).getCompany().equals(comp)) {
+                        noIpo = false;
+                        break;
+                    }
+                }
+                
+                boolean noPool = true;
+                for (Object obj : pool.getCertificates()) {
+                    if (obj instanceof PublicCertificate && ((PublicCertificate) obj).getCompany().equals(comp)) {
+                        noPool = false;
+                        break;
+                    }
+                }
+                
+                if (noIpo && noPool) {
+                    stockMarket.soldOut(comp);
+                }
+            }
+        }
 
         super.finishRound();
     }

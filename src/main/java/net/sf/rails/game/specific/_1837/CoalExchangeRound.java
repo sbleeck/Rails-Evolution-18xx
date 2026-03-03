@@ -56,7 +56,6 @@ public class CoalExchangeRound extends Round implements GuiTargetedAction {
             majorOrderStr.set(sb.toString());
         }
 
-        log.info("1837_CER: Starting Coal Exchange Round.");
         
         List<String> majorList = getMajorList();
         if (majorList.isEmpty()) {
@@ -104,7 +103,6 @@ public class CoalExchangeRound extends Round implements GuiTargetedAction {
                 Player p = players.get(currentPlayerIndex.value());
 
                 if (hasExchangeableMinorsForMajor(p, currentMajor)) {
-                    log.info("1837_CER: Polling " + p.getName() + " for exchanges into " + currentMajorId);
                     getRoot().getPlayerManager().setCurrentPlayer(p);
                     setPossibleActions();
                     return; // Halt and wait for user input
@@ -116,7 +114,6 @@ public class CoalExchangeRound extends Round implements GuiTargetedAction {
             }
 
             // Finished polling all players for this Major. Advance to the next Major.
-            log.info("1837_CER: Finished polling for " + currentMajorId);
             currentMajorIndex.add(1);
             setupPlayerIndexForCurrentMajor();
         }
@@ -134,9 +131,7 @@ public class CoalExchangeRound extends Round implements GuiTargetedAction {
         // 1. Mandatory Discard Resolution
         if (companyOverLimit.value() != null) {
             PublicCompany comp = companyOverLimit.value();
-            if (comp.getPresident() != p) {
-                log.warn("1837_CER: State mismatch! Current player is not president of over-limit company.");
-            }
+
 
             for (Train train : comp.getPortfolioModel().getUniqueTrains()) {
                 Set<Train> singleTrainSet = new HashSet<>();
@@ -181,7 +176,6 @@ public class CoalExchangeRound extends Round implements GuiTargetedAction {
 
     @Override
     protected void finishRound() {
-        log.info("1837_CER: Coal Exchange Round complete.");
         gameManager.nextRound(this);
     }
 

@@ -62,10 +62,10 @@ public class StockMarket_1837 extends StockMarket {
         return 1;
     }
 
-    @Override
+@Override
     public void soldOut(PublicCompany company) {
-        // Rule 9.5: Rise diagonally up-right if director <= 40%, else up-left [cite: 478]
-        if (company.getPresident().getPortfolioModel().getShares(company) > 4) {
+        // Rule 9.5: Rise diagonally up-right if director <= 40%, else up-left 
+        if (company.getPresident() != null && company.getPresident().getPortfolioModel().getShares(company) > 4) {
             moveUpLeft(company);
         } else {
             moveUpRight(company);
@@ -82,6 +82,20 @@ public class StockMarket_1837 extends StockMarket {
         int nc = (r % 2 == 0) ? c : c + 1;
         StockSpace newsquare = getStockSpace(nr, nc);
         if (newsquare != null) prepareMove(company, old, newsquare);
+    }
+
+    @Override
+    public void payOut(PublicCompany company) {
+        moveRightOrUp(company);
+    }
+
+    @Override
+    public void withhold(PublicCompany company) {
+        moveLeft(company);
+    }
+
+    public void moveRight(PublicCompany company) {
+        moveRightOrUp(company);
     }
 
     private void moveDownLeft(PublicCompany company) {
@@ -172,18 +186,7 @@ private StockSpace getSpaceByPrice(int targetPrice) {
     
 @Override
     public void start(PublicCompany company, StockSpace price) {
-// --- START FIX ---
-        if ("Sd".equals(company.getId())) {
-            org.slf4j.LoggerFactory.getLogger(StockMarket_1837.class)
-                    .warn("1837_DIAGNOSTIC_SD: start() called. Active token dropping at price: " 
-                    + (price != null ? price.getPrice() : "null"));
-            
-            if (price != null && price.getPrice() == 120) {
-                org.slf4j.LoggerFactory.getLogger(StockMarket_1837.class)
-                    .error("1837_DIAGNOSTIC_SD: WARNING! Sd token is dropping at 120 instead of 142.");
-            }
-        }
-// --- END FIX ---
+        
         super.start(company, price);
     }
 
@@ -216,24 +219,7 @@ private StockSpace getSpaceByPrice(int targetPrice) {
 
 @Override
     public void correctStockPrice(PublicCompany company, StockSpace target) {
-// --- START FIX ---
-        String companyId = company.getId();
-        int targetPrice = (target != null) ? target.getPrice() : -1;
-        String targetId = (target != null) ? target.getId() : "null";
-        StockSpace current = company.getCurrentSpace();
-        int currentPrice = (current != null) ? current.getPrice() : -1;
 
-        org.slf4j.LoggerFactory.getLogger(StockMarket_1837.class)
-                .info("1837_TRACE: correctStockPrice() for {} | Current: {} ({}) | Target: {} ({})", 
-                      companyId, currentPrice, (current != null ? current.getId() : "null"), targetPrice, targetId);
-                
-        if ("Sd".equals(companyId)) {
-            if (targetPrice == 120) {
-                org.slf4j.LoggerFactory.getLogger(StockMarket_1837.class)
-                        .error("1837_ALERT: Sd is being corrected to 120 (KK Par) instead of 142! Verification required.");
-            }
-        }
-// --- END FIX ---
         super.correctStockPrice(company, target);
     }
 
