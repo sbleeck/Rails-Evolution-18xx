@@ -60,7 +60,23 @@ public class MapManager extends RailsManager implements Configurable {
         
         mapOrientation = MapOrientation.create(tag);
 
+       
+log.error("########## MAP LOADING DIAGNOSTIC ##########");
         List<Tag> hexTags = tag.getChildren("Hex");
+        log.error("Hex Count in XML: " + hexTags.size());
+        if (!hexTags.isEmpty()) {
+            // Log the name of the first hex to identify the map (e.g., A20 vs A10)
+            log.error("First Hex name: " + hexTags.get(0).getAttributeAsString("name"));
+        }
+        
+        // Use a unique name for the debug tag to avoid variable collision
+        Tag debugImageTag = tag.getChild("Image");
+        if (debugImageTag != null) {
+            log.error("SVG path: " + debugImageTag.getAttributeAsString("file"));
+        }
+        log.error("############################################");
+
+
         ImmutableMap.Builder<MapHex.Coordinates, MapHex> hexBuilder = ImmutableMap.builder();
         ImmutableSortedSet.Builder<Integer> tileCostsBuilder= ImmutableSortedSet.naturalOrder();
 
@@ -94,7 +110,7 @@ public class MapManager extends RailsManager implements Configurable {
     }
 
     public void finishConfiguration (RailsRoot root) throws ConfigurationException {
-// log.error("--- MapManager.finishConfiguration START ---"); // <<< ADD
+log.error("MapManager: finishConfiguration started.");
         for (MapHex hex:hexes.values()) {
             hex.finishConfiguration(root);
         }
@@ -131,6 +147,7 @@ public class MapManager extends RailsManager implements Configurable {
         // log.error("--- MapManager.finishConfiguration: Finished placing initial tiles on hexes. ---");
 
         for (PublicCompany company : root.getCompanyManager().getAllPublicCompanies()) {
+          log.error("Processing home hexes for company: " + company.getId());
             List<MapHex> homeHexes = company.getHomeHexes();
             if (homeHexes != null) {
                 for (MapHex homeHex : homeHexes) {

@@ -24,8 +24,8 @@
 	<Hex name="C4" tile="0"/>
 	<Hex name="C6" tile="0"/>
 	<Hex name="C8" tile="-10" city="Detroit"/>
-	<Hex name="C10" tile="0"/>
-	<Hex name="C12" tile="0" impassable="D12"/>
+	<Hex name="C10" tile="0" impassable="D11"/>
+	<Hex name="C12" tile="0"/>
 	<Hex name="C14" tile="-10" city="Buffalo"/>
 	<Hex name="C16" tile="0"/>
 	<Hex name="C18" tile="0"/>
@@ -106,98 +106,6 @@
 
     <Hex name="J7" tile="-901" city="Atlanta" value="20,30,50,60"/>
     <Hex name="J15" tile="-901" city="Raleigh-Durham" value="20,30,50,60"/>
-
-
-
-
-
-
-<!-- OLD -->
-<!-- 
-	<Hex name="B10" tile="-10"/>
-	<Hex name="B12" tile="0"/>
-	<Hex name="B14" tile="0"/>
-	<Hex name="B16" tile="-10" impassable="C17"/>
-	<Hex name="B18" tile="0" cost="80"/>
-	<Hex name="B20" tile="-1"/>
-	<Hex name="B24" tile="-902" orientation="2" value="20,30"/>
-
-	<Hex name="C7" tile="0"/>
-	<Hex name="C9" tile="0"/>
-	<Hex name="C11" tile="0" impassable="D12"/>
-	<Hex name="C13" tile="0" impassable="D12"/>
-	<Hex name="C15" tile="-58" orientation="2"/>
-	<Hex name="C17" tile="0" cost="120"/>
-	<Hex name="C19" tile="0" cost="80"/>
-	<Hex name="C21" tile="0" cost="120"/>
-	<Hex name="C23" tile="0"/>
-
-	<Hex name="D2" tile="-5"/>
-	<Hex name="D4" tile="-1"/>
-	<Hex name="D6" tile="0" cost="80"/>
-	<Hex name="D8" tile="0"/>
-	<Hex name="D10" tile="-20" cost="80" label="OO"/>
-	<Hex name="D12" tile="0"/>
-	<Hex name="D14" tile="-102" value="20"/>
-	<Hex name="D16" tile="0"/>
-    <Hex name="D20" tile="0"/>
-	<Hex name="D22" tile="0" cost="120"/>
-	<Hex name="D24" tile="-7" orientation="2"/>
-   
-	<Hex name="E3" tile="0"/>
-	<Hex name="E5" tile="-20" label="OO" cost="80"/>
-	<Hex name="E7" tile="-1" impassable="F8"/>
-	<Hex name="E9" tile="-7" orientation="4"/>
-	<Hex name="E11" tile="-20" label="OO" unlaidHomeBlocksTokens="yes"/>
-	<Hex name="E13" tile="0"/>
-	<Hex name="E15" tile="0"/>
-	<Hex name="E17" tile="0" cost="120"/>
-	<Hex name="E19" tile="-10"/>
-	<Hex name="E21" tile="0" cost="120"/>
-
-			
-	<Hex name="F2" tile="-903" orientation="5" value="40,70" city="Chicago"/>
-	<Hex name="F4" tile="-10" cost="80"/>
-	<Hex name="F6" tile="-105" city="Cleveland"/>
-	<Hex name="F8" tile="0"/>
-	<Hex name="F10" tile="-1"/>
-	<Hex name="F14" tile="0"/>
-	<Hex name="F16" tile="-10" cost="120"/>
-	<Hex name="F20" tile="-2"/>
-    <Hex name="F22" tile="-10" cost="80"/>
-	<Hex name="F24" tile="-3" orientation="2"/>
-
-
-	<Hex name="G3" tile="0"/>
-	<Hex name="G5" tile="0"/>
-	<Hex name="G9" tile="0"/>
-	<Hex name="G11" tile="0"/>
-	<Hex name="G13" tile="0" cost="120"/>
-	<Hex name="G17" tile="-2"/>
-	<Hex name="G19" tile="-21" orientation="1" cost="80" city="New York"/>
-	
-	<Hex name="H2" tile="0"/>
-	<Hex name="H6" tile="0"/>
-	<Hex name="H8" tile="0"/>
-   	<Hex name="H12" tile="-101" city="Altoona" runThrough="tokenOnly"/>
-   	<Hex name="H14" tile="0"/>
-   	<Hex name="H16" tile="-10"/>
-	
-	<Hex name="I1" tile="-901" orientation="5" value="30,60" city="Gulf"/>
-	<Hex name="I3" tile="0"/>
-	<Hex name="I5" tile="0"/>
-	<Hex name="I7" tile="0"/>
-	<Hex name="I9" tile="0"/>
-	<Hex name="I13" tile="0"/>
-	<Hex name="I17" tile="0" cost="80"/>
-	<Hex name="I19" tile="-3" orientation="2"/>
-	<Hex name="J2" tile="-902" orientation="5" value="30,60" city="Gulf"/>
-	<Hex name="J4" tile="0"/>
-	<Hex name="J6" tile="0"/>
-	<Hex name="J8" tile="0"/>
-	<Hex name="J10" tile="0" cost="120"/>
-	<Hex name="J12" tile="0" cost="120"/>
-	<Hex name="J14" tile="-10" cost="80" city="Washington"/> -->
 
 
 

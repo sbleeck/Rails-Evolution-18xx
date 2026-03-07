@@ -69,7 +69,7 @@ public class ConfigManager implements Configurable {
 
         /*
         // Set default game variant (overrides config profiles)
-    instance.transientConfig.put("default_game", "1835"); 
+    instance.transientConfig.put("default_game", "1817"); 
 
     // Set default player names (overrides config profiles)
     instance.transientConfig.put("player.name.1", "Stefan");
@@ -99,7 +99,7 @@ public class ConfigManager implements Configurable {
         }
         // --- START: ADD THIS BLOCK BACK ---
     // Set default game variant (overrides config profiles)
-    instance.transientConfig.put("default_game", "1835"); 
+    instance.transientConfig.put("default_game", "1817"); 
 
     // Set default player names (overrides config profiles)
     instance.transientConfig.put("player.name.1", "Stefan");

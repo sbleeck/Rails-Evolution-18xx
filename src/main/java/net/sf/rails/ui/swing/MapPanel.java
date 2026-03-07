@@ -48,15 +48,18 @@ public class MapPanel extends JPanel {
 
         mmgr = gameUIManager.getRoot().getMapManager();
         try {
-            map =(HexMap) Class.forName(mmgr.getMapUIClassName()).newInstance();
+            map = (HexMap) Class.forName(mmgr.getMapUIClassName()).newInstance();
             map.init(gameUIManager.getORUIManager(), mmgr);
             originalMapSize = map.getOriginalSize();
         } catch (Exception e) {
-            // log.error("Map class instantiation error:", e);
+
+            log.error("CRITICAL: Map class instantiation or initialization error:", e);
+            e.printStackTrace(); // Force output to the console
+
             return;
         }
 
-        //lightwight tooltip possible since tool tip has its own layer in hex map
+        // lightwight tooltip possible since tool tip has its own layer in hex map
         ToolTipManager.sharedInstance().setLightWeightPopupEnabled(true);
 
         //tooltip should not be dismissed after at all
@@ -186,6 +189,12 @@ public void zoomIn() {
     private void zoomFit (boolean fitToWidth, boolean fitToHeight) {
         if (!fitToWidth && !fitToHeight) return;
 
+
+        if (originalMapSize == null) {
+            log.error("zoomFit aborted: originalMapSize is null. The Map failed to initialize.");
+            return;
+        }
+        
         ImageLoader imageLoader = ImageLoader.getInstance();
         int zoomStep = map.getZoomStep();
 

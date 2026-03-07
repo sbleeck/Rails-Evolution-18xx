@@ -1,35 +1,34 @@
 package net.sf.rails.game.specific._1817;
 
 import net.sf.rails.game.*;
-
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
 import rails.game.action.*;
 import net.sf.rails.common.DisplayBuffer;
-import net.sf.rails.common.GameOption;
 import net.sf.rails.common.LocalText;
 import net.sf.rails.common.ReportBuffer;
 import net.sf.rails.game.financial.Bank;
 import net.sf.rails.game.state.GenericState;
+import net.sf.rails.game.state.IntegerState;
 
-/**
- * Implements an 1830-style initial auction.
- */
 public class StartRound_1817 extends StartRound {
     private static final Logger log = LoggerFactory.getLogger(StartRound_1817.class);
 
-    protected final int bidIncrement;
+    protected final int bidIncrement = 5;
+    
+    private final IntegerState seedMoney = IntegerState.create(this, "seedMoney", 200);
 
     private final GenericState<StartItem> auctionItemState =
             new GenericState<>(this, "auctionItemState");
+            
+    private final GenericState<Player> lastInitiator = new GenericState<>(this, "lastInitiator");
 
-    /**
-     * Constructed via Configure
-     */
     public StartRound_1817(GameManager parent, String id) {
         super(parent, id);
-        bidIncrement = startPacket.getModulus();
+    }
+
+    public IntegerState getSeedMoneyModel() {
+        return seedMoney;
     }
 
     @Override
@@ -40,120 +39,47 @@ public class StartRound_1817 extends StartRound {
     }
 
     @Override
-    public boolean process(PossibleAction action) {
-
-        if (!super.process(action)) return false;
-
-        // Assign any further items that have been bid exactly once
-        // and don't need any further player intervention, such
-        // as setting a start price
-        StartItem item;
-        while ((item = startPacket.getFirstUnsoldItem()) != null
-                && item.getActiveBidders() == 1 && item.needsPriceSetting() == null) {
-            assignItem(item.getBidder(), item, item.getBid(), 0);
-
-            // Check if this has exhausted the start packet
-            if (startPacket.areAllSold()) {
-                finishRound();
-                break;
-            }
-        }
-        return true;
-    }
-
-    @Override
     public boolean setPossibleActions() {
-
         boolean passAllowed = true;
-
         possibleActions.clear();
 
         if (playerManager.getCurrentPlayer() == startPlayer) ReportBuffer.add(this, "");
 
-        // FIXME: Rails 2.0 Could be an infinite loop if there if no player has enough money to buy an item
         while (possibleActions.isEmpty()) {
             Player currentPlayer = playerManager.getCurrentPlayer();
+            StartItem activeAuction = auctionItemState.value();
 
-            for (StartItem item : itemsToSell.view()) {
+            if (activeAuction != null) {
 
-                if (item.isSold()) {
-                    // Don't include
-                } else if (item.getStatus() == StartItem.AUCTIONED) {
+                int currentBid = activeAuction.getBid();
+                boolean hasBidder = activeAuction.getBidder() != null;
+int minBid = hasBidder ? currentBid + bidIncrement
+                        : Math.max(bidIncrement, activeAuction.getBasePrice() - seedMoney.value());
 
-                    if (currentPlayer.getFreeCash()
-                        + item.getBid(currentPlayer) >= item.getMinimumBid()) {
-                        BidStartItem possibleAction =
-                                new BidStartItem(item,
-                                        item.getMinimumBid(),
-                                        startPacket.getModulus(), true);
-                        possibleActions.add(possibleAction);
-                        break; // No more actions
+                if (minBid <= activeAuction.getBasePrice()) {
+                    if (currentPlayer.getFreeCash() + activeAuction.getBid(currentPlayer) >= minBid) {
+                        possibleActions.add(new BidStartItem(activeAuction, minBid, bidIncrement, true));
                     } else {
-                        // Can't bid: Autopass
                         numPasses.add(1);
-                        break;
-                    }
-                } else if (item.getStatus() == StartItem.NEEDS_SHARE_PRICE) {
-                    /* This status is set in buy() if a share price is missing */
-                    playerManager.setCurrentPlayer(item.getBidder());
-                    possibleActions.add(new BuyStartItem(item, item.getBid(), false, true));
-                    passAllowed = false;
-                    break; // No more actions
-                } else if (item == startPacket.getFirstUnsoldItem()) {
-                    if (item.getActiveBidders() == 1) {
-                        // Bid upon by one player.
-                        // If we need a share price, ask for it.
-                        PublicCompany comp = item.needsPriceSetting();
-                        if (comp != null) {
-                            playerManager.setCurrentPlayer(item.getBidder());
-                            item.setStatus(StartItem.NEEDS_SHARE_PRICE);
-                            BuyStartItem newItem =
-                                    new BuyStartItem(item, item.getBid(),
-                                            false, true);
-                            possibleActions.add(newItem);
-                            break; // No more actions possible!
-                        } else {
-                            // ERROR, this should have been detected in process()!
-                            log.error("??? Wrong place to assign item {}", item.getId());
-                            assignItem(item.getBidder(), item, item.getBid(), 0);
-                        }
-                    } else if (item.getActiveBidders() > 1) {
-                        ReportBuffer.add(this, LocalText.getText("TO_AUCTION",
-                                item.getId()));
-                        // Start left of the currently highest bidder
-                        if (item.getStatus() != StartItem.AUCTIONED) {
-                            setNextBiddingPlayer(item, item.getBidder());
-                            currentPlayer = playerManager.getCurrentPlayer();
-                            item.setStatus(StartItem.AUCTIONED);
-                            auctionItemState.set(item);
-                        }
-                        if (currentPlayer.getFreeCash()
-                            + item.getBid(currentPlayer) >= item.getMinimumBid()) {
-                            BidStartItem possibleAction =
-                                    new BidStartItem(item,
-                                            item.getMinimumBid(),
-                                            startPacket.getModulus(), true);
-                            possibleActions.add(possibleAction);
-                        }
-                        break; // No more possible actions!
-                    } else {
-                        item.setStatus(StartItem.BUYABLE);
-                        if (currentPlayer.getFreeCash() >= item.getBasePrice()) {
-                            possibleActions.add(new BuyStartItem(item,
-                                    item.getBasePrice(), false));
-                        }
+                        setNextBiddingPlayer(activeAuction);
+                        continue;
                     }
                 } else {
-                    item.setStatus(StartItem.BIDDABLE);
-                    if (currentPlayer.getFreeCash()
-                        + item.getBid(currentPlayer) >= item.getMinimumBid()) {
-                        BidStartItem possibleAction =
-                                new BidStartItem(item, item.getMinimumBid(),
-                                        startPacket.getModulus(), false);
-                        possibleActions.add(possibleAction);
-                    }
+                    numPasses.add(1);
+                    setNextBiddingPlayer(activeAuction);
+                    continue;
                 }
 
+            } else {
+                for (StartItem item : itemsToSell.view()) {
+                    if (!item.isSold()) {
+                        item.setStatus(StartItem.BIDDABLE);
+                        int maxSubsidizedBid = Math.max(bidIncrement, item.getBasePrice() - seedMoney.value());
+                        if (currentPlayer.getFreeCash() >= maxSubsidizedBid) {
+                            possibleActions.add(new BidStartItem(item, maxSubsidizedBid, bidIncrement, false));
+                        }
+                    }
+                }
             }
 
             if (possibleActions.isEmpty()) {
@@ -170,220 +96,135 @@ public class StartRound_1817 extends StartRound {
             possibleActions.add(new NullAction(getRoot(), NullAction.Mode.PASS));
         }
 
-       return true;
+        return true;
     }
 
-    /*----- moveStack methods -----*/
-    /**
-     * The current player bids on a given start item.
-     *
-     * @param playerName The name of the current player (for checking purposes).
-     * @param bidItem The start item on which the bid is placed.
-     */
     @Override
     protected boolean bid(String playerName, BidStartItem bidItem) {
-
         StartItem item = bidItem.getStartItem();
         String errMsg = null;
         Player player = playerManager.getCurrentPlayer();
-        int previousBid = 0;
+        int previousBid = item.getBid(player);
         int bidAmount = bidItem.getActualBid();
 
         while (true) {
-
-            // Check player
             if (!playerName.equals(player.getId())) {
                 errMsg = LocalText.getText("WrongPlayer", playerName, player.getId());
                 break;
             }
-            // Check item
-            boolean validItem = false;
-            for (StartItemAction activeItem : possibleActions.getType(StartItemAction.class)) {
-                if (bidItem.equalsAsOption(activeItem)) {
-                    validItem = true;
-                    break;
-                }
 
-            }
-            if (!validItem) {
-                errMsg = LocalText.getText("ActionNotAllowed",
-                                bidItem.toString());
+
+            int maxSubsidizedBid = Math.max(bidIncrement, item.getBasePrice() - seedMoney.value());
+            
+            if (bidAmount < maxSubsidizedBid) {
+                errMsg = "Minimum cash bid is " + Bank.format(this, maxSubsidizedBid) + " (Face: " + item.getBasePrice() + " - Seed: " + seedMoney.value() + ")";
                 break;
             }
 
-            // Is the item buyable?
-            if (bidItem.getStatus() != StartItem.BIDDABLE
-                && bidItem.getStatus() != StartItem.AUCTIONED) {
-                errMsg = LocalText.getText("NotForSale");
+            if (bidAmount > item.getBasePrice()) {
+                errMsg = "Bid cannot exceed the face value of the company.";
                 break;
             }
 
-            // Bid must be at least 5 above last bid
-            if (bidAmount < item.getMinimumBid()) {
-                errMsg = LocalText.getText("BidTooLow", ""
-                                                       + item.getMinimumBid());
+            if (bidAmount % bidIncrement != 0) {
+                errMsg = "Bid must be a multiple of " + bidIncrement;
                 break;
             }
 
-            // Bid must be a multiple of the modulus
-            if (bidAmount % startPacket.getModulus() != 0) {
-                errMsg = LocalText.getText("BidMustBeMultipleOf",
-                                bidAmount,
-                                startPacket.getMinimumIncrement());
-                break;
-            }
-
-            // Has the buyer enough cash?
-            previousBid = item.getBid(player);
             int available = player.getFreeCash() + previousBid;
             if (bidAmount > available) {
                 errMsg = LocalText.getText("BidTooHigh", Bank.format(this, available));
                 break;
             }
-
             break;
         }
 
         if (errMsg != null) {
-            DisplayBuffer.add(this, LocalText.getText("InvalidBid",
-                    playerName,
-                    item.getId(),
-                    errMsg ));
+            DisplayBuffer.add(this, errMsg);
             return false;
         }
-
-
 
         item.setBid(bidAmount, player);
         if (previousBid > 0) player.unblockCash(previousBid);
         player.blockCash(bidAmount);
-        ReportBuffer.add(this, LocalText.getText("BID_ITEM_LOG",
-                playerName,
-                Bank.format(this, bidAmount),
-                item.getId(),
-                Bank.format(this, player.getFreeCash()) ));
+        
+        ReportBuffer.add(this, playerName + " bids " + Bank.format(this, bidAmount) + " on " + item.getId());
 
         if (bidItem.getStatus() != StartItem.AUCTIONED) {
-            playerManager.setPriorityPlayerToNext();
+            lastInitiator.set(player);
+            item.setStatus(StartItem.AUCTIONED);
+            auctionItemState.set(item);
+        }
+
+        if (bidAmount >= item.getBasePrice()) {
+            assignItem(player, item, bidAmount, 0);
+            auctionItemState.set(null);
+            numPasses.set(0);
+            playerManager.setCurrentPlayer(lastInitiator.value());
             playerManager.setCurrentToNextPlayer();
         } else {
+numPasses.set(0); 
             setNextBiddingPlayer(item);
+            // Explicitly ensure the UI/GameManager knows the player changed
+            log.debug("Next bidder set to: " + playerManager.getCurrentPlayer().getId());
+            
         }
-        numPasses.set(0);
-
         return true;
-
     }
 
     @Override
-    protected boolean buy(String playerName, BuyStartItem boughtItem) {
-        boolean result = super.buy(playerName, boughtItem);
-        auctionItemState.set(null);
-        return result;
-    }
+    protected boolean pass(NullAction action, String playerName) {
+        Player player = playerManager.getCurrentPlayer();
+        StartItem auctionItem = auctionItemState.value();
 
-
-        /**
-         * Process a player's pass.
-         * @param playerName The name of the current player (for checking purposes).
-         */
-        @Override
-        protected boolean pass(NullAction action, String playerName) {
-
-            String errMsg = null;
-            Player player = playerManager.getCurrentPlayer();
-            StartItem auctionItem = auctionItemState.value();
-
-            while (true) {
-
-                // Check player
-                if (!playerName.equals(player.getId())) {
-                    errMsg = LocalText.getText("WrongPlayer", playerName, player.getId());
-                    break;
-                }
-                break;
-            }
-
-            if (errMsg != null) {
-                DisplayBuffer.add(this, LocalText.getText("InvalidPass",
-                        playerName,
-                        errMsg ));
-                return false;
-            }
-
-            ReportBuffer.add(this, LocalText.getText("PASSES", playerName));
-
-            numPasses.add(1);
-            if (auctionItem != null) {
-
-                if (numPasses.value() >= auctionItem.getActiveBidders() - 1) {
-                    // All but the highest bidder have passed.
-                    int price = auctionItem.getBid();
-
-                    log.debug("Highest bidder is {}", auctionItem.getBidder().getId());
-                    if (auctionItem.needsPriceSetting() != null) {
-                        auctionItem.setStatus(StartItem.NEEDS_SHARE_PRICE);
-                    } else {
-                        assignItem(auctionItem.getBidder(), auctionItem, price, 0);
-                    }
-                    auctionItemState.set(null);
-                    numPasses.set(0);
-                    // Next turn goes to priority holder
-                    playerManager.setCurrentToPriorityPlayer(); // EV - Added to fix bug 2989440
-                } else {
-                    // More than one left: find next bidder
-
-                    if (GameOption.getAsBoolean(this, "LeaveAuctionOnPass")) {
-                        // Game option: player to leave auction after a pass (default no).
-                        player.unblockCash(auctionItem.getBid(player));
-                        auctionItem.setPass(player);
-                    }
-                    setNextBiddingPlayer(auctionItem);
-                }
-
-            } else {
-
-                if (numPasses.value() >= playerManager.getNumberOfPlayers()) {
-                    // All players have passed.
-                    gameManager.reportAllPlayersPassed();
-                    // It the first item has not been sold yet, reduce its price by 5.
-                    if (startPacket.getFirstItem() == startPacket.getFirstUnsoldItem() || startPacket.getFirstUnsoldItem().getReduceable()) {
-                        startPacket.getFirstUnsoldItem().reduceBasePriceBy(5);
-                        ReportBuffer.add(this, LocalText.getText(
-                                "ITEM_PRICE_REDUCED",
-                                        startPacket.getFirstUnsoldItem().getId(),
-                                        Bank.format(this, startPacket.getFirstUnsoldItem().getBasePrice()) ));
-                        numPasses.set(0);
-                        if (startPacket.getFirstUnsoldItem().getBasePrice() == 0) {
-                            getRoot().getPlayerManager().setCurrentToNextPlayer();
-                            assignItem(playerManager.getCurrentPlayer(),
-                                    startPacket.getFirstUnsoldItem(), 0, 0);
-                            getRoot().getPlayerManager().setPriorityPlayerToNext();
-                            getRoot().getPlayerManager().setCurrentToNextPlayer();
-                        } else {
-                            //BR: If the first item's price is reduced, but not to 0,
-                            //    we still need to advance to the next player
-                            playerManager.setCurrentToNextPlayer();
-                        }
-                    } else {
-                        numPasses.set(0);
-                        //gameManager.nextRound(this);
-                        finishRound();
-
-                    }
-                } else {
-                    playerManager.setCurrentToNextPlayer();
-                }
-            }
-
-            return true;
+        if (!playerName.equals(player.getId())) {
+            DisplayBuffer.add(this, LocalText.getText("InvalidPass", playerName, "Wrong Player"));
+            return false;
         }
 
+        ReportBuffer.add(this, LocalText.getText("PASSES", playerName));
+        numPasses.add(1);
+
+        if (auctionItem != null) {
+            if (numPasses.value() >= auctionItem.getActiveBidders() - 1) {
+                int price = auctionItem.getBid();
+                assignItem(auctionItem.getBidder(), auctionItem, price, 0);
+                
+                auctionItemState.set(null);
+                numPasses.set(0);
+                
+                playerManager.setCurrentPlayer(lastInitiator.value());
+                playerManager.setCurrentToNextPlayer();
+            } else {
+                setNextBiddingPlayer(auctionItem);
+            }
+        } else {
+            if (numPasses.value() >= playerManager.getNumberOfPlayers()) {
+                gameManager.reportAllPlayersPassed();
+                numPasses.set(0);
+                finishRound();
+            } else {
+                playerManager.setCurrentToNextPlayer();
+            }
+        }
+        return true;
+    }
+
+    @Override
+    protected void assignItem(Player player, StartItem item, int price, int bPrice) {
+        super.assignItem(player, item, price, bPrice);
+        
+        int subsidy = item.getBasePrice() - price;
+        if (subsidy > 0) {
+            seedMoney.add(-subsidy);
+            ReportBuffer.add(this, Bank.format(this, subsidy) + " seed money used. Remaining: " + Bank.format(this, seedMoney.value()));
+        }
+    }
 
     private void setNextBiddingPlayer(StartItem item, Player biddingPlayer) {
-        for (Player player:playerManager.getNextPlayersAfter(biddingPlayer, false, false)) {
-            if (item.isActive(player)) {
-                playerManager.setCurrentPlayer(player);
+        for (Player p : playerManager.getNextPlayersAfter(biddingPlayer, false, false)) {
+            if (item.isActive(p)) {
+                playerManager.setCurrentPlayer(p);
                 break;
             }
         }
@@ -392,5 +233,4 @@ public class StartRound_1817 extends StartRound {
     private void setNextBiddingPlayer(StartItem item) {
         setNextBiddingPlayer(item, playerManager.getCurrentPlayer());
     }
-
 }

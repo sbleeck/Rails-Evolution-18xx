@@ -731,19 +731,40 @@ private boolean displayHexNames = false;
     }
 
     public void setupBars() {
-        for (MapHex hex : hex2gui.keySet()) {
+       for (MapHex hex : hex2gui.keySet()) {
             // Display impassables and rivers with same colour for now,
             // as there are no games in Rails where both apply.
             // (The difference is that rivers are not impassable).
-            HexSidesSet sides = hex.getImpassableSides().union(hex.getRiverSides());
-            for (HexSide side:sides) {
-                if (side.getTrackPointNumber() < 3) {
-                    hex2gui.get(hex).addBar(side);
+            // --- DELETE --- HexSidesSet sides = hex.getImpassableSides().union(hex.getRiverSides());
+            HexSidesSet impassable = hex.getImpassableSides();
+            HexSidesSet rivers = hex.getRiverSides();
+            HexSidesSet sides = null;
+
+            if (impassable != null && rivers != null) {
+                sides = impassable.union(rivers);
+            } else if (impassable != null) {
+                sides = impassable;
+            } else if (rivers != null) {
+                sides = rivers;
+            }
+
+            if (sides != null) {
+                for (HexSide side : sides) {
+                    if (side.getTrackPointNumber() < 3) {
+                        hex2gui.get(hex).addBar(side);
+                    }
                 }
             }
-            sides = hex.getBorderSides();
-            for (HexSide side:sides) {
-                hex2gui.get(hex).addBorder(side);
+
+            // --- DELETE --- sides = hex.getBorderSides();
+            // --- DELETE --- for (HexSide side:sides) {
+            // --- DELETE ---     hex2gui.get(hex).addBorder(side);
+            // --- DELETE --- }
+            HexSidesSet borderSides = hex.getBorderSides();
+            if (borderSides != null) {
+                for (HexSide side : borderSides) {
+                    hex2gui.get(hex).addBorder(side);
+                }
             }
         }
     }

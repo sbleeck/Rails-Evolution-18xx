@@ -1167,10 +1167,16 @@ public Integer getRoundStart(int currentIndex) {
                 if (nextStartPacket == null) {
                     if (skipFirstStockRound) {
                         Phase currentPhase = getRoot().getPhaseManager().getCurrentPhase();
-                        if (currentPhase.getNumberOfOperatingRounds() != numOfORs.value()) {
+
+                        if (currentPhase != null) {
                             numOfORs.set(currentPhase.getNumberOfOperatingRounds());
+                        } else {
+                            log.error("CRITICAL: StockRound ending but PhaseManager has NO current phase.");
+                            // Fallback to 1 OR if everything is broken
+                            numOfORs.set(1);
                         }
-                        operatingRoundLimit.set(numOfORs.value());
+                        
+
                         log.info("Phase={} ORs={}", currentPhase.toText(), numOfORs);
 
                         // Create a new OperatingRound (never more than one Stock Round)

@@ -374,8 +374,6 @@ if (upperPlayerCaption[j][i] != null) {
         for (int i = 0; i < np; i++) {
             xref[i] = oldPlayerNames.indexOf(newPlayerNames.get(i));
         }
-        log.debug("SRW: old player list: {}", Util.join(oldPlayerNames.toArray(new String[0]), ","));
-        log.debug("SRW: new player list: {}", Util.join(newPlayerNames.toArray(new String[0]), ","));
 
         JComponent[] cells = new Cell[np];
         GridBagConstraints[] constraints = new GridBagConstraints[np];
@@ -577,7 +575,6 @@ if (upperPlayerCaption[j][i] != null) {
         if (si.getSecondary() != null)
             certs.add(si.getSecondary());
 
-        log.info("SRW: Configuring highlighting for StartItem {}. Found {} certs.", si.getId(), certs.size());
 
         // 2. Set Tooltip (based on primary company)
         if (!certs.isEmpty()) {
@@ -593,7 +590,6 @@ if (upperPlayerCaption[j][i] != null) {
             }
             if (pComp != null) {
                 card.setCompanyDetailsTooltip(pComp);
-                log.info("SRW: Assigned tooltip for Company {}", pComp.getId());
             }
         }
 
@@ -603,7 +599,6 @@ if (upperPlayerCaption[j][i] != null) {
             // A. Attach the StartItem listener (highlights blocked hexes for contained
             // Privates)
             HexHighlightMouseListener.addMouseListener(card, gameUIManager.getORUIManager(), si);
-            log.info("SRW: Attached generic StartItem listener for {}", si.getId());
 
             // B. Attach explicit listeners for all associated companies
             for (Certificate cert : certs) {
@@ -618,20 +613,15 @@ if (upperPlayerCaption[j][i] != null) {
                 if (pubComp != null) {
                     // Log the Home Hexes to verify they exist in the model
                     java.util.List<MapHex> homes = pubComp.getHomeHexes();
-                    log.info("SRW: Attaching PublicCompany listener for {}. HomeHexes count: {}",
-                            pubComp.getId(), (homes != null ? homes.size() : "NULL"));
 
                     HexHighlightMouseListener.addMouseListener(card, gameUIManager.getORUIManager(), pubComp, true);
                 } else if (cert instanceof PrivateCompany) {
                     PrivateCompany priv = (PrivateCompany) cert;
-                    log.info("SRW: Attaching explicit PrivateCompany listener for {}. BlockedHexes count: {}",
-                            priv.getId(), (priv.getBlockedHexes() != null ? priv.getBlockedHexes().size() : "NULL"));
 
                     HexHighlightMouseListener.addMouseListener(card, gameUIManager.getORUIManager(), priv, true);
                 }
             }
         } else {
-            log.warn("SRW: Skipping highlight attachment - ORUIManager or Map not available.");
         }
     }
 
@@ -1207,6 +1197,5 @@ if (bidAction.isSelected() || i == selectedItemIndex) {
         dummyButton = new ClickField("", "", "", this, itemGroup);
         updateFonts(currentFontSize);
     }
-// --- END FIX ---
 
 }
