@@ -873,8 +873,8 @@ if (cardWrappers[i] != null) {
                         }
                     } else if (action instanceof BidStartItem) {
                         BidStartItem bidAction = (BidStartItem) action;
-                        if (bidAction.isSelected()) {
-                            cards[i].setState(RailCard.State.SELECTED);
+if (bidAction.isSelected() || i == selectedItemIndex) {
+                                cards[i].setState(RailCard.State.SELECTED);
                             selectedItemIndex = i;
                             if (bidButton != null) {
                                 bidButton.setEnabled(true);
@@ -898,6 +898,13 @@ if (cardWrappers[i] != null) {
         if (passes != null && !passes.isEmpty() && passButton != null) {
             passButton.setEnabled(true);
             passButton.setPossibleAction(passes.get(0));
+        }
+        else if (selectedItemIndex != -1 && cards[selectedItemIndex].getPossibleActions() != null && !cards[selectedItemIndex].getPossibleActions().isEmpty()) {
+            PossibleAction act = cards[selectedItemIndex].getPossibleActions().get(0);
+            if (act instanceof BidStartItem && ((BidStartItem) act).isSelectForAuction() && passButton != null) {
+                passButton.setEnabled(true);
+                passButton.setPossibleAction(act);
+            }
         }
 
         // 6. Final UI and Map Refresh
@@ -939,7 +946,7 @@ if (cardWrappers[i] != null) {
                     BuyStartItem bsi = (BuyStartItem) action;
                     if (bsi.hasSharePriceToSet() && requestStartPrice(bsi))
                         return;
-selectedItemIndex = -1;
+                    selectedItemIndex = -1;
                     process(bsi);
                 } else {
                     // First click highlights and enables buttons
@@ -947,8 +954,20 @@ selectedItemIndex = -1;
                     updateStatus(true);
                 }
             } else {
-                // For bidding, select immediately
+                // For bidding, select and immediately enable the bid interface
                 selectedItemIndex = clickedIndex;
+                if (action instanceof BidStartItem) {
+                    BidStartItem bidAction = (BidStartItem) action;
+                    if (bidAmount != null) {
+                        bidAmount.setEnabled(true);
+                        spinnerModel.setMinimum(bidAction.getMinimumBid());
+                        spinnerModel.setValue(bidAction.getMinimumBid());
+                    }
+                    if (bidButton != null) {
+                        bidButton.setEnabled(true);
+                        bidButton.setPossibleAction(bidAction);
+                    }
+                }
                 updateStatus(true);
             }
             return;
@@ -969,6 +988,14 @@ selectedItemIndex = -1;
                 }
             }
             
+            else if (action instanceof BidStartItem) {
+                BidStartItem bidAction = (BidStartItem) action;
+                if (source == passButton) {
+                    bidAction.setActualBid(-1);
+                } else if (bidAmount != null && bidAmount.isEnabled()) {
+                    bidAction.setActualBid((Integer) bidAmount.getValue());
+                }
+            }
             selectedItemIndex = -1;
             process(action);
         }

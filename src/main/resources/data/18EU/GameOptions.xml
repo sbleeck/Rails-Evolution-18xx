@@ -12,4 +12,6 @@
 	<GameOption name="RevenueCalculation" values="Suggest,Deactivate" default="Suggest"/>
 	<GameOption name="SeparateSalesAtSamePrice" type="toggle" default="yes"/>
 	<GameOption name="NetworthHidden" type="toggle" default="no" />
+	<GameOption name="RestrictTrainTradingToPresident" type="toggle" default="yes"/>
+
 </GameOptions>

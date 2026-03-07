@@ -1950,22 +1950,27 @@ compRetained = new Field[nc];
     }
 
     protected void setTreasuryCertButton(int i, boolean clickable, Object o) {
-        if (i < 0 || i >= shareRowVisibilityObservers.length || shareRowVisibilityObservers[i] == null)
+
+        if (shareRowVisibilityObservers == null || i < 0 || i >= shareRowVisibilityObservers.length)
             return;
 
-        // Safety check for the new array
+        RowVisibility observer = shareRowVisibilityObservers[i];
+        if (observer == null)
+            return;
+
         if (treasuryShareCards == null || treasuryShareCards[i] == null)
             return;
 
         if (stickyFont != null)
             treasuryShareCards[i].setFont(stickyFont);
 
-        // Tooltip
-        if (compCanHoldOwnShares && companies[i] != null) {
+        if (compCanHoldOwnShares && companies != null && i < companies.length && companies[i] != null) {
             treasuryShareCards[i].setShareStackTooltip(companies[i].getPortfolioModel().getCertificates(companies[i]));
         }
 
-        boolean visible = shareRowVisibilityObservers[i].lastValue();
+        boolean visible = observer.lastValue();
+
+
         if (!visible) {
             treasuryShareCards[i].setVisible(false);
             return;

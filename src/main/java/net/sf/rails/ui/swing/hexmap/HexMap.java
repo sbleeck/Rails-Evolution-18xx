@@ -1023,7 +1023,7 @@ private boolean displayHexNames = false;
 
         // display tool tip
         // setToolTipText(newHex != null ? newHex.getToolTip() : null);
-        setToolTipText(null);
+setToolTipText(newHex != null ? newHex.getToolTip() : null);
 
         hexAtMousePosition = newHex;
     }

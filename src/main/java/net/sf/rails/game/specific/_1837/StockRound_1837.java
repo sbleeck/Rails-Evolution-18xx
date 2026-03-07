@@ -195,11 +195,7 @@ public class StockRound_1837 extends StockRound {
             }
         }
 
-        // Rule: If a Major becomes Sold Out (no shares in IPO),
-        // connected Coal/Minors must merge immediately.
-        if (result) {
-            processSoldOutMergers();
-        }
+    
 
         return result;
     }
@@ -258,75 +254,11 @@ public class StockRound_1837 extends StockRound {
         return result;
     }
 
-    private void processSoldOutMergers() {
-        List<PublicCompany> allCompanies = new java.util.ArrayList<>(gameManager.getAllPublicCompanies());
-
-        for (PublicCompany minor : allCompanies) {
-            if (minor.isClosed())
-                continue;
-            String type = minor.getType().getId();
-            if (!"Coal".equals(type) && !"Minor".equals(type))
-                continue;
-
-            PublicCompany major = Merger1837.getMergeTarget(gameManager, minor);
-            if (major == null || !major.hasFloated() || major.isClosed())
-                continue;
-
-            boolean isSoldOut = true;
-            for (PublicCertificate cert : net.sf.rails.game.financial.Bank.getIpo(gameManager).getPortfolioModel()
-                    .getCertificates()) {
-                if (cert.getCompany().equals(major)) {
-                    isSoldOut = false;
-                    break;
-                }
-            }
-
-            if (isSoldOut) {
-                log.debug("Major " + major.getId() + " is Sold Out. Force merging " + minor.getId());
-                ReportBuffer.add(this, LocalText.getText("MergeSoldOut", minor.getId(), major.getId()));
-                mergeCompanies(minor, major, false, true);
-            }
-        }
-        checkExcessTrains();
-    }
-
-@Override
+    @Override
     public void finishRound() {
 
         if (discardingTrains.value())
             return;
-
-        // 1837 Fix: National railways (Sd, kk, Ug) formed mid-game lack the 'started' flag 
-        // due to ghost token circumventions, causing the core engine to skip their sold-out checks.
-        // We explicitly process them here before delegating to the core engine.
-        for (PublicCompany comp : gameManager.getAllPublicCompanies()) {
-            if (comp.isClosed() || !comp.hasFloated()) continue;
-            
-            if ("National".equals(comp.getType().getId()) && !comp.hasStarted()) {
-                PortfolioModel ipo = net.sf.rails.game.financial.Bank.getIpo(gameManager).getPortfolioModel();
-                PortfolioModel pool = net.sf.rails.game.financial.Bank.getPool(gameManager).getPortfolioModel();
-                
-                boolean noIpo = true;
-                for (Object obj : ipo.getCertificates()) {
-                    if (obj instanceof PublicCertificate && ((PublicCertificate) obj).getCompany().equals(comp)) {
-                        noIpo = false;
-                        break;
-                    }
-                }
-                
-                boolean noPool = true;
-                for (Object obj : pool.getCertificates()) {
-                    if (obj instanceof PublicCertificate && ((PublicCertificate) obj).getCompany().equals(comp)) {
-                        noPool = false;
-                        break;
-                    }
-                }
-                
-                if (noIpo && noPool) {
-                    stockMarket.soldOut(comp);
-                }
-            }
-        }
 
         super.finishRound();
     }

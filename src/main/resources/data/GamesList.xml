@@ -5,6 +5,17 @@
 <GamesList>
 
 
+<Game name="1817">
+		<Note>in development</Note>
+		<Description>1817 - 
+		the ultimate stock market game
+		</Description>
+		<Players minimum="3" maximum="6" />
+	</Game>
+
+
+
+
 	<Game name="1835">
 		<Note>Fully playable</Note>
 		<Description>1835 (Germany)

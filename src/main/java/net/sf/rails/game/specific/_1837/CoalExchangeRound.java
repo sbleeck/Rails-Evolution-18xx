@@ -3,6 +3,7 @@ package net.sf.rails.game.specific._1837;
 import java.util.*;
 import net.sf.rails.game.*;
 import net.sf.rails.game.financial.*;
+import net.sf.rails.game.model.PortfolioModel;
 import net.sf.rails.game.state.*;
 import rails.game.action.*;
 import net.sf.rails.common.LocalText;
@@ -161,10 +162,35 @@ public class CoalExchangeRound extends Round implements GuiTargetedAction {
             }
         }
 
-        NullAction done = new NullAction(getRoot(), NullAction.Mode.DONE);
-        done.setLabel("Done / Skip " + currentMajorId);
-        possibleActions.add(done);
+
+
+        PublicCompany currentMajor = getRoot().getCompanyManager().getPublicCompany(currentMajorId);
         
+        // Rule 13: Mandatory if IPO is empty (Sold Out)
+        boolean isSoldOut = true;
+        PortfolioModel ipo = net.sf.rails.game.financial.Bank.getIpo(gameManager).getPortfolioModel();
+        for (PublicCertificate cert : ipo.getCertificates()) {
+            if (cert.getCompany().equals(currentMajor)) {
+                isSoldOut = false;
+                break;
+            }
+        }
+
+        // Rule 13: Mandatory if Phase 5 has started
+        // Using your confirmed working syntax:
+        boolean isPhase5 = getRoot().getPhaseManager().getCurrentPhase().getId().startsWith("5");
+
+        boolean isMandatory = isSoldOut || isPhase5;
+
+        // If mandatory, we only allow the "Done" action if there are no more exchangeable minors 
+        // left for this player for this specific major.
+        if (!isMandatory || !hasExchangeableMinorsForMajor(p, currentMajor)) {
+            NullAction done = new NullAction(getRoot(), NullAction.Mode.DONE);
+            done.setLabel("Done / Skip " + currentMajorId);
+            possibleActions.add(done);
+        }
+
+
         return true;
     }
 

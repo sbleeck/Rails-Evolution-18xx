@@ -1,0 +1,112 @@
+<?xml version="1.0"?>
+<CompanyManager>
+	<CompanyType name="Private" class="net.sf.rails.game.PrivateCompany">
+		<ClosingConditions>
+            <Phase>5</Phase>
+		</ClosingConditions>
+		<Tradeable toCompany="yes" lowerPriceFactor="0.5" upperPriceFactor="2.0"/>
+		<Tradeable toPlayer="yes"/>	
+	</CompanyType>
+	<CompanyType name="Public" class="net.sf.rails.game.PublicCompany">
+		<CanBuyPrivates/>
+		<PoolPaysOut/>
+		<Float percentage="60"/>
+		<BaseTokens>
+			<HomeBase lay="firstOR"/>
+			<LayCost method="sequence" cost="0,40,100"/>
+		</BaseTokens>
+		<Shares unit="10">
+			<Certificate type="President" shares="2"/>
+			<Certificate shares="1" number="8"/>
+		</Shares>
+		<Trains limit="4,3,2"/>
+        <CanUseSpecialProperties/>
+
+	</CompanyType>
+	<Company name="SVNRR" type="Private" basePrice="20" revenue="5"
+			longname="Schuylkill Valley Navigation &amp; Railroad Company">
+	</Company>
+	<Company name="C&amp;StL" type="Private" basePrice="40" revenue="10"
+			longname="Champlain &amp; St.Lawrence">
+
+	</Company>
+	<Company name="D&amp;H" type="Private" basePrice="70" revenue="15"
+		longname="Delaware &amp; Hudson">
+
+	</Company>
+	<Company name="M&amp;H" type="Private" basePrice="110" revenue="20"
+		longname="Mohawk &amp; Hudson">
+
+	</Company>
+	<Company name="C&amp;A" type="Private" basePrice="160" revenue="25"
+		longname="Camden &amp; Amboy">
+		<Info key="ComesWithCertificate" parm="PRR,10"/>
+	</Company>
+	<Company name="B&amp;O" type="Private" basePrice="220" revenue="30"
+		longname="Baltimore &amp; Ohio">
+		<Info key="ComesWithPresidency" parm="B&amp;O,20"/>
+		<Tradeable toCompany="no"/>
+	</Company>
+	
+
+
+
+
+
+
+	<Company name="B&amp;M" type="Public" tokens="2" fgColour="000000" bgColour="60E060"
+			longname="Boston &amp; Maine">
+		<Home hex="C26"/>
+	</Company>	     
+
+	<Company name="B&amp;O" type="Public" tokens="3" fgColour="255,255,255" bgColour="0,0,255"
+			longname="Baltimore &amp; Ohio">
+		<FirstTrainCloses type="Private" name="B&amp;O"/>
+		<Home hex="G18"/>
+	</Company>
+
+	<Company name="C&amp;O" type="Public" tokens="3" fgColour="000000" bgColour="A0E0FF"
+			longname="Chesapeake &amp; Ohio">
+			<Home hex="F3"/>
+	</Company>
+	
+	<Company name="CPR" type="Public" tokens="4" fgColour="FFFFFF" bgColour="FF0000"
+			longname="Canadian Pacific Railroad">
+		<Home hex="B17"/>
+	</Company>
+
+	<Company name="Erie" type="Public" tokens="3" fgColour="000000" bgColour="FFFF00"
+			longname="Erie Railroad">
+		<Home hex="D7" city="0"/>
+	</Company>
+
+	<Company name="NYC" type="Public" tokens="4" fgColour="FFFFFF" bgColour="000000"
+			longname="New York Central">
+		<Home hex="E22"/>
+	</Company>
+
+	<Company name="NYNH" type="Public" tokens="2" fgColour="000000" bgColour="FF8000"
+			longname="New York, New Haven &amp; Hartford">
+		<Home hex="E22" city="0"/>
+	</Company>
+
+	<Company name="PRR" type="Public" tokens="4" fgColour="FFFFFF" bgColour="008000"
+			longname="Pennsylvania Railroad">
+		<Home hex="F13"/>
+	</Company>
+    
+	
+	<StartPacket roundClass="net.sf.rails.game.specific._1817.StartRound_1817">
+		<Bidding initial="5" minimum="5" increment="1"/>
+		<Item name="SVNRR" type="Private" basePrice="20"/>
+		<Item name="C&amp;StL" type="Private" basePrice="40"/>
+		<Item name="D&amp;H" type="Private" basePrice="70"/>
+		<Item name="M&amp;H" type="Private" basePrice="110"/>
+		<Item name="C&amp;A" type="Private" basePrice="160">
+   
+		</Item>
+		<Item name="B&amp;O" type="Private" basePrice="220">
+			<SubItem name="B&amp;O" type="Public" president="yes"/>
+		</Item>
+	</StartPacket>
+</CompanyManager>

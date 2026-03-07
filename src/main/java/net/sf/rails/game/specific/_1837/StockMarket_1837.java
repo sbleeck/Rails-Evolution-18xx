@@ -74,16 +74,6 @@ public class StockMarket_1837 extends StockMarket {
 
     /* Hexagonal Movement Logic for Even-Row (even-r) Pointy-Topped Grid */
 
-    private void moveDownRight(PublicCompany company) {
-        StockSpace old = company.getCurrentSpace();
-        int r = old.getRow();
-        int c = old.getColumn();
-        int nr = r + 1;
-        int nc = (r % 2 == 0) ? c : c + 1;
-        StockSpace newsquare = getStockSpace(nr, nc);
-        if (newsquare != null) prepareMove(company, old, newsquare);
-    }
-
     @Override
     public void payOut(PublicCompany company) {
         moveRightOrUp(company);
@@ -139,34 +129,7 @@ public class StockMarket_1837 extends StockMarket {
         moveUpRight(company);
     }
 
-    protected void moveRightOrUp(PublicCompany company) {
-        StockSpace old = company.getCurrentSpace();
-        int r = old.getRow();
-        int c = old.getColumn();
-        // Rule 10.7.4: Try Right first [cite: 726]
-        StockSpace newsquare = getStockSpace(r, c + 1);
-        // If blocked or ledge reached, move Up-Right [cite: 727]
-        if (newsquare == null || old.isLeftOfLedge()) {
-            int nr = r - 1;
-            int nc = (r % 2 == 0) ? c : c + 1;
-            newsquare = getStockSpace(nr, nc);
-        }
-        if (newsquare != null) prepareMove(company, old, newsquare);
-    }
 
-    public void moveLeft(PublicCompany company) {
-        StockSpace old = company.getCurrentSpace();
-        int r = old.getRow();
-        int c = old.getColumn();
-        // Rule 10.7.4: Withholding moves Left. If not possible, Down-Left. [cite: 732, 733]
-        StockSpace newsquare = getStockSpace(r, c - 1);
-        if (newsquare == null) {
-            int nr = r + 1;
-            int nc = (r % 2 == 0) ? c - 1 : c;
-            newsquare = getStockSpace(nr, nc);
-        }
-        if (newsquare != null) prepareMove(company, old, newsquare);
-    }
 
 
     
@@ -221,6 +184,83 @@ private StockSpace getSpaceByPrice(int targetPrice) {
     public void correctStockPrice(PublicCompany company, StockSpace target) {
 
         super.correctStockPrice(company, target);
+    }
+
+
+    // StockMarket_1837.java
+
+
+    public void moveLeft(PublicCompany company) {
+        StockSpace old = company.getCurrentSpace();
+        int r = old.getRow();
+        int c = old.getColumn();
+        // Primary: Left 
+        StockSpace newsquare = getStockSpace(r, c - 1);
+        
+        // --- START FIX ---
+        // If Left is blocked, momentum deflects to Down-Left 
+        if (newsquare == null) {
+            int nr = r + 1;
+            int nc = (r % 2 == 0) ? c - 1 : c;
+            newsquare = getStockSpace(nr, nc);
+        }
+        // If Down-Left is also blocked (bottom-left corner), stay or move Down-Right
+        if (newsquare == null) {
+            int nr = r + 1;
+            int nc = (r % 2 == 0) ? c : c + 1;
+            newsquare = getStockSpace(nr, nc);
+        }
+        // --- END FIX ---
+        
+        if (newsquare != null) prepareMove(company, old, newsquare);
+    }
+
+    private void moveDownRight(PublicCompany company) {
+        StockSpace old = company.getCurrentSpace();
+        int r = old.getRow();
+        int c = old.getColumn();
+        // Primary: Down-Right 
+        int nr = r + 1;
+        int nc = (r % 2 == 0) ? c : c + 1;
+        StockSpace newsquare = getStockSpace(nr, nc);
+        
+        // --- START FIX ---
+        // If Down-Right is blocked (right edge), deflect to Down-Left 
+        if (newsquare == null) {
+            nr = r + 1;
+            nc = (r % 2 == 0) ? c - 1 : c;
+            newsquare = getStockSpace(nr, nc);
+        }
+        // --- END FIX ---
+        
+        if (newsquare != null) prepareMove(company, old, newsquare);
+    }
+
+    @Override
+    protected void moveRightOrUp(PublicCompany company) {
+        StockSpace old = company.getCurrentSpace();
+        int r = old.getRow();
+        int c = old.getColumn();
+        // Primary: Right 
+        StockSpace newsquare = getStockSpace(r, c + 1);
+        
+        // If blocked or ledge reached, move Up-Right 
+        if (newsquare == null || old.isLeftOfLedge()) {
+            int nr = r - 1;
+            int nc = (r % 2 == 0) ? c : c + 1;
+            newsquare = getStockSpace(nr, nc);
+        }
+        
+        // --- START FIX ---
+        // If Up-Right is blocked (top-right edge), deflect Up-Left 
+        if (newsquare == null) {
+            int nr = r - 1;
+            int nc = (r % 2 == 0) ? c - 1 : c;
+            newsquare = getStockSpace(nr, nc);
+        }
+        // --- END FIX ---
+        
+        if (newsquare != null) prepareMove(company, old, newsquare);
     }
 
 }
