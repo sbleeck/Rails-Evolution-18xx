@@ -32,6 +32,7 @@ import java.util.List;
 import net.sf.rails.ui.swing.elements.RailCard;
 import java.util.Map;
 
+
 /**
  * This class is incorporated into StatusWindow and displays the bulk of
  * rails.game status information.
@@ -198,6 +199,8 @@ public class GameStatus extends GridPanel {
     // Variable to persist the user's zoom/font setting across component recreations
     private Font stickyFont = null;
     private RoundCounterPanel roundCounterPanel;
+
+    private final List<String> selectedPrivateIds = new ArrayList<>();
 
     @Override
     public void setFont(Font f) {
@@ -502,8 +505,6 @@ public class GameStatus extends GridPanel {
         hasBonds = gameUIManager.getGameParameterAsBoolean(GuiDef.Parm.HAS_BONDS);
         hasDirectCompanyIncomeInOr = gameUIManager.getGameParameterAsBoolean(GuiDef.Parm.HAS_SPECIAL_COMPANY_INCOME);
         needsNumberOfSharesColumn = gameUIManager.getGameParameterAsBoolean(GuiDef.Parm.HAS_GROWING_NUMBER_OF_SHARES);
-
-
 
         // TODO: Can this be done using ipo and pool directly?
         ipo = bank.getIpo().getPortfolioModel();
@@ -2915,59 +2916,56 @@ public class GameStatus extends GridPanel {
                 updateCompanyPrivates(i, c);
             }
 
-if (hasCompanyLoans) {
-                try {
-                    // Diagnostic Logging
-                    if (compLoans == null) {
-                        log.info("DEBUG-CRASH: compLoans is NULL for company " + c.getId());
-                    } else if (i >= compLoans.length) {
-                        log.info("DEBUG-CRASH: Index " + i + " out of bounds for compLoans.length " + compLoans.length + " (Company: " + c.getId() + ")");
+            boolean is1817 = "1817".equals(gameUIManager.getGameManager().getGameName());
+            if (hasCompanyLoans && compLoans != null && i < compLoans.length && compLoans[i] != null) {
+                compLoans[i].setBackground(bgRow);
+                compLoans[i].setOpaque(true);
+
+                if (compLoans[i] instanceof ClickField) {
+                    ClickField cf = (ClickField) compLoans[i];
+                    cf.setEnabled(false);
+                    cf.setPossibleAction(null);
+                    cf.setBorder(BORDER_BOX);
+                }
+
+                if (c != null && (c.hasFloated() || (is1817 && c.getPresident() != null))) {
+                    int currentBonds = c.getNumberOfBonds();
+                    int maxBonds = currentBonds;
+                    try {
+                        java.lang.reflect.Method m = c.getClass().getMethod("getShareCount");
+                        maxBonds = (Integer) m.invoke(c);
+                    } catch (Exception e) {
+                        // Fallback
                     }
 
-                    if (compLoans != null && i < compLoans.length && compLoans[i] != null) {
-                        compLoans[i].setBackground(bgRow);
-                        compLoans[i].setOpaque(true);
+                    // Use ClickField's setText directly (ClickField often wraps its label)
+                    if (compLoans[i] instanceof ClickField) {
+                        ((ClickField) compLoans[i]).setText(currentBonds + "/" + maxBonds);
+                    } else if (compLoans[i] instanceof JLabel) {
+                        ((JLabel) compLoans[i]).setText(currentBonds + "/" + maxBonds);
+                    }
 
-                        if (compLoans[i] instanceof ClickField) {
-                            ClickField cf = (ClickField) compLoans[i];
-                            cf.setEnabled(false);
-                            cf.setPossibleAction(null);
-                        }
-
-                        if (c != null && c.hasFloated()) {
-                            int currentBonds = c.getNumberOfBonds();
-                            int maxBonds = currentBonds;
-                            try {
-                                java.lang.reflect.Method m = c.getClass().getMethod("getShareCount");
-                                maxBonds = (Integer) m.invoke(c);
-                            } catch (Exception e) {
-                                // Fallback
-                            }
-
-                            if (compLoans[i] instanceof JLabel) {
-                                ((JLabel) compLoans[i]).setText(currentBonds + "/" + maxBonds);
-                            }
-
-                            if (possibleActions != null && possibleActions.getList() != null) {
-                                for (PossibleAction pa : possibleActions.getList()) {
-                                    if (pa != null && pa.getClass().getName().endsWith("TakeLoans_1817")) {
-                                        if (compLoans[i] instanceof ClickField) {
-                                            ClickField cf = (ClickField) compLoans[i];
-                                            cf.setEnabled(true);
-                                            cf.setPossibleAction(pa);
-                                        }
+                    if (possibleActions != null && possibleActions.getList() != null) {
+                        for (PossibleAction pa : possibleActions.getList()) {
+                            if (pa != null && pa.getClass().getName().endsWith("TakeLoans_1817")) {
+                                net.sf.rails.game.specific._1817.action.TakeLoans_1817 tl = (net.sf.rails.game.specific._1817.action.TakeLoans_1817) pa;
+                                if (tl.getCompany().getId().equals(c.getId())) {
+                                    if (compLoans[i] instanceof ClickField) {
+                                        ClickField cf = (ClickField) compLoans[i];
+                                        cf.setEnabled(true);
+                                        cf.setPossibleAction(pa);
+                                        // MARK RED: Highlight the field background and border
+                                        cf.setBackground(new Color(255, 200, 200));
+                                        cf.setBorder(BorderFactory.createLineBorder(Color.RED, 2));
                                     }
                                 }
                             }
-                        } else if (compLoans[i] instanceof JLabel) {
-                            ((JLabel) compLoans[i]).setText("");
                         }
                     }
-                } catch (Exception e) {
-                    log.error("DEBUG-CRASH: Exception in loan update for " + c.getId(), e);
+                } else if (compLoans[i] instanceof JLabel) {
+                    ((JLabel) compLoans[i]).setText("");
                 }
             }
-            
 
             // Note: We need to ensure the compCash/Revenue/Tokens fields use the new bgRow.
             // Assuming your previous code already updated these fields, we will ensure
@@ -4511,7 +4509,7 @@ if (hasCompanyLoans) {
                 addField(compPrivatesPanel[i], compPrivatesXOffset, y, 1, 1, 0, visible);
             }
 
-if (hasCompanyLoans && compLoans != null && i < compLoans.length) {
+            if (hasCompanyLoans && compLoans != null && i < compLoans.length) {
                 // ClickField requires a ButtonGroup; passing null causes the NPE.
                 // We use buySellGroup to maintain UI focus consistency.
                 ClickField cf = new ClickField("", "takeLoan_" + c.getId(), "Take Loans", this, buySellGroup);
@@ -5223,4 +5221,5 @@ if (hasCompanyLoans && compLoans != null && i < compLoans.length) {
         }
     }
 
+    
 }

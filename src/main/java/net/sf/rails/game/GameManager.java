@@ -1233,6 +1233,15 @@ public Integer getRoundStart(int currentIndex) {
                 }
             }
         }
+        else if (round instanceof net.sf.rails.game.specific._1817.AuctionRound_1817) {
+            // Resume the Stock Round that was interrupted by the IPO auction
+            net.sf.rails.game.round.RoundFacade roundToResume = getInterruptedRound();
+            setInterruptedRound(null);
+            setRound(roundToResume);
+            if (roundToResume != null) {
+                roundToResume.resume();
+            }
+        }
     }
 
     protected void beginStartRound() {

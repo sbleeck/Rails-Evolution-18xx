@@ -1,6 +1,7 @@
 package net.sf.rails.game.specific._1817;
 
 import java.util.List;
+import java.util.ArrayList;
 import net.sf.rails.game.GameManager;
 import net.sf.rails.game.Player;
 import net.sf.rails.game.Round;
@@ -9,6 +10,7 @@ import net.sf.rails.game.state.GenericState;
 import net.sf.rails.game.state.IntegerState;
 import net.sf.rails.game.state.Currency;
 import net.sf.rails.game.specific._1817.action.Bid1817IPO;
+import net.sf.rails.game.specific._1817.action.SettleIPO_1817;
 import rails.game.action.PossibleAction;
 import rails.game.action.NullAction;
 import org.slf4j.Logger;
@@ -26,19 +28,6 @@ public class AuctionRound_1817 extends Round {
     protected final ArrayListState<Player> activeBidders;
     protected final IntegerState currentPlayerIndex;
 
-    public int getCurrentBid() {
-        return currentBid.value();
-    }
-
-    public Player getHighestBidder() {
-        return highestBidder.value();
-    }
-
-    public PublicCompany_1817 getAuctionedCompany() {
-        return auctionedCompany.value();
-    }
-
-
     public AuctionRound_1817(GameManager parent, String id) {
         super(parent, id);
         this.auctionedCompany = new GenericState<>(this, "auctionedCompany_" + id);
@@ -49,6 +38,10 @@ public class AuctionRound_1817 extends Round {
         this.activeBidders = new ArrayListState<>(this, "activeBidders_" + id);
         this.currentPlayerIndex = IntegerState.create(this, "currentPlayerIndex_" + id, 0);
     }
+
+    public int getCurrentBid() { return currentBid.value(); }
+    public Player getHighestBidder() { return highestBidder.value(); }
+    public PublicCompany_1817 getAuctionedCompany() { return auctionedCompany.value(); }
 
     public void setupAuction(PublicCompany_1817 company, String hexId, int startingBid, Player startingPlayer, List<Player> allPlayers) {
         log.info("AUCTION_LOG: Setting up auction for {} at Hex {}. Starting Bid: ${}", company.getId(), hexId, startingBid);
@@ -65,9 +58,7 @@ public class AuctionRound_1817 extends Round {
         
         int startIndex = (allPlayers.indexOf(startingPlayer) + 1) % allPlayers.size();
         this.currentPlayerIndex.set(startIndex);
-        log.info("AUCTION_LOG: First acting bidder will be: {}", getActingPlayer().getName());
     }
-
 
     public Player getActingPlayer() {
         if (activeBidders == null || activeBidders.isEmpty()) return null;
@@ -79,22 +70,25 @@ public class AuctionRound_1817 extends Round {
     public boolean setPossibleActions() {
         possibleActions.clear();
 
-        // If resolution already happened or only 1 bidder left, don't generate more actions
+        // 1. Resolution Check: If only 1 bidder remains, generate the Settlement action
         if (activeBidders.size() <= 1) {
-            log.info("AUCTION_LOG: Resolution condition met (Bidders: {}).", activeBidders.size());
             resolveAuction();
+            
+            Player winner = highestBidder.value();
+            if (winner != null && auctionedCompany.value() != null) {
+                // Generate the settlement action for the UI to populate
+                possibleActions.add(new SettleIPO_1817(
+                    gameManager.getRoot(), 
+                    auctionedCompany.value().getId(), 
+                    new ArrayList<String>(), 
+                    currentBid.value(), 
+                    2)); 
+            }
             return true;
         }
 
+        // 2. Standard Bidding Phase
         Player currentPlayer = getActingPlayer();
-        
-        if (activeBidders.size() <= 1) {
-            log.info("AUCTION_LOG: Only one bidder remains. Resolving...");
-            resolveAuction();
-            return true;
-        }
-
-        log.info("AUCTION_LOG: Generating actions for player: {}", (currentPlayer != null ? currentPlayer.getName() : "NULL"));
         possibleActions.add(new NullAction(gameManager.getRoot(), NullAction.Mode.PASS));
         
         int minNextBid = currentBid.value() + 5;
@@ -107,17 +101,81 @@ public class AuctionRound_1817 extends Round {
     @Override
     public boolean process(PossibleAction action) {
         Player actor = getActingPlayer();
+
+        // --- Handle Settlement Action ---
+        if (action instanceof SettleIPO_1817) {
+            SettleIPO_1817 settle = (SettleIPO_1817) action;
+            PublicCompany_1817 comp = auctionedCompany.value();
+            Player winner = highestBidder.value();
+
+            log.info("AUCTION_LOG: Settling IPO for {}. Size: {}-share. Cash: ${}. Privates: {}", 
+                comp.getId(), settle.getShareSize(), settle.getCashAmount(), settle.getPrivateCompanyIds());
+
+
+            log.info("AUCTION_LOG: Settling IPO for {}. Size: {}-share. Cash: ${}. Privates: {}", 
+                comp.getId(), settle.getShareSize(), settle.getCashAmount(), settle.getPrivateCompanyIds());
+
+            // 1. Set Company Size (updates internal loan limits and certificates)
+            comp.setShareCount(settle.getShareSize());
+
+            // 2. Transfer Cash from Winner to Company Treasury
+            if (settle.getCashAmount() > 0) {
+                net.sf.rails.game.state.Currency.wire(winner, settle.getCashAmount(), comp);
+            }
+
+            // 3. Transfer Private Companies from Winner to Company
+            for (String pId : settle.getPrivateCompanyIds()) {
+                net.sf.rails.game.PrivateCompany pc = gameManager.getRoot().getCompanyManager().getPrivateCompany(pId);
+                if (pc != null) {
+                    pc.moveTo(comp.getPortfolioModel());
+                }
+            }
+
+            // 4. Issue the President's Certificate and set Presidency
+            net.sf.rails.game.financial.PublicCertificate presCert = comp.getPresidentsShare();
+            if (presCert != null) {
+                presCert.moveTo(winner.getPortfolioModel());
+            }
+            comp.setPresident(winner);
+
+// 5. Calculate Par Price (Bid / 10) and find the matching StockSpace
+            int parPrice = currentBid.value() / 10;
+            net.sf.rails.game.financial.StockMarket sm = gameManager.getRoot().getStockMarket();
+            net.sf.rails.game.financial.StockSpace startSpace = sm.getStartSpace(parPrice);
+
+            if (startSpace == null) {
+                // Robust Fallback: Manually search the market grid for a space with the matching price
+                searchLoop:
+                for (int r = 0; r < sm.getNumberOfRows(); r++) {
+                    for (int c = 0; c < sm.getNumberOfColumns(); c++) {
+                        net.sf.rails.game.financial.StockSpace ss = sm.getStockSpace(r, c);
+                        if (ss != null && ss.getPrice() == parPrice) {
+                            startSpace = ss;
+                            break searchLoop;
+                        }
+                    }
+                }
+            }
+
+            if (startSpace != null) {
+                comp.start(startSpace);
+            } else {
+                log.error("AUCTION_LOG: No StockSpace found for price ${}", parPrice);
+            }
+
+            // 6. Finalize state and close the Auction Round
+            comp.setFloated();
+            gameManager.nextRound(this);
+
+
+            return true;
+        }
+
+        // --- Handle Bidding Actions ---
         if (action instanceof NullAction && ((NullAction) action).getMode() == NullAction.Mode.PASS) {
             log.info("AUCTION_LOG: Player {} FOLDED.", actor.getName());
-
-activeBidders.remove(actor);
-            
-            // After removing the passer, if only one is left, the next UI cycle 
-            // calls setPossibleActions() which will trigger resolveAuction().
-            // We do NOT increment currentPlayerIndex here because the list size changed.
+            activeBidders.remove(actor);
             return true;
-            
-
         }
 
         if (action instanceof Bid1817IPO) {
@@ -128,95 +186,12 @@ activeBidders.remove(actor);
             this.currentPlayerIndex.set((currentPlayerIndex.value() + 1) % activeBidders.size());
             return true;
         }
+
         return super.process(action);
     }
 
     private void resolveAuction() {
         Player winner = highestBidder.value();
-        PublicCompany_1817 comp = auctionedCompany.value();
-        int finalBid = currentBid.value();
-
-
-        // 1817 Rule: Par is exactly half the final bid (round up)
-        int parPrice = (finalBid + 1) / 2;
-
-        log.info("AUCTION_LOG: RESOLUTION -> Winner: {}, Bid: ${}, Calculated Par: ${}", winner.getName(), finalBid, parPrice);
-
-        comp.setShareCount(2);
-        
-        net.sf.rails.game.financial.StockMarket stockMarket = getRoot().getStockMarket();
-
-
-        // 2. Hardwired snap to valid 1817 StartSpace prices from StockMarket.xml
-        int snapPrice;
-        if (parPrice >= 200) snapPrice = 200;
-        else if (parPrice >= 180) snapPrice = 180;
-        else if (parPrice >= 165) snapPrice = 165;
-        else if (parPrice >= 150) snapPrice = 150;
-        else if (parPrice >= 135) snapPrice = 135;
-        else if (parPrice >= 120) snapPrice = 120;
-        else if (parPrice >= 110) snapPrice = 110;
-        else if (parPrice >= 100) snapPrice = 100;
-        else if (parPrice >= 90) snapPrice = 90;
-        else if (parPrice >= 80) snapPrice = 80;
-        else if (parPrice >= 70) snapPrice = 70;
-        else if (parPrice >= 65) snapPrice = 65;
-        else if (parPrice >= 60) snapPrice = 60;
-        else if (parPrice >= 55) snapPrice = 55;
-        else snapPrice = 50;
-
-        // Use getStartSpace(int) to find the space associated with the snapped price
-        net.sf.rails.game.financial.StockSpace startSpace = stockMarket.getStartSpace(snapPrice);
-
-        if (startSpace != null) {
-            log.info("AUCTION_LOG: Snapping to valid StartSpace at ${}", snapPrice);
-            comp.start(startSpace);
-        } else {
-            log.error("AUCTION_LOG: FATAL - No StartSpace configured for price ${}", snapPrice);
-        }
-
-        Currency.wire(winner, finalBid, getRoot().getBank());
-        Currency.wire(getRoot().getBank(), finalBid, comp);
-
-        if (comp.getPresidentsShare() != null) {
-            comp.getPresidentsShare().moveTo(winner.getPortfolioModel());
-        }
-        
-        net.sf.rails.game.MapHex homeHex = getRoot().getMapManager().getHex(targetHexId.value());
-
-
-        if (homeHex != null) {
-            comp.setHomeHex(homeHex);
-            
-            // 1817 Rule: Tokens are placed immediately upon floating, not delayed to the OR.
-            net.sf.rails.game.Stop targetStop = null;
-            if (homeHex.getStops() != null) {
-                for (net.sf.rails.game.Stop stop : homeHex.getStops()) {
-                    if (stop.hasTokenSlotsLeft()) {
-                        targetStop = stop;
-                        break; // Grab the first open station slot
-                    }
-                }
-            }
-            
-            if (targetStop != null) {
-                comp.setHomeCityNumber(targetStop.getRelatedStationNumber());
-                boolean tokenLaid = homeHex.layBaseToken(comp, targetStop);
-                if (tokenLaid) {
-                    log.info("AUCTION_LOG: Laid base token for {} on Hex {} (Station {})", 
-                             comp.getId(), homeHex.getId(), targetStop.getRelatedStationNumber());
-                } else {
-                    log.error("AUCTION_LOG: Failed to lay base token for {} on Hex {}", comp.getId(), homeHex.getId());
-                }
-            } else {
-                log.warn("AUCTION_LOG: Could not find free stop on Hex {} for token placement", homeHex.getId());
-            }
-
-        }
-        comp.setFloated();
-
-
-        log.info("AUCTION_LOG: Auction finished. Returning to Stock Round.");
-        gameManager.finishShareSellingRound(true);
+        log.info("AUCTION_LOG: Auction finished. Waiting for settlement from {}", (winner != null ? winner.getName() : "None"));
     }
 }

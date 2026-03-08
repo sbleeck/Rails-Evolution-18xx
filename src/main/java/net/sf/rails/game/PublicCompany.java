@@ -2137,8 +2137,9 @@ return list;
                     Bank.format(this, price)));
         }
 
-        // Move the private certificate
-        portfolio.getPrivatesOwnedModel().getPortfolio().add(privateCompany);
+
+        // Move the private certificate properly to trigger state updates and remove it from the old owner
+        privateCompany.moveTo(this.getPortfolioModel());
 
         // Move the money
         if (price > 0) {
@@ -2934,6 +2935,26 @@ return list;
     public int getNumberOfBonds() {
         return numberOfBonds;
     }
+
+    public void setNumberOfBonds(int bonds) {
+this.numberOfBonds = bonds;
+}
+
+/**
+     * Transfers cash from the Bank purse to the Company treasury purse.
+     * Uses setAmount_AI and value() as required by this Rails version.
+     */
+    public void addCashFromBank(int amount, net.sf.rails.game.financial.Bank bank) {
+        if (bank != null && bank.getPurse() != null) {
+            int bankCash = bank.getPurse().value();
+            bank.getPurse().setAmount_AI(bankCash - amount);
+        }
+        if (this.treasury != null && this.treasury.getPurse() != null) {
+            int treasuryCash = this.treasury.getPurse().value();
+            this.treasury.getPurse().setAmount_AI(treasuryCash + amount);
+        }
+    }
+
 
     public int getPriceOfBonds() {
         return priceOfBonds;

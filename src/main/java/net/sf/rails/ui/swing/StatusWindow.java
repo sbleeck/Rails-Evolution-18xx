@@ -1647,45 +1647,136 @@ if (currentRound != null && currentRound.getClass().getName().contains("AuctionR
                     
                     net.sf.rails.game.specific._1817.action.Bid1817IPO bidAction = null;
                     NullAction passAction = null;
+                   net.sf.rails.game.specific._1817.action.SettleIPO_1817 settleAction = null;
                     
                     if (possibleActions != null && possibleActions.getList() != null) {
                         for (PossibleAction pa : possibleActions.getList()) {
                             if (pa instanceof net.sf.rails.game.specific._1817.action.Bid1817IPO) bidAction = (net.sf.rails.game.specific._1817.action.Bid1817IPO) pa;
                             else if (pa instanceof NullAction && ((NullAction) pa).getMode() == NullAction.Mode.PASS) passAction = (NullAction) pa;
+                            else if (pa instanceof net.sf.rails.game.specific._1817.action.SettleIPO_1817) settleAction = (net.sf.rails.game.specific._1817.action.SettleIPO_1817) pa;
                         }
                     }
 
-                    if (myTurn) {
-                        int minBid = (bidAction != null) ? bidAction.getBidAmount() : 5;
-                        ((SpinnerNumberModel) bidSpinner.getModel()).setMinimum(minBid);
-                        if ((Integer)bidSpinner.getValue() < minBid) bidSpinner.setValue(minBid);
-                        
-                        JLabel bidPrompt = new JLabel(actorName + " bids for " + companyId + ": $");
-                        bidPrompt.setFont(new Font("SansSerif", Font.PLAIN, 13));
-                        dynamicButtonPanel.add(bidPrompt);
-                        dynamicButtonPanel.add(bidSpinner);
-                        
-                        if (auctionBidButton == null) auctionBidButton = new JButton("Place Bid");
-                        auctionBidButton.setPreferredSize(new Dimension(110, 35));
-                        final net.sf.rails.game.specific._1817.action.Bid1817IPO finalBid = bidAction;
-                        for (java.awt.event.ActionListener al : auctionBidButton.getActionListeners()) auctionBidButton.removeActionListener(al);
-                        auctionBidButton.addActionListener(e -> {
-                            if (finalBid != null) {
-                                finalBid.setBidAmount((Integer) bidSpinner.getValue());
-                                process(finalBid);
+
+if (settleAction != null) {
+                        if (myTurn) {
+                            int totalBid = settleAction.getCashAmount(); // Initially holds the full bid
+                            
+                            JPanel settlePanel = new JPanel(new java.awt.BorderLayout(10, 5));
+                            settlePanel.setOpaque(false);
+
+                            JLabel settlePrompt = new JLabel(actorName + ", settle " + companyId + " IPO for $" + totalBid);
+                            settlePrompt.setFont(new Font("SansSerif", Font.BOLD, 13));
+                            settlePanel.add(settlePrompt, java.awt.BorderLayout.NORTH);
+
+                            JPanel privatesPanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
+                            privatesPanel.setOpaque(false);
+                            
+                            java.util.List<JCheckBox> privateBoxes = new java.util.ArrayList<>();
+                            JLabel summaryLabel = new JLabel("Privates: $0 | Cash due: $" + totalBid);
+                            summaryLabel.setFont(new Font("SansSerif", Font.BOLD, 12));
+                            summaryLabel.setForeground(new Color(153, 0, 0)); 
+
+                            // Find owned privates
+                           
+                           for (net.sf.rails.game.PrivateCompany pc : gameUIManager.getRoot().getCompanyManager().getAllPrivateCompanies()) {
+                                // Match the owner's name to the auction winner's name (actorName)
+                                if (pc.getOwner() != null && pc.getOwner().getId().equals(actorName) && !pc.isClosed()) {
+                                    int faceValue = pc.getBasePrice();
+                                    JCheckBox cb = new JCheckBox(pc.getId() + " ($" + faceValue + ")");
+                                    
+                                    cb.putClientProperty("pc_id", pc.getId());
+                                    cb.putClientProperty("pc_value", faceValue);
+                                    cb.setOpaque(false);
+                                    
+                                    cb.addItemListener(e -> {
+                                        int selectedValue = 0;
+                                        for (JCheckBox box : privateBoxes) {
+                                            if (box.isSelected()) {
+                                                selectedValue += (Integer) box.getClientProperty("pc_value");
+                                            }
+                                        }
+                                        int cashDue = Math.max(0, totalBid - selectedValue);
+                                        summaryLabel.setText("Privates: $" + selectedValue + " | Cash due: $" + cashDue);
+                                    });
+                                    
+                                    privateBoxes.add(cb);
+                                    privatesPanel.add(cb);
+                                }
                             }
-                        });
-                        dynamicButtonPanel.add(auctionBidButton);
-                        
-                        if (auctionPassButton == null) auctionPassButton = new JButton("Pass");
-                        auctionPassButton.setPreferredSize(new Dimension(90, 35));
-                        auctionPassButton.setForeground(Color.RED);
-                        final NullAction finalPass = passAction;
-                        for (java.awt.event.ActionListener al : auctionPassButton.getActionListeners()) auctionPassButton.removeActionListener(al);
-                        auctionPassButton.addActionListener(e -> process(finalPass));
-                        dynamicButtonPanel.add(auctionPassButton);
+
+                            JPanel centerPanel = new JPanel(new java.awt.BorderLayout());
+                            centerPanel.setOpaque(false);
+                            if (!privateBoxes.isEmpty()) {
+                                centerPanel.add(new JLabel("Select Private Companies to use at face value:"), java.awt.BorderLayout.NORTH);
+                                centerPanel.add(privatesPanel, java.awt.BorderLayout.CENTER);
+                            }
+                            centerPanel.add(summaryLabel, java.awt.BorderLayout.SOUTH);
+                            settlePanel.add(centerPanel, java.awt.BorderLayout.CENTER);
+
+                            JButton settleButton = new JButton("Confirm Settlement");
+                            settleButton.setPreferredSize(new Dimension(160, 35));
+                            
+                            final net.sf.rails.game.specific._1817.action.SettleIPO_1817 finalSettle = settleAction;
+                            settleButton.addActionListener(e -> {
+                                int selectedValue = 0;
+                                java.util.List<String> selectedIds = new java.util.ArrayList<>();
+                                for (JCheckBox box : privateBoxes) {
+                                    if (box.isSelected()) {
+                                        selectedValue += (Integer) box.getClientProperty("pc_value");
+                                        selectedIds.add((String) box.getClientProperty("pc_id"));
+                                    }
+                                }
+                                int cashDue = Math.max(0, totalBid - selectedValue);
+                                
+                                finalSettle.setPrivateCompanyIds(selectedIds);
+                                finalSettle.setCashAmount(cashDue);
+                                
+                                process(finalSettle);
+                            });
+                            
+                            settlePanel.add(settleButton, java.awt.BorderLayout.EAST);
+                            dynamicButtonPanel.add(settlePanel);
+                        } else {
+                            dynamicButtonPanel.add(new JLabel("Waiting for " + actorName + " to settle " + companyId + " IPO..."));
+                        }
                     } else {
-                        dynamicButtonPanel.add(new JLabel("Waiting for " + actorName + " to bid for " + companyId + "..."));
+
+
+
+
+                        if (myTurn) {
+                            int minBid = (bidAction != null) ? bidAction.getBidAmount() : 5;
+                            ((SpinnerNumberModel) bidSpinner.getModel()).setMinimum(minBid);
+                            if ((Integer)bidSpinner.getValue() < minBid) bidSpinner.setValue(minBid);
+                            
+                            JLabel bidPrompt = new JLabel(actorName + " bids for " + companyId + ": $");
+                            bidPrompt.setFont(new Font("SansSerif", Font.PLAIN, 13));
+                            dynamicButtonPanel.add(bidPrompt);
+                            dynamicButtonPanel.add(bidSpinner);
+                            
+                            if (auctionBidButton == null) auctionBidButton = new JButton("Place Bid");
+                            auctionBidButton.setPreferredSize(new Dimension(110, 35));
+                            final net.sf.rails.game.specific._1817.action.Bid1817IPO finalBid = bidAction;
+                            for (java.awt.event.ActionListener al : auctionBidButton.getActionListeners()) auctionBidButton.removeActionListener(al);
+                            auctionBidButton.addActionListener(e -> {
+                                if (finalBid != null) {
+                                    finalBid.setBidAmount((Integer) bidSpinner.getValue());
+                                    process(finalBid);
+                                }
+                            });
+                            dynamicButtonPanel.add(auctionBidButton);
+                            
+                            if (auctionPassButton == null) auctionPassButton = new JButton("Pass");
+                            auctionPassButton.setPreferredSize(new Dimension(90, 35));
+                            auctionPassButton.setForeground(Color.RED);
+                            final NullAction finalPass = passAction;
+                            for (java.awt.event.ActionListener al : auctionPassButton.getActionListeners()) auctionPassButton.removeActionListener(al);
+                            auctionPassButton.addActionListener(e -> process(finalPass));
+                            dynamicButtonPanel.add(auctionPassButton);
+                        } else {
+                            dynamicButtonPanel.add(new JLabel("Waiting for " + actorName + " to bid for " + companyId + "..."));
+                        }
                     }
                     
                     dynamicButtonPanel.revalidate();
