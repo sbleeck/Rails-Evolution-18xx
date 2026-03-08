@@ -144,10 +144,8 @@ log.error("MapManager: finishConfiguration started.");
             }
         }
         hexTable = hexTableBuilder.build();
-        // log.error("--- MapManager.finishConfiguration: Finished placing initial tiles on hexes. ---");
 
         for (PublicCompany company : root.getCompanyManager().getAllPublicCompanies()) {
-          log.error("Processing home hexes for company: " + company.getId());
             List<MapHex> homeHexes = company.getHomeHexes();
             if (homeHexes != null) {
                 for (MapHex homeHex : homeHexes) {

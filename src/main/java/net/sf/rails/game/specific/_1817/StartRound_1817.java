@@ -91,7 +91,6 @@ public class StartRound_1817 extends StartRound {
                 if (bid > 0) {
                     p.unblockCash(bid);
                     item.setBid(0, p);
-                    log.info("Unblocked losing bid of {} for player {}", bid, p.getId());
                 }
             }
         }
@@ -113,9 +112,7 @@ public class StartRound_1817 extends StartRound {
     private void setNextBiddingPlayer(StartItem item, Player biddingPlayer) {
         for (Player p : playerManager.getNextPlayersAfter(biddingPlayer, false, false)) {
             if (!foldedPlayers.contains(p)) {
-                log.info("Checking player {} for next bid. Has not folded.", p.getId());
                 playerManager.setCurrentPlayer(p);
-                log.info("Next bidder successfully set to: {}", p.getId());
                 break;
             }
 
@@ -187,8 +184,6 @@ public class StartRound_1817 extends StartRound {
         int previousBid = item.getBid(player);
         int bidAmount = bidItem.getActualBid();
 
-        log.info("Evaluating bid from {}: Amount = {}, Item = {}, BasePrice = {}",
-                playerName, bidAmount, item.getId(), item.getBasePrice());
 
         while (true) {
             if (!playerName.equals(player.getId())) {
@@ -204,12 +199,10 @@ public class StartRound_1817 extends StartRound {
                 break;
             }
 
-            // --- START FIX ---
             if (bidAmount > item.getBasePrice()) {
                 errMsg = "Bid cannot exceed the face value of the company.";
                 break;
             }
-            // --- END FIX ---
 
             if (bidAmount % bidIncrement != 0) {
                 errMsg = "Bid must be a multiple of " + bidIncrement;
@@ -225,7 +218,6 @@ public class StartRound_1817 extends StartRound {
         }
 
         if (errMsg != null) {
-            log.warn("Bid rejected for {}: {}", playerName, errMsg);
             DisplayBuffer.add(this, errMsg);
             return false;
         }
@@ -235,7 +227,6 @@ public class StartRound_1817 extends StartRound {
             player.unblockCash(previousBid);
         player.blockCash(bidAmount);
 
-        log.info("Bid accepted. {} blocks {} cash. Previous bid was {}", playerName, bidAmount, previousBid);
         ReportBuffer.add(this, playerName + " bids " + Bank.format(this, bidAmount) + " on " + item.getId());
 
         if (bidItem.getStatus() != StartItem.AUCTIONED) {
@@ -245,7 +236,6 @@ public class StartRound_1817 extends StartRound {
             foldedPlayers.clear(); // Reset folds for the new auction
         }
 
-        // --- START FIX ---
         if (bidAmount >= item.getBasePrice()) {
             // Generate a round of passes for all other remaining active players to formally
             // close the auction
@@ -259,15 +249,12 @@ public class StartRound_1817 extends StartRound {
             auctionItemState.set(null);
             numPasses.set(0);
             foldedPlayers.clear();
-            log.info("Bid met base price. Forced passes and assigned item to {}.", player.getId());
             playerManager.setCurrentPlayer(lastInitiator.value());
             playerManager.setCurrentToNextPlayer();
         } else {
             numPasses.set(0);
             setNextBiddingPlayer(item);
-            log.info("Next bidder set to: {}", playerManager.getCurrentPlayer().getId());
         }
-        // --- END FIX ---
         return true;
     }
 

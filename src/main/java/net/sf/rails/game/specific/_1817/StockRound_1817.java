@@ -88,6 +88,11 @@ try {
                 log.info("Starting 1817 Auction for " + comp.getId() + " initiated by " + initiator.getName());
 
                 // 1. Push the new Auction Round onto the stack
+
+                // Explicitly preserve the current Stock Round so it can be resumed later
+                gameManager.setInterruptedRound(this);
+
+                
                 // This preserves the Stock Round as the 'interruptedRound'
                 AuctionRound_1817 auctionRound = gameManager.createRound(AuctionRound_1817.class, "Auction_" + comp.getId());
 

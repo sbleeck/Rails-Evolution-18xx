@@ -882,7 +882,7 @@ public class StatusWindow extends JFrame implements ActionListener, ActionPerfor
             updateFonts(Math.max(8f, currentBaseFontSize - 1f));
         } else if (command.equals("SHOW_MOVE_MONITOR")) {
             showMoveMonitor();
-        } else if (command.equals("SHOW_ACTION_RUNNER")) { 
+        } else if (command.equals("SHOW_ACTION_RUNNER")) {
             showActionRunner();
 
         } else if (command.equals(REM_TILES_CMD) || command.equals(ORPanel.REM_TILES_CMD)) {
@@ -1383,6 +1383,7 @@ public class StatusWindow extends JFrame implements ActionListener, ActionPerfor
     }
 
     private String currentMetadata = "";
+
     public void updateMetadata(String meta) {
         this.currentMetadata = meta;
         // Force an immediate update so it doesn't lag by 1 second
@@ -1597,9 +1598,9 @@ public class StatusWindow extends JFrame implements ActionListener, ActionPerfor
                 }
                 // int cash = ((ShareSellingRound) currentRound).getRemainingCashToRaise();
                 // JOptionPane.showMessageDialog(this, LocalText.getText(
-                //         "YouMustRaiseCash", getCurrentPlayer(),
-                //         gameUIManager.format(cash)), "",
-                //         JOptionPane.OK_OPTION);
+                // "YouMustRaiseCash", getCurrentPlayer(),
+                // gameUIManager.format(cash)), "",
+                // JOptionPane.OK_OPTION);
 
             } else if (currentRound instanceof StockRound) {
                 if (!Util.hasValue(customTitle)) {
@@ -1612,6 +1613,94 @@ public class StatusWindow extends JFrame implements ActionListener, ActionPerfor
 
             if (dynamicButtonPanel != null) {
                 dynamicButtonPanel.removeAll();
+
+
+if (currentRound != null && currentRound.getClass().getName().contains("AuctionRound_1817")) {
+                    net.sf.rails.game.specific._1817.AuctionRound_1817 auction = 
+                        (net.sf.rails.game.specific._1817.AuctionRound_1817) currentRound;
+                    
+                    // Visual container setup
+                    dynamicButtonPanel.setBackground(new Color(230, 240, 255));
+                    dynamicButtonPanel.setOpaque(true);
+                    dynamicButtonPanel.setBorder(BorderFactory.createLineBorder(Color.BLUE, 1));
+                    dynamicButtonPanel.setLayout(new FlowLayout(FlowLayout.LEFT, 15, 5));
+                    
+                    // 1. Display Highest Bidder and Amount
+                    String highBidderName = (auction.getHighestBidder() != null) ? auction.getHighestBidder().getName() : "None";
+                    JLabel highBidLabel = new JLabel("Highest Bid: " + highBidderName + " ($" + auction.getCurrentBid() + ")");
+                    highBidLabel.setFont(new Font("SansSerif", Font.BOLD, 13));
+                    highBidLabel.setForeground(new Color(0, 102, 204));
+                    dynamicButtonPanel.add(highBidLabel);
+                    
+                    // Vertical separator for visual clarity
+                    JSeparator sep = new JSeparator(JSeparator.VERTICAL);
+                    sep.setPreferredSize(new Dimension(2, 25));
+                    dynamicButtonPanel.add(sep);
+
+                    String actorName = (auction.getActingPlayer() != null) ? auction.getActingPlayer().getName() : "Someone";
+                    String companyId = (auction.getAuctionedCompany() != null) ? auction.getAuctionedCompany().getId() : "Company";
+
+                    if (bidSpinner == null) {
+                        bidSpinner = new JSpinner(new SpinnerNumberModel(5, 5, 10000, 5));
+                        bidSpinner.setPreferredSize(new Dimension(80, 30));
+                    }
+                    
+                    net.sf.rails.game.specific._1817.action.Bid1817IPO bidAction = null;
+                    NullAction passAction = null;
+                    
+                    if (possibleActions != null && possibleActions.getList() != null) {
+                        for (PossibleAction pa : possibleActions.getList()) {
+                            if (pa instanceof net.sf.rails.game.specific._1817.action.Bid1817IPO) bidAction = (net.sf.rails.game.specific._1817.action.Bid1817IPO) pa;
+                            else if (pa instanceof NullAction && ((NullAction) pa).getMode() == NullAction.Mode.PASS) passAction = (NullAction) pa;
+                        }
+                    }
+
+                    if (myTurn) {
+                        int minBid = (bidAction != null) ? bidAction.getBidAmount() : 5;
+                        ((SpinnerNumberModel) bidSpinner.getModel()).setMinimum(minBid);
+                        if ((Integer)bidSpinner.getValue() < minBid) bidSpinner.setValue(minBid);
+                        
+                        JLabel bidPrompt = new JLabel(actorName + " bids for " + companyId + ": $");
+                        bidPrompt.setFont(new Font("SansSerif", Font.PLAIN, 13));
+                        dynamicButtonPanel.add(bidPrompt);
+                        dynamicButtonPanel.add(bidSpinner);
+                        
+                        if (auctionBidButton == null) auctionBidButton = new JButton("Place Bid");
+                        auctionBidButton.setPreferredSize(new Dimension(110, 35));
+                        final net.sf.rails.game.specific._1817.action.Bid1817IPO finalBid = bidAction;
+                        for (java.awt.event.ActionListener al : auctionBidButton.getActionListeners()) auctionBidButton.removeActionListener(al);
+                        auctionBidButton.addActionListener(e -> {
+                            if (finalBid != null) {
+                                finalBid.setBidAmount((Integer) bidSpinner.getValue());
+                                process(finalBid);
+                            }
+                        });
+                        dynamicButtonPanel.add(auctionBidButton);
+                        
+                        if (auctionPassButton == null) auctionPassButton = new JButton("Pass");
+                        auctionPassButton.setPreferredSize(new Dimension(90, 35));
+                        auctionPassButton.setForeground(Color.RED);
+                        final NullAction finalPass = passAction;
+                        for (java.awt.event.ActionListener al : auctionPassButton.getActionListeners()) auctionPassButton.removeActionListener(al);
+                        auctionPassButton.addActionListener(e -> process(finalPass));
+                        dynamicButtonPanel.add(auctionPassButton);
+                    } else {
+                        dynamicButtonPanel.add(new JLabel("Waiting for " + actorName + " to bid for " + companyId + "..."));
+                    }
+                    
+                    dynamicButtonPanel.revalidate();
+                    dynamicButtonPanel.repaint();
+                } else {
+                    dynamicButtonPanel.setBackground(null);
+                    dynamicButtonPanel.setOpaque(false);
+                    dynamicButtonPanel.setBorder(BorderFactory.createEmptyBorder(0, 300, 0, 0));
+                }
+
+
+
+
+
+
             }
 
             // 1. Do NOT disable immediately. This causes the "Switch Off" flicker.
@@ -2394,9 +2483,10 @@ public class StatusWindow extends JFrame implements ActionListener, ActionPerfor
             setSize(600, 500);
         }
 
-public void refresh() {
+        public void refresh() {
             GameManager gm = gui.getGameManager();
-            if (gm == null) return;
+            if (gm == null)
+                return;
 
             StringBuilder sb = new StringBuilder();
             int move = gm.getActionCountModel().value();
@@ -2405,9 +2495,9 @@ public void refresh() {
 
             sb.append("==================================================\n");
             sb.append(String.format(" MOVE: #%-5d | PLAYER: %s\n", move, (p != null ? p.getName() : "None")));
-            sb.append(String.format(" ROUND: %-13s | CLASS: %s\n", 
-                (r != null ? r.getId() : "None"), 
-                (r != null ? r.getClass().getSimpleName() : "N/A")));
+            sb.append(String.format(" ROUND: %-13s | CLASS: %s\n",
+                    (r != null ? r.getId() : "None"),
+                    (r != null ? r.getClass().getSimpleName() : "N/A")));
 
             // --- START FIX: DETECT COMPANY VIA REFLECTION ---
             // Previously: only checked (r instanceof OperatingRound)
@@ -2427,7 +2517,7 @@ public void refresh() {
             }
             sb.append(String.format(" ACTIVE COMPANY (Reflect): %s\n", companyId));
             sb.append("==================================================\n\n");
-            
+
             sb.append(String.format(" %-20s | %-10s | %s\n", "ACTION TYPE", "OWNER", "DETAILS"));
             sb.append(" ---------------------+------------+----------------------\n");
 
@@ -2437,31 +2527,32 @@ public void refresh() {
                     if (pa instanceof GameAction || pa instanceof CorrectionModeAction || pa.isCorrection()) {
                         continue;
                     }
-                    
+
                     // --- START FIX: SHOW ACTION OWNER ---
                     String owner = "-";
                     // Try standard "company" field if available (PossibleORAction)
                     if (pa instanceof rails.game.action.PossibleORAction) {
                         PublicCompany c = ((rails.game.action.PossibleORAction) pa).getCompany();
-                        if (c != null) owner = c.getId();
+                        if (c != null)
+                            owner = c.getId();
                     }
                     // Fallback: Check for getPlayer()
                     else if (pa instanceof rails.game.action.PossibleAction) {
-                         Player pl = pa.getPlayer();
-                         if (pl != null) owner = pl.getName();
+                        Player pl = pa.getPlayer();
+                        if (pl != null)
+                            owner = pl.getName();
                     }
-                    
-                    sb.append(String.format(" %-20s | %-10s | %s\n", 
-                        pa.getClass().getSimpleName(), 
-                        owner,
-                        pa.toString()));
+
+                    sb.append(String.format(" %-20s | %-10s | %s\n",
+                            pa.getClass().getSimpleName(),
+                            owner,
+                            pa.toString()));
                 }
             }
             area.setText(sb.toString());
             area.setCaretPosition(0);
         }
-   
-   
+
     }
 
     private void showActionRunner() {

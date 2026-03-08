@@ -1626,7 +1626,9 @@ public Integer getRoundStart(int currentIndex) {
             try {
                 String filename = String.format("state_%05d.json", actionCount.value());
                 File outputFile = new File(this.logOutputDirectory, filename);
-                net.sf.rails.game.ai.snapshot.JsonStateSerializer.serialize(this, outputFile.getAbsolutePath());
+                if (getCurrentRound() != null) {
+                    net.sf.rails.game.ai.snapshot.JsonStateSerializer.serialize(this, outputFile.getAbsolutePath());
+                }
             } catch (Exception e) {
                 // Ignore snapshot errors
             }

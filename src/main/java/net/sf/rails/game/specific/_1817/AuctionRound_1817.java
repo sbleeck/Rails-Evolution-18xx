@@ -14,10 +14,6 @@ import rails.game.action.NullAction;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-/**
- * 1817 IPO Auction State Machine.
- * Intercepts the Stock Round to resolve company presidency and par price.
- */
 public class AuctionRound_1817 extends Round {
 
     private static final Logger log = LoggerFactory.getLogger(AuctionRound_1817.class);
@@ -30,22 +26,32 @@ public class AuctionRound_1817 extends Round {
     protected final ArrayListState<Player> activeBidders;
     protected final IntegerState currentPlayerIndex;
 
+    public int getCurrentBid() {
+        return currentBid.value();
+    }
+
+    public Player getHighestBidder() {
+        return highestBidder.value();
+    }
+
+    public PublicCompany_1817 getAuctionedCompany() {
+        return auctionedCompany.value();
+    }
+
+
     public AuctionRound_1817(GameManager parent, String id) {
         super(parent, id);
-        // Initialize states using standard constructors as seen in StockRound
-        this.auctionedCompany = new GenericState<PublicCompany_1817>(this, "auctionedCompany_" + id);
-        this.targetHexId = new GenericState<String>(this, "targetHexId_" + id);
+        this.auctionedCompany = new GenericState<>(this, "auctionedCompany_" + id);
+        this.targetHexId = new GenericState<>(this, "targetHexId_" + id);
         this.currentBid = IntegerState.create(this, "currentBid_" + id, 0);
-        this.highestBidder = new GenericState<Player>(this, "highestBidder_" + id);
-        this.initiator = new GenericState<Player>(this, "initiator_" + id);
-        this.activeBidders = new ArrayListState<Player>(this, "activeBidders_" + id);
+        this.highestBidder = new GenericState<>(this, "highestBidder_" + id);
+        this.initiator = new GenericState<>(this, "initiator_" + id);
+        this.activeBidders = new ArrayListState<>(this, "activeBidders_" + id);
         this.currentPlayerIndex = IntegerState.create(this, "currentPlayerIndex_" + id, 0);
     }
 
-    /**
-     * Prepares the auction with parameters from the Stock Round initiation.
-     */
     public void setupAuction(PublicCompany_1817 company, String hexId, int startingBid, Player startingPlayer, List<Player> allPlayers) {
+        log.info("AUCTION_LOG: Setting up auction for {} at Hex {}. Starting Bid: ${}", company.getId(), hexId, startingBid);
         this.auctionedCompany.set(company);
         this.targetHexId.set(hexId);
         this.currentBid.set(startingBid);
@@ -57,63 +63,71 @@ public class AuctionRound_1817 extends Round {
             this.activeBidders.add(p);
         }
         
-        // Start turn clockwise from the initiator
         int startIndex = (allPlayers.indexOf(startingPlayer) + 1) % allPlayers.size();
         this.currentPlayerIndex.set(startIndex);
+        log.info("AUCTION_LOG: First acting bidder will be: {}", getActingPlayer().getName());
     }
 
+
     public Player getActingPlayer() {
-        if (activeBidders.isEmpty()) return null;
+        if (activeBidders == null || activeBidders.isEmpty()) return null;
         int index = currentPlayerIndex.value() % activeBidders.size();
         return activeBidders.get(index);
     }
 
     @Override
     public boolean setPossibleActions() {
-        // Inherited from Round base class
         possibleActions.clear();
-        
-        Player currentPlayer = getActingPlayer();
-        if (currentPlayer == null) return false;
 
-        // If only one remains, the auction is over
+        // If resolution already happened or only 1 bidder left, don't generate more actions
         if (activeBidders.size() <= 1) {
+            log.info("AUCTION_LOG: Resolution condition met (Bidders: {}).", activeBidders.size());
             resolveAuction();
             return true;
         }
 
-        // Generate Pass/Bid actions for the StatusWindow to pick up
+        Player currentPlayer = getActingPlayer();
+        
+        if (activeBidders.size() <= 1) {
+            log.info("AUCTION_LOG: Only one bidder remains. Resolving...");
+            resolveAuction();
+            return true;
+        }
+
+        log.info("AUCTION_LOG: Generating actions for player: {}", (currentPlayer != null ? currentPlayer.getName() : "NULL"));
         possibleActions.add(new NullAction(gameManager.getRoot(), NullAction.Mode.PASS));
         
         int minNextBid = currentBid.value() + 5;
-        if (currentPlayer.getCash() >= minNextBid) {
+        if (currentPlayer != null && currentPlayer.getCash() >= minNextBid) {
             possibleActions.add(new Bid1817IPO(gameManager.getRoot(), minNextBid));
         }
-        
         return true;
     }
 
     @Override
     public boolean process(PossibleAction action) {
+        Player actor = getActingPlayer();
         if (action instanceof NullAction && ((NullAction) action).getMode() == NullAction.Mode.PASS) {
-            Player passingPlayer = getActingPlayer();
-            log.info("Player {} passes the auction.", passingPlayer.getName());
-            activeBidders.remove(passingPlayer);
-            // Turn advances naturally to the next player in the reduced list
+            log.info("AUCTION_LOG: Player {} FOLDED.", actor.getName());
+
+activeBidders.remove(actor);
+            
+            // After removing the passer, if only one is left, the next UI cycle 
+            // calls setPossibleActions() which will trigger resolveAuction().
+            // We do NOT increment currentPlayerIndex here because the list size changed.
             return true;
+            
+
         }
 
         if (action instanceof Bid1817IPO) {
-            Bid1817IPO bidAction = (Bid1817IPO) action;
-            this.currentBid.set(bidAction.getBidAmount());
-            this.highestBidder.set(getActingPlayer());
-            
-            // Turn advances clockwise
-            int nextIndex = (currentPlayerIndex.value() + 1) % activeBidders.size();
-            this.currentPlayerIndex.set(nextIndex);
+            int amount = ((Bid1817IPO) action).getBidAmount();
+            log.info("AUCTION_LOG: Player {} BID ${}.", actor.getName(), amount);
+            this.currentBid.set(amount);
+            this.highestBidder.set(actor);
+            this.currentPlayerIndex.set((currentPlayerIndex.value() + 1) % activeBidders.size());
             return true;
         }
-        
         return super.process(action);
     }
 
@@ -121,27 +135,88 @@ public class AuctionRound_1817 extends Round {
         Player winner = highestBidder.value();
         PublicCompany_1817 comp = auctionedCompany.value();
         int finalBid = currentBid.value();
-        int parPrice = finalBid / 2;
 
-        log.info("Auction resolved. Winner: {} at ${}", winner.getName(), finalBid);
 
-        // 1. Set Company State (2-share initialization)
+        // 1817 Rule: Par is exactly half the final bid (round up)
+        int parPrice = (finalBid + 1) / 2;
+
+        log.info("AUCTION_LOG: RESOLUTION -> Winner: {}, Bid: ${}, Calculated Par: ${}", winner.getName(), finalBid, parPrice);
+
         comp.setShareCount(2);
-        net.sf.rails.game.financial.StockSpace startSpace = getRoot().getStockMarket().getStartSpace(parPrice);
-        comp.start(startSpace);
+        
+        net.sf.rails.game.financial.StockMarket stockMarket = getRoot().getStockMarket();
 
-        // 2. Financial Transfers
+
+        // 2. Hardwired snap to valid 1817 StartSpace prices from StockMarket.xml
+        int snapPrice;
+        if (parPrice >= 200) snapPrice = 200;
+        else if (parPrice >= 180) snapPrice = 180;
+        else if (parPrice >= 165) snapPrice = 165;
+        else if (parPrice >= 150) snapPrice = 150;
+        else if (parPrice >= 135) snapPrice = 135;
+        else if (parPrice >= 120) snapPrice = 120;
+        else if (parPrice >= 110) snapPrice = 110;
+        else if (parPrice >= 100) snapPrice = 100;
+        else if (parPrice >= 90) snapPrice = 90;
+        else if (parPrice >= 80) snapPrice = 80;
+        else if (parPrice >= 70) snapPrice = 70;
+        else if (parPrice >= 65) snapPrice = 65;
+        else if (parPrice >= 60) snapPrice = 60;
+        else if (parPrice >= 55) snapPrice = 55;
+        else snapPrice = 50;
+
+        // Use getStartSpace(int) to find the space associated with the snapped price
+        net.sf.rails.game.financial.StockSpace startSpace = stockMarket.getStartSpace(snapPrice);
+
+        if (startSpace != null) {
+            log.info("AUCTION_LOG: Snapping to valid StartSpace at ${}", snapPrice);
+            comp.start(startSpace);
+        } else {
+            log.error("AUCTION_LOG: FATAL - No StartSpace configured for price ${}", snapPrice);
+        }
+
         Currency.wire(winner, finalBid, getRoot().getBank());
         Currency.wire(getRoot().getBank(), finalBid, comp);
 
-        // 3. Ownership and Map placement
-        comp.getPresidentsShare().moveTo(winner.getPortfolioModel());
+        if (comp.getPresidentsShare() != null) {
+            comp.getPresidentsShare().moveTo(winner.getPortfolioModel());
+        }
         
         net.sf.rails.game.MapHex homeHex = getRoot().getMapManager().getHex(targetHexId.value());
-        if (homeHex != null) comp.setHomeHex(homeHex);
+
+
+        if (homeHex != null) {
+            comp.setHomeHex(homeHex);
+            
+            // 1817 Rule: Tokens are placed immediately upon floating, not delayed to the OR.
+            net.sf.rails.game.Stop targetStop = null;
+            if (homeHex.getStops() != null) {
+                for (net.sf.rails.game.Stop stop : homeHex.getStops()) {
+                    if (stop.hasTokenSlotsLeft()) {
+                        targetStop = stop;
+                        break; // Grab the first open station slot
+                    }
+                }
+            }
+            
+            if (targetStop != null) {
+                comp.setHomeCityNumber(targetStop.getRelatedStationNumber());
+                boolean tokenLaid = homeHex.layBaseToken(comp, targetStop);
+                if (tokenLaid) {
+                    log.info("AUCTION_LOG: Laid base token for {} on Hex {} (Station {})", 
+                             comp.getId(), homeHex.getId(), targetStop.getRelatedStationNumber());
+                } else {
+                    log.error("AUCTION_LOG: Failed to lay base token for {} on Hex {}", comp.getId(), homeHex.getId());
+                }
+            } else {
+                log.warn("AUCTION_LOG: Could not find free stop on Hex {} for token placement", homeHex.getId());
+            }
+
+        }
         comp.setFloated();
 
-        // 4. Cleanup and return to Stock Round
-        gameManager.finishShareSellingRound(true); 
+
+        log.info("AUCTION_LOG: Auction finished. Returning to Stock Round.");
+        gameManager.finishShareSellingRound(true);
     }
 }

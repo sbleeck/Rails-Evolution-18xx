@@ -160,7 +160,6 @@ public class GameStatus extends GridPanel {
     protected int compTokensXOffset, compTokensYOffset;
     protected JPanel[] compPrivatesPanel;
     protected int compPrivatesXOffset, compPrivatesYOffset;
-    protected Field[] compLoans;
     protected int compLoansXOffset, compLoansYOffset;
     protected int rightsXOffset, rightsYOffset;
     protected Field[] rights;
@@ -176,6 +175,7 @@ public class GameStatus extends GridPanel {
     protected int playerORWorthIncreaseXOffset, playerORWorthIncreaseYOffset;
     protected CertLimitGauge[] playerCertCount;
     protected int playerCertCountXOffset, playerCertCountYOffset;
+    protected JComponent[] compLoans;
     protected Field bankCash;
     protected int newTrainsXOffset, newTrainsYOffset;
     protected int futureTrainsXOffset, futureTrainsYOffset, futureTrainsWidth;
@@ -183,6 +183,8 @@ public class GameStatus extends GridPanel {
 
     private final int MAX_TRAIN_SLOTS = 4; // Max trains to display per company
     private final int MAX_FUTURE_SLOTS = 6; // Max future trains to display
+
+    protected net.sf.rails.ui.swing.elements.BondsHeatbarPanel bondsHeatbarPanel;
 
     // Track previous times to detect jumps (penalties/undo)
     private int[] lastPlayerTimes;
@@ -493,11 +495,15 @@ public class GameStatus extends GridPanel {
         hasParPrices = gameUIManager.getGameParameterAsBoolean(GuiDef.Parm.HAS_ANY_PAR_PRICE);
         compCanBuyPrivates = gameUIManager.getGameParameterAsBoolean(GuiDef.Parm.CAN_ANY_COMPANY_BUY_PRIVATES);
         compCanHoldOwnShares = gameUIManager.getGameParameterAsBoolean(GuiDef.Parm.CAN_ANY_COMPANY_HOLD_OWN_SHARES);
-        hasCompanyLoans = gameUIManager.getGameParameterAsBoolean(GuiDef.Parm.HAS_ANY_COMPANY_LOANS);
+        boolean is1817 = "1817".equals(gameUIManager.getGameManager().getGameName());
+        hasCompanyLoans = gameUIManager.getGameParameterAsBoolean(GuiDef.Parm.HAS_ANY_COMPANY_LOANS) || is1817;
+
         hasRights = gameUIManager.getGameParameterAsBoolean(GuiDef.Parm.HAS_ANY_RIGHTS);
         hasBonds = gameUIManager.getGameParameterAsBoolean(GuiDef.Parm.HAS_BONDS);
         hasDirectCompanyIncomeInOr = gameUIManager.getGameParameterAsBoolean(GuiDef.Parm.HAS_SPECIAL_COMPANY_INCOME);
         needsNumberOfSharesColumn = gameUIManager.getGameParameterAsBoolean(GuiDef.Parm.HAS_GROWING_NUMBER_OF_SHARES);
+
+
 
         // TODO: Can this be done using ipo and pool directly?
         ipo = bank.getIpo().getPortfolioModel();
@@ -1282,6 +1288,9 @@ public class GameStatus extends GridPanel {
                 chosenAction = handleBuyTrain((BuyTrain) actions.get(0));
             } else if (actions.get(0).getClass().getName().endsWith("Initiate1817IPO")) {
                 chosenAction = handle1817IPO(actions.get(0));
+            } else if (actions.get(0).getClass().getName().endsWith("TakeLoans_1817")) {
+                processTakeLoans((net.sf.rails.game.specific._1817.action.TakeLoans_1817) actions.get(0));
+                return;
             } else if (actions.get(0).getClass().getSimpleName().equals("StartPrussian")) {
                 // Explicitly handle StartPrussian to ensure it triggers
                 chosenAction = actions.get(0);
@@ -2587,6 +2596,21 @@ public class GameStatus extends GridPanel {
         }
     }
 
+    private void updateBondsHeatbar() {
+        if (bondsHeatbarPanel == null)
+            return;
+
+        int totalLoans = 0;
+        if (companies != null) {
+            for (PublicCompany c : companies) {
+                if (c == null || c.isClosed())
+                    continue;
+                totalLoans += c.getNumberOfBonds();
+            }
+        }
+        bondsHeatbarPanel.setTotalLoansTaken(totalLoans);
+    }
+
     public void initTurn(int actorIndex, boolean myTurn) {
 
         // We use the existing gameUIManager field directly.
@@ -2891,6 +2915,60 @@ public class GameStatus extends GridPanel {
                 updateCompanyPrivates(i, c);
             }
 
+if (hasCompanyLoans) {
+                try {
+                    // Diagnostic Logging
+                    if (compLoans == null) {
+                        log.info("DEBUG-CRASH: compLoans is NULL for company " + c.getId());
+                    } else if (i >= compLoans.length) {
+                        log.info("DEBUG-CRASH: Index " + i + " out of bounds for compLoans.length " + compLoans.length + " (Company: " + c.getId() + ")");
+                    }
+
+                    if (compLoans != null && i < compLoans.length && compLoans[i] != null) {
+                        compLoans[i].setBackground(bgRow);
+                        compLoans[i].setOpaque(true);
+
+                        if (compLoans[i] instanceof ClickField) {
+                            ClickField cf = (ClickField) compLoans[i];
+                            cf.setEnabled(false);
+                            cf.setPossibleAction(null);
+                        }
+
+                        if (c != null && c.hasFloated()) {
+                            int currentBonds = c.getNumberOfBonds();
+                            int maxBonds = currentBonds;
+                            try {
+                                java.lang.reflect.Method m = c.getClass().getMethod("getShareCount");
+                                maxBonds = (Integer) m.invoke(c);
+                            } catch (Exception e) {
+                                // Fallback
+                            }
+
+                            if (compLoans[i] instanceof JLabel) {
+                                ((JLabel) compLoans[i]).setText(currentBonds + "/" + maxBonds);
+                            }
+
+                            if (possibleActions != null && possibleActions.getList() != null) {
+                                for (PossibleAction pa : possibleActions.getList()) {
+                                    if (pa != null && pa.getClass().getName().endsWith("TakeLoans_1817")) {
+                                        if (compLoans[i] instanceof ClickField) {
+                                            ClickField cf = (ClickField) compLoans[i];
+                                            cf.setEnabled(true);
+                                            cf.setPossibleAction(pa);
+                                        }
+                                    }
+                                }
+                            }
+                        } else if (compLoans[i] instanceof JLabel) {
+                            ((JLabel) compLoans[i]).setText("");
+                        }
+                    }
+                } catch (Exception e) {
+                    log.error("DEBUG-CRASH: Exception in loan update for " + c.getId(), e);
+                }
+            }
+            
+
             // Note: We need to ensure the compCash/Revenue/Tokens fields use the new bgRow.
             // Assuming your previous code already updated these fields, we will ensure
             // the logic is consolidated here for simplicity.
@@ -3193,6 +3271,7 @@ public class GameStatus extends GridPanel {
         updateFixedIncome();
         updatePlayerPrivates();
         updateTrainCosts();
+        updateBondsHeatbar();
 
         // 3. ENABLE BUTTONS
         if ((pIdx = this.actorIndex) >= -1 && myTurn) {
@@ -3236,7 +3315,7 @@ public class GameStatus extends GridPanel {
                 }
             }
 
-             // 1817 IPO Binding
+            // 1817 IPO Binding
             if (possibleActions.getList() != null) {
                 for (PossibleAction pa : possibleActions.getList()) {
                     if (pa.getClass().getName().endsWith("Initiate1817IPO")) {
@@ -3251,7 +3330,7 @@ public class GameStatus extends GridPanel {
                     }
                 }
             }
-            
+
             setTrainBuyingActions(possibleActions.getList());
         }
 
@@ -3815,6 +3894,12 @@ public class GameStatus extends GridPanel {
                 compPrivatesPanel = new JPanel[nc];
         }
 
+        if (hasCompanyLoans) {
+            if (compLoans == null || compLoans.length != nc) {
+                compLoans = new JComponent[nc];
+            }
+        }
+
         // Initialize IPO Arrays
         if (ipoPanels == null || ipoPanels.length != nc)
             ipoPanels = new JPanel[nc];
@@ -4053,6 +4138,15 @@ public class GameStatus extends GridPanel {
             f.setBorder(BORDER_THIN);
             f.setPreferredSize(DIM_STD);
             addField(f, compPrivatesXOffset, 1, 1, 1, 0, true);
+        }
+
+        if (hasCompanyLoans) {
+            f = new Caption("Loans");
+            f.setBorder(BORDER_THIN);
+            f.setBackground(BG_HEADER);
+            f.setOpaque(true);
+            f.setPreferredSize(DIM_STD);
+            addField(f, compLoansXOffset, 1, 1, 1, 0, true);
         }
 
     }
@@ -4417,8 +4511,22 @@ public class GameStatus extends GridPanel {
                 addField(compPrivatesPanel[i], compPrivatesXOffset, y, 1, 1, 0, visible);
             }
 
+if (hasCompanyLoans && compLoans != null && i < compLoans.length) {
+                // ClickField requires a ButtonGroup; passing null causes the NPE.
+                // We use buySellGroup to maintain UI focus consistency.
+                ClickField cf = new ClickField("", "takeLoan_" + c.getId(), "Take Loans", this, buySellGroup);
+                compLoans[i] = cf;
+                cf.setBackground(isOperating ? BG_OPERATING : (!isActive ? BG_INACTIVE : BG_MAUVE));
+                cf.setOpaque(true);
+                cf.setBorder(bDet);
+                cf.setPreferredSize(DIM_STD);
+                cf.setHorizontalAlignment(SwingConstants.CENTER);
+                addField(cf, compLoansXOffset, y, 1, 1, 0, visible);
+            }
+
             y++;
         }
+
     }
 
     private void initPlayerFooters() {
@@ -4673,20 +4781,35 @@ public class GameStatus extends GridPanel {
             gbc.weightx = 0.0;
         }
 
-        f = new Caption("Bank Cash");
-        f.setBorder(BORDER_BOX);
-        f.setBackground(BG_BANK);
-        f.setOpaque(true);
-        f.setFont(new Font("SansSerif", Font.BOLD, 12));
-        addField(f, bankX - 1, bankY - 4, 1, 1, 0, true);
+        boolean is1817 = "1817".equals(gameUIManager.getGameManager().getGameName());
 
-        bankCash = new Field(bank.getPurse());
-        bankCash.setBorder(BORDER_BOX);
-        bankCash.setBackground(BG_BANK);
-        bankCash.setOpaque(true);
-        Font bankFont = bankCash.getFont();
-        bankCash.setFont(bankFont.deriveFont(Font.BOLD, bankFont.getSize()));
-        addField(bankCash, bankX, bankY - 4, 1, 1, 0, true);
+        if (is1817) {
+            bondsHeatbarPanel = new net.sf.rails.ui.swing.elements.BondsHeatbarPanel();
+            int span = rightCompCaptionXOffset - (bankX - 1);
+            if (span < 1)
+                span = 1;
+
+            gbc.weightx = 1.0;
+            gbc.fill = GridBagConstraints.BOTH;
+            addField(bondsHeatbarPanel, bankX - 1, bankY - 4, span, 1, 0, true);
+            gbc.weightx = 0.0;
+            gbc.fill = GridBagConstraints.HORIZONTAL;
+        } else {
+            f = new Caption("Bank Cash");
+            f.setBorder(BORDER_BOX);
+            f.setBackground(BG_BANK);
+            f.setOpaque(true);
+            f.setFont(new Font("SansSerif", Font.BOLD, 12));
+            addField(f, bankX - 1, bankY - 4, 1, 1, 0, true);
+
+            bankCash = new Field(bank.getPurse());
+            bankCash.setBorder(BORDER_BOX);
+            bankCash.setBackground(BG_BANK);
+            bankCash.setOpaque(true);
+            Font bankFont = bankCash.getFont();
+            bankCash.setFont(bankFont.deriveFont(Font.BOLD, bankFont.getSize()));
+            addField(bankCash, bankX, bankY - 4, 1, 1, 0, true);
+        }
 
         f = new Caption("Time");
         f.setBackground(Color.WHITE);
@@ -5073,5 +5196,31 @@ public class GameStatus extends GridPanel {
         }
     }
 
+    private void processTakeLoans(net.sf.rails.game.specific._1817.action.TakeLoans_1817 action) {
+        PublicCompany comp = action.getCompany();
+        int current = comp.getNumberOfBonds();
+        int max = action.getMaxLoansAllowed();
+        int available = max - current;
+
+        if (available <= 0) {
+            JOptionPane.showMessageDialog(this, comp.getId() + " is at its loan limit (" + max + ").");
+            return;
+        }
+
+        // Create options: "1", "2", etc.
+        String[] options = new String[available];
+        for (int i = 0; i < available; i++) {
+            options[i] = String.valueOf(i + 1);
+        }
+
+        String selected = (String) JOptionPane.showInputDialog(this,
+                "Select number of loans for " + comp.getId() + ":\n(Current: " + current + ", Max: " + max + ")",
+                "Take Loans", JOptionPane.QUESTION_MESSAGE, null, options, options[0]);
+
+        if (selected != null) {
+            action.setLoansToTake(Integer.parseInt(selected));
+            gameUIManager.processAction(action);
+        }
+    }
 
 }
