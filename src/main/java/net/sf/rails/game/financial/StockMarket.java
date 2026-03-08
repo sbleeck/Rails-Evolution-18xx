@@ -135,7 +135,14 @@ public class StockMarket extends RailsManager implements Configurable {
             }
 
             StockSpace space = StockSpace.create(this, name, Integer.parseInt(price), type);
+            
+// Extract and set the custom label from XML attribute "label"
+            space.setLabel(spaceTag.getAttributeAsString("label"));
+                        
             stockChartSpaces.put(name, space);
+
+            // Read the label from the XML (e.g., label="Liquidation")
+            space.setLabel(spaceTag.getAttributeAsString("label"));
 
             row = Integer.parseInt(name.substring(1));
             col = (name.toUpperCase().charAt(0) - '@');

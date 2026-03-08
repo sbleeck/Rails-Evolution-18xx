@@ -125,6 +125,11 @@ public class StatusWindow extends JFrame implements ActionListener, ActionPerfor
     protected JLabel gameTimeLabel;
     protected javax.swing.Timer uiRefreshTimer;
 
+    protected JPanel auctionPanel;
+    protected JSpinner bidSpinner;
+    protected JButton auctionBidButton;
+    protected JButton auctionPassButton;
+
     protected String buildTimestamp = "Dev Build"; // Stores the build time
     private JScrollPane gameStatusPane; // <--- ADD THIS
     protected static final String CORRECT_SHARES_CMD = "CorrectShares";

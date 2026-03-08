@@ -6,24 +6,30 @@ import net.sf.rails.game.RailsRoot;
 
 /**
  * Action generated when a player initiates an IPO in 1817.
- * Encapsulates the company, the hex ID for the initial station marker,
- * and the opening bid.
+ * Storing the company ID as a String to ensure serialization compatibility.
  */
 public class Initiate1817IPO extends PossibleAction {
 
     private static final long serialVersionUID = 1L;
     
-    private final PublicCompany company;
+    private final String companyName;
     private String hexId;
     private int bid;
 
-    public Initiate1817IPO(RailsRoot root, PublicCompany company) {
+    public Initiate1817IPO(RailsRoot root, String companyName) {
         super(root);
-        this.company = company;
+        this.companyName = companyName;
     }
 
+    /**
+     * Helper to resolve the company object from the stored ID string.
+     */
     public PublicCompany getCompany() {
-        return company;
+        return getRoot().getCompanyManager().getPublicCompany(companyName);
+    }
+
+    public String getCompanyName() {
+        return companyName;
     }
 
     public String getHexId() {
@@ -44,7 +50,6 @@ public class Initiate1817IPO extends PossibleAction {
 
     @Override
     public String toString() {
-        return "Initiate IPO for " + (company != null ? company.getId() : "Unknown") 
-                + " at " + hexId + " with bid $" + bid;
+        return "Initiate IPO for " + companyName + " at " + (hexId != null ? hexId : "??") + " with bid $" + bid;
     }
 }

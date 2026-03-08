@@ -440,7 +440,7 @@ if (upperPlayerCaption[j][i] != null) {
 
         if (includeBuying) {
             buyButton = new ActionButton(RailsIcon.AUCTION_BUY);
-            buyButton.setMnemonic(KeyEvent.VK_B);
+            buyButton.setMnemonic(KeyEvent.VK_U);
             buyButton.addActionListener(this);
             buyButton.setEnabled(false);
             buttonPanel.add(buyButton);
@@ -448,7 +448,7 @@ if (upperPlayerCaption[j][i] != null) {
 
         if (includeBidding != StartRound.Bidding.NO) {
             bidButton = new ActionButton(RailsIcon.BID);
-            bidButton.setMnemonic(KeyEvent.VK_D);
+            bidButton.setMnemonic(KeyEvent.VK_B);
             bidButton.addActionListener(this);
             bidButton.setEnabled(false);
             buttonPanel.add(bidButton);
@@ -863,8 +863,8 @@ if (cardWrappers[i] != null) {
                         }
                     } else if (action instanceof BidStartItem) {
                         BidStartItem bidAction = (BidStartItem) action;
-if (bidAction.isSelected() || i == selectedItemIndex) {
-                                cards[i].setState(RailCard.State.SELECTED);
+                        if (bidAction.isSelected() || i == selectedItemIndex) {
+                            cards[i].setState(RailCard.State.SELECTED);
                             selectedItemIndex = i;
                             if (bidButton != null) {
                                 bidButton.setEnabled(true);
@@ -978,14 +978,23 @@ if (bidAction.isSelected() || i == selectedItemIndex) {
                 }
             }
             
-            else if (action instanceof BidStartItem) {
+else if (action instanceof BidStartItem) {
                 BidStartItem bidAction = (BidStartItem) action;
                 if (source == passButton) {
                     bidAction.setActualBid(-1);
+                    log.info("Player {} passed on bidding.", players.getCurrentPlayer().getId());
                 } else if (bidAmount != null && bidAmount.isEnabled()) {
-                    bidAction.setActualBid((Integer) bidAmount.getValue());
+                    try {
+                        bidAmount.commitEdit();
+                    } catch (java.text.ParseException pe) {
+                        log.warn("Invalid bid amount format in spinner", pe);
+                    }
+                    int committedBid = (Integer) bidAmount.getValue();
+                    log.info("Committing bid of {} from UI panel for player {}.", committedBid, players.getCurrentPlayer().getId());
+                    bidAction.setActualBid(committedBid);
                 }
             }
+
             selectedItemIndex = -1;
             process(action);
         }
