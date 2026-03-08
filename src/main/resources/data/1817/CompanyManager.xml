@@ -21,92 +21,75 @@
 		</Shares>
 		<Trains limit="4,3,2"/>
         <CanUseSpecialProperties/>
-
 	</CompanyType>
-	<Company name="SVNRR" type="Private" basePrice="20" revenue="5"
-			longname="Schuylkill Valley Navigation &amp; Railroad Company">
-	</Company>
-	<Company name="C&amp;StL" type="Private" basePrice="40" revenue="10"
-			longname="Champlain &amp; St.Lawrence">
-
-	</Company>
-	<Company name="D&amp;H" type="Private" basePrice="70" revenue="15"
-		longname="Delaware &amp; Hudson">
-
-	</Company>
-	<Company name="M&amp;H" type="Private" basePrice="110" revenue="20"
-		longname="Mohawk &amp; Hudson">
-
-	</Company>
-	<Company name="C&amp;A" type="Private" basePrice="160" revenue="25"
-		longname="Camden &amp; Amboy">
-		<Info key="ComesWithCertificate" parm="PRR,10"/>
-	</Company>
-	<Company name="B&amp;O" type="Private" basePrice="220" revenue="30"
-		longname="Baltimore &amp; Ohio">
-		<Info key="ComesWithPresidency" parm="B&amp;O,20"/>
-		<Tradeable toCompany="no"/>
-	</Company>
 	
-
-
-
-
-
-
-	<Company name="B&amp;M" type="Public" tokens="2" fgColour="000000" bgColour="60E060"
-			longname="Boston &amp; Maine">
-		<Home hex="C26"/>
-	</Company>	     
-
-	<Company name="B&amp;O" type="Public" tokens="3" fgColour="255,255,255" bgColour="0,0,255"
-			longname="Baltimore &amp; Ohio">
-		<FirstTrainCloses type="Private" name="B&amp;O"/>
-		<Home hex="G18"/>
-	</Company>
-
-	<Company name="C&amp;O" type="Public" tokens="3" fgColour="000000" bgColour="A0E0FF"
-			longname="Chesapeake &amp; Ohio">
-			<Home hex="F3"/>
-	</Company>
 	
-	<Company name="CPR" type="Public" tokens="4" fgColour="FFFFFF" bgColour="FF0000"
-			longname="Canadian Pacific Railroad">
-		<Home hex="B17"/>
-	</Company>
+	   <Company name="PSM40" longname="Pittsburgh Steel Mill" 
+	   type="Private" basePrice="40" revenue="0" 
+		description="Allows building the unique Pittsburgh tile. Yellow lay, no connectivity required." />
+	    <Company name="MNE40" longname="Mountain Engineers" type="Private" basePrice="40" revenue="0" 
+             description="Owner gets $20 when building on mountains (after paying terrain fee)." />
+    <Company name="OBC40" longname="Ohio Bridge Co" type="Private" basePrice="40" revenue="0" 
+             description="1 bridge token. Free river lays. Marker adds $10 to city value." />
+    <Company name="UBC80" longname="Union Bridge Co" type="Private" basePrice="80" revenue="0" 
+             description="2 bridge tokens. Free river lays. Markers add $10 to city value." />
+    <Company name="STA80" longname="Train Station" type="Private" basePrice="80" revenue="0" 
+             description="Provides an extra station marker on the charter." />
+    <Company name="MNM30" longname="Minor Coal Mine" type="Private" basePrice="30" revenue="0" 
+             description="1 coal token. Skips $15 mountain fee. +$10 route value. No upgrades." />
+    <Company name="CLM60" longname="Coal Mine" type="Private" basePrice="60" revenue="0" 
+             description="2 coal tokens. Skips $15 mountain fee. +$10 route value. No upgrades." />
+    <Company name="MJM90" longname="Major Coal Mine" type="Private" basePrice="90" revenue="0" 
+             description="3 coal tokens. Skips $15 mountain fee. +$10 route value. No upgrades." />
+    <Company name="MNM60" longname="Minor Mail Contract" type="Private" basePrice="60" revenue="10" 
+             description="Pays $10/OR if company owns a train." />
+    <Company name="MLC90" longname="Mail Contract" type="Private" basePrice="90" revenue="15" 
+             description="Pays $15/OR if company owns a train." />
+    <Company name="MJM12" longname="Major Mail Contract" type="Private" basePrice="120" revenue="20" 
+             description="Pays $20/OR if company owns a train." />
 
-	<Company name="Erie" type="Public" tokens="3" fgColour="000000" bgColour="FFFF00"
-			longname="Erie Railroad">
-		<Home hex="D7" city="0"/>
-	</Company>
 
-	<Company name="NYC" type="Public" tokens="4" fgColour="FFFFFF" bgColour="000000"
-			longname="New York Central">
-		<Home hex="E22"/>
-	</Company>
 
-	<Company name="NYNH" type="Public" tokens="2" fgColour="000000" bgColour="FF8000"
-			longname="New York, New Haven &amp; Hartford">
-		<Home hex="E22" city="0"/>
-	</Company>
-
-	<Company name="PRR" type="Public" tokens="4" fgColour="FFFFFF" bgColour="008000"
-			longname="Pennsylvania Railroad">
-		<Home hex="F13"/>
-	</Company>
-    
-	
 	<StartPacket roundClass="net.sf.rails.game.specific._1817.StartRound_1817">
 		<Bidding initial="5" minimum="5" increment="1"/>
-		<Item name="SVNRR" type="Private" basePrice="20"/>
-		<Item name="C&amp;StL" type="Private" basePrice="40"/>
-		<Item name="D&amp;H" type="Private" basePrice="70"/>
-		<Item name="M&amp;H" type="Private" basePrice="110"/>
-		<Item name="C&amp;A" type="Private" basePrice="160">
-   
-		</Item>
-		<Item name="B&amp;O" type="Private" basePrice="220">
-			<SubItem name="B&amp;O" type="Public" president="yes"/>
-		</Item>
+		<Item name="PSM40" type="Private" basePrice="40" />
+		<Item name="MNE40" type="Private" basePrice="40"/>
+		<Item name="OBC40" type="Private" basePrice="40"/>
+		<Item name="UBC80" type="Private" basePrice="80" />
+		<Item name="STA80" type="Private" basePrice="80" />
+		<Item name="MNM30" type="Private" basePrice="30" />
+		<Item name="CLM60" type="Private" basePrice="60" />
+		<Item name="MJM90" type="Private" basePrice="90" />
+		<Item name="MNM60" type="Private" basePrice="60" />
+		<Item name="MLC90" type="Private" basePrice="90" />
+		<Item name="MJM12" type="Private" basePrice="120"/>
+
 	</StartPacket>
+
+
+		<Company name="A&amp;S" type="Public" tokens="8" fgColour="FFFFFF" bgColour="000000" longname="Alton &amp; Southern" />
+        <Company name="B&amp;A" type="Public" tokens="8" fgColour="FFFFFF" bgColour="FF0000" longname="Boston &amp; Albany" />
+        <Company name="B&amp;M" type="Public" tokens="8" fgColour="000000" bgColour="60E060" longname="Boston &amp; Maine" />
+        <Company name="B&amp;O" type="Public" tokens="8" fgColour="FFFFFF" bgColour="0000FF" longname="Baltimore &amp; Ohio" />
+        <Company name="C&amp;O" type="Public"  tokens="8" fgColour="000000" bgColour="A0E0FF" longname="Chesapeake &amp; Ohio" />
+        <Company name="Erie" type="Public" tokens="8" fgColour="000000" bgColour="FFFF00" longname="Erie Railroad" />
+        <Company name="GT" type="Public" tokens="8" fgColour="FFFFFF" bgColour="FF8000" longname="Grand Trunk" />
+        <Company name="IC" type="Public" tokens="8" fgColour="FFFFFF" bgColour="008000" longname="Illinois Central" />
+        <Company name="J" type="Public" tokens="8" fgColour="FFFFFF" bgColour="800080" longname="Elgin, Joliet &amp; Eastern" />
+        <Company name="L&amp;N" type="Public" tokens="8" fgColour="FFFFFF" bgColour="000080" longname="Louisville &amp; Nashville" />
+        <Company name="LV" type="Public" tokens="8" fgColour="FFFFFF" bgColour="FF0000" longname="Lehigh Valley" />
+        <Company name="N&amp;W" type="Public" tokens="8" fgColour="FFFFFF" bgColour="000000" longname="Norfolk &amp; Western" />
+        <Company name="NKP" type="Public" tokens="8" fgColour="FFFFFF" bgColour="000000" longname="Nickel Plate Road" />
+        <Company name="NYC" type="Public" tokens="8" fgColour="FFFFFF" bgColour="000000" longname="New York Central" />
+        <Company name="NYNH" type="Public" tokens="8" fgColour="000000" bgColour="FF8000" longname="New York, New Haven &amp; Hartford" />
+        <Company name="PRR" type="Public" tokens="8" fgColour="FFFFFF" bgColour="008000" longname="Pennsylvania Railroad" />
+        <Company name="RDG" type="Public" tokens="8" fgColour="FFFFFF" bgColour="008000" longname="Reading Railroad" />
+        <Company name="TP&amp;W" type="Public" tokens="8" fgColour="000000" bgColour="FF8000" longname="Toledo, Peoria &amp; Western" />
+        <Company name="UR" type="Public" tokens="8" fgColour="FFFFFF" bgColour="000080" longname="Union Railroad" />
+        <Company name="W" type="Public" tokens="8" fgColour="FFFFFF" bgColour="000000" longname="Wabash" />
+
+
+    
+	
+
 </CompanyManager>

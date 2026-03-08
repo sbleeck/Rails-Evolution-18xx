@@ -85,7 +85,7 @@ public class CompanyManager extends RailsManager implements Configurable {
         Map<String, CompanyType> mCompanyTypes
               = new HashMap<>();
 
-        //NEW//
+   
         Map<String, Tag> typeTags = new HashMap<>();
 
         for (Tag compTypeTag : tag.getChildren(CompanyType.ELEMENT_ID)) {
@@ -99,6 +99,8 @@ public class CompanyManager extends RailsManager implements Configurable {
             String className =
                     compTypeTag.getAttributeAsString(CompanyType.CLASS_TAG);
             if (className == null) {
+                log.error("CompanyTypeHasNoClass: " + LocalText.getText(
+                        "CompanyTypeHasNoClass", name));
                 throw new ConfigurationException(LocalText.getText(
                         "CompanyTypeHasNoClass", name));
             }
