@@ -2036,8 +2036,12 @@ log.info("1817_DEBUG: GameManager.createRound requested for Class: " + roundClas
 
             if (oldFiles != null) {
                 for (File f : oldFiles) {
-                    // f.delete();
+                    f.delete();
                 }
+            }
+            // Automatically persist UI window states during the recovery autosave cycle
+            if (gameUIManager != null) {
+                gameUIManager.saveWindowSettings(getGameName());
             }
 
             recoverySaveWarning = false;
@@ -3971,19 +3975,19 @@ public void logAction(PossibleAction action, int moveNumber) {
 
                 entry = actionString;
             }
-            // // Unified Console Output: Single source for Move #, Actor, and Action details
-            // if (Util.hasValue(entry)) {
-            //     StringBuilder sb = new StringBuilder();
-            //     // Use the provided moveNumber to allow replay overrides
-            //     sb.append("Move #").append(moveNumber).append(" ");
-            //     sb.append("[").append(currentLogPrefix).append("] : ");
-            //     sb.append(entry);
-            //     sb.append(action.isAIAction() ? " [AI]" : " [Human]");
-            //     if (isReloading()) {
-            //         sb.append(" [loaded]");
-            //     }
-            //     log.info(sb.toString());
-            // }
+            // Unified Console Output: Single source for Move #, Actor, and Action details
+            if (Util.hasValue(entry)) {
+                StringBuilder sb = new StringBuilder();
+                // Use the provided moveNumber to allow replay overrides
+                sb.append("Move #").append(moveNumber).append(" ");
+                sb.append("[").append(currentLogPrefix).append("] : ");
+                sb.append(entry);
+                sb.append(action.isAIAction() ? " [AI]" : " [Human]");
+                if (isReloading()) {
+                    sb.append(" [loaded]");
+                }
+                log.info(sb.toString());
+            }
 
             // --- 4. SMART APPEND LOGIC ---
             String currentHistory = statusMessageState.value();

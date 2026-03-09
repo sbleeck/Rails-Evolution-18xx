@@ -61,6 +61,9 @@ public class AuctionRound_1817 extends Round {
     }
 
     public Player getActingPlayer() {
+        if (activeBidders != null && activeBidders.size() <= 1) {
+        return highestBidder.value();
+    }
         if (activeBidders == null || activeBidders.isEmpty()) return null;
         int index = currentPlayerIndex.value() % activeBidders.size();
         return activeBidders.get(index);
@@ -117,19 +120,23 @@ public class AuctionRound_1817 extends Round {
 
             // 1. Set Company Size (updates internal loan limits and certificates)
             comp.setShareCount(settle.getShareSize());
+int cashToTransfer = currentBid.value();
 
-            // 2. Transfer Cash from Winner to Company Treasury
-            if (settle.getCashAmount() > 0) {
-                net.sf.rails.game.state.Currency.wire(winner, settle.getCashAmount(), comp);
-            }
+           
 
             // 3. Transfer Private Companies from Winner to Company
             for (String pId : settle.getPrivateCompanyIds()) {
                 net.sf.rails.game.PrivateCompany pc = gameManager.getRoot().getCompanyManager().getPrivateCompany(pId);
                 if (pc != null) {
                     pc.moveTo(comp.getPortfolioModel());
+                    cashToTransfer -= pc.getBasePrice();
                 }
             }
+
+            // 2. Transfer Cash from Winner to Company Treasury
+        if (cashToTransfer > 0) {
+            net.sf.rails.game.state.Currency.wire(winner, cashToTransfer, comp);
+        }
 
             // 4. Issue the President's Certificate and set Presidency
             net.sf.rails.game.financial.PublicCertificate presCert = comp.getPresidentsShare();
@@ -139,7 +146,7 @@ public class AuctionRound_1817 extends Round {
             comp.setPresident(winner);
 
 // 5. Calculate Par Price (Bid / 10) and find the matching StockSpace
-            int parPrice = currentBid.value() / 10;
+            int parPrice = currentBid.value() / 2;
             net.sf.rails.game.financial.StockMarket sm = gameManager.getRoot().getStockMarket();
             net.sf.rails.game.financial.StockSpace startSpace = sm.getStartSpace(parPrice);
 
@@ -208,7 +215,12 @@ public class AuctionRound_1817 extends Round {
         // --- Handle Bidding Actions ---
         if (action instanceof NullAction && ((NullAction) action).getMode() == NullAction.Mode.PASS) {
             log.info("AUCTION_LOG: Player {} passed.", actor.getName());
+            int index = activeBidders.indexOf(actor);
             activeBidders.remove(actor);
+            if (!activeBidders.isEmpty()) {
+                currentPlayerIndex.set(index % activeBidders.size());
+            }
+
             return true;
         }
 
@@ -217,7 +229,9 @@ public class AuctionRound_1817 extends Round {
             log.info("AUCTION_LOG: Player {} BID ${}.", actor.getName(), amount);
             this.currentBid.set(amount);
             this.highestBidder.set(actor);
-            this.currentPlayerIndex.set((currentPlayerIndex.value() + 1) % activeBidders.size());
+
+            int index = activeBidders.indexOf(actor);
+            this.currentPlayerIndex.set((index + 1) % activeBidders.size());
             return true;
         }
 

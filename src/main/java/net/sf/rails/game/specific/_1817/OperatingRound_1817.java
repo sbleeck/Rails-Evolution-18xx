@@ -9,7 +9,6 @@ import net.sf.rails.game.special.SpecialBaseTokenLay;
 import net.sf.rails.game.special.SpecialProperty;
 import net.sf.rails.game.special.SpecialTileLay;
 
-// Corrected Action Imports
 import rails.game.action.LayTile;
 import rails.game.action.PossibleAction;
 
@@ -18,9 +17,7 @@ import org.slf4j.LoggerFactory;
 
 import net.sf.rails.game.StartRound;
 import net.sf.rails.game.StartItem;
-import net.sf.rails.game.GameManager;
 import net.sf.rails.game.Player;
-import net.sf.rails.game.PublicCompany;
 import net.sf.rails.game.RailsItem;
 import net.sf.rails.game.financial.Bank;
 import net.sf.rails.common.LocalText;
@@ -28,7 +25,6 @@ import net.sf.rails.common.DisplayBuffer;
 import net.sf.rails.common.ReportBuffer;
 import net.sf.rails.common.GameOption;
 
-import rails.game.action.PossibleAction;
 import rails.game.action.BuyStartItem;
 import rails.game.action.StartItemAction;
 import rails.game.action.NullAction;
@@ -50,6 +46,10 @@ public class OperatingRound_1817 extends OperatingRound {
     protected final net.sf.rails.game.state.BooleanState loanBlackoutPeriod = new net.sf.rails.game.state.BooleanState(
             this, "loanBlackoutPeriod", false);
 
+      protected final net.sf.rails.game.state.IntegerState tilesLaidThisTurn = net.sf.rails.game.state.IntegerState.create(this, "tilesLaidThisTurn", 0);
+    protected final net.sf.rails.game.state.IntegerState upgradesThisTurn = net.sf.rails.game.state.IntegerState.create(this, "upgradesThisTurn", 0);
+     protected final net.sf.rails.game.state.ArrayListState<MapHex> hexesLaidThisTurn = new net.sf.rails.game.state.ArrayListState<>(this, "hexesLaidThisTurn");
+
     public OperatingRound_1817(GameManager gameManager, String roundId) {
         super(gameManager, roundId);
     }
@@ -59,6 +59,9 @@ public class OperatingRound_1817 extends OperatingRound {
         super.initTurn();
         // Reset the flag at the start of every company's turn
         loanBlackoutPeriod.set(false);
+        tilesLaidThisTurn.set(0);
+        upgradesThisTurn.set(0);
+        hexesLaidThisTurn.clear();
     }
 
     @Override
@@ -119,7 +122,6 @@ public class OperatingRound_1817 extends OperatingRound {
 
     }
 
-    // ... (lines of unchanged context code) ...
     @Override
     public boolean processGameSpecificAction(PossibleAction action) {
         if (action instanceof net.sf.rails.game.specific._1817.action.TakeLoans_1817) {
@@ -128,7 +130,6 @@ public class OperatingRound_1817 extends OperatingRound {
             int count = tlAction.getLoansToTake();
 
             if (count > 0) {
-                // --- START FIX ---
                 // 1. Verify Liquidation State (Rule 6.10/6.11)
                 // Companies in the red area (price 0) are effectively closed/bankrupt
                 if (comp.isClosed() || (comp.hasStockPrice() && comp.getCurrentSpace().getPrice() == 0)) {
@@ -186,11 +187,7 @@ public class OperatingRound_1817 extends OperatingRound {
     }
 
     @Override
-
     public boolean setPossibleActions() {
-        // 1. Execute base engine logic to populate standard actions (LayTile, BuyTrain,
-        // etc.)
-        super.setPossibleActions();
         // 1. Execute base engine logic and capture the result
         boolean actionsAdded = super.setPossibleActions();
 
@@ -233,5 +230,60 @@ public class OperatingRound_1817 extends OperatingRound {
         possibleActions.add(new net.sf.rails.game.specific._1817.action.TakeLoans_1817(comp1817, maxLoans));
         return true;
 
+    }
+
+    @Override
+    public boolean layTile(LayTile action) {
+        MapHex hex = action.getChosenHex();
+        boolean success = super.layTile(action);
+        if (success && action.getType() != LayTile.CORRECTION) {
+            hexesLaidThisTurn.add(hex);
+        }
+        return success;
+    }
+
+    @Override
+    protected boolean gameSpecificTileLayAllowed(PublicCompany company, MapHex hex, int orientation) {
+        if (!super.gameSpecificTileLayAllowed(company, hex, orientation)) {
+            return false;
+        }
+        // Rule 6.3: A Company may not lay a yellow tile and upgrade it during the same turn.
+        if (hexesLaidThisTurn.contains(hex)) {
+            return false;
+        }
+        return true;
+    }
+
+    @Override
+    protected void updateAllowedTileColours(String colour, int oldAllowedNumber) {
+        // Increment upgrade count if the tile is not yellow.
+        if (!"Yellow".equalsIgnoreCase(colour)) {
+            upgradesThisTurn.set(upgradesThisTurn.value() + 1);
+        }
+        tilesLaidThisTurn.set(tilesLaidThisTurn.value() + 1);
+
+        tileLaysPerColour.clear();
+
+        // Rule 6.3: Maximum of two operations; at most one can be an upgrade.
+        if (tilesLaidThisTurn.value() < 2) {
+            tileLaysPerColour.put("Yellow", 1);
+            
+            if (upgradesThisTurn.value() == 0) {
+                net.sf.rails.game.Phase currentPhase = net.sf.rails.game.Phase.getCurrent(this);
+                if (currentPhase.isTileColourAllowed("Green")) tileLaysPerColour.put("Green", 1);
+                if (currentPhase.isTileColourAllowed("Brown")) tileLaysPerColour.put("Brown", 1);
+                if (currentPhase.isTileColourAllowed("Grey")) tileLaysPerColour.put("Grey", 1);
+            }
+        }
+    }
+
+    @Override
+    public int getTileLayCost(PublicCompany company, MapHex hex, int standardCost) {
+        int cost = super.getTileLayCost(company, hex, standardCost);
+        // Rule 6.3: Second tile operation costs an additional $20.
+        if (tilesLaidThisTurn.value() > 0) {
+            cost += 20;
+        }
+        return cost;
     }
 }

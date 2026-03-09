@@ -423,6 +423,17 @@ public class GameUIManager implements DialogOwner {
 
             statusWindow.init(this);
 
+            // Register Status Window for Safe Storage
+            registerWindowStorage(statusWindow);
+
+            // Hook into the window closing event to ensure all settings are saved to disk
+            statusWindow.addWindowListener(new java.awt.event.WindowAdapter() {
+                @Override
+                public void windowClosing(java.awt.event.WindowEvent e) {
+                    saveWindowSettings(railsRoot.getGameName());
+                }
+            });
+
             initGameTimer();
             if (gameTimer != null) {
                 gameTimer.start();
@@ -2590,6 +2601,17 @@ currentRoundName = "Game Start";
             windowSettings.set(orWindow);
         if (reportWindow != null)
             windowSettings.set(reportWindow);
+
+        // Include the Stock Chart window which was previously omitted
+        if (stockChartWindow != null)
+            windowSettings.set(stockChartWindow);
+            
+        // Include the Config window for completeness
+        if (configWindow != null)
+            windowSettings.set(configWindow);
+
+        // Save the font UI scaling
+        windowSettings.setProperty("font.ui.scale", String.valueOf(this.currentFontScale));
 
         // 2. Save Map Zoom Step
         if (orUIManager != null && orUIManager.getMap() != null) {

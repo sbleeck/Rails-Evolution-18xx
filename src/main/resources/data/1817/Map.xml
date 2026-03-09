@@ -3,8 +3,8 @@
 	<Image file="1817/1817B.svg" x="35" y="7" scale="0.94"/>
 
 
-    <!-- <Hex name="A20" tile="-901" city="Montreal" value="20,30,50,60"/> -->
-    <!-- <Hex name="A28" tile="-901" city="Maritime Prov" value="20,30,50,60"/> -->
+    <Hex name="A20" tile="-901" city="Montreal" value="20,30,50,60"/> 
+    <Hex name="A28" tile="-901" city="Maritime Prov" value="20,30,50,60"/>
 
 	<Hex name="B3" tile="0"/>	
 	<Hex name="B5" tile="-10" city="Lansing"/>
@@ -86,7 +86,7 @@
 	<Hex name="G20" tile="0"/>
 	<Hex name="G22" tile="0"/>
 
-	<Hex name="H1" tile="-901" city="St Louis" value="20,30,50,60"/>
+	<Hex name="H1" tile="-903" city="St Louis" value="20,30,50,60"/>
 	<Hex name="H3" tile="-10" city="Louisville"/>
 	<Hex name="H5" tile="0"/>
 	<Hex name="H7" tile="0"/>

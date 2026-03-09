@@ -22,6 +22,9 @@
 		</Shares>
 		<Trains limit="4,3,2"/>
         <CanUseSpecialProperties/>
+        <TileLays>
+			<Number number="2"/>
+		</TileLays>
 	</CompanyType>
 	
 	
