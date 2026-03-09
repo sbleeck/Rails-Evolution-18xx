@@ -14,10 +14,10 @@
         	</StockRound>
 
 
-
-            <OperatingRound>
+			<OperatingRound class="net.sf.rails.game.specific._1817.OperatingRound_1817">
                 <EmergencyTrainBuying mustBuyCheapestTrain="no" mayBuyFromCompany="yes"/>
             </OperatingRound>
+			
 		</GameParameters>
 		<EndOfGame>
 			<Bankruptcy/>

@@ -9,6 +9,8 @@ import rails.game.action.PossibleAction;
 import rails.game.action.StartCompany;
 import net.sf.rails.game.financial.StockRound;
 import net.sf.rails.game.specific._1817.action.Initiate1817IPO;
+import net.sf.rails.game.specific._1817.action.Short1817;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import net.sf.rails.game.specific._1817.action.TakeLoans_1817;
@@ -60,6 +62,36 @@ public class StockRound_1817 extends StockRound {
                         possibleActions.add(new TakeLoans_1817(comp, maxLoans));
                     }
                 }
+
+                // 1817: Players can short sell companies under strict conditions
+                if (comp instanceof PublicCompany_1817 && !comp.isClosed()) {
+                    PublicCompany_1817 comp1817 = (PublicCompany_1817) comp;
+
+                    // 1. Must be a 5-share or 10-share company
+                    boolean isLargeEnough = comp1817.getShareCount() > 2;
+
+                    // 2. Player must own zero shares
+                    boolean ownsZeroShares = currentPlayer.getPortfolioModel().getShare(comp) == 0;
+
+                    // 3. Max 5 short shares in play
+                    // We check if there are shares available in the pool to short
+                    int poolShares = pool.getShare(comp);
+                    boolean underShortLimit = poolShares > 0;
+
+                    // 4. Prohibited in acquisition/liquidation zones
+                    // Shares are only buyable in the 'white' or 'green' areas
+                    boolean notInAcquisitionZone = comp.isBuyable();
+
+                    // 5. Prohibited in Phase 8
+                    String phaseId = gameManager.getCurrentPhase().getId();
+                    boolean notPhase8 = phaseId != null && !phaseId.startsWith("8");
+
+                    if (isLargeEnough && ownsZeroShares && underShortLimit && notInAcquisitionZone && notPhase8) {
+                        possibleActions.add(new net.sf.rails.game.specific._1817.action.Short1817(gameManager.getRoot(),
+                                comp.getId()));
+                    }
+                }
+
             }
         }
 
@@ -136,6 +168,38 @@ public class StockRound_1817 extends StockRound {
             }
 
         }
+        if (action instanceof net.sf.rails.game.specific._1817.action.Short1817) {
+            net.sf.rails.game.specific._1817.action.Short1817 sAction = (net.sf.rails.game.specific._1817.action.Short1817) action;
+            // Use companyManager (inherited from Round) instead of gameManager for company
+            // lookups
+            PublicCompany comp = companyManager.getPublicCompany(sAction.getCompanyId());
+
+            if (comp != null && comp.hasStockPrice()) {
+                // 1. Calculate price and cash transfer
+                int price = comp.getCurrentSpace().getPrice() / comp.getShareUnitsForSharePrice();
+
+                // Use the static Currency state utility to transfer cash from the Bank to the
+                // player
+                net.sf.rails.game.state.Currency.fromBank(price, currentPlayer);
+
+                // 2. Move certificate from Pool to sequestered portfolio
+                // 1817 sequestering typically uses the Bank's Unavailable portfolio
+                net.sf.rails.game.financial.PublicCertificate cert = pool.findCertificate(comp, 1, false);
+                if (cert != null) {
+                    cert.moveTo(getRoot().getBank().getUnavailable());
+                }
+
+                // 3. Adjust stock price (drop one space)
+                stockMarket.sell(comp, currentPlayer, 1);
+
+                // 4. Record action and report
+                net.sf.rails.common.ReportBuffer.add(this, net.sf.rails.common.LocalText.getText("SHORT_SELL_LOG",
+                        currentPlayer.getId(), comp.getId(), net.sf.rails.game.financial.Bank.format(this, price)));
+
+                hasActed.set(true);
+                return true;
+            }
+        }
 
         if (action instanceof net.sf.rails.game.specific._1817.action.TakeLoans_1817) {
             net.sf.rails.game.specific._1817.action.TakeLoans_1817 tlAction = (net.sf.rails.game.specific._1817.action.TakeLoans_1817) action;
@@ -143,14 +207,18 @@ public class StockRound_1817 extends StockRound {
             int count = tlAction.getLoansToTake();
 
             if (count > 0) {
-                // Update bond count
-                comp.setNumberOfBonds(comp.getNumberOfBonds() + count);
+                if (comp instanceof net.sf.rails.game.specific._1817.PublicCompany_1817) {
+                    net.sf.rails.game.specific._1817.PublicCompany_1817 comp1817 = (net.sf.rails.game.specific._1817.PublicCompany_1817) comp;
 
-                // Calculate and transfer cash ($100 per bond)
-                int loanAmount = count * 100;
-                net.sf.rails.game.financial.Bank bank = gameManager.getRoot().getBank();
-                comp.addCashFromBank(loanAmount, bank);
+                    // Update bond count
+                    comp1817.setNumberOfBonds(comp1817.getNumberOfBonds() + count);
 
+                    // Calculate and transfer cash ($100 per bond)
+                    int loanAmount = count * 100;
+                    net.sf.rails.game.financial.Bank bank = (net.sf.rails.game.financial.Bank) gameManager.getRoot()
+                            .getBank();
+                    comp1817.addCashFromBank(loanAmount, bank);
+                }
                 // Mark that the player has taken an action
                 hasActed.set(true);
                 return true;

@@ -22,10 +22,12 @@ public class PublicCompany_1817 extends PublicCompany {
     private static final Logger log = LoggerFactory.getLogger(PublicCompany_1817.class);
 
     protected final IntegerState shareCount;
+protected final IntegerState bondsState;
 
     public PublicCompany_1817(RailsItem parent, String id) {
         super(parent, id);
         this.shareCount = IntegerState.create(this, "shareCount_" + id, 2);
+        this.bondsState = IntegerState.create(this, "bondsState_" + id, 0);
     }
 
     @Override
@@ -33,6 +35,25 @@ public class PublicCompany_1817 extends PublicCompany {
         super.finishConfiguration(root);
         // Initial certificate setup for all companies
         adjustCertificates();
+    }
+
+    @Override
+    public int getNumberOfBonds() {
+        return bondsState.value();
+    }
+
+    public void setNumberOfBonds(int bonds) {
+        bondsState.set(bonds);
+    }
+
+
+
+    /**
+     * Transfers cash from the Bank to the Company treasury.
+     * Uses Currency state movement to ensure the Undo/Redo stack functions correctly.
+     */
+    public void addCashFromBank(int amount, net.sf.rails.game.financial.Bank bank) {
+        net.sf.rails.game.state.Currency.fromBank(amount, this);
     }
 
     /**

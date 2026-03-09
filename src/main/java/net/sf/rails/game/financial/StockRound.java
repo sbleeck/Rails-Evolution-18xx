@@ -143,7 +143,7 @@ public class StockRound extends Round implements I_MapRenderableRound {
     /*
      * Companies started this round (shares may not be sold in SOH)
      */
-    private ArrayListState<PublicCompany> startedThisRound = new ArrayListState<>(
+    protected ArrayListState<PublicCompany> startedThisRound = new ArrayListState<>(
             this, "startedThisSR");
 
     /** Release rules, parsed and initialised in CompanyManager */

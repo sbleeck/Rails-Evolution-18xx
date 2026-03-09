@@ -163,17 +163,51 @@ public class AuctionRound_1817 extends Round {
                 log.error("AUCTION_LOG: No StockSpace found for price ${}", parPrice);
             }
 
-            // 6. Finalize state and close the Auction Round
+
+            // 6. Float the company BEFORE laying the token so the engine accepts it
             comp.setFloated();
+
+            // 7. Lay the base token on the map
+            net.sf.rails.game.MapHex homeHex = getRoot().getMapManager().getHex(targetHexId.value());
+            if (homeHex != null) {
+                comp.setHomeHex(homeHex);
+                
+                net.sf.rails.game.Stop targetStop = null;
+                if (homeHex.getStops() != null) {
+                    for (net.sf.rails.game.Stop stop : homeHex.getStops()) {
+                        if (stop.hasTokenSlotsLeft()) {
+                            targetStop = stop;
+                            break; // Grab the first open station slot
+                        }
+                    }
+                }
+                
+                if (targetStop != null) {
+                    comp.setHomeCityNumber(targetStop.getRelatedStationNumber());
+                    boolean tokenLaid = homeHex.layBaseToken(comp, targetStop);
+                    if (tokenLaid) {
+                        log.info("AUCTION_LOG: Laid base token for {} on Hex {} (Station {})", 
+                                 comp.getId(), homeHex.getId(), targetStop.getRelatedStationNumber());
+                    } else {
+                        log.error("AUCTION_LOG: Engine rejected base token for {} on Hex {}", comp.getId(), homeHex.getId());
+                    }
+                } else {
+                    log.warn("AUCTION_LOG: Could not find free stop on Hex {} for token placement", homeHex.getId());
+                }
+            } else {
+                log.error("AUCTION_LOG: Target hex {} is null. Cannot lay base token.", targetHexId.value());
+            }
+
+            // 8. Close the Auction Round
             gameManager.nextRound(this);
 
-
             return true;
+            
         }
 
         // --- Handle Bidding Actions ---
         if (action instanceof NullAction && ((NullAction) action).getMode() == NullAction.Mode.PASS) {
-            log.info("AUCTION_LOG: Player {} FOLDED.", actor.getName());
+            log.info("AUCTION_LOG: Player {} passed.", actor.getName());
             activeBidders.remove(actor);
             return true;
         }
