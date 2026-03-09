@@ -3,8 +3,8 @@
 	<Image file="1817/1817B.svg" x="35" y="7" scale="0.94"/>
 
 
-    <Hex name="A20" tile="-901" city="Montreal" value="20,30,50,60"/>
-    <Hex name="A28" tile="-901" city="Maritime Prov" value="20,30,50,60"/>
+    <!-- <Hex name="A20" tile="-901" city="Montreal" value="20,30,50,60"/> -->
+    <!-- <Hex name="A28" tile="-901" city="Maritime Prov" value="20,30,50,60"/> -->
 
 	<Hex name="B3" tile="0"/>	
 	<Hex name="B5" tile="-10" city="Lansing"/>
@@ -32,10 +32,10 @@
 	<Hex name="C20" tile="0" cost="15"/>
 	<Hex name="C22" tile="-10" city="Albany"/>
 	<Hex name="C24" tile="0" cost="15"/>
-	<Hex name="C26" tile="-11" orientation="5" label="B" city="Boston"/>
+	<Hex name="C26" tile="-11" label="B" city="Boston"/>
 
 
-	<Hex name="D1" tile="-5" orientation="0" value="20,30,50,60" city="Chicago"/>
+	<!-- <Hex name="D1" tile="-5" orientation="0" value="20,30,50,60" city="Chicago"/> -->
 	<Hex name="D3" tile="0"/>
 	<Hex name="D5" tile="0"/>
 	<Hex name="D7" tile="-10" city="Toledo"/>
@@ -60,7 +60,7 @@
 	<Hex name="E16" tile="0"/>
 	<Hex name="E18" tile="0"/>
 	<Hex name="E20" tile="0"/>	
-	<Hex name="E22" tile="-10" city="New York"/>			
+	<Hex name="E22" tile="-21" city="New York"/>			
 
 	<Hex name="F1" tile="0"/>	
 	<Hex name="F3" tile="-10" city="Indianapolis"/>
@@ -82,7 +82,7 @@
 	<Hex name="G12" tile="0"/>
 	<Hex name="G14" tile="0"/>
 	<Hex name="G16" tile="0"/>
-	<Hex name="G18" tile="-10" city="Baltimore"/>
+	<Hex name="G18" tile="-11" city="Baltimore"/>
 	<Hex name="G20" tile="0"/>
 	<Hex name="G22" tile="0"/>
 
