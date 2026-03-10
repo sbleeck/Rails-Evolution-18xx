@@ -68,10 +68,14 @@ public class ORPanel extends GridPanel
     private JPanel sidebarPanel;
 
     // Standard Panels
-    private JPanel phase1Panel, phase2Panel, phase3Panel, phase4Panel, footerPanel;
+private JPanel phase1Panel, phase2Panel, phase3Panel, phase4Panel, phase5Panel, footerPanel;
     private JPanel cashPanel;
+    private JPanel loansPanel;
     private JPanel miscActionPanel;
     private JPanel trainButtonsPanel;
+    private JPanel specialActionsButtonPanel;
+
+    
 
     // Special Mode Panels
     private JPanel specialContainer;
@@ -127,8 +131,9 @@ private JLabel focusLight;
     // Sidebar Elements
     private JLabel companyLogo;
     private JLabel lblCash;
-    private JLabel lblRoute;
     private JLabel lblFixed;
+    private JLabel lblLoans;
+    private JLabel lblRoute;
 
     private TokenDisplayPanel tokenDisplay;
     private TrainDisplayPanel trainDisplay;
@@ -239,43 +244,47 @@ private JLabel focusLight;
     private int determineActivePhase(List<PossibleAction> actions) {
         int phase = 0;
         boolean hasDoneAction = false;
+boolean hasSpecialAction = false;
 
         if (actions == null || actions.isEmpty()) {
             return 0;
         }
 
+       
         for (PossibleAction pa : actions) {
-            // Phase 1: Track
-            if (pa instanceof LayTile) {
+// --- START FIX ---
+            if (pa instanceof LayTile && (phase == 0 || phase > 1)) {
                 phase = 1;
             }
-            // Phase 2: Station/Token
-            else if (pa instanceof LayToken) {
+            else if (pa instanceof LayToken && (phase == 0 || phase > 2)) {
                 phase = 2;
             }
-            // Phase 3: Revenue
-            else if (pa instanceof SetDividend) {
+            else if (pa instanceof SetDividend && (phase == 0 || phase > 3)) {
                 phase = 3;
             }
-            // Phase 4: Train Buying
-            else if (pa instanceof BuyTrain) {
+            else if (pa instanceof BuyTrain && (phase == 0 || phase > 4)) {
                 phase = 4;
             }
-            // Check for "Done" or "Pass" availability
+else if (pa instanceof TakeLoans || pa instanceof RepayLoans
+                    || pa.getClass().getName().endsWith("TakeLoans_1817")) {
+                hasSpecialAction = true;
+            }
             else if (pa instanceof NullAction) {
                 NullAction.Mode mode = ((NullAction) pa).getMode();
                 if (mode == NullAction.Mode.DONE || mode == NullAction.Mode.PASS) {
                     hasDoneAction = true;
                 }
             }
+
         }
 
-        // --- THE FIX ---
-        // If no specific work phase (1-4) was detected, but we have a "Done" action,
-        // we are in Phase 5 (Finalize / End Turn).
-        // This fixes the bug where the "Done" button remained disabled after Revenue.
-        if (phase == 0 && hasDoneAction) {
-            phase = 5;
+
+if (phase == 0) {
+            if (hasDoneAction) {
+                phase = 6;
+            } else if (hasSpecialAction) {
+                phase = 5;
+            }
         }
 
         return phase;
@@ -350,6 +359,9 @@ private JLabel focusLight;
                     !(pa instanceof NullAction) &&
                     !(pa instanceof LayTile) &&
                     !(pa instanceof LayToken) &&
+                    !(pa instanceof TakeLoans) &&
+                    !(pa instanceof RepayLoans) &&
+                    !pa.getClass().getName().endsWith("TakeLoans_1817") &&
                     !(pa instanceof LayBaseToken)) {
 
                 labelToAdd = pa.getButtonLabel().toUpperCase();
@@ -362,7 +374,9 @@ private JLabel focusLight;
                     addedSpecialLabels.add(labelToAdd);
                 }
             }
-            // --- END FIX ---
+if (pa instanceof TakeLoans || pa instanceof RepayLoans || pa.getClass().getName().endsWith("TakeLoans_1817")) {
+                addSpecialActionButtonToPhase5(pa);
+            }
 
             // Continue with standard distribution...
             if (pa instanceof SetDividend) {
@@ -392,7 +406,6 @@ private JLabel focusLight;
         }
 
     }
-    // ... (rest of the method) ...
 
     private void updatePhaseSpecifics() {
 
@@ -412,8 +425,33 @@ private JLabel focusLight;
             if (activePhase == 4 && btnTrainSkip != null)
                 btnTrainSkip.setEnabled(true);
         }
-
     }
+
+
+    private void addSpecialActionButtonToPhase5(PossibleAction action) {
+        ActionButton btn = new ActionButton(RailsIcon.OK);
+        String text = action.getButtonLabel();
+        btn.setText(text);
+        btn.setIcon(null);
+
+        btn.setBackground(new Color(255, 255, 240)); 
+        btn.setOpaque(true);
+        btn.setForeground(Color.BLACK);
+        btn.setBorder(BorderFactory.createCompoundBorder(
+                BorderFactory.createLineBorder(Color.BLACK, 1),
+                BorderFactory.createEmptyBorder(3, 5, 3, 5)));
+
+        btn.setAlignmentX(Component.CENTER_ALIGNMENT);
+        btn.setMaximumSize(new Dimension(SIDEBAR_WIDTH - 10, 30));
+        btn.setPossibleAction(action);
+        btn.addActionListener(this);
+        
+        if (specialActionsButtonPanel != null) {
+            specialActionsButtonPanel.add(btn);
+            specialActionsButtonPanel.add(Box.createVerticalStrut(4));
+        }
+    }
+
 
     private void addSpecialNotificationButton(String text, PossibleAction sourceAction) {
         if (specialNotificationPanel == null)
@@ -514,22 +552,19 @@ private JLabel focusLight;
         }
     }
 
+
     private void setStandardPanelsVisible(boolean visible) {
-        if (phase1Panel != null)
-            phase1Panel.setVisible(visible);
-        if (phase2Panel != null)
-            phase2Panel.setVisible(visible);
-        if (phase3Panel != null)
-            phase3Panel.setVisible(visible);
-        if (phase4Panel != null)
-            phase4Panel.setVisible(visible);
-        if (footerPanel != null)
-            footerPanel.setVisible(visible);
-        if (cashPanel != null)
-            cashPanel.setVisible(visible);
-        if (lblCash != null && lblCash.getParent() != null)
-            lblCash.getParent().setVisible(visible);
+        if (phase1Panel != null) phase1Panel.setVisible(visible);
+        if (phase2Panel != null) phase2Panel.setVisible(visible);
+        if (phase3Panel != null) phase3Panel.setVisible(visible);
+        if (phase4Panel != null) phase4Panel.setVisible(visible);
+        if (phase5Panel != null) phase5Panel.setVisible(visible);
+        if (footerPanel != null) footerPanel.setVisible(visible);
+        if (cashPanel != null) cashPanel.setVisible(visible);
+        if (loansPanel != null) loansPanel.setVisible(visible);
+        if (lblCash != null && lblCash.getParent() != null) lblCash.getParent().setVisible(visible);
     }
+
 
     private void colorizeActivePhase(Color unused) {
         resetPhasePanel(phase1Panel, btnTileConfirm);
@@ -551,6 +586,7 @@ private JLabel focusLight;
         }
 
         resetPhasePanel(phase4Panel, btnTrainSkip);
+resetPhasePanel(null, btnDone);
         resetPhasePanel(null, btnDone);
 
         // Phase 1: Infrastructure - Track (Matches Ochre/Brown Palette)
@@ -558,9 +594,14 @@ private JLabel focusLight;
             applyPhaseStyle(phase1Panel, null, UITheme.TRACK_DARK, UITheme.TRAIN_LIGHT, "Confirm Track");
             if (btnTileConfirm != null) {
                 btnTileConfirm.setEnabled(true);
-                // logic preserved: Defaults to Blue Skip, enableConfirm() will override to
-                // Brown Confirm
-                styleButton(btnTileConfirm, UITheme.ACTION_SKIP, "Skip");
+
+                boolean hasSelection = (orUIManager != null && orUIManager.getMap() != null && orUIManager.getMap().getSelectedHex() != null);
+                if (hasSelection) {
+                    styleButton(btnTileConfirm, SYS_BLUE, "Confirm");
+                } else {
+                    styleButton(btnTileConfirm, UITheme.ACTION_SKIP, "Skip");
+                }
+
             }
 
             // Phase 2: Infrastructure - Token (Matches Forest Green Palette)
@@ -568,8 +609,14 @@ private JLabel focusLight;
             applyPhaseStyle(phase2Panel, null, UITheme.TOKEN_DARK, UITheme.TRAIN_LIGHT, "Confirm Token");
             if (btnTokenConfirm != null) {
                 btnTokenConfirm.setEnabled(true);
-                styleButton(btnTokenConfirm, UITheme.ACTION_SKIP, "Skip");
-            }
+
+boolean hasSelection = (orUIManager != null && orUIManager.getMap() != null && orUIManager.getMap().getSelectedHex() != null);
+                if (hasSelection) {
+                    styleButton(btnTokenConfirm, SYS_BLUE, "Confirm");
+                } else {
+                    styleButton(btnTokenConfirm, UITheme.ACTION_SKIP, "Skip");
+                }
+                        }
 
             // Phase 3: Capital - Revenue (Matches Royal Blue palette)
         } else if (activePhase == 3) {
@@ -613,21 +660,45 @@ private JLabel focusLight;
             String label = canBuy ? "Skip Buy" : "Done Buying";
 
             applyPhaseStyle(phase4Panel, null, UITheme.TRAIN_DARK, UITheme.TRAIN_LIGHT, label);
-            styleButton(btnTrainSkip, UITheme.ACTION_SKIP, label);
 
-            // Phase 5: Control - Conclusion (Uses Warning Red)
-        } else if (activePhase == 5) {
+            boolean canSkip = (btnTrainSkip.getPossibleActions() != null && !btnTrainSkip.getPossibleActions().isEmpty());
+            btnTrainSkip.setEnabled(canSkip);
+            if (canSkip) {
+                styleButton(btnTrainSkip, UITheme.ACTION_SKIP, label);
+            } else {
+                styleButton(btnTrainSkip, UIManager.getColor("Button.background"), label);
+                btnTrainSkip.setForeground(Color.GRAY);
+            }
+        } else if (activePhase == 6) {
+
             // ACTIVATE: Enable and colorize for the final step
             btnDone.setEnabled(true);
             styleButton(btnDone, UITheme.ACTION_SKIP, "END TURN");
             btnDone.setForeground(Color.WHITE);
             btnDone.setFont(new Font("SansSerif", Font.BOLD, 16));
         } else {
-            // PERSISTENT WAIT: Keep as 'END TURN' but disabled and grey
-            btnDone.setEnabled(false);
-            styleButton(btnDone, UIManager.getColor("Button.background"), "END TURN");
-            btnDone.setForeground(Color.GRAY);
-            btnDone.setFont(new Font("SansSerif", Font.BOLD, 14));
+           
+        // DIRECT ENGINE SYNC: If the engine natively provides a DONE/PASS action,
+            // expose it immediately. Do not hide valid engine actions behind local UI phases.
+            if (btnDone.getPossibleActions() != null && !btnDone.getPossibleActions().isEmpty()) {
+                btnDone.setEnabled(true);
+                styleButton(btnDone, UITheme.ACTION_SKIP, "END TURN");
+                btnDone.setForeground(Color.WHITE);
+                btnDone.setFont(new Font("SansSerif", Font.BOLD, 14));
+            } else {
+                // PERSISTENT WAIT: Keep as 'END TURN' but disabled and grey
+                btnDone.setEnabled(false);
+                styleButton(btnDone, UIManager.getColor("Button.background"), "END TURN");
+                btnDone.setForeground(Color.GRAY);
+                btnDone.setFont(new Font("SansSerif", Font.BOLD, 14));
+            }
+        }
+        // ALWAYS evaluate Phase 5 (Special Actions) independently!
+        boolean hasSpecialActions = specialActionsButtonPanel != null && specialActionsButtonPanel.getComponentCount() > 0;
+        if (hasSpecialActions) {
+            applyPhaseStyle(phase5Panel, null, UITheme.ACTION_SKIP, UITheme.TRAIN_LIGHT, "Special Actions");
+        } else {
+            resetPhasePanel(phase5Panel, null);
         }
     }
 
@@ -798,6 +869,10 @@ private JLabel focusLight;
             trainButtonsPanel.removeAll();
             trainButtonsPanel.setVisible(true);
         }
+        if (specialActionsButtonPanel != null) {
+            specialActionsButtonPanel.removeAll();
+            specialActionsButtonPanel.setVisible(true);
+        }
         if (miscActionPanel != null) {
             miscActionPanel.removeAll();
         }
@@ -907,6 +982,13 @@ private JLabel focusLight;
         sidebarPanel.add(lblPhaseInstruction);
 
         sidebarPanel.add(Box.createVerticalStrut(5));
+
+        lblLoans = new JLabel("0/0", SwingConstants.CENTER);
+        loansPanel = createReadoutPanel("Loans", lblLoans);
+        if (hasCompanyLoans) {
+            sidebarPanel.add(loansPanel);
+            sidebarPanel.add(Box.createVerticalStrut(5));
+        }
 
         // 2. Cash (Readout Style)
         lblCash = new JLabel("-", SwingConstants.CENTER);
@@ -1048,6 +1130,16 @@ private JLabel focusLight;
         phase4Panel.add(btnTrainSkip);
         sidebarPanel.add(phase4Panel);
 
+        sidebarPanel.add(Box.createVerticalStrut(5));
+
+        // 7.5 Phase 5 (Special Actions)
+        phase5Panel = createPhasePanel("5. Special Actions");
+        specialActionsButtonPanel = new JPanel();
+        specialActionsButtonPanel.setLayout(new BoxLayout(specialActionsButtonPanel, BoxLayout.Y_AXIS));
+        specialActionsButtonPanel.setOpaque(false);
+        phase5Panel.add(Box.createVerticalStrut(5));
+        phase5Panel.add(specialActionsButtonPanel);
+        sidebarPanel.add(phase5Panel);
         sidebarPanel.add(Box.createVerticalStrut(5));
 
         // 8. Footer (Done Button)
@@ -1277,6 +1369,9 @@ private JLabel focusLight;
                 defaultBtn = btnRevWithhold;
         } else if (activePhase == 4)
             defaultBtn = btnTrainSkip;
+            else if (activePhase == 5)
+            defaultBtn = btnDone; 
+        
         else
             defaultBtn = btnDone;
 
@@ -1774,6 +1869,10 @@ private JLabel focusLight;
                 instruction = "BUY TRAIN";
                 break;
             case 5:
+                phaseColor = UITheme.ACTION_SKIP;
+                instruction = "SPECIAL ACTIONS";
+                break;
+            case 6:
                 phaseColor = UITheme.ACTION_DONE;
                 instruction = "FINALIZE";
                 break;
@@ -1821,6 +1920,18 @@ private JLabel focusLight;
         colorizeActivePhase(null);
         if (lblCash != null)
             lblCash.setText(format(orComp.getPurseMoneyModel().value()));
+
+        if (lblLoans != null && orComp != null && hasCompanyLoans) {
+            int currentBonds = orComp.getNumberOfBonds();
+            int maxBonds = currentBonds;
+            try {
+                java.lang.reflect.Method m = orComp.getClass().getMethod("getShareCount");
+                maxBonds = (Integer) m.invoke(orComp);
+            } catch (Exception e) {
+                // Fallback
+            }
+            lblLoans.setText(currentBonds + "/" + maxBonds);
+        }
 
         if (tokenDisplay != null) {
             int available = 0;
@@ -1876,7 +1987,7 @@ private JLabel focusLight;
         } else if (command.equals(SHOW_CMD)) {
             toggleTileBuildNumbers();
         } else if (command.equals(TRAIN_SKIP_CMD)) {
-            activePhase = 5;
+            activePhase = 6;
             updateSidebarData();
             updateDefaultButton();
             if (btnTrainSkip != null)
@@ -1907,6 +2018,9 @@ private JLabel focusLight;
             }
             List<PossibleAction> executedActions = ((ActionTaker) source).getPossibleActions();
             if (executedActions == null || executedActions.isEmpty()) {
+            } else if (executedActions.get(0).getClass().getName().endsWith("TakeLoans_1817")) {
+                processTakeLoans_1817(executedActions.get(0));
+                return;
             } else {
                 orUIManager.processAction(command, executedActions, source);
             }
@@ -1924,6 +2038,48 @@ private JLabel focusLight;
                 });
             }
 
+        }
+    }
+
+
+    private void processTakeLoans_1817(PossibleAction action) {
+        try {
+            String compId = (String) action.getClass().getMethod("getCompanyId").invoke(action);
+            int max = (Integer) action.getClass().getMethod("getMaxLoansAllowed").invoke(action);
+            net.sf.rails.game.CompanyManager cm = orUIManager.getGameUIManager().getRoot().getCompanyManager();
+            net.sf.rails.game.PublicCompany comp = cm.getPublicCompany(compId);
+            int current = comp.getNumberOfBonds();
+            int available = max - current;
+
+            if (available <= 0) {
+                JOptionPane.showMessageDialog(this, comp.getId() + " is at its loan limit (" + max + ").");
+                return;
+            }
+
+            String[] options = new String[available];
+            for (int i = 0; i < available; i++) {
+                options[i] = String.valueOf(i + 1);
+            }
+
+            String selected = (String) JOptionPane.showInputDialog(this,
+                    "Select number of loans for " + comp.getId() + ":\n(Current: " + current + ", Max: " + max + ")",
+                    "Take Loans", JOptionPane.QUESTION_MESSAGE, null, options, options[0]);
+
+            if (selected != null) {
+                action.getClass().getMethod("setLoansToTake", int.class).invoke(action, Integer.parseInt(selected));
+                orUIManager.processAction("TakeLoans", java.util.Collections.singletonList(action), this);
+            } else {
+                // Re-enable the button if the user cancels the dialog
+                if (specialActionsButtonPanel != null) {
+                    for (Component c : specialActionsButtonPanel.getComponents()) {
+                        if (c instanceof ActionButton) {
+                            ((ActionButton) c).setEnabled(true);
+                        }
+                    }
+                }
+            }
+        } catch (Exception ex) {
+            log.error("Failed to process TakeLoans_1817 in ORPanel", ex);
         }
     }
 
@@ -2180,14 +2336,15 @@ private JLabel focusLight;
                 }
             }
 
-            // 5. RENDER SPECIAL MODE
-            if (!specialActions.isEmpty()) {
+            int computedPhase = determineActivePhase(actions);
+            boolean hasStandardActions = computedPhase > 0;
 
+            // 5. RENDER SPECIAL MODE (Exclusive Interrupts Only)
+            if (!specialActions.isEmpty() && !hasStandardActions) {
                 this.specialModeActive = true;
                 this.activePhase = 0;
                 setStandardPanelsVisible(false);
 
-                // Update Header using the Context Provider (or defaults)
                 if (contextProvider != null) {
                     updateSpecialHeader(contextProvider);
                 }
@@ -2195,40 +2352,52 @@ private JLabel focusLight;
                 if (specialPanel != null && specialContainer != null) {
                     specialContainer.setVisible(true);
                     specialPanel.removeAll();
-
                     for (PossibleAction spa : specialActions) {
                         addSpecialActionButton(spa);
                     }
                     specialPanel.revalidate();
                     specialPanel.repaint();
 
-                    // had 0 height despite being visible.
                     if (sidebarPanel != null) {
                         sidebarPanel.revalidate();
                         sidebarPanel.repaint();
                     }
-
                 }
                 return;
             }
-            // --- 6. STANDARD MODE ---
 
+            // --- 6. STANDARD MODE (OR MIXED) ---
             this.specialModeActive = false;
-            if (specialContainer != null)
-                specialContainer.setVisible(false);
 
-            activePhase = determineActivePhase(actions);
+            if (!specialActions.isEmpty() && specialPanel != null && specialContainer != null) {
+                specialContainer.setVisible(true);
+                specialPanel.removeAll();
+                for (PossibleAction spa : specialActions) {
+                    addSpecialActionButton(spa);
+                }
+                specialPanel.revalidate();
+            } else if (specialContainer != null) {
+                specialContainer.setVisible(false);
+            }
+
+            activePhase = computedPhase;
             setStandardPanelsVisible(true);
 
-            // if (activePhase == 1 || activePhase == 2) {
-            // boolean hasSelection = (orUIManager != null &&
-            // orUIManager.getMap().getSelectedHex() != null);
-            // enableConfirm(hasSelection);
-            // }
+            if (activePhase == 1 || activePhase == 2) {
+                boolean hasSelection = (orUIManager != null && orUIManager.getMap() != null && orUIManager.getMap().getSelectedHex() != null);
+                enableConfirm(hasSelection);
+            }
+
+
 
             distributeStandardActions(actions);
             updateSidebarData();
             updatePhaseSpecifics();
+
+            if (activePhase == 1 || activePhase == 2) {
+                boolean hasSelection = (orUIManager != null && orUIManager.getMap() != null && orUIManager.getMap().getSelectedHex() != null);
+                enableConfirm(hasSelection);
+            }
 
             if (sidebarPanel != null)
                 sidebarPanel.revalidate(); // Ensure standard mode revalidates too
@@ -2323,7 +2492,8 @@ private JLabel focusLight;
             activePanel = phase3Panel;
         else if (activePhase == 4)
             activePanel = phase4Panel;
-
+else if (activePhase == 5)
+            activePanel = phase5Panel;
         if (activePanel != null && activePanel.isVisible()) {
             if (scanAndClickBestButton(activePanel))
                 return;

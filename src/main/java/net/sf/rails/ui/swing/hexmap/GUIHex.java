@@ -442,6 +442,14 @@ public class GUIHex implements Observer {
             float strokeWidth = (float) state.getStrokeWidth(dimensions.hexagon);
             Shape innerHex = state.getInnerHexagon(dimensions.hexagon, dimensions.center);
 
+            // Intercept TOKEN_SELECTABLE during 1817 Auctions to force the purple style
+            boolean is1817AuctionSelection = false;
+            if (state == State.TOKEN_SELECTABLE && hexMap != null && hexMap.getOrUIManager() != null && hexMap.getOrUIManager().getGameUIManager() != null) {
+                net.sf.rails.game.round.RoundFacade currentRound = hexMap.getOrUIManager().getGameUIManager().getCurrentRound();
+                if (currentRound instanceof net.sf.rails.game.specific._1817.AuctionRound_1817) {
+                    is1817AuctionSelection = true;
+                }
+            }
             if (state == State.HIGHLIGHT_PORTFOLIO) {
                 // 1. Force-clear the stroke path to erase the stale white halo
                 // from the persistent MarksLayer buffer.
@@ -458,15 +466,14 @@ public class GUIHex implements Observer {
                         dashPattern, 0.0f));
                 g.setColor(state.getColor());
                 g.draw(innerHex);
-            } else if (state == State.HIGHLIGHT_PURPLE) {
-
+            } else if (state == State.HIGHLIGHT_PURPLE || is1817AuctionSelection) {
                 // Active company: Solid white halo first, then solid purple
                 g.setStroke(new BasicStroke(strokeWidth + 3.0f));
                 g.setColor(Color.WHITE);
                 g.draw(innerHex);
 
                 g.setStroke(new BasicStroke(strokeWidth));
-                g.setColor(state.getColor());
+g.setColor(State.HIGHLIGHT_PURPLE.getColor());
                 g.draw(innerHex);
             } else {
                 g.setStroke(new BasicStroke(strokeWidth));

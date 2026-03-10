@@ -541,15 +541,6 @@ public class GameUIManager implements DialogOwner {
 
             String combinedMessage = Util.join(message, " ");
 
-            // Suppress Modals ---
-
-            if (combinedMessage.contains("Bank is broken") ||
-                    combinedMessage.contains("Correction activated")) {
-
-                log.info("SUPPRESSED UI MESSAGE: {}", combinedMessage);
-                return false;
-            }
-
            // Suppress Modals ---
             if (combinedMessage.contains("Bank is broken") ||
                     combinedMessage.contains("Correction activated") ||
@@ -2131,22 +2122,7 @@ currentRoundName = "Game Start";
             return result;
         }
         
-        // Reset flag for normal moves
-        isHistoryNavigation = false;
-
-
-        // Safety Check for Game Actions (Undo/Redo) ---
-        if (action instanceof GameAction) {
-
-            result = previousResult = processOnServer(action);
-            if (result) {
-                updateUI();
-                if (statusWindow != null) {
-                    statusWindow.setGameActions();
-                }
-            }
-            return result;
-        }
+        
 
         // Intercept Train Correction Actions and route to Manager
         if (action instanceof TrainCorrectionAction) {

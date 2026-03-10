@@ -46,9 +46,12 @@ public class OperatingRound_1817 extends OperatingRound {
     protected final net.sf.rails.game.state.BooleanState loanBlackoutPeriod = new net.sf.rails.game.state.BooleanState(
             this, "loanBlackoutPeriod", false);
 
-      protected final net.sf.rails.game.state.IntegerState tilesLaidThisTurn = net.sf.rails.game.state.IntegerState.create(this, "tilesLaidThisTurn", 0);
-    protected final net.sf.rails.game.state.IntegerState upgradesThisTurn = net.sf.rails.game.state.IntegerState.create(this, "upgradesThisTurn", 0);
-     protected final net.sf.rails.game.state.ArrayListState<MapHex> hexesLaidThisTurn = new net.sf.rails.game.state.ArrayListState<>(this, "hexesLaidThisTurn");
+    protected final net.sf.rails.game.state.IntegerState tilesLaidThisTurn = net.sf.rails.game.state.IntegerState
+            .create(this, "tilesLaidThisTurn", 0);
+    protected final net.sf.rails.game.state.IntegerState upgradesThisTurn = net.sf.rails.game.state.IntegerState
+            .create(this, "upgradesThisTurn", 0);
+    protected final net.sf.rails.game.state.ArrayListState<MapHex> hexesLaidThisTurn = new net.sf.rails.game.state.ArrayListState<>(
+            this, "hexesLaidThisTurn");
 
     public OperatingRound_1817(GameManager gameManager, String roundId) {
         super(gameManager, roundId);
@@ -66,26 +69,27 @@ public class OperatingRound_1817 extends OperatingRound {
 
     @Override
     public boolean process(PossibleAction action) {
-        // Intercept the processing to detect if the D&H tile is being laid
+
         if (action instanceof LayTile) {
             LayTile layTile = (LayTile) action;
-            SpecialProperty sp = layTile.getSpecialProperty();
+            PublicCompany activeCompany = operatingCompany.value();
 
-            if (sp != null
-                    && sp instanceof SpecialTileLay
-                    && sp.getOriginalCompany() != null) {
+            log.info("1817_DEBUG: Processing LayTile for {}. Tiles laid this turn: {}. Company Cash: {}",
+                    activeCompany.getId(), tilesLaidThisTurn.value(), activeCompany.getCash());
 
-                Company originalComp = sp.getOriginalCompany();
-
-                // Use getId() because getName() is not guaranteed on the Company interface
-                String compName = originalComp.getId();
-
-            }
-
+            log.info("1817_DEBUG: Action Details - Hex: {}, Tile: {}, Action Cost: {}",
+                    layTile.getChosenHex().getId(), layTile.getLaidTile().getId(), layTile.getCost());
         }
 
         // Proceed with normal processing
-        return super.process(action);
+        boolean result = super.process(action);
+
+        if (action instanceof LayTile && !result) {
+            log.warn(
+                    "1817_DEBUG: LayTile action REJECTED by super.process(action). Check for rule violations or cost mismatches.");
+        }
+        return result;
+
     }
 
     @Override
@@ -126,7 +130,7 @@ public class OperatingRound_1817 extends OperatingRound {
     public boolean processGameSpecificAction(PossibleAction action) {
         if (action instanceof net.sf.rails.game.specific._1817.action.TakeLoans_1817) {
             net.sf.rails.game.specific._1817.action.TakeLoans_1817 tlAction = (net.sf.rails.game.specific._1817.action.TakeLoans_1817) action;
-            PublicCompany comp = tlAction.getCompany();
+            PublicCompany comp = companyManager.getPublicCompany(tlAction.getCompanyId());
             int count = tlAction.getLoansToTake();
 
             if (count > 0) {
@@ -227,19 +231,9 @@ public class OperatingRound_1817 extends OperatingRound {
 
         // 6. Force Injection
         log.info("1817_DEBUG: Injecting TakeLoans_1817 action for " + comp1817.getId());
-        possibleActions.add(new net.sf.rails.game.specific._1817.action.TakeLoans_1817(comp1817, maxLoans));
+        possibleActions.add(new net.sf.rails.game.specific._1817.action.TakeLoans_1817(comp1817.getId(), maxLoans));
         return true;
 
-    }
-
-    @Override
-    public boolean layTile(LayTile action) {
-        MapHex hex = action.getChosenHex();
-        boolean success = super.layTile(action);
-        if (success && action.getType() != LayTile.CORRECTION) {
-            hexesLaidThisTurn.add(hex);
-        }
-        return success;
     }
 
     @Override
@@ -247,7 +241,8 @@ public class OperatingRound_1817 extends OperatingRound {
         if (!super.gameSpecificTileLayAllowed(company, hex, orientation)) {
             return false;
         }
-        // Rule 6.3: A Company may not lay a yellow tile and upgrade it during the same turn.
+        // Rule 6.3: A Company may not lay a yellow tile and upgrade it during the same
+        // turn.
         if (hexesLaidThisTurn.contains(hex)) {
             return false;
         }
@@ -255,35 +250,87 @@ public class OperatingRound_1817 extends OperatingRound {
     }
 
     @Override
+    public int getTileLayCost(PublicCompany company, MapHex hex, int standardCost) {
+        int cost = super.getTileLayCost(company, hex, standardCost);
+        // Rule 6.3: Second tile operation costs an additional $20.
+        // --- START FIX ---
+        if (tilesLaidThisTurn.value() > 0) {
+            int extraCost = 20;
+            log.info(
+                    "1817_DEBUG: Applying Rule 6.3 surcharge. Base/Terrain Cost: {}, Surcharge: {}, Total: {} for Hex: {}",
+                    cost, extraCost, (cost + extraCost), hex.getId());
+            cost += extraCost;
+        } else {
+            log.info("1817_DEBUG: First tile lay cost for Hex {}: {}", hex.getId(), cost);
+        }
+        // --- END FIX ---
+        return cost;
+    }// We are modifying OperatingRound_1817.java
+
+   
+    // ... (lines of unchanged context code) ...
+    @Override
+    public boolean layTile(LayTile action) {
+        MapHex hex = action.getChosenHex();
+        // super.layTile() calls registerNormalTileLay() -> updateAllowedTileColours()
+        boolean success = super.layTile(action);
+
+        // --- START FIX ---
+        if (success && action.getType() != LayTile.CORRECTION) {
+            // Rule 6.3: Prevent upgrading the exact same hex twice in one turn.
+            hexesLaidThisTurn.add(hex);
+
+            // The UI's MapWindow click listener checks the base class's
+            // normalTileLaidThisTurn flag.
+            // If true, it swallows mouse clicks, assuming the normal lay step is over.
+            // We must reset this flag to trick the UI into accepting the second click.
+            if (tilesLaidThisTurn.value() < 2) {
+                normalTileLaidThisTurn.set(false);
+                log.info("1817_TRACE: Reset normalTileLaidThisTurn to unblock UI MapWindow.");
+            }
+        }
+        // --- END FIX ---
+        return success;
+    }
+
+    // ... (lines of unchanged context code) ...
+    @Override
     protected void updateAllowedTileColours(String colour, int oldAllowedNumber) {
-        // Increment upgrade count if the tile is not yellow.
+        // --- START FIX ---
+        // 1. Update Rule 6.3 counters based on the tile JUST laid.
+        // 'colour' is provided by the base engine as the color of the placed tile.
         if (!"Yellow".equalsIgnoreCase(colour)) {
             upgradesThisTurn.set(upgradesThisTurn.value() + 1);
         }
         tilesLaidThisTurn.set(tilesLaidThisTurn.value() + 1);
 
+        // 2. Clear the map to define the NEXT operation's limits.
         tileLaysPerColour.clear();
 
-        // Rule 6.3: Maximum of two operations; at most one can be an upgrade.
+        // 3. If we've only used one operation, allow a second one.
         if (tilesLaidThisTurn.value() < 2) {
+            // Bypassing base engine case-sensitivity inconsistencies
+            tileLaysPerColour.put("yellow", 1);
             tileLaysPerColour.put("Yellow", 1);
-            
+
             if (upgradesThisTurn.value() == 0) {
                 net.sf.rails.game.Phase currentPhase = net.sf.rails.game.Phase.getCurrent(this);
-                if (currentPhase.isTileColourAllowed("Green")) tileLaysPerColour.put("Green", 1);
-                if (currentPhase.isTileColourAllowed("Brown")) tileLaysPerColour.put("Brown", 1);
-                if (currentPhase.isTileColourAllowed("Grey")) tileLaysPerColour.put("Grey", 1);
+                if (currentPhase.isTileColourAllowed("Green") || currentPhase.isTileColourAllowed("green")) {
+                    tileLaysPerColour.put("Green", 1);
+                    tileLaysPerColour.put("green", 1);
+                }
+                if (currentPhase.isTileColourAllowed("Brown") || currentPhase.isTileColourAllowed("brown")) {
+                    tileLaysPerColour.put("Brown", 1);
+                    tileLaysPerColour.put("brown", 1);
+                }
+                if (currentPhase.isTileColourAllowed("Grey") || currentPhase.isTileColourAllowed("grey")) {
+                    tileLaysPerColour.put("Grey", 1);
+                    tileLaysPerColour.put("grey", 1);
+                }
             }
         }
+        // --- END FIX ---
     }
+    // ... (rest of the method) ...
 
-    @Override
-    public int getTileLayCost(PublicCompany company, MapHex hex, int standardCost) {
-        int cost = super.getTileLayCost(company, hex, standardCost);
-        // Rule 6.3: Second tile operation costs an additional $20.
-        if (tilesLaidThisTurn.value() > 0) {
-            cost += 20;
-        }
-        return cost;
-    }
 }

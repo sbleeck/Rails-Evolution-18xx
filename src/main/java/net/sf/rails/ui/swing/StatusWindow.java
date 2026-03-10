@@ -1287,6 +1287,12 @@ public class StatusWindow extends JFrame implements ActionListener, ActionPerfor
      * Subclasses (like StatusWindow_1856) override this to provide custom panels.
      */
     protected GameStatus createGameStatus() {
+        // Explicitly inject the 1817 GameStatus if the game matches
+        if ("1817".equals(gameUIManager.getGameManager().getGameName())) {
+            // Use direct compile-time instantiation instead of reflection
+            return new net.sf.rails.ui.swing.gamespecific._1817.GameStatus_1817();
+        }
+
         String gameStatusClassName = gameUIManager.getClassName(GuiDef.ClassName.GAME_STATUS);
         try {
             Class<? extends GameStatus> gameStatusClass = Class.forName(gameStatusClassName)
@@ -1615,7 +1621,8 @@ public class StatusWindow extends JFrame implements ActionListener, ActionPerfor
                 dynamicButtonPanel.removeAll();
 
 
-if (currentRound != null && currentRound.getClass().getName().contains("AuctionRound_1817")) {
+
+                 if (currentRound instanceof net.sf.rails.game.specific._1817.AuctionRound_1817) {
                     net.sf.rails.game.specific._1817.AuctionRound_1817 auction = 
                         (net.sf.rails.game.specific._1817.AuctionRound_1817) currentRound;
                     

@@ -150,6 +150,10 @@ public class PrivateCompany extends RailsOwnableItem<PrivateCompany> implements 
                     infoText += ", ";
                 }
             }
+            String description = tag.getAttributeAsString("description", null);
+            if (Util.hasValue(description)) {
+                infoText += "<br>" + description;
+            }
 
             Tag certificateTag = tag.getChild("Certificate");
             if (certificateTag != null) {

@@ -3,6 +3,7 @@ package net.sf.rails.ui.swing;
 import com.google.common.collect.Lists;
 import net.sf.rails.common.GuiDef;
 import net.sf.rails.common.LocalText;
+import net.sf.rails.game.CompanyManager;
 import net.sf.rails.game.Player;
 import net.sf.rails.game.PublicCompany;
 import net.sf.rails.game.financial.Bank;
@@ -1290,7 +1291,7 @@ public class GameStatus extends GridPanel {
             } else if (actions.get(0).getClass().getName().endsWith("Initiate1817IPO")) {
                 chosenAction = handle1817IPO(actions.get(0));
             } else if (actions.get(0).getClass().getName().endsWith("TakeLoans_1817")) {
-                processTakeLoans((net.sf.rails.game.specific._1817.action.TakeLoans_1817) actions.get(0));
+                processTakeLoans(actions.get(0));
                 return;
             } else if (actions.get(0).getClass().getSimpleName().equals("StartPrussian")) {
                 // Explicitly handle StartPrussian to ensure it triggers
@@ -1326,6 +1327,14 @@ public class GameStatus extends GridPanel {
         }
 
         repaint();
+    }
+
+    /** Stubs for game-specific subclasses like GameStatus_1817 */
+    protected PossibleAction handle1817IPO(PossibleAction action) {
+        return null;
+    }
+
+    protected void processTakeLoans(PossibleAction action) {
     }
 
     /**
@@ -1642,31 +1651,18 @@ public class GameStatus extends GridPanel {
 
         // Fix NPE: Check if the observer exists before accessing lastValue()
         boolean visible = true;
-        if (shareRowVisibilityObservers != null && i < shareRowVisibilityObservers.length
-                && shareRowVisibilityObservers[i] != null) {
-            visible = shareRowVisibilityObservers[i].lastValue();
+       
+
+        if (shareRowVisibilityObservers == null || i < 0 || i >= shareRowVisibilityObservers.length) {
+            return;
+        }
+        
+        RowVisibility observer = shareRowVisibilityObservers[i];
+        if (observer == null || j < 0) {
+            return;
         }
 
-        if (!visible)
-            return;
-
-        if (shareRowVisibilityObservers != null && i < shareRowVisibilityObservers.length
-                && shareRowVisibilityObservers[i] != null) {
-            // The line causing the crash is likely accessing .lastValue() or .setValue()
-            boolean isVisible = shareRowVisibilityObservers[i].lastValue();
-            // (Keep the rest of your existing logic here that uses isVisible)
-            // If you cannot identify the exact lines, just wrapping the observer usage is
-            // enough.
-        }
-        // SAFETY CHECK: Prevent NPE if observers are missing
-        if (shareRowVisibilityObservers == null
-                || i < 0
-                || i >= shareRowVisibilityObservers.length
-                || shareRowVisibilityObservers[i] == null) {
-            return;
-        }
-        if (j < 0)
-            return;
+        boolean panelVisible = observer.lastValue();
 
         // 1. Manage Dot Visibility (Environment)
         if (playerSoldDots != null && playerSoldDots.length > i && playerSoldDots[i] != null
@@ -1688,8 +1684,6 @@ public class GameStatus extends GridPanel {
             }
         }
 
-        // 2. Manage Card Visibility & Content
-        boolean panelVisible = shareRowVisibilityObservers[i].lastValue();
 
         if (playerSharePanels != null && playerSharePanels[i][j] != null && panelVisible) {
             playerSharePanels[i][j].setVisible(true);
@@ -2056,6 +2050,7 @@ public class GameStatus extends GridPanel {
             // Phase not ready
         }
 
+        boolean is1817 = "1817".equals(gameUIManager.getGameManager().getGameName());
         for (int i = 0; i < np; i++) {
             if (playerFixedIncome[i] == null)
                 continue;
@@ -2067,26 +2062,24 @@ public class GameStatus extends GridPanel {
                 Player p = players.getPlayerByPosition(i);
 
                 if (p.getPortfolioModel() != null) {
-                    for (net.sf.rails.game.PrivateCompany pc : p.getPortfolioModel().getPrivateCompanies()) {
-                        privateCount++;
-
-                        // 1. Try Phase-based revenue
-                        int r = (phase != null) ? pc.getRevenueByPhase(phase) : 0;
-
-                        // 2. Fallback
-                        if (r == 0 && pc.getRevenue() != null && !pc.getRevenue().isEmpty()) {
-                            r = pc.getRevenue().get(0);
+                   
+                    if (is1817) {
+                        total += p.getCashValue();
+                        for (net.sf.rails.game.PrivateCompany pc : p.getPortfolioModel().getPrivateCompanies()) {
+                            privateCount++;
+                            total += pc.getBasePrice();
                         }
-
-                        total += r;
-
-                        // DEBUG PRINT: Use 'phase' directly to avoid compilation errors
-                        // System.out.println("DEBUG-INC: Player " + p.getName() + " owns " + pc.getId()
-                        // +
-                        // " | RevList=" + pc.getRevenue() +
-                        // " | Phase=" + (phase!=null ? phase : "null") +
-                        // " | CalcRev=" + r);
+                    } else {
+                        for (net.sf.rails.game.PrivateCompany pc : p.getPortfolioModel().getPrivateCompanies()) {
+                            privateCount++;
+                            int r = (phase != null) ? pc.getRevenueByPhase(phase) : 0;
+                            if (r == 0 && pc.getRevenue() != null && !pc.getRevenue().isEmpty()) {
+                                r = pc.getRevenue().get(0);
+                            }
+                            total += r;
+                        }
                     }
+
                 }
             } catch (Exception e) {
                 e.printStackTrace();
@@ -2949,8 +2942,8 @@ public class GameStatus extends GridPanel {
                         for (PossibleAction pa : possibleActions.getList()) {
                             if (pa != null && pa.getClass().getName().endsWith("TakeLoans_1817")) {
                                 net.sf.rails.game.specific._1817.action.TakeLoans_1817 tl = (net.sf.rails.game.specific._1817.action.TakeLoans_1817) pa;
-                                if (tl.getCompany().getId().equals(c.getId())) {
-                                    if (compLoans[i] instanceof ClickField) {
+                                if (tl.getCompanyId().equals(c.getId())) {
+                                        if (compLoans[i] instanceof ClickField) {
                                         ClickField cf = (ClickField) compLoans[i];
                                         cf.setEnabled(true);
                                         cf.setPossibleAction(pa);
@@ -4763,8 +4756,10 @@ public class GameStatus extends GridPanel {
         int bankY = playerTimerYOffset;
         int bankX = certInIPOXOffset; // Matches colUsed
 
-        f = new Caption("Fixed Inc");
-        f.setBorder(BORDER_THIN);
+
+boolean is1817 = "1817".equals(gameUIManager.getGameManager().getGameName());
+        f = new Caption(is1817 ? "Pur. Power" : "Fixed Inc");
+                f.setBorder(BORDER_THIN);
         f.setBackground(Color.WHITE);
         f.setOpaque(true);
         gbc.anchor = GridBagConstraints.CENTER;
@@ -4779,7 +4774,6 @@ public class GameStatus extends GridPanel {
             gbc.weightx = 0.0;
         }
 
-        boolean is1817 = "1817".equals(gameUIManager.getGameManager().getGameName());
 
         if (is1817) {
             bondsHeatbarPanel = new net.sf.rails.ui.swing.elements.BondsHeatbarPanel();
@@ -5141,62 +5135,11 @@ public class GameStatus extends GridPanel {
         return null;
     }
 
-    /**
-     * Handles the UI interaction for initiating an 1817 IPO.
-     * Prompts the user for a Hex ID and a starting bid.
-     */
-    private PossibleAction handle1817IPO(PossibleAction action) {
-        try {
-            // 1. Prompt for Hex ID
-            String hexId = JOptionPane.showInputDialog(this,
-                    "Enter starting Hex ID for the new company (e.g., D14):",
-                    "1817 IPO: Select Location",
-                    JOptionPane.QUESTION_MESSAGE);
-
-            if (hexId == null || hexId.trim().isEmpty())
-                return null; // Cancelled
-
-            // 2. Prompt for Bid
-            String bidStr = JOptionPane.showInputDialog(this,
-                    "Enter starting bid ($100 - $400, multiples of $5):",
-                    "1817 IPO: Initial Bid",
-                    JOptionPane.QUESTION_MESSAGE);
-
-            if (bidStr == null || bidStr.trim().isEmpty())
-                return null; // Cancelled
-
-            int bid = Integer.parseInt(bidStr.replaceAll("[^0-9]", ""));
-
-            // 3. Validate 1817 Bidding Rules
-            // IPO bids must be between $100 and $400 and in multiples of $5.
-            if (bid < 100 || bid > 400 || bid % 5 != 0) {
-                JOptionPane.showMessageDialog(this,
-                        "Invalid bid. Must be between $100 and $400 and a multiple of $5.",
-                        "Validation Error", JOptionPane.ERROR_MESSAGE);
-                return null;
-            }
-
-            // 4. Populate the action using reflection
-            // This avoids hard dependencies if the action class is in a game-specific
-            // package.
-            action.getClass().getMethod("setHexId", String.class).invoke(action, hexId.trim().toUpperCase());
-            action.getClass().getMethod("setBid", int.class).invoke(action, bid);
-
-            return action;
-
-        } catch (NumberFormatException e) {
-            JOptionPane.showMessageDialog(this, "Please enter a valid numeric amount.", "Error",
-                    JOptionPane.ERROR_MESSAGE);
-            return null;
-        } catch (Exception e) {
-            log.error("Failed to process 1817 IPO initiation", e);
-            return null;
-        }
-    }
-
     private void processTakeLoans(net.sf.rails.game.specific._1817.action.TakeLoans_1817 action) {
-        PublicCompany comp = action.getCompany();
-        int current = comp.getNumberOfBonds();
+   String compId = action.getCompanyId();
+           CompanyManager cm = gameUIManager.getRoot().getCompanyManager();
+            PublicCompany comp = cm.getPublicCompany(compId);
+               int current = comp.getNumberOfBonds();
         int max = action.getMaxLoansAllowed();
         int available = max - current;
 

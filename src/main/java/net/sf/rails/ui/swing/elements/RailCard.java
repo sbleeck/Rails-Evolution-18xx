@@ -322,6 +322,49 @@ public net.sf.rails.game.Train getTrain() {
             }
 
         }
+
+        // Adjust content panel padding to prevent text overlapping the right-side stripe
+        int rightPadding = 0;
+        java.awt.Color stripeColor = null;
+        boolean isPresident = false;
+        
+        if (associatedCompany instanceof PublicCompany) {
+            PublicCompany pc = (PublicCompany) associatedCompany;
+            stripeColor = pc.getBgColour();
+            if (!pc.hasStockPrice()) {
+                isPresident = true;
+            } else if (customLabel != null) {
+                String plain = customLabel.replaceAll("\\<.*?\\>", "").trim();
+                if (plain.endsWith("P") || plain.equals("Owner") || plain.contains("%P")) {
+                    isPresident = true;
+                }
+            }
+        } else {
+            for (Certificate cert : certificates) {
+                if (cert instanceof PublicCertificate) {
+                    PublicCertificate pc = (PublicCertificate) cert;
+                    if (pc.getCompany() != null) {
+                        stripeColor = pc.getCompany().getBgColour();
+                        if (pc.getCompany().getPresidentsShare() != null && pc.getCompany().getPresidentsShare().equals(pc)) {
+                            isPresident = true;
+                        } else if (pc.getShare() >= 20) {
+                            isPresident = true;
+                        }
+                    }
+                    break;
+                }
+            }
+        }
+        
+        if (stripeColor != null) {
+            int baseWidth = getPreferredSize().width;
+            rightPadding = isPresident ? (int) (baseWidth * 0.20) : (int) (baseWidth * 0.10);
+            rightPadding += 2; // Add a 2px buffer so text doesn't touch the line
+        }
+        
+        contentPanel.setBorder(BorderFactory.createEmptyBorder(0, 0, 0, rightPadding));
+
+
         contentPanel.revalidate();
         contentPanel.repaint();
         this.revalidate();
@@ -564,8 +607,9 @@ public static Dimension calculateBaseSize(Font f, boolean compactMode, double sc
             return;
         }
         String info = pc.getInfoText();
-        if (info != null && !info.toLowerCase().startsWith("<html>")) {
-            info = "<html>" + info + "</html>";
+if (info != null) {
+            info = info.replaceAll("(?i)^<html>|</html>$", "");
+            info = "<html><div style='width: 250px;'>" + info + "</div></html>";
         }
         setToolTipText(info);
     }
@@ -580,8 +624,9 @@ public static Dimension calculateBaseSize(Font f, boolean compactMode, double sc
             return;
         }
         String info = c.getInfoText();
-        if (info != null && !info.toLowerCase().startsWith("<html>")) {
-            info = "<html>" + info + "</html>";
+if (info != null) {
+            info = info.replaceAll("(?i)^<html>|</html>$", "");
+            info = "<html><div style='width: 250px;'>" + info + "</div></html>";
         }
         setToolTipText(info);
     }
@@ -617,7 +662,8 @@ public static Dimension calculateBaseSize(Font f, boolean compactMode, double sc
     }
     
 
-        @Override
+
+    @Override
     protected void paintComponent(java.awt.Graphics g) {
         super.paintComponent(g);
 
@@ -655,65 +701,19 @@ public static Dimension calculateBaseSize(Font f, boolean compactMode, double sc
         }
 
         if (stripeColor != null) {
-            int width = getWidth();
-            int height = getHeight();
-            int stripeWidth = isPresident ? (int) (width * 0.20) : (int) (width * 0.10);
+            java.awt.Insets insets = getInsets();
+            int innerY = insets.top;
+            int innerWidth = getWidth() - insets.left - insets.right;
+            int innerHeight = getHeight() - insets.top - insets.bottom;
+            
+            int stripeWidth = isPresident ? (int) (innerWidth * 0.20) : (int) (innerWidth * 0.10);
+            int stripeX = getWidth() - insets.right - stripeWidth;
 
             g.setColor(stripeColor);
-            g.fillRect(width - stripeWidth, 0, stripeWidth, height);
+            g.fillRect(stripeX, innerY, stripeWidth, innerHeight);
 
             g.setColor(java.awt.Color.BLACK);
-            g.drawLine(width - stripeWidth, 0, width - stripeWidth, height);
-        }
-    }
-
-
-    @Override
-    protected void paintChildren(java.awt.Graphics g) {
-        super.paintChildren(g); // Paint the text and label backgrounds first
-
-        java.awt.Color stripeColor = null;
-        boolean isPresident = false;
-
-        if (associatedCompany instanceof PublicCompany) {
-            PublicCompany pc = (PublicCompany) associatedCompany;
-            stripeColor = pc.getBgColour();
-            
-            if (!pc.hasStockPrice()) {
-                isPresident = true;
-            } else if (customLabel != null) {
-                String plain = customLabel.replaceAll("\\<.*?\\>", "").trim();
-                if (plain.endsWith("P") || plain.equals("Owner") || plain.contains("%P")) {
-                    isPresident = true;
-                }
-            }
-        } else {
-            for (Certificate cert : certificates) {
-                if (cert instanceof PublicCertificate) {
-                    PublicCertificate pc = (PublicCertificate) cert;
-                    if (pc.getCompany() != null) {
-                        stripeColor = pc.getCompany().getBgColour();
-                        if (pc.getCompany().getPresidentsShare() != null && pc.getCompany().getPresidentsShare().equals(pc)) {
-                            isPresident = true;
-                        } else if (pc.getShare() >= 20) {
-                            isPresident = true;
-                        }
-                    }
-                    break;
-                }
-            }
-        }
-
-        if (stripeColor != null) {
-            int width = getWidth();
-            int height = getHeight();
-            int stripeWidth = isPresident ? (int)(width * 0.20) : (int)(width * 0.10);
-            
-            g.setColor(stripeColor);
-            g.fillRect(width - stripeWidth, 0, stripeWidth, height);
-            
-            g.setColor(java.awt.Color.BLACK);
-            g.drawLine(width - stripeWidth, 0, width - stripeWidth, height);
+            g.drawLine(stripeX, innerY, stripeX, innerY + innerHeight - 1);
         }
     }
 

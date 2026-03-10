@@ -21,13 +21,16 @@ public class PublicCompany_1817 extends PublicCompany {
 
     private static final Logger log = LoggerFactory.getLogger(PublicCompany_1817.class);
 
+
+    protected final IntegerState tokenCapacity;
     protected final IntegerState shareCount;
 protected final IntegerState bondsState;
 
     public PublicCompany_1817(RailsItem parent, String id) {
         super(parent, id);
-        this.shareCount = IntegerState.create(this, "shareCount_" + id, 2);
-        this.bondsState = IntegerState.create(this, "bondsState_" + id, 0);
+this.shareCount = IntegerState.create(this, "shareCount", 2);
+        this.bondsState = IntegerState.create(this, "bondsState", 0);
+        this.tokenCapacity = IntegerState.create(this, "tokenCapacity", 8);
     }
 
     @Override
@@ -35,7 +38,7 @@ protected final IntegerState bondsState;
         super.finishConfiguration(root);
         // Initial certificate setup for all companies
         adjustCertificates();
-    }
+            }
 
     @Override
     public int getNumberOfBonds() {
@@ -118,11 +121,71 @@ protected final IntegerState bondsState;
             this.shareCount.set(count);
             log.info("Company " + getId() + " set to " + count + "-share size.");
             adjustCertificates();
+
+            // Set initial station marker capacity according to 1817 rules.
+            // 2-share: 1 token, 5-share: 2 tokens, 10-share: 4 tokens.
+            if (this.tokenCapacity.value() == 8) {
+                int capacity = (count == 2) ? 1 : (count == 5) ? 2 : 4;
+                this.tokenCapacity.set(capacity);
+            }
         }
     }
+
+    
+    public void addTokenCapacity(int amount) {
+        this.tokenCapacity.add(amount);
+    }
+
 
     @Override
     public int getShareUnitsForSharePrice() {
         return 1; 
     }
+
+
+@Override
+    public java.util.Set<net.sf.rails.game.BaseToken> getAllBaseTokens() {
+        java.util.Set<net.sf.rails.game.BaseToken> all = super.getAllBaseTokens();
+        int limit = tokenCapacity.value();
+        if (all.size() <= limit) {
+            return all;
+        }
+        
+        java.util.Set<net.sf.rails.game.BaseToken> restricted = new java.util.TreeSet<>();
+        int count = 0;
+        for (net.sf.rails.game.BaseToken t : all) {
+            if (count < limit) {
+                restricted.add(t);
+            }
+            count++;
+        }
+        return restricted;
+    }
+
+    @Override
+    public int getNumberOfBaseTokens() {
+        return getAllBaseTokens().size();
+    }
+
+    @Override
+    public int getNumberOfFreeBaseTokens() {
+        return Math.max(0, getNumberOfBaseTokens() - getNumberOfLaidBaseTokens());
+    }
+
+    @Override
+    public net.sf.rails.game.BaseToken getNextBaseToken() {
+        if (getNumberOfFreeBaseTokens() <= 0) {
+            return null;
+        }
+        for (net.sf.rails.game.BaseToken t : getAllBaseTokens()) {
+            if (!t.isPlaced()) {
+                    return t;
+            }
+        }
+        return null;
+    }
+
+
+
+
 }

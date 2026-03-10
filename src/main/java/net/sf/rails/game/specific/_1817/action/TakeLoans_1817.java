@@ -5,20 +5,20 @@ import net.sf.rails.game.PublicCompany;
 
 public class TakeLoans_1817 extends PossibleAction {
     private static final long serialVersionUID = 1L;
-    
-    private final PublicCompany company;
+
+    private final String companyId;
     private final int maxLoansAllowed;
     private int loansToTake = 0;
 
-public TakeLoans_1817(PublicCompany company, int maxLoansAllowed) {
+    public TakeLoans_1817(String companyId, int maxLoansAllowed) {
         // Correcting to RailsRoot as per your environment's requirement
         super((net.sf.rails.game.RailsRoot) null);
-        this.company = company;
+        this.companyId = companyId;
         this.maxLoansAllowed = maxLoansAllowed;
     }
 
-    public PublicCompany getCompany() {
-        return company;
+    public String getCompanyId() {
+        return companyId;
     }
 
     public int getMaxLoansAllowed() {
@@ -35,6 +35,6 @@ public TakeLoans_1817(PublicCompany company, int maxLoansAllowed) {
 
     @Override
     public String toString() {
-        return "Take Loans (" + (company != null ? company.getId() : "Unknown") + ")";
+        return "Take Loans (" + (companyId != null ? companyId : "Unknown") + ")";
     }
 }

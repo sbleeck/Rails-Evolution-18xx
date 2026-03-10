@@ -1124,11 +1124,19 @@ setToolTipText(newHex != null ? newHex.getToolTip() : null);
         return layers.get(layers.size() - 1).getSize();
     }
 
-    private void addMouseListener(MouseListener ml) {
+public void addMouseListener(java.awt.event.MouseListener ml) {
         for (JComponent l : layers) {
             l.addMouseListener(ml);
         }
     }
+
+    public void removeMouseListener(java.awt.event.MouseListener ml) {
+        if (layers == null) return;
+        for (JComponent l : layers) {
+            l.removeMouseListener(ml);
+        }
+    }
+    
 
     private void addMouseMotionListener(MouseMotionListener ml) {
         for (JComponent l : layers) {

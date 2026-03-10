@@ -59,7 +59,7 @@ public class StockRound_1817 extends StockRound {
                     int maxLoans = (comp instanceof PublicCompany_1817) ? ((PublicCompany_1817) comp).getShareCount()
                             : 0;
                     if (comp.getNumberOfBonds() < maxLoans) {
-                        possibleActions.add(new TakeLoans_1817(comp, maxLoans));
+possibleActions.add(new TakeLoans_1817(comp.getId(), maxLoans));
                     }
                 }
 
@@ -203,7 +203,7 @@ public class StockRound_1817 extends StockRound {
 
         if (action instanceof net.sf.rails.game.specific._1817.action.TakeLoans_1817) {
             net.sf.rails.game.specific._1817.action.TakeLoans_1817 tlAction = (net.sf.rails.game.specific._1817.action.TakeLoans_1817) action;
-            PublicCompany comp = tlAction.getCompany();
+PublicCompany comp = companyManager.getPublicCompany(tlAction.getCompanyId());
             int count = tlAction.getLoansToTake();
 
             if (count > 0) {
