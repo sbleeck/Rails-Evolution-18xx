@@ -72,14 +72,35 @@ public class LinearRoundTracker extends JComponent {
             cachedActiveIndex = -1;
             PublicCompany activeComp = null;
 
+
+            boolean isOperatingType = false;
+
             if (roundObj instanceof OperatingRound) {
                 // Operating Round: Use Engine Order
                 OperatingRound or = (OperatingRound) roundObj;
                 List<PublicCompany> sorted = or.getOperatingCompanies();
-                if (sorted != null)
-                    cachedTimeline.addAll(sorted);
+                if (sorted != null) cachedTimeline.addAll(sorted);
                 activeComp = or.getOperatingCompany();
+                isOperatingType = true;
             } else {
+                // Reflection fallback for 1817 M&A rounds or other custom rounds
+                try {
+                    java.lang.reflect.Method getComps = roundObj.getClass().getMethod("getOperatingCompanies");
+                    @SuppressWarnings("unchecked")
+                    List<PublicCompany> sorted = (List<PublicCompany>) getComps.invoke(roundObj);
+                    if (sorted != null && !sorted.isEmpty()) {
+                        cachedTimeline.addAll(sorted);
+                        isOperatingType = true;
+                    }
+
+                    java.lang.reflect.Method getComp = roundObj.getClass().getMethod("getOperatingCompany");
+                    activeComp = (PublicCompany) getComp.invoke(roundObj);
+                } catch (Exception e) {
+                    // Not an operating-type round
+                }
+            }
+
+            if (!isOperatingType) {
                 // Stock Round: Predict Order
                 for (PublicCompany c : companies) {
                     if (!c.isClosed() && c.hasFloated()) {
@@ -107,6 +128,19 @@ public class LinearRoundTracker extends JComponent {
                 });
             }
 
+            // Generic fallback for activeComp if reflection failed but GUI actions exist
+            if (activeComp == null && gameUIManager.getGameManager().getPossibleActions() != null) {
+                for (rails.game.action.PossibleAction pa : gameUIManager.getGameManager().getPossibleActions().getList()) {
+                    if (pa instanceof rails.game.action.GuiTargetedAction) {
+                        net.sf.rails.game.state.Owner actor = ((rails.game.action.GuiTargetedAction) pa).getActor();
+                        if (actor instanceof PublicCompany) {
+                            activeComp = (PublicCompany) actor;
+                            break;
+                        }
+                    }
+                }
+            }
+            
             // Find Index
             if (activeComp != null) {
                 for (int i = 0; i < cachedTimeline.size(); i++) {

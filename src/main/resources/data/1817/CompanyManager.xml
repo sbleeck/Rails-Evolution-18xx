@@ -71,27 +71,26 @@
 	</StartPacket>
 
 
-		<Company name="A&amp;S" type="Public" tokens="8" fgColour="FFFFFF" bgColour="000000" longname="Alton &amp; Southern" />
-        <Company name="B&amp;A" type="Public" tokens="8" fgColour="FFFFFF" bgColour="FF0000" longname="Boston &amp; Albany" />
-        <Company name="B&amp;M" type="Public" tokens="8" fgColour="000000" bgColour="60E060" longname="Boston &amp; Maine" />
-        <Company name="B&amp;O" type="Public" tokens="8" fgColour="FFFFFF" bgColour="0000FF" longname="Baltimore &amp; Ohio" />
-        <Company name="C&amp;O" type="Public"  tokens="8" fgColour="000000" bgColour="A0E0FF" longname="Chesapeake &amp; Ohio" />
-        <Company name="Erie" type="Public" tokens="8" fgColour="000000" bgColour="FFFF00" longname="Erie Railroad" />
-        <Company name="GT" type="Public" tokens="8" fgColour="FFFFFF" bgColour="FF8000" longname="Grand Trunk" />
-        <Company name="IC" type="Public" tokens="8" fgColour="FFFFFF" bgColour="008000" longname="Illinois Central" />
-        <Company name="J" type="Public" tokens="8" fgColour="FFFFFF" bgColour="800080" longname="Elgin, Joliet &amp; Eastern" />
-        <Company name="L&amp;N" type="Public" tokens="8" fgColour="FFFFFF" bgColour="000080" longname="Louisville &amp; Nashville" />
-        <Company name="LV" type="Public" tokens="8" fgColour="FFFFFF" bgColour="FF0000" longname="Lehigh Valley" />
-        <Company name="N&amp;W" type="Public" tokens="8" fgColour="FFFFFF" bgColour="000000" longname="Norfolk &amp; Western" />
-        <Company name="NKP" type="Public" tokens="8" fgColour="FFFFFF" bgColour="000000" longname="Nickel Plate Road" />
-        <Company name="NYC" type="Public" tokens="8" fgColour="FFFFFF" bgColour="000000" longname="New York Central" />
-        <Company name="NYNH" type="Public" tokens="8" fgColour="000000" bgColour="FF8000" longname="New York, New Haven &amp; Hartford" />
-        <Company name="PRR" type="Public" tokens="8" fgColour="FFFFFF" bgColour="008000" longname="Pennsylvania Railroad" />
-        <Company name="RDG" type="Public" tokens="8" fgColour="FFFFFF" bgColour="008000" longname="Reading Railroad" />
-        <Company name="TP&amp;W" type="Public" tokens="8" fgColour="000000" bgColour="FF8000" longname="Toledo, Peoria &amp; Western" />
-        <Company name="UR" type="Public" tokens="8" fgColour="FFFFFF" bgColour="000080" longname="Union Railroad" />
-        <Company name="W" type="Public" tokens="8" fgColour="FFFFFF" bgColour="000000" longname="Wabash" />
-
+	<Company name="AA" type="Public" tokens="8" fgColour="FFFFFF" bgColour="E31A1C" longname="Ann Arbor" />
+<Company name="ALT" type="Public" tokens="8" fgColour="000000" bgColour="A6CEE3" longname="Alton" />
+<Company name="BA" type="Public" tokens="8" fgColour="FFFFFF" bgColour="33A02C" longname="Bangor &amp; Aroostook" />
+<Company name="BELT" type="Public" tokens="8" fgColour="000000" bgColour="D3D3D3" longname="Belt Railway of Chicago" />
+<Company name="BESS" type="Public" tokens="8" fgColour="000000" bgColour="FF7F00" longname="Bessemer &amp; Lake Erie" />
+<Company name="EJE" type="Public" tokens="8" fgColour="000000" bgColour="B2DF8A" longname="Elgin, Joliet &amp; Eastern" />
+<Company name="GTW" type="Public" tokens="8" fgColour="FFFFFF" bgColour="1F78B4" longname="Grand Trunk Western" />
+<Company name="HOU" type="Public" tokens="8" fgColour="000000" bgColour="FFFF33" longname="Houston Belt &amp; Terminal" />
+<Company name="LR" type="Public" tokens="8" fgColour="FFFFFF" bgColour="800000" longname="Little Rock &amp; Fort Smith" />
+<Company name="ME" type="Public" tokens="8" fgColour="000000" bgColour="FFD700" longname="Maine Central" />
+<Company name="NYOW" type="Public" tokens="8" fgColour="FFFFFF" bgColour="000080" longname="New York, Ontario &amp; Western" />
+<Company name="NYSW" type="Public" tokens="8" fgColour="000000" bgColour="FDBF6F" longname="New York, Susquehanna &amp; Western" />
+<Company name="PLE" type="Public" tokens="8" fgColour="FFFFFF" bgColour="008080" longname="Pittsburgh &amp; Lake Erie" />
+<Company name="PSN" type="Public" tokens="8" fgColour="000000" bgColour="F781BF" longname="Pittsburg, Shawmut &amp; Northern" />
+<Company name="PW" type="Public" tokens="8" fgColour="FFFFFF" bgColour="663300" longname="Providence &amp; Worcester" />
+<Company name="RUT" type="Public" tokens="8" fgColour="FFFFFF" bgColour="6A3D9A" longname="Rutland" />
+<Company name="STR" type="Public" tokens="8" fgColour="000000" bgColour="FB9A99" longname="Staten Island Rapid Transit" />
+<Company name="UR" type="Public" tokens="8" fgColour="FFFFFF" bgColour="D95F02" longname="Union Railroad" />
+<Company name="WC" type="Public" tokens="8" fgColour="FFFFFF" bgColour="800020" longname="Wisconsin Central" />
+<Company name="W&amp;T" type="Public" tokens="8" fgColour="FFFFFF" bgColour="A65628" longname="Wrightsville &amp; Tennille" />
 
     
 	

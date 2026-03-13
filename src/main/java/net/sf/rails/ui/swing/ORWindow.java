@@ -240,8 +240,7 @@ sidebarWrapper.setPreferredSize(new Dimension(ORPanel.SIDEBAR_WIDTH, 0));
     }
 
 
-
-    public void activate(OperatingRound or) {
+    public void activate(Round or) {
         orPanel.recreate(or);
         setMapWindowTitle(or);
 
@@ -264,7 +263,7 @@ sidebarWrapper.setPreferredSize(new Dimension(ORPanel.SIDEBAR_WIDTH, 0));
             }
         }
         setVisible(true);
-// Do not steal focus if we are actually in a Start Round (e.g. dummy OR for minor token lay)
+        // Do not steal focus if we are actually in a Start Round (e.g. dummy OR for minor token lay)
         if (!(gameUIManager.getCurrentRound() instanceof StartRound)) {
             // Use invokeLater to ensure this runs after the visibility change is fully processed
             SwingUtilities.invokeLater(() -> {
@@ -274,6 +273,8 @@ sidebarWrapper.setPreferredSize(new Dimension(ORPanel.SIDEBAR_WIDTH, 0));
         }
         
     }
+
+
 
     protected void setMapWindowTitle(Round round) {
         GameManager gameManager = gameUIManager.getGameManager();

@@ -33,7 +33,6 @@ import java.util.List;
 import net.sf.rails.ui.swing.elements.RailCard;
 import java.util.Map;
 
-
 /**
  * This class is incorporated into StatusWindow and displays the bulk of
  * rails.game status information.
@@ -182,6 +181,10 @@ public class GameStatus extends GridPanel {
     protected int newTrainsXOffset, newTrainsYOffset;
     protected int futureTrainsXOffset, futureTrainsYOffset, futureTrainsWidth;
     protected int rightCompCaptionXOffset;
+
+    protected JPanel specialActionContainer;
+    protected JPanel specialActionPanel;
+    protected javax.swing.JLabel specialActionLabel;
 
     private final int MAX_TRAIN_SLOTS = 4; // Max trains to display per company
     private final int MAX_FUTURE_SLOTS = 6; // Max future trains to display
@@ -572,18 +575,24 @@ public class GameStatus extends GridPanel {
         certInIPOYOffset = lastY;
         certInPoolXOffset = ++lastX;
         certInPoolYOffset = lastY;
-        if (compCanHoldOwnShares) {
+
+                if (compCanHoldOwnShares) {
             certInTreasuryXOffset = ++lastX;
             certInTreasuryYOffset = lastY;
         }
+        
         if (hasParPrices) {
             parPriceXOffset = ++lastX;
             parPriceYOffset = lastY;
         }
 
+
         // New Sequence: Treasury -> Trains -> Dividend -> Retained -> Markers
-        compCashXOffset = ++lastX;
+compCashXOffset = ++lastX;
         compTrainsXOffset = ++lastX;
+
+
+
         compRevenueXOffset = ++lastX;
         compRetainedXOffset = ++lastX;
         compTokensXOffset = ++lastX;
@@ -1288,7 +1297,7 @@ public class GameStatus extends GridPanel {
                 chosenAction = actions.get(0);
             } else if (actions.get(0) instanceof BuyTrain) {
                 chosenAction = handleBuyTrain((BuyTrain) actions.get(0));
-            } else if (actions.get(0).getClass().getName().endsWith("Initiate1817IPO")) {
+ } else if (actions.get(0).getClass().getName().endsWith("Initiate1817IPO")) {
                 chosenAction = handle1817IPO(actions.get(0));
             } else if (actions.get(0).getClass().getName().endsWith("TakeLoans_1817")) {
                 processTakeLoans(actions.get(0));
@@ -1651,12 +1660,11 @@ public class GameStatus extends GridPanel {
 
         // Fix NPE: Check if the observer exists before accessing lastValue()
         boolean visible = true;
-       
 
         if (shareRowVisibilityObservers == null || i < 0 || i >= shareRowVisibilityObservers.length) {
             return;
         }
-        
+
         RowVisibility observer = shareRowVisibilityObservers[i];
         if (observer == null || j < 0) {
             return;
@@ -1683,7 +1691,6 @@ public class GameStatus extends GridPanel {
                 playerSoldDots[i][j].setVisible(false);
             }
         }
-
 
         if (playerSharePanels != null && playerSharePanels[i][j] != null && panelVisible) {
             playerSharePanels[i][j].setVisible(true);
@@ -1858,9 +1865,13 @@ public class GameStatus extends GridPanel {
         ipoShareCards[i].clearPossibleActions();
 
         if (clickable && o != null) {
-            if (o instanceof BuyCertificate) {
+            if (o instanceof BuyCertificate || o.getClass().getName().endsWith("Initiate1817IPO")) {
                 ipoShareCards[i].setBackground(BG_CARD_PASSIVE);
                 ipoShareCards[i].setBorder(BorderFactory.createLineBorder(BORDER_COL_BUY, BORDER_THICKNESS));
+
+                if (o.getClass().getName().endsWith("Initiate1817IPO") && !hasContent) {
+                    ipoShareCards[i].setCustomLabel("Start");
+                }
             } else if (o instanceof SellShares) {
                 ipoShareCards[i].setBackground(BG_CARD_PASSIVE);
                 ipoShareCards[i].setBorder(BorderFactory.createLineBorder(BORDER_COL_SELL, BORDER_THICKNESS));
@@ -2062,7 +2073,7 @@ public class GameStatus extends GridPanel {
                 Player p = players.getPlayerByPosition(i);
 
                 if (p.getPortfolioModel() != null) {
-                   
+
                     if (is1817) {
                         total += p.getCashValue();
                         for (net.sf.rails.game.PrivateCompany pc : p.getPortfolioModel().getPrivateCompanies()) {
@@ -2943,7 +2954,7 @@ public class GameStatus extends GridPanel {
                             if (pa != null && pa.getClass().getName().endsWith("TakeLoans_1817")) {
                                 net.sf.rails.game.specific._1817.action.TakeLoans_1817 tl = (net.sf.rails.game.specific._1817.action.TakeLoans_1817) pa;
                                 if (tl.getCompanyId().equals(c.getId())) {
-                                        if (compLoans[i] instanceof ClickField) {
+                                    if (compLoans[i] instanceof ClickField) {
                                         ClickField cf = (ClickField) compLoans[i];
                                         cf.setEnabled(true);
                                         cf.setPossibleAction(pa);
@@ -3950,10 +3961,11 @@ public class GameStatus extends GridPanel {
 
         compCashXOffset = col++;
         compTrainsXOffset = col++;
+
         compRevenueXOffset = col++;
         compRetainedXOffset = col++;
         compTokensXOffset = col++;
-
+        
         if (compCanBuyPrivates)
             compPrivatesXOffset = col++;
         if (hasCompanyLoans)
@@ -4029,7 +4041,8 @@ public class GameStatus extends GridPanel {
 
         dummyButton = new ClickField("", "", "", this, buySellGroup);
         updateTrainCosts();
-    }
+
+        }
 
     protected void initHeaders() {
         for (int i = 0; i < np; i++) {
@@ -4756,10 +4769,9 @@ public class GameStatus extends GridPanel {
         int bankY = playerTimerYOffset;
         int bankX = certInIPOXOffset; // Matches colUsed
 
-
-boolean is1817 = "1817".equals(gameUIManager.getGameManager().getGameName());
+        boolean is1817 = "1817".equals(gameUIManager.getGameManager().getGameName());
         f = new Caption(is1817 ? "Pur. Power" : "Fixed Inc");
-                f.setBorder(BORDER_THIN);
+        f.setBorder(BORDER_THIN);
         f.setBackground(Color.WHITE);
         f.setOpaque(true);
         gbc.anchor = GridBagConstraints.CENTER;
@@ -4773,7 +4785,6 @@ boolean is1817 = "1817".equals(gameUIManager.getGameManager().getGameName());
             addField(f, certPerPlayerXOffset + i, playerFixedIncomeYOffset, 1, 1, 0, true);
             gbc.weightx = 0.0;
         }
-
 
         if (is1817) {
             bondsHeatbarPanel = new net.sf.rails.ui.swing.elements.BondsHeatbarPanel();
@@ -5007,51 +5018,58 @@ boolean is1817 = "1817".equals(gameUIManager.getGameManager().getGameName());
     }
 
     protected void initGameSpecificActions() {
-        // 1. Safety Checks
-        if (possibleActions == null)
-            return;
-        if (players == null)
-            return;
-
-        java.util.List<rails.game.action.PossibleAction> list = possibleActions.getList();
-        if (list == null || list.isEmpty())
-            return;
-
-        // UNIFIED SPECIAL ACTION HANDLER
-        // We iterate through all actions. If they implement GuiTargetedAction,
-        // we ask the action for its Visual Signature and apply it.
-
-        for (rails.game.action.PossibleAction pa : list) {
-
-            if (pa instanceof GuiTargetedAction) {
-
-                GuiTargetedAction gta = (GuiTargetedAction) pa;
-                Object target = gta.getTarget();
-
-                // 1. Find the UI Component
-                net.sf.rails.ui.swing.elements.RailCard card = findRailCardFor(target);
-
-                // 2. Apply Highlight & Action using the Signature
-                if (card != null) {
-                    card.addPossibleAction(pa);
-
-                    // CONSUME THE SIGNATURE
-                    // A. Background
-                    card.setBackground(gta.getHighlightBackgroundColor());
-
-                    // B. Border (Match ORPanel thickness)
-                    card.setBorder(BorderFactory.createLineBorder(gta.getHighlightBorderColor(), 3));
-
-                    // C. Text
-                    card.setForeground(gta.getHighlightTextColor());
-
-                    card.setEnabled(true);
-                    card.setVisible(true);
-                    card.repaint();
-                }
-            }
-        }
+   
     }
+
+    private ClickField createSpecialActionButton(PossibleAction action) {
+        String label = action.getButtonLabel();
+        Color bgColor = Color.LIGHT_GRAY;
+        Color borderColor = Color.GRAY;
+        Color textColor = Color.BLACK;
+
+        if (action instanceof GuiTargetedAction) {
+            GuiTargetedAction gta = (GuiTargetedAction) action;
+            label = gta.getButtonLabel();
+            bgColor = gta.getHighlightBackgroundColor();
+            borderColor = gta.getHighlightBorderColor();
+            textColor = gta.getHighlightTextColor();
+        } else if (action instanceof NullAction) {
+            label = ((NullAction) action).getMode() == NullAction.Mode.PASS ? "Decline" : "Done";
+            bgColor = new Color(30, 144, 255); // UITheme.ACTION_SKIP
+            borderColor = bgColor.darker();
+            textColor = Color.WHITE;
+        }
+
+       
+        if (label != null && label.length() > 15 && !label.toLowerCase().startsWith("<html>")) {
+            label = label.substring(0, 15) + "...";
+        }
+
+        ClickField btn = new ClickField(label, "SpecialAction", "", this, buySellGroup);
+
+        if (label != null && !label.toLowerCase().startsWith("<html>")) {
+            btn.setText("<html><center>" + label + "</center></html>");
+        }
+
+        btn.setPossibleAction(action);
+        btn.setEnabled(true);
+
+        btn.setBackground(bgColor);
+        btn.setForeground(textColor);
+        btn.setBorder(BorderFactory.createCompoundBorder(
+                BorderFactory.createLineBorder(borderColor, 2),
+                BorderFactory.createEmptyBorder(2, 5, 2, 5)));
+
+        btn.setOpaque(true);
+        if (stickyFont != null) {
+            btn.setFont(stickyFont.deriveFont(Font.BOLD, 10f));
+        } else {
+            btn.setFont(new Font("SansSerif", Font.BOLD, 10));
+        }
+
+        return btn;
+    }
+
 
     /**
      * Central Registry: Locates the RailCard UI component for any game object.
@@ -5136,10 +5154,10 @@ boolean is1817 = "1817".equals(gameUIManager.getGameManager().getGameName());
     }
 
     private void processTakeLoans(net.sf.rails.game.specific._1817.action.TakeLoans_1817 action) {
-   String compId = action.getCompanyId();
-           CompanyManager cm = gameUIManager.getRoot().getCompanyManager();
-            PublicCompany comp = cm.getPublicCompany(compId);
-               int current = comp.getNumberOfBonds();
+        String compId = action.getCompanyId();
+        CompanyManager cm = gameUIManager.getRoot().getCompanyManager();
+        PublicCompany comp = cm.getPublicCompany(compId);
+        int current = comp.getNumberOfBonds();
         int max = action.getMaxLoansAllowed();
         int available = max - current;
 
@@ -5164,5 +5182,4 @@ boolean is1817 = "1817".equals(gameUIManager.getGameManager().getGameName());
         }
     }
 
-    
 }

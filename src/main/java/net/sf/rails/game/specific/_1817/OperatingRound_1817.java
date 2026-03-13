@@ -230,7 +230,6 @@ public class OperatingRound_1817 extends OperatingRound {
         }
 
         // 6. Force Injection
-        log.info("1817_DEBUG: Injecting TakeLoans_1817 action for " + comp1817.getId());
         possibleActions.add(new net.sf.rails.game.specific._1817.action.TakeLoans_1817(comp1817.getId(), maxLoans));
         return true;
 

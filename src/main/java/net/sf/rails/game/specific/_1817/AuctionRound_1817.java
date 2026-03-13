@@ -53,8 +53,13 @@ public class AuctionRound_1817 extends Round {
 
     public void setupAuction(PublicCompany_1817 company, String hexId, int startingBid, Player startingPlayer,
             List<Player> allPlayers) {
-        log.info("AUCTION_LOG: Setting up auction for {} at Hex {}. Starting Bid: ${}", company.getId(), hexId,
-                startingBid);
+// --- START FIX ---
+// --- DELETE ---        log.info("AUCTION_LOG: Setting up auction for {} at Hex {}. Starting Bid: ${}", company.getId(), hexId,
+// --- DELETE ---                startingBid);
+        log.info("AUCTION_LOG: === NEW IPO AUCTION INITIATED ===");
+        log.info("AUCTION_LOG: Company: {} | Target Hex: {} | Initiator: {} | Starting Bid: ${}", 
+                 company.getId(), hexId, startingPlayer.getName(), startingBid);
+// --- END FIX ---
         this.auctionedCompany.set(company);
         this.targetHexId.set(hexId);
         this.currentBid.set(startingBid);
@@ -68,6 +73,11 @@ public class AuctionRound_1817 extends Round {
 
         int startIndex = (allPlayers.indexOf(startingPlayer) + 1) % allPlayers.size();
         this.currentPlayerIndex.set(startIndex);
+advanceToNextValidBidder();
+        log.info("AUCTION_LOG: Active bidders post-prune: {}. Next to act: {}", 
+                 this.activeBidders.size(), 
+                 (this.activeBidders.isEmpty() ? "None" : getActingPlayer().getName()));
+
     }
 
     public Player getActingPlayer() {
@@ -84,11 +94,12 @@ public class AuctionRound_1817 extends Round {
     @Override
     public boolean setPossibleActions() {
         possibleActions.clear();
-if (activeBidders.size() <= 1) {
+        if (activeBidders.size() <= 1) {
             resolveAuction();
 
             Player winner = highestBidder.value();
             if (winner != null && auctionedCompany.value() != null) {
+                log.info("AUCTION_LOG: Generating Settlement Action for winner {} at ${}", winner.getName(), currentBid.value());
                 // Generate the settlement action for the UI to populate
                 possibleActions.add(new SettleIPO_1817(
                         gameManager.getRoot(),
@@ -122,9 +133,6 @@ if (activeBidders.size() <= 1) {
             SettleIPO_1817 settle = (SettleIPO_1817) action;
             PublicCompany_1817 comp = auctionedCompany.value();
             Player winner = highestBidder.value();
-
-            log.info("AUCTION_LOG: Settling IPO for {}. Size: {}-share. Cash: ${}. Privates: {}",
-                    comp.getId(), settle.getShareSize(), settle.getCashAmount(), settle.getPrivateCompanyIds());
 
             log.info("AUCTION_LOG: Settling IPO for {}. Size: {}-share. Cash: ${}. Privates: {}",
                     comp.getId(), settle.getShareSize(), settle.getCashAmount(), settle.getPrivateCompanyIds());
@@ -238,6 +246,7 @@ if (activeBidders.size() <= 1) {
             if (!activeBidders.isEmpty()) {
                 currentPlayerIndex.set(index % activeBidders.size());
             }
+            advanceToNextValidBidder();
 
             return true;
         }
@@ -250,6 +259,7 @@ if (activeBidders.size() <= 1) {
 
             int index = activeBidders.indexOf(actor);
             this.currentPlayerIndex.set((index + 1) % activeBidders.size());
+            advanceToNextValidBidder();
             return true;
         }
 
@@ -261,4 +271,27 @@ if (activeBidders.size() <= 1) {
         log.info("AUCTION_LOG: Auction finished. Waiting for settlement from {}",
                 (winner != null ? winner.getName() : "None"));
     }
+
+
+    private void advanceToNextValidBidder() {
+        int minNextBid = currentBid.value() + 5;
+
+        while (activeBidders.size() > 1) {
+            int index = currentPlayerIndex.value() % activeBidders.size();
+            Player candidate = activeBidders.get(index);
+
+            if (candidate.getCash() >= minNextBid) {
+                return;
+            }
+
+            log.info("AUCTION_LOG: Auto-skipping {} (insufficient funds: has ${}, needs ${}).",
+                    candidate.getName(), candidate.getCash(), minNextBid);
+            activeBidders.remove(index);
+
+            if (!activeBidders.isEmpty()) {
+                currentPlayerIndex.set(index % activeBidders.size());
+            }
+        }
+    }
+
 }

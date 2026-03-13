@@ -116,21 +116,28 @@ this.shareCount = IntegerState.create(this, "shareCount", 2);
         return shareCount.value();
     }
 
+
     public void setShareCount(int count) {
         if (count == 2 || count == 5 || count == 10) {
             this.shareCount.set(count);
             log.info("Company " + getId() + " set to " + count + "-share size.");
             adjustCertificates();
 
-            // Set initial station marker capacity according to 1817 rules.
+            // --- DELETE ---
+            // // Set initial station marker capacity according to 1817 rules.
+            // // 2-share: 1 token, 5-share: 2 tokens, 10-share: 4 tokens.
+            // if (this.tokenCapacity.value() == 8) {
+            //     int capacity = (count == 2) ? 1 : (count == 5) ? 2 : 4;
+            //     this.tokenCapacity.set(capacity);
+            // }
+            // --- START FIX ---
+            // Set station marker capacity according to 1817 rules.
             // 2-share: 1 token, 5-share: 2 tokens, 10-share: 4 tokens.
-            if (this.tokenCapacity.value() == 8) {
-                int capacity = (count == 2) ? 1 : (count == 5) ? 2 : 4;
-                this.tokenCapacity.set(capacity);
-            }
+            int capacity = (count == 2) ? 1 : (count == 5) ? 2 : 4;
+            this.tokenCapacity.set(capacity);
+            // --- END FIX ---
         }
     }
-
     
     public void addTokenCapacity(int amount) {
         this.tokenCapacity.add(amount);

@@ -112,20 +112,7 @@ String displayValue;
                         publicCompany.getId()
                 );
 
-                // Adjust diameter so tokens fit vertically in the linear row
-                // We divide by 4 to ensure several tokens can stack without overlap
-                DoubleBinding diameter = Bindings.multiply(Bindings.min(widthProperty(), heightProperty()), 0.25);
-
-
-                token.minWidthProperty().bind(diameter);
-                token.prefWidthProperty().bind(diameter);
-                token.maxWidthProperty().bind(diameter);
-
-                token.minHeightProperty().bind(diameter);
-                token.prefHeightProperty().bind(diameter);
-                token.maxHeightProperty().bind(diameter);
-
-
+              
                 tokens.add(token);
             }
         }
@@ -133,21 +120,32 @@ String displayValue;
         return tokens;
     }
 
+
     public void populate() {
         getChildren().clear();
 
         VBox layout = new VBox(5); // Spacing between price and token stack
-        layout.setAlignment(Pos.CENTER);
-        
+// Anchor price to top to prevent vertical jumping when tokens appear
+        layout.setAlignment(Pos.TOP_CENTER);
+        layout.setPadding(new Insets(5, 0, 5, 0));
+                
         layout.getChildren().add(createStockSpacePrice());
         
         tokenContainer.getChildren().clear();
         tokenContainer.getChildren().addAll(createTokens());
         layout.getChildren().add(tokenContainer);
         
+// --- START FIX ---
+        // Force the StackPane to anchor the VBox to the top
+        StackPane.setAlignment(layout, Pos.TOP_CENTER);
+// --- END FIX ---
+
         getChildren().add(layout);
 
     }
+
+
+    
 
     @Override
     public void update(String text) {

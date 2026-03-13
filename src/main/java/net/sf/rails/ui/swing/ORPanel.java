@@ -1281,8 +1281,17 @@ boolean hasSelection = (orUIManager != null && orUIManager.getMap() != null && o
         }
     }
 
-    public ORWindow getORWindow() {
-        return orWindow;
+public void recreate(Round or) {
+        PublicCompany comp = null;
+        if (or instanceof OperatingRound) {
+            comp = ((OperatingRound) or).getOperatingCompany();
+        } else {
+            try {
+                java.lang.reflect.Method m = or.getClass().getMethod("getOperatingCompany");
+                comp = (PublicCompany) m.invoke(or);
+            } catch (Exception e) {}
+        }
+        initORCompanyTurn(comp, 0);
     }
 
     public void recreate(OperatingRound or) {
@@ -2268,13 +2277,23 @@ boolean hasSelection = (orUIManager != null && orUIManager.getMap() != null && o
             cleanupUpgradesPanel();
             resetSidebarState();
 
-            // ROBUST CONTEXT HANDOVER
+// ROBUST CONTEXT HANDOVER
             PublicCompany engineActiveComp = null;
+            boolean isMaARound = false;
+
             if (orUIManager != null && orUIManager.getGameUIManager().getGameManager() != null) {
                 net.sf.rails.game.round.RoundFacade rf = orUIManager.getGameUIManager().getGameManager()
                         .getCurrentRound();
-                if (rf instanceof net.sf.rails.game.OperatingRound) {
-                    engineActiveComp = ((net.sf.rails.game.OperatingRound) rf).getOperatingCompany();
+                if (rf != null) {
+                    isMaARound = rf.getClass().getSimpleName().contains("Merger");
+                    if (rf instanceof net.sf.rails.game.OperatingRound) {
+                        engineActiveComp = ((net.sf.rails.game.OperatingRound) rf).getOperatingCompany();
+                    } else {
+                        try {
+                            java.lang.reflect.Method m = rf.getClass().getMethod("getOperatingCompany");
+                            engineActiveComp = (PublicCompany) m.invoke(rf);
+                        } catch(Exception e) {}
+                    }
                 }
             }
 
@@ -2339,18 +2358,31 @@ boolean hasSelection = (orUIManager != null && orUIManager.getMap() != null && o
             int computedPhase = determineActivePhase(actions);
             boolean hasStandardActions = computedPhase > 0;
 
-            // 5. RENDER SPECIAL MODE (Exclusive Interrupts Only)
-            if (!specialActions.isEmpty() && !hasStandardActions) {
+     
+     // 5. RENDER SPECIAL MODE (Exclusive Interrupts Only)
+            if (isMaARound || (!specialActions.isEmpty() && !hasStandardActions)) {
                 this.specialModeActive = true;
                 this.activePhase = 0;
                 setStandardPanelsVisible(false);
 
                 if (contextProvider != null) {
                     updateSpecialHeader(contextProvider);
+                } else if (isMaARound && this.orComp != null) {
+                    lblCompanyInfo.setText("<html><center><font size='6'><b>" + this.orComp.getId() + "</b></font></center></html>");
+                    lblCompanyInfo.setBackground(this.orComp.getBgColour());
+                    lblCompanyInfo.setForeground(this.orComp.getFgColour());
+                    lblCompanyInfo.setVisible(true);
+
+                    if (lblPhaseInstruction != null) {
+                        lblPhaseInstruction.setText("<html><center><font size='4'><b>M&A Actions</b></font></center></html>");
+                        lblPhaseInstruction.setBackground(this.orComp.getBgColour());
+                        lblPhaseInstruction.setForeground(this.orComp.getFgColour());
+                        lblPhaseInstruction.setVisible(true);
+                    }
                 }
 
                 if (specialPanel != null && specialContainer != null) {
-                    specialContainer.setVisible(true);
+                           specialContainer.setVisible(true);
                     specialPanel.removeAll();
                     for (PossibleAction spa : specialActions) {
                         addSpecialActionButton(spa);

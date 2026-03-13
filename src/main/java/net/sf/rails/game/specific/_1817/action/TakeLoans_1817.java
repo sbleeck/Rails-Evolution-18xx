@@ -34,6 +34,31 @@ public class TakeLoans_1817 extends PossibleAction {
     }
 
     @Override
+    protected boolean equalsAs(PossibleAction pa, boolean asOption) {
+        if (pa == this) return true;
+        
+        // CRITICAL FIX: Bypass super.equalsAs() completely. 
+        // Because super((RailsRoot) null) is called in the constructor, the base 
+        // PossibleAction fails to resolve the 'actor' object upon deserialization, 
+        // causing false negatives during reload validation.
+        if (pa == null || this.getClass() != pa.getClass()) return false;
+
+        TakeLoans_1817 other = (TakeLoans_1817) pa;
+        
+        boolean options = false;
+        if (this.companyId != null) {
+            options = this.companyId.equals(other.companyId);
+        } else {
+            options = (other.companyId == null);
+        }
+        options = options && (this.maxLoansAllowed == other.maxLoansAllowed);
+
+        if (asOption) return options;
+
+        return options && (this.loansToTake == other.loansToTake);
+    }
+
+    @Override
     public String toString() {
         return "Take Loans (" + (companyId != null ? companyId : "Unknown") + ")";
     }

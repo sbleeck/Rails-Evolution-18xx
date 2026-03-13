@@ -2,11 +2,11 @@ package net.sf.rails.game.specific._1817.action;
 
 import rails.game.action.PossibleAction;
 
-public class Short1817 extends PossibleAction {
+public class SelectPurchasingCompany_1817 extends PossibleAction {
     private static final long serialVersionUID = 1L;
-    private String companyId;
+    private final String companyId;
 
-    public Short1817(net.sf.rails.game.RailsRoot root, String companyId) {
+    public SelectPurchasingCompany_1817(net.sf.rails.game.RailsRoot root, String companyId) {
         super(root);
         this.companyId = companyId;
     }
@@ -15,6 +15,6 @@ public class Short1817 extends PossibleAction {
 
     @Override
     public String toString() {
-        return "Sell Short " + companyId;
+        return "Select " + companyId + " to acquire target";
     }
 }

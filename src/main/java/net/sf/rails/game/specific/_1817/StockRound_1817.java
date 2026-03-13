@@ -137,8 +137,8 @@ possibleActions.add(new TakeLoans_1817(comp.getId(), maxLoans));
                 PublicCompany_1817 comp = (PublicCompany_1817) ipoAction.getCompany();
                 net.sf.rails.game.Player initiator = gameManager.getCurrentPlayer();
 
-                log.info("Starting 1817 Auction for " + comp.getId() + " initiated by " + initiator.getName());
-
+log.info("IPO INITIATED: Company " + comp.getId() + " by Player " + initiator.getName() +
+" at Hex " + ipoAction.getHexId() + " with starting bid $" + ipoAction.getBid());
                 // 1. Push the new Auction Round onto the stack
 
                 // Explicitly preserve the current Stock Round so it can be resumed later
@@ -243,5 +243,18 @@ PublicCompany comp = companyManager.getPublicCompany(tlAction.getCompanyId());
         }
         return super.checkAgainstHoldLimit(player, company, number);
     }
+
+
+
+
+
+    // ... (lines of unchanged context code) ...
+    private void setupCompanyActions(PublicCompany company) {
+        log.info("M&A ROUND: setupCompanyActions() invoked for " + company.getId());
+       
+    }
+
+
+
 
 }

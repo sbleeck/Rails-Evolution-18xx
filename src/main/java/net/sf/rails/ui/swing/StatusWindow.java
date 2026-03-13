@@ -1105,11 +1105,15 @@ public class StatusWindow extends JFrame implements ActionListener, ActionPerfor
         // }
 
         gameStatus.init(this, gameUIManager);
-        gameStatusPane = new JScrollPane(gameStatus); //
+
+        gameStatusPane = new JScrollPane(gameStatus);
+        gameStatusPane.getVerticalScrollBar().setUnitIncrement(16);
+        gameStatusPane.setVerticalScrollBarPolicy(ScrollPaneConstants.VERTICAL_SCROLLBAR_ALWAYS);
+        gameStatusPane.setHorizontalScrollBarPolicy(ScrollPaneConstants.HORIZONTAL_SCROLLBAR_AS_NEEDED);
 
         // --- BUTTONS (SOUTH) ---
         // 1. Single Row Grid (1 Row, 5 Cols) -> HGap=12 for "tiny bit more space"
-        buttonPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 12, 0));
+        buttonPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 5, 0));
 
         // 2. Define Buttons
         // We use RailsIcon.PASS as a placeholder for the constructor, then strip it for
@@ -1178,7 +1182,7 @@ public class StatusWindow extends JFrame implements ActionListener, ActionPerfor
         styleStatusButton(passButton, SYS_BLUE);
 
         // Force Taller Buttons (45px height)
-        Dimension btnDim = new Dimension(80, 45);
+        Dimension btnDim = new Dimension(60, 35);
         pauseButton.setPreferredSize(btnDim);
         undoButton.setPreferredSize(btnDim);
         redoButton.setPreferredSize(btnDim);
@@ -1235,13 +1239,14 @@ public class StatusWindow extends JFrame implements ActionListener, ActionPerfor
         pane.add(gameStatusPane, BorderLayout.CENTER); // Table in Center
 
         // Bottom Container
-        JPanel southContainer = new JPanel(new BorderLayout(100, 0));
+        JPanel southContainer = new JPanel(new BorderLayout(10, 0));
         southContainer.setBorder(BorderFactory.createEtchedBorder());
         southContainer.add(buttonPanel, BorderLayout.WEST);
 
         dynamicButtonPanel = new JPanel();
         dynamicButtonPanel.setLayout(new FlowLayout(FlowLayout.LEFT));
-        dynamicButtonPanel.setBorder(BorderFactory.createEmptyBorder(0, 300, 0, 0));
+        dynamicButtonPanel.setBorder(BorderFactory.createEmptyBorder(0, 10, 0, 0));
+
         dynamicButtonPanel.setOpaque(false);
         southContainer.add(dynamicButtonPanel, BorderLayout.CENTER);
         southContainer.add(gameTimeLabel, BorderLayout.EAST);
@@ -1620,82 +1625,88 @@ public class StatusWindow extends JFrame implements ActionListener, ActionPerfor
             if (dynamicButtonPanel != null) {
                 dynamicButtonPanel.removeAll();
 
+                if (currentRound instanceof net.sf.rails.game.specific._1817.AuctionRound_1817) {
+                    net.sf.rails.game.specific._1817.AuctionRound_1817 auction = (net.sf.rails.game.specific._1817.AuctionRound_1817) currentRound;
 
-
-                 if (currentRound instanceof net.sf.rails.game.specific._1817.AuctionRound_1817) {
-                    net.sf.rails.game.specific._1817.AuctionRound_1817 auction = 
-                        (net.sf.rails.game.specific._1817.AuctionRound_1817) currentRound;
-                    
                     // Visual container setup
                     dynamicButtonPanel.setBackground(new Color(230, 240, 255));
                     dynamicButtonPanel.setOpaque(true);
                     dynamicButtonPanel.setBorder(BorderFactory.createLineBorder(Color.BLUE, 1));
-                    dynamicButtonPanel.setLayout(new FlowLayout(FlowLayout.LEFT, 15, 5));
-                    
+
+                    dynamicButtonPanel.setLayout(new FlowLayout(FlowLayout.LEFT, 8, 2));
                     // 1. Display Highest Bidder and Amount
-                    String highBidderName = (auction.getHighestBidder() != null) ? auction.getHighestBidder().getName() : "None";
-                    JLabel highBidLabel = new JLabel("Highest Bid: " + highBidderName + " ($" + auction.getCurrentBid() + ")");
+                    String highBidderName = (auction.getHighestBidder() != null) ? auction.getHighestBidder().getName()
+                            : "None";
+                    JLabel highBidLabel = new JLabel("High: " + highBidderName + " ($" + auction.getCurrentBid() + ")");
                     highBidLabel.setFont(new Font("SansSerif", Font.BOLD, 13));
+
                     highBidLabel.setForeground(new Color(0, 102, 204));
                     dynamicButtonPanel.add(highBidLabel);
-                    
+
                     // Vertical separator for visual clarity
                     JSeparator sep = new JSeparator(JSeparator.VERTICAL);
                     sep.setPreferredSize(new Dimension(2, 25));
                     dynamicButtonPanel.add(sep);
 
-                    String actorName = (auction.getActingPlayer() != null) ? auction.getActingPlayer().getName() : "Someone";
-                    String companyId = (auction.getAuctionedCompany() != null) ? auction.getAuctionedCompany().getId() : "Company";
+                    String actorName = (auction.getActingPlayer() != null) ? auction.getActingPlayer().getName()
+                            : "Someone";
+                    String companyId = (auction.getAuctionedCompany() != null) ? auction.getAuctionedCompany().getId()
+                            : "Company";
 
                     if (bidSpinner == null) {
                         bidSpinner = new JSpinner(new SpinnerNumberModel(5, 5, 10000, 5));
-                        bidSpinner.setPreferredSize(new Dimension(80, 30));
+                        bidSpinner.setPreferredSize(new Dimension(65, 30));
                     }
-                    
+
                     net.sf.rails.game.specific._1817.action.Bid1817IPO bidAction = null;
                     NullAction passAction = null;
-                   net.sf.rails.game.specific._1817.action.SettleIPO_1817 settleAction = null;
-                    
+                    net.sf.rails.game.specific._1817.action.SettleIPO_1817 settleAction = null;
+
                     if (possibleActions != null && possibleActions.getList() != null) {
                         for (PossibleAction pa : possibleActions.getList()) {
-                            if (pa instanceof net.sf.rails.game.specific._1817.action.Bid1817IPO) bidAction = (net.sf.rails.game.specific._1817.action.Bid1817IPO) pa;
-                            else if (pa instanceof NullAction && ((NullAction) pa).getMode() == NullAction.Mode.PASS) passAction = (NullAction) pa;
-                            else if (pa instanceof net.sf.rails.game.specific._1817.action.SettleIPO_1817) settleAction = (net.sf.rails.game.specific._1817.action.SettleIPO_1817) pa;
+                            if (pa instanceof net.sf.rails.game.specific._1817.action.Bid1817IPO)
+                                bidAction = (net.sf.rails.game.specific._1817.action.Bid1817IPO) pa;
+                            else if (pa instanceof NullAction && ((NullAction) pa).getMode() == NullAction.Mode.PASS)
+                                passAction = (NullAction) pa;
+                            else if (pa instanceof net.sf.rails.game.specific._1817.action.SettleIPO_1817)
+                                settleAction = (net.sf.rails.game.specific._1817.action.SettleIPO_1817) pa;
                         }
                     }
 
-
-if (settleAction != null) {
+                    if (settleAction != null) {
                         if (myTurn) {
                             int totalBid = settleAction.getCashAmount(); // Initially holds the full bid
-                            
+
                             JPanel settlePanel = new JPanel(new java.awt.BorderLayout(10, 5));
                             settlePanel.setOpaque(false);
 
-                            JLabel settlePrompt = new JLabel(actorName + ", settle " + companyId + " IPO for $" + totalBid);
+                            JLabel settlePrompt = new JLabel(
+                                    actorName + ", settle " + companyId + " IPO for $" + totalBid);
                             settlePrompt.setFont(new Font("SansSerif", Font.BOLD, 13));
                             settlePanel.add(settlePrompt, java.awt.BorderLayout.NORTH);
 
                             JPanel privatesPanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
                             privatesPanel.setOpaque(false);
-                            
+
                             java.util.List<JCheckBox> privateBoxes = new java.util.ArrayList<>();
                             JLabel summaryLabel = new JLabel("Privates: $0 | Cash due: $" + totalBid);
                             summaryLabel.setFont(new Font("SansSerif", Font.BOLD, 12));
-                            summaryLabel.setForeground(new Color(153, 0, 0)); 
+                            summaryLabel.setForeground(new Color(153, 0, 0));
 
                             // Find owned privates
-                           
-                           for (net.sf.rails.game.PrivateCompany pc : gameUIManager.getRoot().getCompanyManager().getAllPrivateCompanies()) {
+
+                            for (net.sf.rails.game.PrivateCompany pc : gameUIManager.getRoot().getCompanyManager()
+                                    .getAllPrivateCompanies()) {
                                 // Match the owner's name to the auction winner's name (actorName)
-                                if (pc.getOwner() != null && pc.getOwner().getId().equals(actorName) && !pc.isClosed()) {
+                                if (pc.getOwner() != null && pc.getOwner().getId().equals(actorName)
+                                        && !pc.isClosed()) {
                                     int faceValue = pc.getBasePrice();
                                     JCheckBox cb = new JCheckBox(pc.getId() + " ($" + faceValue + ")");
-                                    
+
                                     cb.putClientProperty("pc_id", pc.getId());
                                     cb.putClientProperty("pc_value", faceValue);
                                     cb.setOpaque(false);
-                                    
+
                                     cb.addItemListener(e -> {
                                         int selectedValue = 0;
                                         for (JCheckBox box : privateBoxes) {
@@ -1704,9 +1715,10 @@ if (settleAction != null) {
                                             }
                                         }
                                         int cashDue = Math.max(0, totalBid - selectedValue);
-                                        summaryLabel.setText("Privates: $" + selectedValue + " | Cash due: $" + cashDue);
+                                        summaryLabel
+                                                .setText("Privates: $" + selectedValue + " | Cash due: $" + cashDue);
                                     });
-                                    
+
                                     privateBoxes.add(cb);
                                     privatesPanel.add(cb);
                                 }
@@ -1715,15 +1727,16 @@ if (settleAction != null) {
                             JPanel centerPanel = new JPanel(new java.awt.BorderLayout());
                             centerPanel.setOpaque(false);
                             if (!privateBoxes.isEmpty()) {
-                                centerPanel.add(new JLabel("Select Private Companies to use at face value:"), java.awt.BorderLayout.NORTH);
+                                centerPanel.add(new JLabel("Select Private Companies to use at face value:"),
+                                        java.awt.BorderLayout.NORTH);
                                 centerPanel.add(privatesPanel, java.awt.BorderLayout.CENTER);
                             }
                             centerPanel.add(summaryLabel, java.awt.BorderLayout.SOUTH);
                             settlePanel.add(centerPanel, java.awt.BorderLayout.CENTER);
 
                             JButton settleButton = new JButton("Confirm Settlement");
-                            settleButton.setPreferredSize(new Dimension(160, 35));
-                            
+                            settleButton.setPreferredSize(new Dimension(80, 35));
+
                             final net.sf.rails.game.specific._1817.action.SettleIPO_1817 finalSettle = settleAction;
                             settleButton.addActionListener(e -> {
                                 int selectedValue = 0;
@@ -1735,37 +1748,39 @@ if (settleAction != null) {
                                     }
                                 }
                                 int cashDue = Math.max(0, totalBid - selectedValue);
-                                
+
                                 finalSettle.setPrivateCompanyIds(selectedIds);
                                 finalSettle.setCashAmount(cashDue);
-                                
+
                                 process(finalSettle);
                             });
-                            
+
                             settlePanel.add(settleButton, java.awt.BorderLayout.EAST);
                             dynamicButtonPanel.add(settlePanel);
                         } else {
-                            dynamicButtonPanel.add(new JLabel("Waiting for " + actorName + " to settle " + companyId + " IPO..."));
+                            dynamicButtonPanel.add(
+                                    new JLabel("Waiting for " + actorName + " to settle " + companyId + " IPO..."));
                         }
                     } else {
-
-
-
 
                         if (myTurn) {
                             int minBid = (bidAction != null) ? bidAction.getBidAmount() : 5;
                             ((SpinnerNumberModel) bidSpinner.getModel()).setMinimum(minBid);
-                            if ((Integer)bidSpinner.getValue() < minBid) bidSpinner.setValue(minBid);
-                            
-                            JLabel bidPrompt = new JLabel(actorName + " bids for " + companyId + ": $");
+                            if ((Integer) bidSpinner.getValue() < minBid)
+                                bidSpinner.setValue(minBid);
+
+                            JLabel bidPrompt = new JLabel(actorName + " bids: $");
                             bidPrompt.setFont(new Font("SansSerif", Font.PLAIN, 13));
                             dynamicButtonPanel.add(bidPrompt);
                             dynamicButtonPanel.add(bidSpinner);
-                            
-                            if (auctionBidButton == null) auctionBidButton = new JButton("Place Bid");
-                            auctionBidButton.setPreferredSize(new Dimension(110, 35));
+
+                            if (auctionBidButton == null)
+                                auctionBidButton = new JButton("Place Bid");
+                            auctionBidButton.setPreferredSize(new Dimension(90, 28));
+
                             final net.sf.rails.game.specific._1817.action.Bid1817IPO finalBid = bidAction;
-                            for (java.awt.event.ActionListener al : auctionBidButton.getActionListeners()) auctionBidButton.removeActionListener(al);
+                            for (java.awt.event.ActionListener al : auctionBidButton.getActionListeners())
+                                auctionBidButton.removeActionListener(al);
                             auctionBidButton.addActionListener(e -> {
                                 if (finalBid != null) {
                                     finalBid.setBidAmount((Integer) bidSpinner.getValue());
@@ -1773,26 +1788,126 @@ if (settleAction != null) {
                                 }
                             });
                             dynamicButtonPanel.add(auctionBidButton);
-                            
-                            if (auctionPassButton == null) auctionPassButton = new JButton("Pass");
-                            auctionPassButton.setPreferredSize(new Dimension(90, 35));
+
+                            if (auctionPassButton == null)
+                                auctionPassButton = new JButton("Pass");
+
+                            auctionPassButton.setPreferredSize(new Dimension(70, 28));
                             auctionPassButton.setForeground(Color.RED);
                             final NullAction finalPass = passAction;
-                            for (java.awt.event.ActionListener al : auctionPassButton.getActionListeners()) auctionPassButton.removeActionListener(al);
+                            for (java.awt.event.ActionListener al : auctionPassButton.getActionListeners())
+                                auctionPassButton.removeActionListener(al);
                             auctionPassButton.addActionListener(e -> process(finalPass));
                             dynamicButtonPanel.add(auctionPassButton);
                         } else {
-                            dynamicButtonPanel.add(new JLabel("Waiting for " + actorName + " to bid for " + companyId + "..."));
+                            dynamicButtonPanel
+                                    .add(new JLabel("Waiting for " + actorName + " to bid for " + companyId + "..."));
                         }
                     }
-                    
+
                     dynamicButtonPanel.revalidate();
                     dynamicButtonPanel.repaint();
                 } else {
-                    dynamicButtonPanel.setBackground(null);
-                    dynamicButtonPanel.setOpaque(false);
-                    dynamicButtonPanel.setBorder(BorderFactory.createEmptyBorder(0, 300, 0, 0));
-                }
+                
+
+boolean hasSpecialActions = false;
+                        java.util.List<PossibleAction> specialActions = new java.util.ArrayList<>();
+                        GuiTargetedAction contextProvider = null;
+                        NullAction specialNullAction = null;
+
+                        if (possibleActions != null && possibleActions.getList() != null) {
+                            for (PossibleAction pa : possibleActions.getList()) {
+                                if (pa instanceof GuiTargetedAction) {
+                                    specialActions.add(pa);
+                                    hasSpecialActions = true;
+                                    if (contextProvider == null) contextProvider = (GuiTargetedAction) pa;
+                                } else if (pa instanceof NullAction && (((NullAction) pa).getMode() == NullAction.Mode.PASS || ((NullAction) pa).getMode() == NullAction.Mode.DONE)) {
+                                    specialNullAction = (NullAction) pa;
+                                }
+                            }
+                        }
+
+                        if (hasSpecialActions) {
+                            dynamicButtonPanel.setBackground(new Color(230, 240, 255));
+                            dynamicButtonPanel.setOpaque(true);
+                            dynamicButtonPanel.setBorder(BorderFactory.createLineBorder(Color.BLUE, 1));
+                            dynamicButtonPanel.setLayout(new FlowLayout(FlowLayout.LEFT, 8, 2));
+
+                          
+                          
+
+                            String actorName = (effectivePlayer != null) ? effectivePlayer.getName() : "Player";
+                            net.sf.rails.game.state.Owner actorOwner = contextProvider.getActor();
+                            String companyPrefix = "";
+                            if (actorOwner instanceof net.sf.rails.game.Company) {
+                                companyPrefix = " (" + ((net.sf.rails.game.Company) actorOwner).getId() + ")";
+                            }
+                            
+                            String title = contextProvider.getGroupLabel();
+                            if (title == null || title.isEmpty()) title = "Special Action";
+                            
+                            JLabel promptLabel = new JLabel("<html><b>" + actorName + companyPrefix + "</b>, " + title + ":</html>");
+
+
+                            promptLabel.setForeground(new Color(0, 102, 204));
+                            dynamicButtonPanel.add(promptLabel);
+
+                            JSeparator sep = new JSeparator(JSeparator.VERTICAL);
+                            sep.setPreferredSize(new Dimension(2, 25));
+                            dynamicButtonPanel.add(sep);
+
+                            for (PossibleAction spa : specialActions) {
+                                GuiTargetedAction gta = (GuiTargetedAction) spa;
+                                ActionButton btn = new ActionButton(null);
+                                
+                                String labelText = gta.getButtonLabel();
+                                if (labelText != null && labelText.length() > 20) {
+                                    labelText = labelText.substring(0, 20) + "...";
+                                }
+                                btn.setText(labelText);
+                                
+                                btn.setBackground(gta.getHighlightBackgroundColor());
+                                btn.setForeground(gta.getHighlightTextColor());
+                                btn.setBorder(BorderFactory.createCompoundBorder(
+                                        BorderFactory.createLineBorder(gta.getHighlightBorderColor(), 2),
+                                        BorderFactory.createEmptyBorder(2, 5, 2, 5)));
+                                btn.setOpaque(true);
+                                btn.setFont(new Font("SansSerif", Font.BOLD, 12));
+                                btn.setPossibleAction(spa);
+                                btn.setActionCommand("SpecialAction");
+                                btn.addActionListener(this);
+                                dynamicButtonPanel.add(btn);
+                            }
+                            
+                            if (specialNullAction != null) {
+                                ActionButton declineBtn = new ActionButton(null);
+                                declineBtn.setText(specialNullAction.getMode() == NullAction.Mode.PASS ? "Decline" : "Done");
+                                declineBtn.setBackground(new Color(255, 69, 0)); // SYS_RED
+                                declineBtn.setForeground(Color.WHITE);
+                                declineBtn.setBorder(BorderFactory.createCompoundBorder(
+                                        BorderFactory.createLineBorder(new Color(200, 0, 0), 2),
+                                        BorderFactory.createEmptyBorder(2, 5, 2, 5)));
+                                declineBtn.setOpaque(true);
+                                declineBtn.setFont(new Font("SansSerif", Font.BOLD, 12));
+                                declineBtn.setPossibleAction(specialNullAction);
+                                declineBtn.setActionCommand(specialNullAction.getMode() == NullAction.Mode.PASS ? PASS_CMD : DONE_CMD);
+                                declineBtn.addActionListener(this);
+                                dynamicButtonPanel.add(declineBtn);
+                            }
+                        } else {
+                            dynamicButtonPanel.setBackground(null);
+                            dynamicButtonPanel.setOpaque(false);
+                            dynamicButtonPanel.setBorder(BorderFactory.createEmptyBorder(0, 10, 0, 0));
+                        }
+                    }
+
+
+
+
+
+
+
+
 
 
 
@@ -1801,15 +1916,18 @@ if (settleAction != null) {
 
             }
 
-            // 1. Do NOT disable immediately. This causes the "Switch Off" flicker.
-            // passButton.setEnabled(false);
-            // autopassButton.setEnabled(false);
-
             boolean passFound = false;
+            boolean blockGlobalPass = (dynamicButtonPanel.getComponentCount() > 0);
 
             List<NullAction> inactiveItems = possibleActions.getType(NullAction.class);
 
-            if (inactiveItems != null) {
+            if (inactiveItems != null && !blockGlobalPass) {
+
+                // boolean passFound = false;
+
+                // List<NullAction> inactiveItems = possibleActions.getType(NullAction.class);
+
+                // if (inactiveItems != null) {
                 for (NullAction na : inactiveItems) {
                     switch (na.getMode()) {
                         case PASS:

@@ -15,6 +15,9 @@ public class RoundCounterPanel extends JPanel {
     private static final int HEIGHT = 45;
     private static final Logger log = LoggerFactory.getLogger(GameStatus.class);
 
+        private boolean is1817 = false;
+
+
     // External Dependency
     private final GameUIManager gameUIManager;
 
@@ -69,9 +72,12 @@ public class RoundCounterPanel extends JPanel {
         if (gameUIManager == null || gameUIManager.getRoot() == null)
             return;
 
+        
         // 1. Get Phase Limits and Color
         if (gameUIManager.getGameManager() != null) {
-            phaseMaxOrs = gameUIManager.getGameManager().getNumberOfOperatingRounds();
+        is1817 = "1817".equals(gameUIManager.getGameManager().getGameName());
+
+        phaseMaxOrs = gameUIManager.getGameManager().getNumberOfOperatingRounds();
 
             var phase = gameUIManager.getRoot().getPhaseManager().getCurrentPhase();
            
@@ -122,37 +128,35 @@ public class RoundCounterPanel extends JPanel {
         if (round instanceof StockRound) {
             isStockRound = true;
             currentOrNum = 0;
-        } else if (round instanceof OperatingRound) {
-            isStockRound = false;
-            String orId = gameUIManager.getGameManager().getORId();
-            currentOrNum = 1;
-            if (orId != null && orId.contains(".")) {
-                try {
-                    String suffix = orId.substring(orId.lastIndexOf('.') + 1);
-                    currentOrNum = Integer.parseInt(suffix);
-                } catch (NumberFormatException e) {
-                    currentOrNum = 1;
-                }
-            }
+
         } else {
-            isStockRound = true;
+isStockRound = false;
+currentOrNum = gameUIManager.getGameManager().getRelativeORNumber();
         }
 
         // 3. Calculate Target Position
-        int startX = 25;
-        int gap = 55;
+        int startX = is1817 ? 20 : 25;
+        int gap = is1817 ? 42 : 55;
         int activeIndex;
 
-        if (isStockRound) {
-            activeIndex = 3; // SR always last
+        if (is1817) {
+            if (isStockRound) {
+                activeIndex = 4;
+            } else if (rName.contains("Merger") || rName.contains("Acquisition") || rName.contains("M&A")) {
+                activeIndex = (currentOrNum == 1) ? 1 : 3;
+            } else {
+                activeIndex = (currentOrNum == 1) ? 0 : 2;
+            }
         } else {
-            activeIndex = currentOrNum - 1;
-            if (activeIndex < 0)
-                activeIndex = 0;
-            if (activeIndex > 2)
-                activeIndex = 2;
+            if (isStockRound) {
+                activeIndex = 3; // SR always last
+            } else {
+                activeIndex = currentOrNum - 1;
+                if (activeIndex < 0) activeIndex = 0;
+                if (activeIndex > 2) activeIndex = 2;
+            }
         }
-
+        
         double newTarget = startX + (activeIndex * gap);
 
         // 4. Trigger Animation
@@ -175,18 +179,21 @@ public class RoundCounterPanel extends JPanel {
         Graphics2D g2 = (Graphics2D) g;
         g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
 
-        int startX = 25;
-        int gap = 55;
+        int startX = is1817 ? 20 : 25;
+        int gap = is1817 ? 42 : 55;
         int trackY = HEIGHT - 12;
-        int capW = 34;
+        int capW = is1817 ? 38 : 34; // Slightly wider to comfortably hold "M&A1"
         int capH = 18;
+        int segments = is1817 ? 4 : 3;
+        int nodes = is1817 ? 5 : 4;
 
         // --- 1. DRAW TRACK ---
         g2.setStroke(new BasicStroke(3));
-        for (int i = 0; i < 3; i++) {
+        for (int i = 0; i < segments; i++) {
             int x1 = startX + (i * gap);
             int x2 = startX + ((i + 1) * gap);
-            boolean isFutureDisabled = ((i + 1) < 3 && (i + 1) >= phaseMaxOrs);
+            boolean isFutureDisabled = !is1817 && ((i + 1) < 3 && (i + 1) >= phaseMaxOrs);
+
 
             if (isFutureDisabled) {
                 g2.setColor(Color.LIGHT_GRAY);
@@ -201,11 +208,22 @@ public class RoundCounterPanel extends JPanel {
 
         // --- 2. DRAW STATIONS ---
         g2.setStroke(new BasicStroke(1.5f));
-        for (int i = 0; i < 4; i++) {
+       for (int i = 0; i < nodes; i++) {
             int cx = startX + (i * gap);
-            String label = (i == 3) ? "SR" : "OR" + (i + 1);
-            boolean isDisabled = (i < 3 && i >= phaseMaxOrs);
+            String label;
+            boolean isDisabled = false;
 
+            if (is1817) {
+                if (i == 4) label = "SR";
+                else if (i == 0) label = "OR1";
+                else if (i == 1) label = "M&A1";
+                else if (i == 2) label = "OR2";
+                else label = "M&A2";
+            } else {
+                label = (i == 3) ? "SR" : "OR" + (i + 1);
+                isDisabled = (i < 3 && i >= phaseMaxOrs);
+            }
+            
             RoundRectangle2D capsule = new RoundRectangle2D.Float(cx - (capW / 2f), trackY - (capH / 2f), capW, capH,
                     10, 10);
 

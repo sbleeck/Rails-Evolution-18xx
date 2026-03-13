@@ -44,6 +44,8 @@ public class GameStatus_1817 extends GameStatus {
             }
             map.repaintAll(new java.awt.Rectangle(map.getSize()));
 
+            log.info("waiting for user to click on hex");
+            
             // 3. Attach one-off MouseListener
             map.addMouseListener(new java.awt.event.MouseAdapter() {
                 @Override

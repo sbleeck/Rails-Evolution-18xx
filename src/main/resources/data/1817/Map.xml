@@ -11,7 +11,9 @@
 	<Hex name="B7" tile="0"/>
 	<Hex name="B9" tile="0" cost="20"/>
 	<Hex name="B11" tile="0" />
-	<Hex name="B13" tile="-10" city="Toronto" value="20,30,40"/>
+	<Hex name="B13" tile="-911" city="Toronto" value="20,30,40">
+		<Access runThrough="yes"/>
+	</Hex>
 	<Hex name="B15" tile="0"/>
 	<Hex name="B17" tile="-10" city="Rochester"/>
 	<Hex name="B19" tile="0"/>
@@ -23,7 +25,7 @@
 
 	<Hex name="C4" tile="0"/>
 	<Hex name="C6" tile="0"/>
-	<Hex name="C8" tile="-10" city="Detroit"/>
+	<Hex name="C8" tile="11111" label="B" cost="20" city="Detroit"/>
 	<Hex name="C10" tile="0" impassable="D11"/>
 	<Hex name="C12" tile="0"/>
 	<Hex name="C14" tile="-10" city="Buffalo"/>
@@ -32,14 +34,23 @@
 	<Hex name="C20" tile="0" cost="15"/>
 	<Hex name="C22" tile="-10" city="Albany"/>
 	<Hex name="C24" tile="0" cost="15"/>
-	<Hex name="C26" tile="-11" label="B" city="Boston"/>
+	<Hex name="C26" tile="11111" label="B" orientation="5" city="Boston"/>
 
 
 	<!-- <Hex name="D1" tile="-5" orientation="0" value="20,30,50,60" city="Chicago"/> -->
+	<Hex name="D1" tile="-904" value="20,30,50,60" city="Chicago">
+				<Access runThrough="no"/>
+	</Hex>
+
 	<Hex name="D3" tile="0"/>
 	<Hex name="D5" tile="0"/>
 	<Hex name="D7" tile="-10" cost="10" city="Toledo"/>
-	<Hex name="D9" tile="-10"  city="Cleveland"/>
+
+	<Hex name="D9" tile="-912"  city="Cleveland" value="30,40,50,60" >
+		<Access runThrough="yes"/>
+	</Hex>
+
+
 	<Hex name="D11" tile="0" />
 	<Hex name="D13" tile="0" cost="10" />
 	<Hex name="D15" tile="0"/>
@@ -60,7 +71,7 @@
 	<Hex name="E16" tile="0" cost="15"/>
 	<Hex name="E18" tile="0" cost="15"/>
 	<Hex name="E20" tile="0"/>	
-	<Hex name="E22" tile="-21" city="New York"/>			
+	<Hex name="E22" tile="212121" orientation="1" city="New York"/>			
 
 	<Hex name="F1" tile="-910"/>	
 	<Hex name="F3" tile="-10" city="Indianapolis"/>
@@ -82,7 +93,7 @@
 	<Hex name="G12" tile="0" cost="15"/>
 	<Hex name="G14" tile="0" cost="15"/>
 	<Hex name="G16" tile="0" />
-	<Hex name="G18" tile="-11" city="Baltimore"/>
+	<Hex name="G18" tile="11111" label="B" pic="11111" orientation="0" city="Baltimore"/>
 	<Hex name="G20" tile="0" cost="20"/>
 	<Hex name="G22" tile="0"/>
 
@@ -108,8 +119,12 @@
 	<Hex name="I16" tile="-10" city="Richmond"/>
 
 
-    <Hex name="J7" tile="-901" city="Atlanta" value="20,30,50,60"/>
-    <Hex name="J15" tile="-901" city="Raleigh-Durham" value="20,30,50,60"/>
+	<Hex name="J7" tile="-905" value="20,30,50,60" city="Atlanta">
+				<Access runThrough="no"/>
+	</Hex>
+		<Hex name="J15" tile="-906" value="20,30,50,60" city="Raleigh-Durham">
+				<Access runThrough="no"/>
+	</Hex>
 
 
 

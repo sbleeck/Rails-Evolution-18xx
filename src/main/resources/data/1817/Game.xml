@@ -1,10 +1,10 @@
 <?xml version="1.0"?>
 <ComponentManager>
-	<Component name="GameManager" class="net.sf.rails.game.GameManager">
+<Component name="GameManager" class="net.sf.rails.game.specific._1817.GameManager_1817">
 		<Game name="1817"/>
 		<GameParameters>
+		<Parameter name="CanAnyCompanyHoldOwnShares" value="yes"/>
 			<PlayerShareLimit percentage="60">
-
 				
 			</PlayerShareLimit>
 			<BankPoolLimit percentage="50"/>

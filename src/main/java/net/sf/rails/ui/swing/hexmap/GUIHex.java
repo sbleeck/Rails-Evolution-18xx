@@ -519,6 +519,19 @@ g.setColor(State.HIGHLIGHT_PURPLE.getColor());
                                 + ((fontMetrics.getHeight() + dimensions.rectBound.height) * 9 / 15));
             }
 
+            // Force label drawing strictly for SVG/preprinted tiles to bypass the GUITile skip
+            Tile visibleTile = getVisibleTile();
+            if (visibleTile != null && visibleTile.isPrepainted()) {
+                String hexLabel = getHex().getLabel();
+                if (hexLabel != null && !hexLabel.isEmpty()) {
+                    FontMetrics fontMetrics = g.getFontMetrics();
+                    g.setColor(Color.BLACK);
+                    g.drawString(hexLabel, 
+                            dimensions.rectBound.x + 15, 
+                            dimensions.rectBound.y + fontMetrics.getHeight() + 5);
+                }
+            }
+            
             Map<PublicCompany, Stop> homes = getHex().getHomes();
 
             if (homes != null) {
