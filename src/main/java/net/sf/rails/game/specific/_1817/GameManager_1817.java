@@ -46,6 +46,7 @@ public class GameManager_1817 extends GameManager {
             // Sequence: OR 1 -> M&A 1  OR  OR 2 -> M&A 2
             capturePlayerWorthSnapshot(round.getId());
             captureCompanyPayoutSnapshot(round.getId());
+            exportTrain();
             startMergerAndAcquisitionRound();
 
         } else if (round instanceof MergerAndAcquisitionRound_1817) {
@@ -67,6 +68,53 @@ public class GameManager_1817 extends GameManager {
         }
     }
     
+    /**
+     * Executes Rule 6.11: Exporting the next available train at the end of the OR.
+     */
+ 
+protected void exportTrain() {
+        net.sf.rails.game.TrainManager tm = getRoot().getTrainManager();
+        net.sf.rails.game.financial.BankPortfolio ipo = net.sf.rails.game.financial.Bank.getIpo(tm);
+        net.sf.rails.game.financial.BankPortfolio scrap = getRoot().getBank().getScrapHeap();
+
+        java.util.Set<net.sf.rails.game.Train> available = tm.getAvailableNewTrains();
+        if (available == null || available.isEmpty()) {
+            return;
+        }
+
+        // 1. Identify what is at the top of the stack
+        net.sf.rails.game.Train trainToExport = available.iterator().next();
+        net.sf.rails.game.TrainCardType type = trainToExport.getCardType();
+
+        net.sf.rails.common.ReportBuffer.add(this, "The Bank exports a " + type.getId() + " train.");
+
+        // 2. Handle special 2-train removal without rusting owned trains
+        if ("2".equals(type.getId())) {
+            java.util.List<net.sf.rails.game.TrainCard> cardsToTrash = new java.util.ArrayList<>();
+            for (net.sf.rails.game.RailsItem item : ipo.getPortfolioModel().getTrainsModel().getPortfolio().items()) {
+                if (item instanceof net.sf.rails.game.TrainCard) {
+                    net.sf.rails.game.TrainCard card = (net.sf.rails.game.TrainCard) item;
+                    if (card.getType().equals(type)) {
+                        cardsToTrash.add(card);
+                    }
+                }
+            }
+            
+            for (net.sf.rails.game.TrainCard card : cardsToTrash) {
+                card.moveTo(scrap);
+            }
+        } else {
+            // Standard export
+            trainToExport.getCard().moveTo(scrap);
+        }
+
+        // 3. Update engine state so PhaseManager detects the change
+        type.addToBoughtFromIPO();
+        
+        // Because the 2-trains are now gone from the IPO, this check automatically releases the 2+ trains
+        tm.checkTrainAvailability(trainToExport, ipo);
+    }
+
 protected void startMergerAndAcquisitionRound() {
         clearStatusMessage();
         // Changed ID prefix to "MR" to help the UI round tracker identify the phase

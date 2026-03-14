@@ -3,18 +3,23 @@ package net.sf.rails.game.specific._1817;
 import java.util.List;
 import java.util.ArrayList;
 import net.sf.rails.game.GameManager;
+import net.sf.rails.game.MapHex;
 import net.sf.rails.game.Player;
 import net.sf.rails.game.Round;
 import net.sf.rails.game.state.ArrayListState;
 import net.sf.rails.game.state.GenericState;
 import net.sf.rails.game.state.IntegerState;
 import net.sf.rails.game.state.Currency;
+import net.sf.rails.game.state.BooleanState;
 import net.sf.rails.game.specific._1817.action.Bid1817IPO;
+import net.sf.rails.game.specific._1817.action.LayNYHomeToken;
 import net.sf.rails.game.specific._1817.action.SettleIPO_1817;
 import rails.game.action.PossibleAction;
+import rails.game.action.LayBaseToken;
 import rails.game.action.NullAction;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import net.sf.rails.game.Stop;
 
 public class AuctionRound_1817 extends Round {
 
@@ -27,6 +32,7 @@ public class AuctionRound_1817 extends Round {
     protected final GenericState<Player> initiator;
     protected final ArrayListState<Player> activeBidders;
     protected final IntegerState currentPlayerIndex;
+    protected final IntegerState targetStationNumber;
 
     public AuctionRound_1817(GameManager parent, String id) {
         super(parent, id);
@@ -37,6 +43,8 @@ public class AuctionRound_1817 extends Round {
         this.initiator = new GenericState<>(this, "initiator_" + id);
         this.activeBidders = new ArrayListState<>(this, "activeBidders_" + id);
         this.currentPlayerIndex = IntegerState.create(this, "currentPlayerIndex_" + id, 0);
+        this.targetStationNumber = IntegerState.create(this, "targetStationNumber_" + id, -1);
+
     }
 
     public int getCurrentBid() {
@@ -51,17 +59,15 @@ public class AuctionRound_1817 extends Round {
         return auctionedCompany.value();
     }
 
-    public void setupAuction(PublicCompany_1817 company, String hexId, int startingBid, Player startingPlayer,
+    public void setupAuction(PublicCompany_1817 company, String hexId, int stationNumber, int startingBid,
+            Player startingPlayer,
             List<Player> allPlayers) {
-// --- START FIX ---
-// --- DELETE ---        log.info("AUCTION_LOG: Setting up auction for {} at Hex {}. Starting Bid: ${}", company.getId(), hexId,
-// --- DELETE ---                startingBid);
         log.info("AUCTION_LOG: === NEW IPO AUCTION INITIATED ===");
-        log.info("AUCTION_LOG: Company: {} | Target Hex: {} | Initiator: {} | Starting Bid: ${}", 
-                 company.getId(), hexId, startingPlayer.getName(), startingBid);
-// --- END FIX ---
+        log.info("AUCTION_LOG: Company: {} | Target Hex: {} | Initiator: {} | Starting Bid: ${}",
+                company.getId(), hexId, startingPlayer.getName(), startingBid);
         this.auctionedCompany.set(company);
         this.targetHexId.set(hexId);
+        this.targetStationNumber.set(stationNumber);
         this.currentBid.set(startingBid);
         this.initiator.set(startingPlayer);
         this.highestBidder.set(startingPlayer);
@@ -73,10 +79,10 @@ public class AuctionRound_1817 extends Round {
 
         int startIndex = (allPlayers.indexOf(startingPlayer) + 1) % allPlayers.size();
         this.currentPlayerIndex.set(startIndex);
-advanceToNextValidBidder();
-        log.info("AUCTION_LOG: Active bidders post-prune: {}. Next to act: {}", 
-                 this.activeBidders.size(), 
-                 (this.activeBidders.isEmpty() ? "None" : getActingPlayer().getName()));
+        advanceToNextValidBidder();
+        log.info("AUCTION_LOG: Active bidders post-prune: {}. Next to act: {}",
+                this.activeBidders.size(),
+                (this.activeBidders.isEmpty() ? "None" : getActingPlayer().getName()));
 
     }
 
@@ -98,8 +104,10 @@ advanceToNextValidBidder();
             resolveAuction();
 
             Player winner = highestBidder.value();
+
             if (winner != null && auctionedCompany.value() != null) {
-                log.info("AUCTION_LOG: Generating Settlement Action for winner {} at ${}", winner.getName(), currentBid.value());
+                log.info("AUCTION_LOG: Generating Settlement Action for winner {} at ${}", winner.getName(),
+                        currentBid.value());
                 // Generate the settlement action for the UI to populate
                 possibleActions.add(new SettleIPO_1817(
                         gameManager.getRoot(),
@@ -121,12 +129,10 @@ advanceToNextValidBidder();
         }
         return true;
     }
-    
 
     @Override
     public boolean process(PossibleAction action) {
         Player actor = getActingPlayer();
-
 
         // --- Handle Settlement Action ---
         if (action instanceof SettleIPO_1817) {
@@ -162,8 +168,8 @@ advanceToNextValidBidder();
             }
             comp.setPresident(winner);
 
-
-            // 5. Calculate Par Price (Bid / ShareSize) - Integer division naturally rounds down
+            // 5. Calculate Par Price (Bid / ShareSize) - Integer division naturally rounds
+            // down
             int parPrice = currentBid.value() / settle.getShareSize();
             net.sf.rails.game.financial.StockMarket sm = gameManager.getRoot().getStockMarket();
             net.sf.rails.game.financial.StockSpace startSpace = sm.getStartSpace(parPrice);
@@ -183,10 +189,10 @@ advanceToNextValidBidder();
                         }
                     }
                 }
-                
+
                 if (startSpace != null) {
-                    log.info("AUCTION_LOG: Exact price ${} not found. Starting at {} (${})", 
-                             parPrice, startSpace.getId(), startSpace.getPrice());
+                    log.info("AUCTION_LOG: Exact price ${} not found. Starting at {} (${})",
+                            parPrice, startSpace.getId(), startSpace.getPrice());
                 }
             }
 
@@ -199,41 +205,41 @@ advanceToNextValidBidder();
             // 6. Float the company BEFORE laying the token so the engine accepts it
             comp.setFloated();
 
-            // 7. Lay the base token on the map
+            // 7. Lay the base token on the map using the specific station number passed
+            // from the Stock Round
             net.sf.rails.game.MapHex homeHex = getRoot().getMapManager().getHex(targetHexId.value());
             if (homeHex != null) {
                 comp.setHomeHex(homeHex);
-
                 net.sf.rails.game.Stop targetStop = null;
+
                 if (homeHex.getStops() != null) {
+                    for (net.sf.rails.game.Stop stop : homeHex.getStops()) {
+                        if (stop.getRelatedStationNumber() == targetStationNumber.value()) {
+                            targetStop = stop;
+                            break;
+                        }
+                    }
+                }
+
+                // Fallback for non-E22 hexes where stationNumber defaults to 0 but might not
+                // perfectly match
+                if (targetStop == null && homeHex.getStops() != null && !homeHex.getStops().isEmpty()) {
                     for (net.sf.rails.game.Stop stop : homeHex.getStops()) {
                         if (stop.hasTokenSlotsLeft()) {
                             targetStop = stop;
-                            break; // Grab the first open station slot
+                            break;
                         }
                     }
                 }
 
                 if (targetStop != null) {
                     comp.setHomeCityNumber(targetStop.getRelatedStationNumber());
-                    boolean tokenLaid = homeHex.layBaseToken(comp, targetStop);
-                    if (tokenLaid) {
-                        log.info("AUCTION_LOG: Laid base token for {} on Hex {} (Station {})",
-                                comp.getId(), homeHex.getId(), targetStop.getRelatedStationNumber());
-                    } else {
-                        log.error("AUCTION_LOG: Engine rejected base token for {} on Hex {}", comp.getId(),
-                                homeHex.getId());
-                    }
-                } else {
-                    log.warn("AUCTION_LOG: Could not find free stop on Hex {} for token placement", homeHex.getId());
+                    homeHex.layBaseToken(comp, targetStop);
                 }
-            } else {
-                log.error("AUCTION_LOG: Target hex {} is null. Cannot lay base token.", targetHexId.value());
             }
 
             // 8. Close the Auction Round
             gameManager.nextRound(this);
-
             return true;
 
         }
@@ -268,10 +274,10 @@ advanceToNextValidBidder();
 
     private void resolveAuction() {
         Player winner = highestBidder.value();
+
         log.info("AUCTION_LOG: Auction finished. Waiting for settlement from {}",
                 (winner != null ? winner.getName() : "None"));
     }
-
 
     private void advanceToNextValidBidder() {
         int minNextBid = currentBid.value() + 5;

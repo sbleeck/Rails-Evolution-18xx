@@ -133,7 +133,7 @@ this.shareCount = IntegerState.create(this, "shareCount", 2);
             // --- START FIX ---
             // Set station marker capacity according to 1817 rules.
             // 2-share: 1 token, 5-share: 2 tokens, 10-share: 4 tokens.
-            int capacity = (count == 2) ? 1 : (count == 5) ? 2 : 4;
+            int capacity = (count == 2) ? 2 : (count == 5) ? 3 : 5;
             this.tokenCapacity.set(capacity);
             // --- END FIX ---
         }

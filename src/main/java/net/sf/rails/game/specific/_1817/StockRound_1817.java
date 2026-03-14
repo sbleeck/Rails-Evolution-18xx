@@ -14,6 +14,13 @@ import net.sf.rails.game.specific._1817.action.Short1817;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import net.sf.rails.game.specific._1817.action.TakeLoans_1817;
+import net.sf.rails.game.state.BooleanState;
+import net.sf.rails.game.state.GenericState;
+import net.sf.rails.game.state.IntegerState;
+import net.sf.rails.game.specific._1817.action.LayNYHomeToken;
+import net.sf.rails.game.MapHex;
+import net.sf.rails.game.Stop;
+// --- END FIX ---
 
 /**
  * 1817 specific Stock Round logic.
@@ -24,8 +31,15 @@ public class StockRound_1817 extends StockRound {
 
     private static final Logger log = LoggerFactory.getLogger(StockRound_1817.class);
 
+    protected final BooleanState waitingForE22Start;
+    protected final GenericState<PublicCompany> pendingE22Company;
+    protected final IntegerState pendingE22Bid;
+
     public StockRound_1817(GameManager parent, String id) {
         super(parent, id);
+        waitingForE22Start = new BooleanState(this, "waitingForE22Start_" + id, false);
+        pendingE22Company = new GenericState<>(this, "pendingE22Company_" + id);
+        pendingE22Bid = IntegerState.create(this, "pendingE22Bid_" + id, 0);
     }
 
     @Override
@@ -43,6 +57,17 @@ public class StockRound_1817 extends StockRound {
 
     @Override
     public void setBuyableCerts() {
+        if (waitingForE22Start.value()) {
+            possibleActions.clear();
+            MapHex nyHex = getRoot().getMapManager().getHex("E22");
+            PublicCompany comp = pendingE22Company.value();
+            for (Stop stop : nyHex.getStops()) {
+                if (stop.hasTokenSlotsLeft()) {
+                    possibleActions.add(new LayNYHomeToken(nyHex, comp, stop));
+                }
+            }
+            return;
+        }
         super.setBuyableCerts();
 
         if (possibleActions == null)
@@ -135,37 +160,49 @@ possibleActions.add(new TakeLoans_1817(comp.getId(), maxLoans));
             try {
                 Initiate1817IPO ipoAction = (Initiate1817IPO) action;
                 PublicCompany_1817 comp = (PublicCompany_1817) ipoAction.getCompany();
-                net.sf.rails.game.Player initiator = gameManager.getCurrentPlayer();
+               
+               
+               
+               int bid = ipoAction.getBid();
+                String hexId = ipoAction.getHexId(); 
 
-log.info("IPO INITIATED: Company " + comp.getId() + " by Player " + initiator.getName() +
-" at Hex " + ipoAction.getHexId() + " with starting bid $" + ipoAction.getBid());
-                // 1. Push the new Auction Round onto the stack
-
-                // Explicitly preserve the current Stock Round so it can be resumed later
-                gameManager.setInterruptedRound(this);
-
-                // This preserves the Stock Round as the 'interruptedRound'
-                AuctionRound_1817 auctionRound = gameManager.createRound(AuctionRound_1817.class,
-                        "Auction_" + comp.getId());
-
-                // 2. Initialize the auction state
-                auctionRound.setupAuction(
-                        comp,
-                        ipoAction.getHexId(),
-                        ipoAction.getBid(),
-                        initiator,
-                        gameManager.getPlayers());
-
-                // 3. Mark the initiator as having acted so the SR continues correctly after
-                // resolution
-                hasActed.set(true);
-                companyBoughtThisTurnWrapper.set(comp);
-
-                return true;
+                if ("E22".equals(hexId)) {
+                    log.info("E22 IPO Initiated. Pausing Stock Round to prompt for North/South location.");
+                    waitingForE22Start.set(true);
+                    pendingE22Company.set(comp);
+                    pendingE22Bid.set(bid);
+                    return true;
+                } else {
+                    startAuctionRound(comp, hexId, 0, bid); 
+                    hasActed.set(true);
+                    companyBoughtThisTurnWrapper.set(comp);
+                    return true;
+                }
             } catch (Exception e) {
                 log.error("Failed to transition to 1817 Auction", e);
                 return false;
             }
+        }
+
+        if (action instanceof LayNYHomeToken) {
+            LayNYHomeToken layAction = (LayNYHomeToken) action;
+            PublicCompany_1817 comp = (PublicCompany_1817) pendingE22Company.value();
+            int bid = pendingE22Bid.value();
+            int stationNumber = layAction.getChosenStation();
+            
+            log.info("E22 Location selected: Station {}", stationNumber);
+            
+            waitingForE22Start.set(false);
+            startAuctionRound(comp, "E22", stationNumber, bid);
+            hasActed.set(true);
+            companyBoughtThisTurnWrapper.set(comp);
+            return true;
+        
+               
+               
+
+
+                
 
         }
         if (action instanceof net.sf.rails.game.specific._1817.action.Short1817) {
@@ -255,6 +292,16 @@ PublicCompany comp = companyManager.getPublicCompany(tlAction.getCompanyId());
     }
 
 
+
+    private void startAuctionRound(PublicCompany_1817 comp, String hexId, int stationNumber, int bid) {
+        net.sf.rails.game.Player initiator = gameManager.getCurrentPlayer();
+        log.info("IPO INITIATED: Company " + comp.getId() + " by Player " + initiator.getName() +
+                " at Hex " + hexId + " Station " + stationNumber + " with starting bid $" + bid);
+        
+        gameManager.setInterruptedRound(this);
+        AuctionRound_1817 auctionRound = gameManager.createRound(AuctionRound_1817.class, "Auction_" + comp.getId());
+        auctionRound.setupAuction(comp, hexId, stationNumber, bid, initiator, gameManager.getPlayers());
+    }
 
 
 }

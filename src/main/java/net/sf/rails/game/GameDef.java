@@ -35,6 +35,7 @@ public class GameDef {
         MUST_BUY_TRAIN_EVEN_IF_NO_ROUTE (false),
         REMOVE_PERMANENT (false),
         BANKRUPTCY_STYLE (Bankruptcy.Style.DEFAULT);
+        
 
         private Object defaultValue;
 
@@ -63,6 +64,7 @@ public class GameDef {
         PAYOUT,
         BUY_TRAIN,
         TRADE_SHARES,
+        PAY_LOAN_INTEREST,
         REPAY_LOANS,
         BUY_BONDS,
         FINAL,

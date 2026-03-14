@@ -15,7 +15,7 @@
     <Tile id="-11" quantity="3"><Upgrade id="2053"/></Tile> 
     <Tile id="11111" quantity="3"><Upgrade id="2053"/></Tile> 
     <Tile id="43800" quantity="1"><Upgrade id="1484"/></Tile> 
-    <Tile id="212121" quantity="1"><Upgrade id="54"/></Tile> 
+<Tile id="212121" quantity="-1"><Upgrade id="54"/></Tile>
 
 
 

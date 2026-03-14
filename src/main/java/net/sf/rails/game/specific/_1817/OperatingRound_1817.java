@@ -88,6 +88,32 @@ public class OperatingRound_1817 extends OperatingRound {
             log.warn(
                     "1817_DEBUG: LayTile action REJECTED by super.process(action). Check for rule violations or cost mismatches.");
         }
+
+        // Rule 6.5 / Phase 4: Discard 2+ trains at the end of the Run Trains step.
+        // The SetDividend action indicates the completion of the train running
+        // calculations.
+        if (result && action instanceof rails.game.action.SetDividend) {
+            net.sf.rails.game.Phase currentPhase = net.sf.rails.game.Phase.getCurrent(this);
+            net.sf.rails.game.Phase phase4 = gameManager.getRoot().getPhaseManager().getPhaseByName("4");
+
+            if (currentPhase != null && phase4 != null && currentPhase.getIndex() >= phase4.getIndex()) {
+                PublicCompany activeCompany = operatingCompany.value();
+                if (activeCompany != null) {
+                    java.util.List<net.sf.rails.game.Train> trainsToTrash = new java.util.ArrayList<>();
+                    for (net.sf.rails.game.Train t : gameManager.getRoot().getTrainManager().getTrains(activeCompany)) {
+                        if ("2+".equals(t.getCardType().getId())) {
+                            trainsToTrash.add(t);
+                        }
+                    }
+                    for (net.sf.rails.game.Train t : trainsToTrash) {
+                        net.sf.rails.common.ReportBuffer.add(gameManager,
+                                activeCompany.getId() + " discards its 2+ train without compensation.");
+                        gameManager.getRoot().getTrainManager().trashTrain(t);
+                    }
+                }
+            }
+        }
+
         return result;
 
     }
@@ -266,7 +292,6 @@ public class OperatingRound_1817 extends OperatingRound {
         return cost;
     }// We are modifying OperatingRound_1817.java
 
-   
     // ... (lines of unchanged context code) ...
     @Override
     public boolean layTile(LayTile action) {
