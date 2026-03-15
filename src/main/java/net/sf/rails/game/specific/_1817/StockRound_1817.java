@@ -160,11 +160,9 @@ possibleActions.add(new TakeLoans_1817(getRoot(), comp.getId(), maxLoans));
             try {
                 Initiate1817IPO ipoAction = (Initiate1817IPO) action;
                 PublicCompany_1817 comp = (PublicCompany_1817) ipoAction.getCompany();
-               
-               
-               
-               int bid = ipoAction.getBid();
-                String hexId = ipoAction.getHexId(); 
+
+                int bid = ipoAction.getBid();
+                String hexId = ipoAction.getHexId();
 
                 if ("E22".equals(hexId)) {
                     log.info("E22 IPO Initiated. Pausing Stock Round to prompt for North/South location.");
@@ -173,7 +171,7 @@ possibleActions.add(new TakeLoans_1817(getRoot(), comp.getId(), maxLoans));
                     pendingE22Bid.set(bid);
                     return true;
                 } else {
-                    startAuctionRound(comp, hexId, 0, bid); 
+                    startAuctionRound(comp, hexId, 0, bid);
                     hasActed.set(true);
                     companyBoughtThisTurnWrapper.set(comp);
                     return true;
@@ -189,20 +187,14 @@ possibleActions.add(new TakeLoans_1817(getRoot(), comp.getId(), maxLoans));
             PublicCompany_1817 comp = (PublicCompany_1817) pendingE22Company.value();
             int bid = pendingE22Bid.value();
             int stationNumber = layAction.getChosenStation();
-            
+
             log.info("E22 Location selected: Station {}", stationNumber);
-            
+
             waitingForE22Start.set(false);
             startAuctionRound(comp, "E22", stationNumber, bid);
             hasActed.set(true);
             companyBoughtThisTurnWrapper.set(comp);
             return true;
-        
-               
-               
-
-
-                
 
         }
         if (action instanceof net.sf.rails.game.specific._1817.action.Short1817) {
@@ -240,7 +232,7 @@ possibleActions.add(new TakeLoans_1817(getRoot(), comp.getId(), maxLoans));
 
         if (action instanceof net.sf.rails.game.specific._1817.action.TakeLoans_1817) {
             net.sf.rails.game.specific._1817.action.TakeLoans_1817 tlAction = (net.sf.rails.game.specific._1817.action.TakeLoans_1817) action;
-PublicCompany comp = companyManager.getPublicCompany(tlAction.getCompanyId());
+            PublicCompany comp = companyManager.getPublicCompany(tlAction.getCompanyId());
             int count = tlAction.getLoansToTake();
 
             if (count > 0) {
@@ -281,27 +273,20 @@ PublicCompany comp = companyManager.getPublicCompany(tlAction.getCompanyId());
         return super.checkAgainstHoldLimit(player, company, number);
     }
 
-
-
-
-
     // ... (lines of unchanged context code) ...
     private void setupCompanyActions(PublicCompany company) {
         log.info("M&A ROUND: setupCompanyActions() invoked for " + company.getId());
-       
+
     }
-
-
 
     private void startAuctionRound(PublicCompany_1817 comp, String hexId, int stationNumber, int bid) {
         net.sf.rails.game.Player initiator = gameManager.getCurrentPlayer();
         log.info("IPO INITIATED: Company " + comp.getId() + " by Player " + initiator.getName() +
                 " at Hex " + hexId + " Station " + stationNumber + " with starting bid $" + bid);
-        
+
         gameManager.setInterruptedRound(this);
         AuctionRound_1817 auctionRound = gameManager.createRound(AuctionRound_1817.class, "Auction_" + comp.getId());
         auctionRound.setupAuction(comp, hexId, stationNumber, bid, initiator, gameManager.getPlayers());
     }
-
 
 }

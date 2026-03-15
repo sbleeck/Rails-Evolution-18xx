@@ -342,10 +342,12 @@ public class MergerAndAcquisitionRound_1817 extends Round {
         } else if (action instanceof net.sf.rails.game.specific._1817.action.SelectPurchasingCompany_1817) {
             net.sf.rails.game.specific._1817.action.SelectPurchasingCompany_1817 selectAction = (net.sf.rails.game.specific._1817.action.SelectPurchasingCompany_1817) action;
             PublicCompany target = operatingCompany.value();
-            PublicCompany predator = gameManagerRef.getRoot().getCompanyManager().getPublicCompany(selectAction.getCompanyId());
+            PublicCompany predator = gameManagerRef.getRoot().getCompanyManager()
+                    .getPublicCompany(selectAction.getCompanyId());
             int finalBid = highestBid.value();
-            
-            log.info("M&A ROUND: President " + highestBiddingPlayer.value().getName() + " selected " + predator.getId() + " to make the purchase.");
+
+            log.info("M&A ROUND: President " + highestBiddingPlayer.value().getName() + " selected " + predator.getId()
+                    + " to make the purchase.");
             executeSale(target, predator, finalBid);
             return true;
         }
@@ -671,7 +673,7 @@ public class MergerAndAcquisitionRound_1817 extends Round {
         }
     }
 
-@Override
+    @Override
     public boolean setPossibleActions() {
         updateCurrentPlayer();
         possibleActions.clear();
@@ -700,14 +702,14 @@ public class MergerAndAcquisitionRound_1817 extends Round {
             net.sf.rails.game.Player winner = highestBiddingPlayer.value();
             gameManagerRef.getRoot().getPlayerManager().setCurrentPlayer(winner);
             PublicCompany target = operatingCompany.value();
-            
+
             // Winning president must choose which of their eligible companies makes the buy
             for (PublicCompany comp : gameManagerRef.getRoot().getCompanyManager().getAllPublicCompanies()) {
                 if (comp.getPresident() != null && comp.getPresident().equals(winner) && !comp.equals(target)) {
                     // Predators must not be in the liquidation or acquisition zones ($30 or less)
                     if (comp.getCurrentSpace() != null && comp.getCurrentSpace().getPrice() > 30) {
                         possibleActions.add(new net.sf.rails.game.specific._1817.action.SelectPurchasingCompany_1817(
-                            gameManagerRef.getRoot(), comp.getId()));
+                                gameManagerRef.getRoot(), comp.getId()));
                     }
                 }
             }
@@ -858,8 +860,7 @@ possibleActions.add(new TakeLoans_1817(getRoot(), comp.getId(), limit));
             PublicCompany_1817 comp1817 = (PublicCompany_1817) company;
             int maxLoans = comp1817.getShareCount();
             if (company.getNumberOfBonds() < maxLoans) {
-                possibleActions
-.add(new net.sf.rails.game.specific._1817.action.TakeLoans_1817(getRoot(), company.getId(), maxLoans));
+                possibleActions.add(new net.sf.rails.game.specific._1817.action.TakeLoans_1817(getRoot(), company.getId(), maxLoans));
                 log.info("M&A ROUND: Added TakeLoans_1817 action for " + company.getId() + " with max loans: "
                         + maxLoans);
             }
@@ -946,7 +947,6 @@ possibleActions.add(new TakeLoans_1817(getRoot(), comp.getId(), limit));
         setPossibleActions();
     }
 
-
     private void executeSale(PublicCompany target, PublicCompany predator, int finalBid) {
         log.info(">>> Executing Sale: " + (predator != null ? predator.getId() : "Bank") + " buys " + target.getId()
                 + " for $" + finalBid);
@@ -966,7 +966,7 @@ possibleActions.add(new TakeLoans_1817(getRoot(), comp.getId(), limit));
 
         if (!isRed && !isGray && treasurySharesSold > 0) {
             int cashInfusion = treasurySharesSold * target.getMarketPrice();
-target.setCash_AI(target.getCash() + cashInfusion);
+            target.setCash_AI(target.getCash() + cashInfusion);
             log.info("M&A ROUND: Treasury shares sold. Infused $" + cashInfusion + " into " + target.getId());
         }
 
@@ -977,13 +977,13 @@ target.setCash_AI(target.getCash() + cashInfusion);
         // 3. Execution of Sale Assets (Rule 7.2.4 [cite: 763, 764])
         if (predator != null) {
             // Predator pays the Bank (Rule 7.2.4 [cite: 836])
-predator.setCash_AI(predator.getCash() - finalBid);
+            predator.setCash_AI(predator.getCash() - finalBid);
 
             predator.transferAssetsFrom(target);
             if (predator instanceof PublicCompany_1817 && target instanceof PublicCompany_1817) {
                 int acquiredBonds = ((PublicCompany_1817) target).getNumberOfBonds();
                 ((PublicCompany_1817) predator).setNumberOfBonds(predator.getNumberOfBonds() + acquiredBonds);
-                
+
                 // Loan Penalty (Rule 7.2.4 )
                 for (int i = 0; i < acquiredBonds; i++) {
                     // TODO: Replace with your specific 1817 StockMarket method to move left
@@ -1000,7 +1000,6 @@ predator.setCash_AI(predator.getCash() - finalBid);
         companyIndex.set(companyIndex.value() + 1);
         processNextSale();
     }
-
 
     private void setupAuctionActions() {
         if (activeBidders.isEmpty())
@@ -1045,23 +1044,22 @@ predator.setCash_AI(predator.getCash() - finalBid);
         }
     }
 
-
     private void finalizeAuction() {
         PublicCompany target = operatingCompany.value();
         net.sf.rails.game.Player winner = highestBiddingPlayer.value();
         int finalBid = highestBid.value();
-        
+
         if (winner == null) {
             executeSale(target, null, finalBid);
         } else {
-            log.info("M&A ROUND: Auction won by " + winner.getName() + " for $" + finalBid + ". Awaiting purchasing company selection.");
+            log.info("M&A ROUND: Auction won by " + winner.getName() + " for $" + finalBid
+                    + ". Awaiting purchasing company selection.");
             currentStep.set(MaAStep.SALES_SELECT_BUYER);
             setPossibleActions();
         }
     }
 
-
-private void settleWithShareholders(PublicCompany target, int payoutPerShare) {
+    private void settleWithShareholders(PublicCompany target, int payoutPerShare) {
         log.info("M&A ROUND: Settling shareholders for {}. Payout: ${} per share.", target.getId(), payoutPerShare);
 
         for (Player p : gameManagerRef.getRoot().getPlayerManager().getPlayers()) {
@@ -1069,21 +1067,18 @@ private void settleWithShareholders(PublicCompany target, int payoutPerShare) {
             int sharesOwned = countPlayerShares(target, p);
             if (sharesOwned > 0) {
                 int totalPayout = sharesOwned * payoutPerShare;
-p.setCash_AI(p.getCash() + totalPayout);
+                p.setCash_AI(p.getCash() + totalPayout);
                 log.info("M&A ROUND: Paid {} ${} for shares of {}.", p.getName(), totalPayout, target.getId());
             }
-            
+
             // Short positions pay cash (Rule 7.2.4 [cite: 847])
-           // TODO: Settle short positions
-            // 1. Iterate over p.getPortfolioModel().getCertificates() to find short shares for 'target'.
+            // TODO: Settle short positions
+            // 1. Iterate over p.getPortfolioModel().getCertificates() to find short shares
+            // for 'target'.
             // 2. Calculate debt = shortShares * payoutPerShare.
             // 3. p.setCash_AI(p.getCash() - debt);
             // 4. Move short certificates back to the Bank.
         }
     }
-
-
-
-
 
 }

@@ -68,14 +68,12 @@ public class ORPanel extends GridPanel
     private JPanel sidebarPanel;
 
     // Standard Panels
-private JPanel phase1Panel, phase2Panel, phase3Panel, phase4Panel, phase5Panel, footerPanel;
+    private JPanel phase1Panel, phase2Panel, phase3Panel, phase4Panel, phase5Panel, footerPanel;
     private JPanel cashPanel;
     private JPanel loansPanel;
     private JPanel miscActionPanel;
     private JPanel trainButtonsPanel;
     private JPanel specialActionsButtonPanel;
-
-    
 
     // Special Mode Panels
     private JPanel specialContainer;
@@ -94,7 +92,7 @@ private JPanel phase1Panel, phase2Panel, phase3Panel, phase4Panel, phase5Panel, 
     public ActionButton btnTileSkip, btnTileConfirm;
     public ActionButton btnTokenSkip, btnTokenConfirm;
     public ActionButton buttonOC, button1, button2, button3; // Legacy placeholders
-private JLabel focusLight;
+    private JLabel focusLight;
 
     private GameAction currentUndoAction;
     private GameAction currentRedoAction;
@@ -234,7 +232,6 @@ private JLabel focusLight;
             }
         });
 
-
     }
 
     /**
@@ -244,33 +241,27 @@ private JLabel focusLight;
     private int determineActivePhase(List<PossibleAction> actions) {
         int phase = 0;
         boolean hasDoneAction = false;
-boolean hasSpecialAction = false;
+        boolean hasSpecialAction = false;
 
         if (actions == null || actions.isEmpty()) {
             return 0;
         }
 
-       
         for (PossibleAction pa : actions) {
-// --- START FIX ---
+            // --- START FIX ---
             if (pa instanceof LayTile && (phase == 0 || phase > 1)) {
                 phase = 1;
-            }
-            else if (pa instanceof LayToken && (phase == 0 || phase > 2)) {
+            } else if (pa instanceof LayToken && (phase == 0 || phase > 2)) {
                 phase = 2;
-            }
-            else if (pa instanceof SetDividend && (phase == 0 || phase > 3)) {
+            } else if (pa instanceof SetDividend && (phase == 0 || phase > 3)) {
                 phase = 3;
-            }
-            else if (pa instanceof BuyTrain && (phase == 0 || phase > 4)) {
+            } else if (pa instanceof BuyTrain && (phase == 0 || phase > 4)) {
                 phase = 4;
-            }
-else if (pa instanceof TakeLoans || pa instanceof RepayLoans
+            } else if (pa instanceof TakeLoans || pa instanceof RepayLoans
                     || pa instanceof rails.game.action.SpecialORAction) {
 
                 hasSpecialAction = true;
-            }
-            else if (pa instanceof NullAction) {
+            } else if (pa instanceof NullAction) {
                 NullAction.Mode mode = ((NullAction) pa).getMode();
                 if (mode == NullAction.Mode.DONE || mode == NullAction.Mode.PASS) {
                     hasDoneAction = true;
@@ -279,8 +270,7 @@ else if (pa instanceof TakeLoans || pa instanceof RepayLoans
 
         }
 
-
-if (phase == 0) {
+        if (phase == 0) {
             if (hasDoneAction) {
                 phase = 6;
             } else if (hasSpecialAction) {
@@ -362,7 +352,7 @@ if (phase == 0) {
                     !(pa instanceof LayToken) &&
                     !(pa instanceof TakeLoans) &&
                     !(pa instanceof RepayLoans) &&
-!(pa instanceof rails.game.action.SpecialORAction) &&
+                    !(pa instanceof rails.game.action.SpecialORAction) &&
                     !(pa instanceof LayBaseToken)) {
 
                 labelToAdd = pa.getButtonLabel().toUpperCase();
@@ -375,9 +365,10 @@ if (phase == 0) {
                     addedSpecialLabels.add(labelToAdd);
                 }
             }
-if (pa instanceof TakeLoans || pa instanceof RepayLoans
-                    || pa instanceof rails.game.action.SpecialORAction) {
 
+            if (pa instanceof TakeLoans || pa instanceof RepayLoans
+                    || pa instanceof rails.game.action.SpecialORAction) {
+                addSpecialActionButtonToPhase5(pa);
             }
 
             // Continue with standard distribution...
@@ -429,10 +420,9 @@ if (pa instanceof TakeLoans || pa instanceof RepayLoans
         }
     }
 
-
     private void addSpecialActionButtonToPhase5(PossibleAction action) {
         ActionButton btn = new ActionButton(RailsIcon.OK);
-        
+
         String text = action.getButtonLabel();
         if (text == null || text.trim().isEmpty()) {
             text = action.toString();
@@ -442,7 +432,7 @@ if (pa instanceof TakeLoans || pa instanceof RepayLoans
 
         btn.setIcon(null);
 
-        btn.setBackground(new Color(255, 255, 240)); 
+        btn.setBackground(new Color(255, 255, 240));
         btn.setOpaque(true);
         btn.setForeground(Color.BLACK);
         btn.setBorder(BorderFactory.createCompoundBorder(
@@ -453,13 +443,12 @@ if (pa instanceof TakeLoans || pa instanceof RepayLoans
         btn.setMaximumSize(new Dimension(SIDEBAR_WIDTH - 10, 30));
         btn.setPossibleAction(action);
         btn.addActionListener(this);
-        
+
         if (specialActionsButtonPanel != null) {
             specialActionsButtonPanel.add(btn);
             specialActionsButtonPanel.add(Box.createVerticalStrut(4));
         }
     }
-
 
     private void addSpecialNotificationButton(String text, PossibleAction sourceAction) {
         if (specialNotificationPanel == null)
@@ -560,19 +549,26 @@ if (pa instanceof TakeLoans || pa instanceof RepayLoans
         }
     }
 
-
     private void setStandardPanelsVisible(boolean visible) {
-        if (phase1Panel != null) phase1Panel.setVisible(visible);
-        if (phase2Panel != null) phase2Panel.setVisible(visible);
-        if (phase3Panel != null) phase3Panel.setVisible(visible);
-        if (phase4Panel != null) phase4Panel.setVisible(visible);
-        if (phase5Panel != null) phase5Panel.setVisible(visible);
-        if (footerPanel != null) footerPanel.setVisible(visible);
-        if (cashPanel != null) cashPanel.setVisible(visible);
-        if (loansPanel != null) loansPanel.setVisible(visible);
-        if (lblCash != null && lblCash.getParent() != null) lblCash.getParent().setVisible(visible);
+        if (phase1Panel != null)
+            phase1Panel.setVisible(visible);
+        if (phase2Panel != null)
+            phase2Panel.setVisible(visible);
+        if (phase3Panel != null)
+            phase3Panel.setVisible(visible);
+        if (phase4Panel != null)
+            phase4Panel.setVisible(visible);
+        if (phase5Panel != null)
+            phase5Panel.setVisible(visible);
+        if (footerPanel != null)
+            footerPanel.setVisible(visible);
+        if (cashPanel != null)
+            cashPanel.setVisible(visible);
+        if (loansPanel != null)
+            loansPanel.setVisible(visible);
+        if (lblCash != null && lblCash.getParent() != null)
+            lblCash.getParent().setVisible(visible);
     }
-
 
     private void colorizeActivePhase(Color unused) {
         resetPhasePanel(phase1Panel, btnTileConfirm);
@@ -594,7 +590,7 @@ if (pa instanceof TakeLoans || pa instanceof RepayLoans
         }
 
         resetPhasePanel(phase4Panel, btnTrainSkip);
-resetPhasePanel(null, btnDone);
+        resetPhasePanel(null, btnDone);
         resetPhasePanel(null, btnDone);
 
         // Phase 1: Infrastructure - Track (Matches Ochre/Brown Palette)
@@ -603,7 +599,8 @@ resetPhasePanel(null, btnDone);
             if (btnTileConfirm != null) {
                 btnTileConfirm.setEnabled(true);
 
-                boolean hasSelection = (orUIManager != null && orUIManager.getMap() != null && orUIManager.getMap().getSelectedHex() != null);
+                boolean hasSelection = (orUIManager != null && orUIManager.getMap() != null
+                        && orUIManager.getMap().getSelectedHex() != null);
                 if (hasSelection) {
                     styleButton(btnTileConfirm, SYS_BLUE, "Confirm");
                 } else {
@@ -618,13 +615,14 @@ resetPhasePanel(null, btnDone);
             if (btnTokenConfirm != null) {
                 btnTokenConfirm.setEnabled(true);
 
-boolean hasSelection = (orUIManager != null && orUIManager.getMap() != null && orUIManager.getMap().getSelectedHex() != null);
+                boolean hasSelection = (orUIManager != null && orUIManager.getMap() != null
+                        && orUIManager.getMap().getSelectedHex() != null);
                 if (hasSelection) {
                     styleButton(btnTokenConfirm, SYS_BLUE, "Confirm");
                 } else {
                     styleButton(btnTokenConfirm, UITheme.ACTION_SKIP, "Skip");
                 }
-                        }
+            }
 
             // Phase 3: Capital - Revenue (Matches Royal Blue palette)
         } else if (activePhase == 3) {
@@ -669,7 +667,8 @@ boolean hasSelection = (orUIManager != null && orUIManager.getMap() != null && o
 
             applyPhaseStyle(phase4Panel, null, UITheme.TRAIN_DARK, UITheme.TRAIN_LIGHT, label);
 
-            boolean canSkip = (btnTrainSkip.getPossibleActions() != null && !btnTrainSkip.getPossibleActions().isEmpty());
+            boolean canSkip = (btnTrainSkip.getPossibleActions() != null
+                    && !btnTrainSkip.getPossibleActions().isEmpty());
             btnTrainSkip.setEnabled(canSkip);
             if (canSkip) {
                 styleButton(btnTrainSkip, UITheme.ACTION_SKIP, label);
@@ -685,9 +684,10 @@ boolean hasSelection = (orUIManager != null && orUIManager.getMap() != null && o
             btnDone.setForeground(Color.WHITE);
             btnDone.setFont(new Font("SansSerif", Font.BOLD, 16));
         } else {
-           
-        // DIRECT ENGINE SYNC: If the engine natively provides a DONE/PASS action,
-            // expose it immediately. Do not hide valid engine actions behind local UI phases.
+
+            // DIRECT ENGINE SYNC: If the engine natively provides a DONE/PASS action,
+            // expose it immediately. Do not hide valid engine actions behind local UI
+            // phases.
             if (btnDone.getPossibleActions() != null && !btnDone.getPossibleActions().isEmpty()) {
                 btnDone.setEnabled(true);
                 styleButton(btnDone, UITheme.ACTION_SKIP, "END TURN");
@@ -702,7 +702,8 @@ boolean hasSelection = (orUIManager != null && orUIManager.getMap() != null && o
             }
         }
         // ALWAYS evaluate Phase 5 (Special Actions) independently!
-        boolean hasSpecialActions = specialActionsButtonPanel != null && specialActionsButtonPanel.getComponentCount() > 0;
+        boolean hasSpecialActions = specialActionsButtonPanel != null
+                && specialActionsButtonPanel.getComponentCount() > 0;
         if (hasSpecialActions) {
             applyPhaseStyle(phase5Panel, null, UITheme.ACTION_SKIP, UITheme.TRAIN_LIGHT, "Special Actions");
         } else {
@@ -1289,7 +1290,7 @@ boolean hasSelection = (orUIManager != null && orUIManager.getMap() != null && o
         }
     }
 
-public void recreate(Round or) {
+    public void recreate(Round or) {
         PublicCompany comp = null;
         if (or instanceof OperatingRound) {
             comp = ((OperatingRound) or).getOperatingCompany();
@@ -1297,7 +1298,8 @@ public void recreate(Round or) {
             try {
                 java.lang.reflect.Method m = or.getClass().getMethod("getOperatingCompany");
                 comp = (PublicCompany) m.invoke(or);
-            } catch (Exception e) {}
+            } catch (Exception e) {
+            }
         }
         initORCompanyTurn(comp, 0);
     }
@@ -1386,9 +1388,9 @@ public void recreate(Round or) {
                 defaultBtn = btnRevWithhold;
         } else if (activePhase == 4)
             defaultBtn = btnTrainSkip;
-            else if (activePhase == 5)
-            defaultBtn = btnDone; 
-        
+        else if (activePhase == 5)
+            defaultBtn = btnDone;
+
         else
             defaultBtn = btnDone;
 
@@ -2035,7 +2037,7 @@ public void recreate(Round or) {
             }
             List<PossibleAction> executedActions = ((ActionTaker) source).getPossibleActions();
             if (executedActions == null || executedActions.isEmpty()) {
-} else if (executedActions.get(0) instanceof net.sf.rails.game.specific._1817.action.LoanAction) {
+            } else if (executedActions.get(0) instanceof net.sf.rails.game.specific._1817.action.LoanAction) {
                 processTakeLoans_1817((net.sf.rails.game.specific._1817.action.LoanAction) executedActions.get(0));
 
                 return;
@@ -2058,17 +2060,18 @@ public void recreate(Round or) {
 
         }
     }
+
     private void processTakeLoans_1817(net.sf.rails.game.specific._1817.action.LoanAction action) {
         String compId = action.getCompanyId();
         int max = action.getMaxLoansAllowed();
-        
+
         net.sf.rails.game.CompanyManager cm = orUIManager.getGameUIManager().getRoot().getCompanyManager();
         net.sf.rails.game.PublicCompany comp = cm.getPublicCompany(compId);
         int current = comp.getNumberOfBonds();
         int available = max - current;
 
         if (available <= 0) {
-            JOptionPane.showMessageDialog(this, comp.getId() + " is at its loan limit (" + max + ").");
+            javax.swing.JOptionPane.showMessageDialog(this, comp.getId() + " is at its loan limit (" + max + ").");
             return;
         }
 
@@ -2077,18 +2080,17 @@ public void recreate(Round or) {
             options[i] = String.valueOf(i + 1);
         }
 
-        String selected = (String) JOptionPane.showInputDialog(this,
+        String selected = (String) javax.swing.JOptionPane.showInputDialog(this,
                 "Select number of loans for " + comp.getId() + ":\n(Current: " + current + ", Max: " + max + ")",
-                "Take Loans", JOptionPane.QUESTION_MESSAGE, null, options, options[0]);
+                "Take Loans", javax.swing.JOptionPane.QUESTION_MESSAGE, null, options, options[0]);
 
         if (selected != null) {
             action.setLoansToTake(Integer.parseInt(selected));
             // Cast back to PossibleAction for the manager
-            orUIManager.processAction("TakeLoans", java.util.Collections.singletonList((rails.game.action.PossibleAction) action), this);
+            orUIManager.processAction("TakeLoans",
+                    java.util.Collections.singletonList((rails.game.action.PossibleAction) action), this);
         }
     }
-    
-
 
     private void processTakeLoans_1817(PossibleAction action) {
         try {
@@ -2279,7 +2281,8 @@ public void recreate(Round or) {
             if (pa instanceof NullAction) {
                 formattedData = "Logical " + ((NullAction) pa).getMode() + " (Stopper/Pass)";
             } else if (rawData.contains(",")) {
-                // Format comma-separatepublic ActionButton buttonOC, button1, button2, button3; // Legacy placeholdersd lists (like BuyTrain) into a vertical list
+                // Format comma-separatepublic ActionButton buttonOC, button1, button2, button3;
+                // // Legacy placeholdersd lists (like BuyTrain) into a vertical list
                 formattedData = "- " + rawData.replace(", ", "\n                     | - ");
             } else {
                 formattedData = rawData;
@@ -2295,19 +2298,20 @@ public void recreate(Round or) {
     public void updateDynamicActions(List<PossibleAction> actions) {
 
         // // --- START DEBUG INSTRUMENTATION ---
-        // log.info("\nORPanel: updateDynamicActions() RECEIVED " + (actions == null ? "null" : actions.size())
-        //         + " actions.");
+        // log.info("\nORPanel: updateDynamicActions() RECEIVED " + (actions == null ?
+        // "null" : actions.size())
+        // + " actions.");
         // if (actions != null) {
-        //     for (int i = 0; i < actions.size(); i++) {
-        //         PossibleAction pa = actions.get(i);
-        //         // Filter out CorrectionModeAction entries from the UI log output
-        //         if (pa.toString().contains("CorrectionModeAction")) {
-        //             continue;
-        //         }
-        //         String hash = Integer.toHexString(System.identityHashCode(pa));
-        //         log.info(String.format("   UI Action[%d]: Class: %-20s | Hash: %s | Str: %s",
-        //                 i, pa.getClass().getSimpleName(), hash, pa.toString()));
-        //     }
+        // for (int i = 0; i < actions.size(); i++) {
+        // PossibleAction pa = actions.get(i);
+        // // Filter out CorrectionModeAction entries from the UI log output
+        // if (pa.toString().contains("CorrectionModeAction")) {
+        // continue;
+        // }
+        // String hash = Integer.toHexString(System.identityHashCode(pa));
+        // log.info(String.format(" UI Action[%d]: Class: %-20s | Hash: %s | Str: %s",
+        // i, pa.getClass().getSimpleName(), hash, pa.toString()));
+        // }
         // }
         // // --- END DEBUG INSTRUMENTATION ---
 
@@ -2316,7 +2320,7 @@ public void recreate(Round or) {
             cleanupUpgradesPanel();
             resetSidebarState();
 
-// ROBUST CONTEXT HANDOVER
+            // ROBUST CONTEXT HANDOVER
             PublicCompany engineActiveComp = null;
             boolean isMaARound = false;
 
@@ -2331,7 +2335,8 @@ public void recreate(Round or) {
                         try {
                             java.lang.reflect.Method m = rf.getClass().getMethod("getOperatingCompany");
                             engineActiveComp = (PublicCompany) m.invoke(rf);
-                        } catch(Exception e) {}
+                        } catch (Exception e) {
+                        }
                     }
                 }
             }
@@ -2397,8 +2402,7 @@ public void recreate(Round or) {
             int computedPhase = determineActivePhase(actions);
             boolean hasStandardActions = computedPhase > 0;
 
-     
-     // 5. RENDER SPECIAL MODE (Exclusive Interrupts Only)
+            // 5. RENDER SPECIAL MODE (Exclusive Interrupts Only)
             if (isMaARound || (!specialActions.isEmpty() && !hasStandardActions)) {
                 this.specialModeActive = true;
                 this.activePhase = 0;
@@ -2407,13 +2411,15 @@ public void recreate(Round or) {
                 if (contextProvider != null) {
                     updateSpecialHeader(contextProvider);
                 } else if (isMaARound && this.orComp != null) {
-                    lblCompanyInfo.setText("<html><center><font size='6'><b>" + this.orComp.getId() + "</b></font></center></html>");
+                    lblCompanyInfo.setText(
+                            "<html><center><font size='6'><b>" + this.orComp.getId() + "</b></font></center></html>");
                     lblCompanyInfo.setBackground(this.orComp.getBgColour());
                     lblCompanyInfo.setForeground(this.orComp.getFgColour());
                     lblCompanyInfo.setVisible(true);
 
                     if (lblPhaseInstruction != null) {
-                        lblPhaseInstruction.setText("<html><center><font size='4'><b>M&A Actions</b></font></center></html>");
+                        lblPhaseInstruction
+                                .setText("<html><center><font size='4'><b>M&A Actions</b></font></center></html>");
                         lblPhaseInstruction.setBackground(this.orComp.getBgColour());
                         lblPhaseInstruction.setForeground(this.orComp.getFgColour());
                         lblPhaseInstruction.setVisible(true);
@@ -2421,7 +2427,7 @@ public void recreate(Round or) {
                 }
 
                 if (specialPanel != null && specialContainer != null) {
-                           specialContainer.setVisible(true);
+                    specialContainer.setVisible(true);
                     specialPanel.removeAll();
                     for (PossibleAction spa : specialActions) {
                         addSpecialActionButton(spa);
@@ -2455,18 +2461,18 @@ public void recreate(Round or) {
             setStandardPanelsVisible(true);
 
             if (activePhase == 1 || activePhase == 2) {
-                boolean hasSelection = (orUIManager != null && orUIManager.getMap() != null && orUIManager.getMap().getSelectedHex() != null);
+                boolean hasSelection = (orUIManager != null && orUIManager.getMap() != null
+                        && orUIManager.getMap().getSelectedHex() != null);
                 enableConfirm(hasSelection);
             }
-
-
 
             distributeStandardActions(actions);
             updateSidebarData();
             updatePhaseSpecifics();
 
             if (activePhase == 1 || activePhase == 2) {
-                boolean hasSelection = (orUIManager != null && orUIManager.getMap() != null && orUIManager.getMap().getSelectedHex() != null);
+                boolean hasSelection = (orUIManager != null && orUIManager.getMap() != null
+                        && orUIManager.getMap().getSelectedHex() != null);
                 enableConfirm(hasSelection);
             }
 
@@ -2563,7 +2569,7 @@ public void recreate(Round or) {
             activePanel = phase3Panel;
         else if (activePhase == 4)
             activePanel = phase4Panel;
-else if (activePhase == 5)
+        else if (activePhase == 5)
             activePanel = phase5Panel;
         if (activePanel != null && activePanel.isVisible()) {
             if (scanAndClickBestButton(activePanel))

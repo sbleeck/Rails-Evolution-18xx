@@ -360,23 +360,33 @@ public class ORUIManager implements DialogOwner {
             }
         }
 
+        boolean hasSpecialOR = false;
+        if (possibleActions != null) {
+            for (PossibleAction pa : possibleActions.getList()) {
+                if (pa instanceof rails.game.action.SpecialORAction) {
+                    hasSpecialOR = true;
+                    break;
+                }
+            }
+        }
+
         if (!isUndoOrRedo) {
             if (orStep == GameDef.OrStep.LAY_TRACK) {
                 boolean canLay = !possibleActions.getType(LayTile.class).isEmpty();
                 boolean canSpecial = !possibleActions.getType(UseSpecialProperty.class).isEmpty();
-                if (!canLay && !canSpecial) {
+                if (!canLay && !canSpecial && !hasSpecialOR) {
                     // Only return if we actually processed the SKIP.
                     // If no SKIP exists (e.g., only DONE exists), fall through to update UI.
                     if (processNullAction(possibleActions, NullAction.Mode.SKIP))
                         return;
                 }
             } else if (orStep == GameDef.OrStep.LAY_TOKEN) {
-                if (possibleActions.getType(LayToken.class).isEmpty()) {
+                if (possibleActions.getType(LayToken.class).isEmpty() && !hasSpecialOR) {
                     if (processNullAction(possibleActions, NullAction.Mode.SKIP))
                         return;
                 }
             } else if (orStep == GameDef.OrStep.BUY_TRAIN) {
-                if (possibleActions.getType(BuyTrain.class).isEmpty()) {
+                if (possibleActions.getType(BuyTrain.class).isEmpty() && !hasSpecialOR) {
                     // This was the specific bug: It tried to SKIP, failed (because only DONE
                     // existed),
                     // but returned anyway. Now it will fall through.
