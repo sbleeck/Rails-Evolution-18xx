@@ -5,21 +5,26 @@ import net.sf.rails.game.OperatingRound;
 import net.sf.rails.game.financial.StockRound;
 import net.sf.rails.game.Round;
 import net.sf.rails.game.round.RoundFacade;
+import net.sf.rails.ui.swing.ORPanel;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class GameManager_1817 extends GameManager {
 
     // Placeholder for the upcoming M&A class
     protected String mergerAndAcquisitionRoundClassName = "net.sf.rails.game.specific._1817.MergerAndAcquisitionRound_1817";
 
+    protected static final Logger log = LoggerFactory.getLogger(ORPanel.class);
+
     public GameManager_1817(net.sf.rails.game.RailsRoot parent, String id) {
         super(parent, id);
     }
 
-
-@Override
+    @Override
     public void nextRound(Round round) {
-        
-        // 1. ALWAYS resolve interrupted rounds first. 
+
+        // 1. ALWAYS resolve interrupted rounds first.
         RoundFacade roundToResume = getInterruptedRound();
         if (roundToResume != null) {
             setInterruptedRound(null);
@@ -39,23 +44,23 @@ public class GameManager_1817 extends GameManager {
             // Sequence: SR -> OR 1
             capturePlayerWorthSnapshot(round.getId());
             captureCompanyPayoutSnapshot(round.getId());
-            relativeORNumber.set(0); 
+            relativeORNumber.set(0);
             startOperatingRound(true);
 
         } else if (round instanceof OperatingRound) {
-            // Sequence: OR 1 -> M&A 1  OR  OR 2 -> M&A 2
+            // Sequence: OR 1 -> M&A 1 OR OR 2 -> M&A 2
             capturePlayerWorthSnapshot(round.getId());
             captureCompanyPayoutSnapshot(round.getId());
             exportTrain();
             startMergerAndAcquisitionRound();
 
         } else if (round instanceof MergerAndAcquisitionRound_1817) {
-            // Sequence: M&A 1 -> OR 2  OR  M&A 2 -> SR
+            // Sequence: M&A 1 -> OR 2 OR M&A 2 -> SR
             capturePlayerWorthSnapshot(round.getId());
             captureCompanyPayoutSnapshot(round.getId());
 
             if (relativeORNumber.value() == 1) {
-                startOperatingRound(true); 
+                startOperatingRound(true);
             } else {
                 if (gameOverPending.value() && gameEndWhen == GameEnd.AFTER_SET_OF_ORS) {
                     finishGame();
@@ -67,12 +72,45 @@ public class GameManager_1817 extends GameManager {
             super.nextRound(round);
         }
     }
-    
+
+    @Override
+    public void startOperatingRound(boolean increment) {
+        super.startOperatingRound(increment);
+        payMailContracts();
+    }
+
+    /**
+     * Regel 6.0: Mail contracts werden zu Beginn der OR an Gesellschaften gezahlt,
+     * die einen Mail Contract und mindestens einen Zug besitzen.
+     */
+private void payMailContracts() {
+        for (net.sf.rails.game.PublicCompany comp : getRoot().getCompanyManager().getAllPublicCompanies()) {
+            if (comp instanceof PublicCompany_1817) {
+                PublicCompany_1817 comp1817 = (PublicCompany_1817) comp;
+
+                if (comp1817.getPortfolioModel().getNumberOfTrains() > 0) {
+                    for (net.sf.rails.game.PrivateCompany priv : comp1817.getPortfolioModel().getPrivateCompanies()) {
+                        int bonus = 0;
+                        if ("MNM60".equals(priv.getId())) bonus = 10;
+                        else if ("MLC90".equals(priv.getId())) bonus = 15;
+                        else if ("MJM12".equals(priv.getId())) bonus = 20;
+
+                        if (bonus > 0) {
+                            log.info("1817_DEBUG: Paying Mail Contract {} to {}. Amount: ${}", priv.getId(), comp1817.getId(), bonus);
+                            net.sf.rails.common.ReportBuffer.add(this, comp1817.getId() + " receives $" + bonus + " from " + priv.getLongName());
+                            comp1817.addCashFromBank(bonus, getRoot().getBank());
+                        }
+                    }
+                }
+            }
+        }
+    }
+
     /**
      * Executes Rule 6.11: Exporting the next available train at the end of the OR.
      */
- 
-protected void exportTrain() {
+
+    protected void exportTrain() {
         net.sf.rails.game.TrainManager tm = getRoot().getTrainManager();
         net.sf.rails.game.financial.BankPortfolio ipo = net.sf.rails.game.financial.Bank.getIpo(tm);
         net.sf.rails.game.financial.BankPortfolio scrap = getRoot().getBank().getScrapHeap();
@@ -99,7 +137,7 @@ protected void exportTrain() {
                     }
                 }
             }
-            
+
             for (net.sf.rails.game.TrainCard card : cardsToTrash) {
                 card.moveTo(scrap);
             }
@@ -110,28 +148,26 @@ protected void exportTrain() {
 
         // 3. Update engine state so PhaseManager detects the change
         type.addToBoughtFromIPO();
-        
-        // Because the 2-trains are now gone from the IPO, this check automatically releases the 2+ trains
+
+        // Because the 2-trains are now gone from the IPO, this check automatically
+        // releases the 2+ trains
         tm.checkTrainAvailability(trainToExport, ipo);
     }
 
-protected void startMergerAndAcquisitionRound() {
+    protected void startMergerAndAcquisitionRound() {
         clearStatusMessage();
         // Changed ID prefix to "MR" to help the UI round tracker identify the phase
         String id = "MR_" + stockRoundNumber.value() + "." + relativeORNumber.value();
         RoundFacade maRound = createRound(mergerAndAcquisitionRoundClassName, id);
         setRound(maRound);
-        currentSRorOR.set((Round) maRound); 
+        currentSRorOR.set((Round) maRound);
         ((MergerAndAcquisitionRound_1817) maRound).start();
     }
-
 
     @Override
     protected void setGuiParameters() {
         super.setGuiParameters();
-guiParameters.put(net.sf.rails.common.GuiDef.Parm.CAN_ANY_COMPANY_HOLD_OWN_SHARES, true);
+        guiParameters.put(net.sf.rails.common.GuiDef.Parm.CAN_ANY_COMPANY_HOLD_OWN_SHARES, true);
     }
-
-
 
 }

@@ -52,6 +52,9 @@ public class OperatingRound_1817 extends OperatingRound {
             .create(this, "upgradesThisTurn", 0);
     protected final net.sf.rails.game.state.ArrayListState<MapHex> hexesLaidThisTurn = new net.sf.rails.game.state.ArrayListState<>(
             this, "hexesLaidThisTurn");
+private String lastLaidTileColour = null;
+    private final java.util.Map<String, Integer> hexBaseCosts = new java.util.HashMap<>();
+
 
     public OperatingRound_1817(GameManager gameManager, String roundId) {
         super(gameManager, roundId);
@@ -256,7 +259,7 @@ public class OperatingRound_1817 extends OperatingRound {
         }
 
         // 6. Force Injection
-        possibleActions.add(new net.sf.rails.game.specific._1817.action.TakeLoans_1817(comp1817.getId(), maxLoans));
+possibleActions.add(new net.sf.rails.game.specific._1817.action.TakeLoans_1817(getRoot(), comp1817.getId(), maxLoans));
         return true;
 
     }
@@ -277,18 +280,17 @@ public class OperatingRound_1817 extends OperatingRound {
     @Override
     public int getTileLayCost(PublicCompany company, MapHex hex, int standardCost) {
         int cost = super.getTileLayCost(company, hex, standardCost);
+        // Capture the raw terrain cost from the XML before any dynamic surcharges are applied
+        hexBaseCosts.put(hex.getId(), standardCost);
+
         // Rule 6.3: Second tile operation costs an additional $20.
-        // --- START FIX ---
         if (tilesLaidThisTurn.value() > 0) {
             int extraCost = 20;
-            log.info(
-                    "1817_DEBUG: Applying Rule 6.3 surcharge. Base/Terrain Cost: {}, Surcharge: {}, Total: {} for Hex: {}",
-                    cost, extraCost, (cost + extraCost), hex.getId());
             cost += extraCost;
         } else {
             log.info("1817_DEBUG: First tile lay cost for Hex {}: {}", hex.getId(), cost);
         }
-        // --- END FIX ---
+
         return cost;
     }// We are modifying OperatingRound_1817.java
 
@@ -296,13 +298,35 @@ public class OperatingRound_1817 extends OperatingRound {
     @Override
     public boolean layTile(LayTile action) {
         MapHex hex = action.getChosenHex();
+
+        lastLaidTileColour = null;
         // super.layTile() calls registerNormalTileLay() -> updateAllowedTileColours()
         boolean success = super.layTile(action);
 
-        // --- START FIX ---
         if (success && action.getType() != LayTile.CORRECTION) {
             // Rule 6.3: Prevent upgrading the exact same hex twice in one turn.
             hexesLaidThisTurn.add(hex);
+
+            // Rule 1.2.6: Mountain Engineers Bonus
+            if ("Yellow".equalsIgnoreCase(lastLaidTileColour)) {
+                PublicCompany activeCompany = operatingCompany.value();
+                Integer baseCost = hexBaseCosts.get(hex.getId());
+                
+                // Using the intercepted standardCost = 15 to identify mountains
+                if (baseCost != null && baseCost == 15) {
+                    for (net.sf.rails.game.PrivateCompany priv : activeCompany.getPortfolioModel().getPrivateCompanies()) {
+                        if ("MNE40".equals(priv.getId())) {
+                            int bonus = 20;
+                            log.info("1817_DEBUG: Mountain Engineers (MNE40) triggered for {} on hex {}. Paying $20.", activeCompany.getId(), hex.getId());
+                            net.sf.rails.common.ReportBuffer.add(gameManager, 
+                                activeCompany.getId() + " receives $" + bonus + " from Mountain Engineers for tile on " + hex.getId());
+                            if (activeCompany instanceof PublicCompany_1817) {
+                                ((PublicCompany_1817) activeCompany).addCashFromBank(bonus, gameManager.getRoot().getBank());
+                            }
+                        }
+                    }
+                }
+            }
 
             // The UI's MapWindow click listener checks the base class's
             // normalTileLaidThisTurn flag.
@@ -317,10 +341,11 @@ public class OperatingRound_1817 extends OperatingRound {
         return success;
     }
 
-    // ... (lines of unchanged context code) ...
+
     @Override
     protected void updateAllowedTileColours(String colour, int oldAllowedNumber) {
-        // --- START FIX ---
+
+lastLaidTileColour = colour;
         // 1. Update Rule 6.3 counters based on the tile JUST laid.
         // 'colour' is provided by the base engine as the color of the placed tile.
         if (!"Yellow".equalsIgnoreCase(colour)) {

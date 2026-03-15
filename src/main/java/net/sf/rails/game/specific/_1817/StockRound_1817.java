@@ -84,7 +84,7 @@ public class StockRound_1817 extends StockRound {
                     int maxLoans = (comp instanceof PublicCompany_1817) ? ((PublicCompany_1817) comp).getShareCount()
                             : 0;
                     if (comp.getNumberOfBonds() < maxLoans) {
-possibleActions.add(new TakeLoans_1817(comp.getId(), maxLoans));
+possibleActions.add(new TakeLoans_1817(getRoot(), comp.getId(), maxLoans));
                     }
                 }
 

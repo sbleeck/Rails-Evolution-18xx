@@ -31,8 +31,12 @@
 	   <Company name="PSM40" longname="Pittsburgh Steel Mill" 
 	   type="Private" basePrice="40" revenue="0" 
 		description="Allows building the unique Pittsburgh tile. Yellow lay, no connectivity required." />
-	    <Company name="MNE40" longname="Mountain Engineers" type="Private" basePrice="40" revenue="0" 
-             description="Owner gets $20 when building on mountains (after paying terrain fee)." />
+	
+	
+<Company name="MNE40" longname="Mountain Engineers" type="Private" basePrice="40" revenue="0" 
+             description="Owner gets $20 when building on mountains (after paying terrain fee)."
+	/>
+   
     <Company name="OBC40" longname="Ohio Bridge Co" type="Private" basePrice="40" revenue="0" 
              description="1 bridge token. Free river lays. Marker adds $10 to city value." />
     <Company name="UBC80" longname="Union Bridge Co" type="Private" basePrice="80" revenue="0" 

@@ -123,19 +123,20 @@ this.shareCount = IntegerState.create(this, "shareCount", 2);
             log.info("Company " + getId() + " set to " + count + "-share size.");
             adjustCertificates();
 
-            // --- DELETE ---
-            // // Set initial station marker capacity according to 1817 rules.
-            // // 2-share: 1 token, 5-share: 2 tokens, 10-share: 4 tokens.
-            // if (this.tokenCapacity.value() == 8) {
-            //     int capacity = (count == 2) ? 1 : (count == 5) ? 2 : 4;
-            //     this.tokenCapacity.set(capacity);
-            // }
-            // --- START FIX ---
-            // Set station marker capacity according to 1817 rules.
+// Set station marker capacity according to 1817 rules.
             // 2-share: 1 token, 5-share: 2 tokens, 10-share: 4 tokens.
-            int capacity = (count == 2) ? 2 : (count == 5) ? 3 : 5;
+            int capacity = (count == 2) ? 1 : (count == 5) ? 2 : 4;
+            
+            // Rule 1.2.6: Train Station provides an additional station marker.
+            for (net.sf.rails.game.PrivateCompany priv : getPortfolioModel().getPrivateCompanies()) {
+                if ("STA80".equals(priv.getId())) {
+                    capacity += 1;
+                    log.info("1817: Train Station (STA80) bonus applied to " + getId());
+                }
+            }
+            
             this.tokenCapacity.set(capacity);
-            // --- END FIX ---
+            
         }
     }
     

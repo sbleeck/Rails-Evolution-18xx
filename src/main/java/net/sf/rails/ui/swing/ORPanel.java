@@ -266,7 +266,8 @@ boolean hasSpecialAction = false;
                 phase = 4;
             }
 else if (pa instanceof TakeLoans || pa instanceof RepayLoans
-                    || pa.getClass().getName().endsWith("TakeLoans_1817")) {
+                    || pa instanceof rails.game.action.SpecialORAction) {
+
                 hasSpecialAction = true;
             }
             else if (pa instanceof NullAction) {
@@ -361,7 +362,7 @@ if (phase == 0) {
                     !(pa instanceof LayToken) &&
                     !(pa instanceof TakeLoans) &&
                     !(pa instanceof RepayLoans) &&
-                    !pa.getClass().getName().endsWith("TakeLoans_1817") &&
+!(pa instanceof rails.game.action.SpecialORAction) &&
                     !(pa instanceof LayBaseToken)) {
 
                 labelToAdd = pa.getButtonLabel().toUpperCase();
@@ -374,8 +375,9 @@ if (phase == 0) {
                     addedSpecialLabels.add(labelToAdd);
                 }
             }
-if (pa instanceof TakeLoans || pa instanceof RepayLoans || pa.getClass().getName().endsWith("TakeLoans_1817")) {
-                addSpecialActionButtonToPhase5(pa);
+if (pa instanceof TakeLoans || pa instanceof RepayLoans
+                    || pa instanceof rails.game.action.SpecialORAction) {
+
             }
 
             // Continue with standard distribution...
@@ -430,8 +432,14 @@ if (pa instanceof TakeLoans || pa instanceof RepayLoans || pa.getClass().getName
 
     private void addSpecialActionButtonToPhase5(PossibleAction action) {
         ActionButton btn = new ActionButton(RailsIcon.OK);
+        
         String text = action.getButtonLabel();
+        if (text == null || text.trim().isEmpty()) {
+            text = action.toString();
+        }
+
         btn.setText(text);
+
         btn.setIcon(null);
 
         btn.setBackground(new Color(255, 255, 240)); 
@@ -2027,8 +2035,9 @@ public void recreate(Round or) {
             }
             List<PossibleAction> executedActions = ((ActionTaker) source).getPossibleActions();
             if (executedActions == null || executedActions.isEmpty()) {
-            } else if (executedActions.get(0).getClass().getName().endsWith("TakeLoans_1817")) {
-                processTakeLoans_1817(executedActions.get(0));
+} else if (executedActions.get(0) instanceof net.sf.rails.game.specific._1817.action.LoanAction) {
+                processTakeLoans_1817((net.sf.rails.game.specific._1817.action.LoanAction) executedActions.get(0));
+
                 return;
             } else {
                 orUIManager.processAction(command, executedActions, source);
@@ -2049,6 +2058,36 @@ public void recreate(Round or) {
 
         }
     }
+    private void processTakeLoans_1817(net.sf.rails.game.specific._1817.action.LoanAction action) {
+        String compId = action.getCompanyId();
+        int max = action.getMaxLoansAllowed();
+        
+        net.sf.rails.game.CompanyManager cm = orUIManager.getGameUIManager().getRoot().getCompanyManager();
+        net.sf.rails.game.PublicCompany comp = cm.getPublicCompany(compId);
+        int current = comp.getNumberOfBonds();
+        int available = max - current;
+
+        if (available <= 0) {
+            JOptionPane.showMessageDialog(this, comp.getId() + " is at its loan limit (" + max + ").");
+            return;
+        }
+
+        String[] options = new String[available];
+        for (int i = 0; i < available; i++) {
+            options[i] = String.valueOf(i + 1);
+        }
+
+        String selected = (String) JOptionPane.showInputDialog(this,
+                "Select number of loans for " + comp.getId() + ":\n(Current: " + current + ", Max: " + max + ")",
+                "Take Loans", JOptionPane.QUESTION_MESSAGE, null, options, options[0]);
+
+        if (selected != null) {
+            action.setLoansToTake(Integer.parseInt(selected));
+            // Cast back to PossibleAction for the manager
+            orUIManager.processAction("TakeLoans", java.util.Collections.singletonList((rails.game.action.PossibleAction) action), this);
+        }
+    }
+    
 
 
     private void processTakeLoans_1817(PossibleAction action) {

@@ -1,65 +1,31 @@
 package net.sf.rails.game.specific._1817.action;
 
-import rails.game.action.PossibleAction;
-import net.sf.rails.game.PublicCompany;
+import net.sf.rails.game.RailsRoot;
+import rails.game.action.SpecialORAction;
+import rails.game.action.PossibleORAction;
 
-public class TakeLoans_1817 extends PossibleAction {
+public class TakeLoans_1817 extends PossibleORAction implements SpecialORAction, LoanAction {
     private static final long serialVersionUID = 1L;
-
     private final String companyId;
-    private final int maxLoansAllowed;
-    private int loansToTake = 0;
+    private final int maxLoans;
+    private int loansToTake;
 
-    public TakeLoans_1817(String companyId, int maxLoansAllowed) {
-        // Correcting to RailsRoot as per your environment's requirement
-        super((net.sf.rails.game.RailsRoot) null);
+    public TakeLoans_1817(RailsRoot root, String companyId, int maxLoans) {
+        super(root);
         this.companyId = companyId;
-        this.maxLoansAllowed = maxLoansAllowed;
+        this.maxLoans = maxLoans;
     }
 
-    public String getCompanyId() {
-        return companyId;
-    }
-
-    public int getMaxLoansAllowed() {
-        return maxLoansAllowed;
-    }
-
-    public void setLoansToTake(int loansToTake) {
-        this.loansToTake = loansToTake;
-    }
-
-    public int getLoansToTake() {
+    public int getLoansToTake() { 
         return loansToTake;
     }
 
-    @Override
-    protected boolean equalsAs(PossibleAction pa, boolean asOption) {
-        if (pa == this) return true;
-        
-        // CRITICAL FIX: Bypass super.equalsAs() completely. 
-        // Because super((RailsRoot) null) is called in the constructor, the base 
-        // PossibleAction fails to resolve the 'actor' object upon deserialization, 
-        // causing false negatives during reload validation.
-        if (pa == null || this.getClass() != pa.getClass()) return false;
-
-        TakeLoans_1817 other = (TakeLoans_1817) pa;
-        
-        boolean options = false;
-        if (this.companyId != null) {
-            options = this.companyId.equals(other.companyId);
-        } else {
-            options = (other.companyId == null);
-        }
-        options = options && (this.maxLoansAllowed == other.maxLoansAllowed);
-
-        if (asOption) return options;
-
-        return options && (this.loansToTake == other.loansToTake);
-    }
+    @Override public String getCompanyId() { return companyId; }
+    @Override public int getMaxLoansAllowed() { return maxLoans; }
+    @Override public void setLoansToTake(int count) { this.loansToTake = count; }
 
     @Override
-    public String toString() {
-        return "Take Loans (" + (companyId != null ? companyId : "Unknown") + ")";
+    public String getButtonLabel() {
+        return "Take Loans (" + companyId + ")";
     }
 }

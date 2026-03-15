@@ -787,7 +787,7 @@ public class MergerAndAcquisitionRound_1817 extends Round {
             int current = comp.getNumberOfBonds();
 
             if (current < limit) {
-                possibleActions.add(new TakeLoans_1817(comp.getId(), limit));
+possibleActions.add(new TakeLoans_1817(getRoot(), comp.getId(), limit));
                 log.info("M&A ROUND: Offering loans to " + comp.getId() + " (Current: " + current + ", Max: " + limit
                         + ")");
             } else {
@@ -859,7 +859,7 @@ public class MergerAndAcquisitionRound_1817 extends Round {
             int maxLoans = comp1817.getShareCount();
             if (company.getNumberOfBonds() < maxLoans) {
                 possibleActions
-                        .add(new net.sf.rails.game.specific._1817.action.TakeLoans_1817(company.getId(), maxLoans));
+.add(new net.sf.rails.game.specific._1817.action.TakeLoans_1817(getRoot(), company.getId(), maxLoans));
                 log.info("M&A ROUND: Added TakeLoans_1817 action for " + company.getId() + " with max loans: "
                         + maxLoans);
             }
