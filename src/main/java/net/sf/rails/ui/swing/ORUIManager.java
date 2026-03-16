@@ -360,10 +360,12 @@ public class ORUIManager implements DialogOwner {
             }
         }
 
-        boolean hasSpecialOR = false;
+boolean hasSpecialOR = false;
         if (possibleActions != null) {
             for (PossibleAction pa : possibleActions.getList()) {
-                if (pa instanceof rails.game.action.SpecialORAction) {
+                if (pa instanceof rails.game.action.SpecialORAction ||
+                    pa instanceof net.sf.rails.game.specific._1817.action.PayLoanInterest_1817 ||
+                    pa instanceof net.sf.rails.game.specific._1817.action.RepayLoans_1817) {
                     hasSpecialOR = true;
                     break;
                 }

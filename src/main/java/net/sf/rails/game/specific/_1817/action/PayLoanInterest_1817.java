@@ -1,10 +1,9 @@
 package net.sf.rails.game.specific._1817.action;
 
 import net.sf.rails.game.RailsRoot;
-import rails.game.action.SpecialORAction;
 import rails.game.action.PossibleORAction;
 
-public class PayLoanInterest_1817 extends PossibleORAction implements SpecialORAction {
+public class PayLoanInterest_1817 extends PossibleORAction {
     private static final long serialVersionUID = 1L;
     private final String companyName;
     private final int interestDue;

@@ -55,6 +55,17 @@ public class OperatingRound_1817 extends OperatingRound {
     private String lastLaidTileColour = null;
     private final java.util.Map<String, Integer> hexBaseCosts = new java.util.HashMap<>();
 
+protected final net.sf.rails.game.state.BooleanState trainBuyingDone = new net.sf.rails.game.state.BooleanState(this, "trainBuyingDone", false);
+
+    protected final net.sf.rails.game.state.BooleanState interestPaidThisTurn = new net.sf.rails.game.state.BooleanState(
+            this, "interestPaidThisTurn", false);
+    protected final net.sf.rails.game.state.BooleanState repayPhaseDoneThisTurn = new net.sf.rails.game.state.BooleanState(
+            this, "repayPhaseDoneThisTurn", false);
+
+    // 1817 Financial Sequence Flags
+    protected final net.sf.rails.game.state.BooleanState loansRepaidThisTurn = new net.sf.rails.game.state.BooleanState(
+            this, "loansRepaidThisTurn", false);
+
     public OperatingRound_1817(GameManager gameManager, String roundId) {
         super(gameManager, roundId);
     }
@@ -63,6 +74,9 @@ public class OperatingRound_1817 extends OperatingRound {
     protected void initTurn() {
         super.initTurn();
         // Reset the flag at the start of every company's turn
+        interestPaidThisTurn.set(false);
+        repayPhaseDoneThisTurn.set(false);
+
         loanBlackoutPeriod.set(false);
         tilesLaidThisTurn.set(0);
         upgradesThisTurn.set(0);
@@ -81,6 +95,26 @@ public class OperatingRound_1817 extends OperatingRound {
 
             log.info("1817_DEBUG: Action Details - Hex: {}, Tile: {}, Action Cost: {}",
                     layTile.getChosenHex().getId(), layTile.getLaidTile().getId(), layTile.getCost());
+        }
+
+        // Intercept DONE action to advance our internal financial sequence
+        if (action instanceof rails.game.action.NullAction) {
+            rails.game.action.NullAction nullAction = (rails.game.action.NullAction) action;
+            if (nullAction.getMode() == rails.game.action.NullAction.Mode.DONE || nullAction.getMode() == rails.game.action.NullAction.Mode.SKIP) {
+                net.sf.rails.game.GameDef.OrStep step = getStep();
+                if (step == net.sf.rails.game.GameDef.OrStep.BUY_TRAIN) {
+                    if (!interestPaidThisTurn.value()) {
+                        // Finished buying trains with 0 loans. Skip financials.
+                        interestPaidThisTurn.set(true);
+                        repayPhaseDoneThisTurn.set(true);
+                        return true; 
+                    } else if (interestPaidThisTurn.value() && !repayPhaseDoneThisTurn.value()) {
+                        // Finished repayment window.
+                        repayPhaseDoneThisTurn.set(true);
+                        return true; 
+                    }
+                }
+            }
         }
 
         // Proceed with normal processing
@@ -156,112 +190,188 @@ public class OperatingRound_1817 extends OperatingRound {
 
     @Override
     public boolean processGameSpecificAction(PossibleAction action) {
+
         if (action instanceof net.sf.rails.game.specific._1817.action.TakeLoans_1817) {
             net.sf.rails.game.specific._1817.action.TakeLoans_1817 tlAction = (net.sf.rails.game.specific._1817.action.TakeLoans_1817) action;
             PublicCompany comp = companyManager.getPublicCompany(tlAction.getCompanyId());
             int count = tlAction.getLoansToTake();
 
             if (count > 0) {
-                // 1. Verify Liquidation State (Rule 6.10/6.11)
-                // Companies in the red area (price 0) are effectively closed/bankrupt
                 if (comp.isClosed() || (comp.hasStockPrice() && comp.getCurrentSpace().getPrice() == 0)) {
                     log.error("1817: Company in liquidation cannot take loans.");
                     return false;
                 }
 
-                // 2. Verify OR Step Timing (Rule 6.1 Blackout Period)
-                // Evaluates the state flag set during the OR flow
-                if (loanBlackoutPeriod.value()) {
+                // Rule 6.1: Cannot take loans between interest and repayment
+                if (interestPaidThisTurn.value() && !repayPhaseDoneThisTurn.value()) {
                     log.error("1817: Cannot take loans between paying interest and repaying loans.");
                     return false;
                 }
 
-                // 3. Verify Company Capacity (Rule 1.2.7)
-                // 2-share=2, 5-share=5, 10-share=10
                 int currentLoans = comp.getNumberOfBonds();
                 if (currentLoans + count > tlAction.getMaxLoansAllowed()) {
                     log.error("1817: " + comp.getId() + " loan capacity exceeded.");
                     return false;
                 }
 
-                // 4. Verify Global Bank of New York Limit (Rule 1.2.5)
-                int globalLoansTaken = 0;
-                for (PublicCompany c : gameManager.getAllPublicCompanies()) {
-                    globalLoansTaken += c.getNumberOfBonds();
-                }
-
-                if (globalLoansTaken + count > 70) {
-                    log.error("1817: Bank of New York exhausted (70 loan limit).");
-                    return false;
-                }
-
-                // 5. Execute Action (State-Safe)
                 if (comp instanceof net.sf.rails.game.specific._1817.PublicCompany_1817) {
                     net.sf.rails.game.specific._1817.PublicCompany_1817 comp1817 = (net.sf.rails.game.specific._1817.PublicCompany_1817) comp;
-
-                    // Bonds update via IntegerState in the subclass
                     comp1817.setNumberOfBonds(currentLoans + count);
-
-                    // Cash transfer via subclass method
                     int loanAmount = count * 100;
-                    net.sf.rails.game.financial.Bank bank = gameManager.getRoot().getBank();
-                    comp1817.addCashFromBank(loanAmount, bank);
-                    log.info("1817: " + comp.getId() + " took " + count + " loans.");
+                    comp1817.addCashFromBank(loanAmount, gameManager.getRoot().getBank());
+                    net.sf.rails.common.ReportBuffer.add(this, comp.getId() + " took " + count + " loans.");
                     return true;
-                } else {
-                    log.error("1817: Active company is not a valid 1817 Public Company.");
-                    return false;
                 }
             }
+            return false;
         }
 
+        if (action instanceof net.sf.rails.game.specific._1817.action.PayLoanInterest_1817) {
+            net.sf.rails.game.specific._1817.action.PayLoanInterest_1817 payAction = (net.sf.rails.game.specific._1817.action.PayLoanInterest_1817) action;
+            PublicCompany comp = companyManager.getPublicCompany(payAction.getCompanyName());
+
+            if (comp.getCash() >= payAction.getInterestDue()) {
+                net.sf.rails.game.state.Currency.toBank(comp, payAction.getInterestDue());
+                net.sf.rails.common.ReportBuffer.add(this,
+                        comp.getId() + " pays $" + payAction.getInterestDue() + " in loan interest.");
+                interestPaidThisTurn.set(true);
+                return true;
+            }
+            return false;
+        }
+
+        if (action instanceof net.sf.rails.game.specific._1817.action.RepayLoans_1817) {
+            net.sf.rails.game.specific._1817.action.RepayLoans_1817 rlAction = (net.sf.rails.game.specific._1817.action.RepayLoans_1817) action;
+            net.sf.rails.game.PublicCompany comp = companyManager.getPublicCompany(rlAction.getCompanyId());
+            int count = rlAction.getLoansToRepay();
+
+            if (count > 0) {
+                int cost = count * 100;
+                net.sf.rails.game.state.Currency.toBank(comp, cost);
+                if (comp instanceof net.sf.rails.game.specific._1817.PublicCompany_1817) {
+                    net.sf.rails.game.specific._1817.PublicCompany_1817 comp1817 = (net.sf.rails.game.specific._1817.PublicCompany_1817) comp;
+                    comp1817.setNumberOfBonds(comp1817.getNumberOfBonds() - count);
+                }
+                net.sf.rails.common.ReportBuffer.add(this,
+                        comp.getId() + " repays " + count + " loan(s) for $" + cost + ".");
+            }
+            return true;
+        }
         return super.processGameSpecificAction(action);
     }
 
     @Override
     public boolean setPossibleActions() {
-        // 1. Execute base engine logic and capture the result
         boolean actionsAdded = super.setPossibleActions();
 
         PublicCompany comp = operatingCompany.value();
-        if (comp == null)
+        if (!(comp instanceof net.sf.rails.game.specific._1817.PublicCompany_1817))
             return actionsAdded;
-        // 2. Enforce Subclass Polymorphism
-        if (!(comp instanceof net.sf.rails.game.specific._1817.PublicCompany_1817)) {
-            return actionsAdded;
-        }
         net.sf.rails.game.specific._1817.PublicCompany_1817 comp1817 = (net.sf.rails.game.specific._1817.PublicCompany_1817) comp;
 
-        // 3. Verify Blackout and Liquidation States
-        if (loanBlackoutPeriod.value() || comp1817.isClosed()
-                || (comp1817.hasStockPrice() && comp1817.getCurrentSpace().getPrice() == 0)) {
-            return actionsAdded;
-        }
-
-        // 4. Verify Company Capacity Limit
         int currentLoans = comp1817.getNumberOfBonds();
         int maxLoans = comp1817.getShareCount();
-        if (currentLoans >= maxLoans) {
-            return actionsAdded;
-        }
+        net.sf.rails.game.GameDef.OrStep step = getStep();
 
-        // 5. Verify Global Bank of New York Limit
-        int globalLoansTaken = 0;
-        for (PublicCompany c : gameManager.getAllPublicCompanies()) {
-            if (c instanceof net.sf.rails.game.specific._1817.PublicCompany_1817) {
-                globalLoansTaken += ((net.sf.rails.game.specific._1817.PublicCompany_1817) c).getNumberOfBonds();
+       
+
+// 1. Take Loans Logic
+        boolean inBlackout = (trainBuyingDone.value() && !repayPhaseDoneThisTurn.value());
+        boolean canTakeLoans = !inBlackout && !comp1817.isClosed() && 
+                             !(comp1817.hasStockPrice() && comp1817.getCurrentSpace().getPrice() == 0);
+
+        if (canTakeLoans && currentLoans < maxLoans) {
+            int globalLoansTaken = 0;
+            for (PublicCompany c : gameManager.getAllPublicCompanies()) {
+                if (c instanceof net.sf.rails.game.specific._1817.PublicCompany_1817) {
+                    globalLoansTaken += ((net.sf.rails.game.specific._1817.PublicCompany_1817) c).getNumberOfBonds();
+                }
+            }
+            if (globalLoansTaken < 70) {
+                possibleActions.add(new net.sf.rails.game.specific._1817.action.TakeLoans_1817(getRoot(), comp1817.getId(), maxLoans));
+                actionsAdded = true;
             }
         }
 
-        if (globalLoansTaken >= 70) {
-            return actionsAdded;
+        // 2. Financial Sequence (Inside BUY_TRAIN Step)
+        if (step == net.sf.rails.game.GameDef.OrStep.BUY_TRAIN) {
+            
+            if (trainBuyingDone.value() && !interestPaidThisTurn.value()) {
+                // State 2: Paying Interest (Wipe base actions to force interest payment)
+                for (rails.game.action.BuyTrain pa : possibleActions.getType(rails.game.action.BuyTrain.class)) possibleActions.remove(pa);
+                for (rails.game.action.NullAction pa : possibleActions.getType(rails.game.action.NullAction.class)) possibleActions.remove(pa);
+                
+                int interestRate = 5; 
+                int interestDue = currentLoans * interestRate;
+                if (currentLoans > 0) {
+                    if (comp1817.getCash() >= interestDue) {
+                        possibleActions.add(new net.sf.rails.game.specific._1817.action.PayLoanInterest_1817(getRoot(), comp1817.getId(), interestDue));
+                    } else {
+                        possibleActions.add(new net.sf.rails.game.specific._1817.action.LiquidateCompany_1817(getRoot(), comp1817.getId(), interestDue));
+                    }
+                } else {
+                    possibleActions.add(new rails.game.action.NullAction(getRoot(), rails.game.action.NullAction.Mode.DONE));
+                }
+                actionsAdded = true;
+            } 
+            else if (interestPaidThisTurn.value() && !repayPhaseDoneThisTurn.value()) {
+                // State 3: Repaying Loans
+                for (rails.game.action.BuyTrain pa : possibleActions.getType(rails.game.action.BuyTrain.class)) possibleActions.remove(pa);
+                for (rails.game.action.NullAction pa : possibleActions.getType(rails.game.action.NullAction.class)) {
+                    if (pa.getMode() == rails.game.action.NullAction.Mode.SKIP) possibleActions.remove(pa);
+                }
+                
+                if (currentLoans > 0 && comp1817.getCash() >= 100) {
+                    int maxRepay = Math.min(currentLoans, comp1817.getCash() / 100);
+                    possibleActions.add(new net.sf.rails.game.specific._1817.action.RepayLoans_1817(getRoot(), comp1817.getId(), maxRepay));
+                }
+                
+                boolean hasDone = false;
+                for (rails.game.action.NullAction pa : possibleActions.getType(rails.game.action.NullAction.class)) {
+                    if (pa.getMode() == rails.game.action.NullAction.Mode.DONE) hasDone = true;
+                }
+                if (!hasDone) possibleActions.add(new rails.game.action.NullAction(getRoot(), rails.game.action.NullAction.Mode.DONE));
+                actionsAdded = true;
+            }
+            else if (repayPhaseDoneThisTurn.value()) {
+                // State 4: Post-repayment Window
+                for (rails.game.action.BuyTrain pa : possibleActions.getType(rails.game.action.BuyTrain.class)) possibleActions.remove(pa);
+                for (rails.game.action.NullAction pa : possibleActions.getType(rails.game.action.NullAction.class)) {
+                    if (pa.getMode() == rails.game.action.NullAction.Mode.SKIP) possibleActions.remove(pa);
+                }
+                boolean hasDone = false;
+                for (rails.game.action.NullAction pa : possibleActions.getType(rails.game.action.NullAction.class)) {
+                    if (pa.getMode() == rails.game.action.NullAction.Mode.DONE) hasDone = true;
+                }
+                if (!hasDone) {
+                    possibleActions.add(new rails.game.action.NullAction(getRoot(), rails.game.action.NullAction.Mode.DONE));
+                    actionsAdded = true;
+                }
+            }
         }
 
-        // 6. Force Injection
-        possibleActions
-                .add(new net.sf.rails.game.specific._1817.action.TakeLoans_1817(getRoot(), comp1817.getId(), maxLoans));
-        return true;
+        // 3. Global Cleanup: Guarantee SKIP and DONE never render simultaneously, and prevent deadlocks
+        boolean hasDoneFinal = false;
+        java.util.List<rails.game.action.NullAction> skipsFinal = new java.util.ArrayList<>();
+        for (rails.game.action.NullAction pa : possibleActions.getType(rails.game.action.NullAction.class)) {
+            if (pa.getMode() == rails.game.action.NullAction.Mode.DONE) hasDoneFinal = true;
+            if (pa.getMode() == rails.game.action.NullAction.Mode.SKIP) skipsFinal.add(pa);
+        }
+        
+        if (hasDoneFinal && !skipsFinal.isEmpty()) {
+            // DONE is present, safely remove redundant SKIP
+            for (rails.game.action.NullAction skip : skipsFinal) possibleActions.remove(skip);
+        } else if (!hasDoneFinal && !skipsFinal.isEmpty()) {
+            // ONLY SKIP is present. Convert to DONE to give the player a clickable exit button.
+            for (rails.game.action.NullAction skip : skipsFinal) possibleActions.remove(skip);
+            possibleActions.add(new rails.game.action.NullAction(getRoot(), rails.game.action.NullAction.Mode.DONE));
+            actionsAdded = true;
+        }
 
+
+
+
+        return actionsAdded;
     }
 
     @Override
@@ -341,7 +451,7 @@ public class OperatingRound_1817 extends OperatingRound {
                 log.info("1817_TRACE: Reset normalTileLaidThisTurn to unblock UI MapWindow.");
             }
         }
-        // --- END FIX ---
+
         return success;
     }
 
@@ -381,8 +491,8 @@ public class OperatingRound_1817 extends OperatingRound {
                 }
             }
         }
-        // --- END FIX ---
+
     }
-    // ... (rest of the method) ...
+
 
 }

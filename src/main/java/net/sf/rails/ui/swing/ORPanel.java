@@ -366,10 +366,11 @@ public class ORPanel extends GridPanel
                 }
             }
 
-            if (pa instanceof TakeLoans || pa instanceof RepayLoans
+if (pa instanceof TakeLoans || pa instanceof RepayLoans
                     || pa instanceof rails.game.action.SpecialORAction) {
                 addSpecialActionButtonToPhase5(pa);
             }
+
 
             // Continue with standard distribution...
             if (pa instanceof SetDividend) {
@@ -2039,7 +2040,9 @@ public class ORPanel extends GridPanel
             if (executedActions == null || executedActions.isEmpty()) {
             } else if (executedActions.get(0) instanceof net.sf.rails.game.specific._1817.action.LoanAction) {
                 processTakeLoans_1817((net.sf.rails.game.specific._1817.action.LoanAction) executedActions.get(0));
-
+                return;
+            } else if (executedActions.get(0) instanceof net.sf.rails.game.specific._1817.action.RepayLoans_1817) {
+                processRepayLoans_1817((net.sf.rails.game.specific._1817.action.RepayLoans_1817) executedActions.get(0));
                 return;
             } else {
                 orUIManager.processAction(command, executedActions, source);
@@ -2061,6 +2064,35 @@ public class ORPanel extends GridPanel
         }
     }
 
+    private void processRepayLoans_1817(net.sf.rails.game.specific._1817.action.RepayLoans_1817 action) {
+        String compId = action.getCompanyId();
+        int max = action.getMaxRepayable();
+        
+        if (max <= 0) return;
+
+        String[] options = new String[max];
+        for (int i = 0; i < max; i++) {
+            options[i] = String.valueOf(i + 1);
+        }
+
+        String selected = (String) javax.swing.JOptionPane.showInputDialog(this,
+                "Select number of loans to repay for " + compId + " ($100 each):\n(Max affordable: " + max + ")",
+                "Repay Loans", javax.swing.JOptionPane.QUESTION_MESSAGE, null, options, options[0]);
+
+        if (selected != null) {
+            action.setLoansToRepay(Integer.parseInt(selected));
+            orUIManager.processAction("RepayLoans", java.util.Collections.singletonList((rails.game.action.PossibleAction) action), this);
+        } else {
+             if (specialActionsButtonPanel != null) {
+                 for (Component c : specialActionsButtonPanel.getComponents()) {
+                     if (c instanceof ActionButton) {
+                         ((ActionButton) c).setEnabled(true);
+                     }
+                 }
+             }
+        }
+    }
+    
     private void processTakeLoans_1817(net.sf.rails.game.specific._1817.action.LoanAction action) {
         String compId = action.getCompanyId();
         int max = action.getMaxLoansAllowed();
