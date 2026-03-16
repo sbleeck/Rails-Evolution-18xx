@@ -349,17 +349,18 @@ public class ORPanel extends GridPanel
 
             // --- D. CATCH-ALL (The Safety Net) ---
             else if (!(pa instanceof SetDividend) &&
-                   !(pa instanceof NullAction) &&
-!(pa instanceof LayTile) &&
-!(pa instanceof LayToken) &&
-!(pa instanceof TakeLoans) &&
-!(pa instanceof RepayLoans) &&
-!(pa instanceof rails.game.action.SpecialORAction) &&
-!(pa instanceof LayBaseToken) &&
-!pa.getClass().getSimpleName().contains("1817")) {
+                    !(pa instanceof NullAction) &&
+                    !(pa instanceof LayTile) &&
+                    !(pa instanceof LayToken) &&
+                    !(pa instanceof BuyTrain) &&
+                    !(pa instanceof TakeLoans) &&
+                    !(pa instanceof RepayLoans) &&
+                    !(pa instanceof rails.game.action.SpecialORAction) &&
+                    !(pa instanceof LayBaseToken) &&
+                    !pa.getClass().getSimpleName().contains("1817")) {
 
-            labelToAdd = pa.getButtonLabel().toUpperCase();
-        }
+                labelToAdd = pa.getButtonLabel().toUpperCase();
+            }
 
             // --- E. ADD BUTTON (Deduplicated) ---
             if (labelToAdd != null) {
@@ -575,6 +576,51 @@ btn.addActionListener(this);
             lblCash.getParent().setVisible(visible);
     }
 
+    private String getDoneButtonText() {
+String text = "END TURN";
+if (orComp == null && currentOperatingComp == null) return text;
+
+    PublicCompany compToCheck = (orComp != null) ? orComp : currentOperatingComp;
+    boolean is1817 = compToCheck.getClass().getSimpleName().contains("1817");
+    if (!is1817) return text;
+
+    if (orUIManager != null && orUIManager.getGameUIManager() != null && orUIManager.getGameUIManager().getGameManager() != null) {
+        net.sf.rails.game.round.RoundFacade currentRound = orUIManager.getGameUIManager().getGameManager().getCurrentRound();
+        if (currentRound instanceof OperatingRound) {
+            OperatingRound or = (OperatingRound) currentRound;
+            net.sf.rails.game.GameDef.OrStep step = or.getStep();
+            
+            if (step.compareTo(net.sf.rails.game.GameDef.OrStep.BUY_TRAIN) < 0) {
+                return "Continue";
+            }
+            
+            try {
+                java.lang.reflect.Field field = or.getClass().getDeclaredField("repayPhaseDoneThisTurn");
+                field.setAccessible(true);
+                Object state = field.get(or);
+                java.lang.reflect.Method m = state.getClass().getMethod("value");
+                boolean isRepayDone = (Boolean) m.invoke(state);
+                if (!isRepayDone) {
+                    return "Continue";
+                }
+            } catch (Exception e) {
+                rails.game.action.PossibleActions possibleActionsObj = orUIManager.getGameUIManager().getGameManager().getPossibleActions();
+                if (possibleActionsObj != null) {
+                    for (PossibleAction pa : possibleActionsObj.getList()) {
+                        if (pa instanceof BuyTrain || 
+                            pa.getClass().getSimpleName().contains("RepayLoans") || 
+                            pa.getClass().getSimpleName().contains("PayLoanInterest") ||
+                            pa.getClass().getSimpleName().contains("LiquidateCompany")) {
+                            return "Continue";
+                        }
+                    }
+                }
+            }
+        }
+    }
+    return text;
+}
+
     private void colorizeActivePhase(Color unused) {
         resetPhasePanel(phase1Panel, btnTileConfirm);
         resetPhasePanel(phase2Panel, btnTokenConfirm);
@@ -682,10 +728,10 @@ btn.addActionListener(this);
                 btnTrainSkip.setForeground(Color.GRAY);
             }
         } else if (activePhase == 6) {
-
             // ACTIVATE: Enable and colorize for the final step
             btnDone.setEnabled(true);
-            styleButton(btnDone, UITheme.ACTION_SKIP, "END TURN");
+            String doneText = getDoneButtonText();
+            styleButton(btnDone, UITheme.ACTION_SKIP, doneText);
             btnDone.setForeground(Color.WHITE);
             btnDone.setFont(new Font("SansSerif", Font.BOLD, 16));
         } else {
@@ -693,19 +739,21 @@ btn.addActionListener(this);
             // DIRECT ENGINE SYNC: If the engine natively provides a DONE/PASS action,
             // expose it immediately. Do not hide valid engine actions behind local UI
             // phases.
+            String doneText = getDoneButtonText();
             if (btnDone.getPossibleActions() != null && !btnDone.getPossibleActions().isEmpty()) {
                 btnDone.setEnabled(true);
-                styleButton(btnDone, UITheme.ACTION_SKIP, "END TURN");
+                styleButton(btnDone, UITheme.ACTION_SKIP, doneText);
                 btnDone.setForeground(Color.WHITE);
                 btnDone.setFont(new Font("SansSerif", Font.BOLD, 14));
             } else {
                 // PERSISTENT WAIT: Keep as 'END TURN' but disabled and grey
                 btnDone.setEnabled(false);
-                styleButton(btnDone, UIManager.getColor("Button.background"), "END TURN");
+                styleButton(btnDone, UIManager.getColor("Button.background"), doneText);
                 btnDone.setForeground(Color.GRAY);
                 btnDone.setFont(new Font("SansSerif", Font.BOLD, 14));
             }
         }
+   
         // ALWAYS evaluate Phase 5 (Special Actions) independently!
         boolean hasSpecialActions = specialActionsButtonPanel != null
                 && specialActionsButtonPanel.getComponentCount() > 0;
