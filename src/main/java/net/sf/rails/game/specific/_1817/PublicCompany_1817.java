@@ -117,6 +117,7 @@ this.shareCount = IntegerState.create(this, "shareCount", 2);
     }
 
 
+
     public void setShareCount(int count) {
         if (count == 2 || count == 5 || count == 10) {
             this.shareCount.set(count);
@@ -193,7 +194,15 @@ this.shareCount = IntegerState.create(this, "shareCount", 2);
         return null;
     }
 
-
+    /**
+     * Places the company in a zombie state for liquidation.
+     * We bypass super.setClosed() to ensure trains, cash, tokens, and loans
+     * are retained for the M&A auction.
+     */
+    public void close() {
+        getIsClosedModel().set(true);
+        log.info("1817_TRACE: Company " + getId() + " has been marked as closed (Zombie state for M&A).");
+    }
 
 
 }

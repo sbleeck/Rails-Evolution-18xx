@@ -323,12 +323,16 @@ public class OperatingRound_1817 extends OperatingRound {
                 }
             }
             return true;
+        } 
+        if (action instanceof net.sf.rails.game.specific._1817.action.LiquidateCompany_1817) {
+            return handleImmediateLiquidation((net.sf.rails.game.specific._1817.action.LiquidateCompany_1817) action);
         }
 
         log.info("1817_TRACE: Action {} not handled by processGameSpecificAction, delegating to superclass.",
                 action.getClass().getSimpleName());
         return super.processGameSpecificAction(action);
     }
+
 
     // We are modifying OperatingRound_1817.java 'TEST'
 
@@ -468,4 +472,69 @@ public class OperatingRound_1817 extends OperatingRound {
     }
     // --- END FIX ---
 
+// ... (at the end of the class) ...
+
+// --- START FIX ---
+    /**
+     * Handles the immediate consequences of failing an interest payment (Rule 6.8).
+     * The President pays the shortfall, and the marker moves to the liquidation space.
+     */
+private boolean handleImmediateLiquidation(net.sf.rails.game.specific._1817.action.LiquidateCompany_1817 action) {
+        PublicCompany comp = companyManager.getPublicCompany(action.getCompanyName());
+        if (comp == null) return false;
+
+        int totalInterestDue = action.getShortfall();
+        int compCash = comp.getCash();
+        int playerShortfall = Math.max(0, totalInterestDue - compCash);
+        net.sf.rails.game.Player president = (net.sf.rails.game.Player) comp.getPresident();
+
+        log.info("1817_TRACE: Liquidating {}. Interest due: ${}, Company cash: ${}", 
+                comp.getId(), totalInterestDue, compCash);
+
+        // 1. Drain company treasury to pay what it can (Rule 6.8)
+        if (compCash > 0) {
+            net.sf.rails.game.state.Currency.toBank(comp, Math.min(compCash, totalInterestDue));
+        }
+
+        // 2. President personally pays the remaining shortfall (Rule 6.8)
+        if (playerShortfall > 0 && president != null) {
+            net.sf.rails.game.state.Currency.toBank(president, playerShortfall);
+            net.sf.rails.common.ReportBuffer.add(gameManager, 
+                president.getName() + " personally pays $" + playerShortfall + " interest shortfall for " + comp.getId() + ".");
+        }
+
+        // 3. Move marker to the Red Liquidation space (price 0)
+        net.sf.rails.game.financial.StockMarket market = (net.sf.rails.game.financial.StockMarket) getRoot().getStockMarket();
+        net.sf.rails.game.financial.StockSpace liquidationSpace = null;
+        for (int r = 0; r < market.getNumberOfRows(); r++) {
+            for (int c = 0; c < market.getNumberOfColumns(); c++) {
+                net.sf.rails.game.financial.StockSpace ss = market.getStockSpace(r, c);
+                if (ss != null && ss.getPrice() == 0) {
+                    liquidationSpace = ss;
+                    break;
+                }
+            }
+            if (liquidationSpace != null) break;
+        }
+
+        if (liquidationSpace != null) {
+            market.correctStockPrice(comp, liquidationSpace);
+        } else {
+            log.error("1817_ERROR: Could not find a StockSpace with price 0 for Liquidation.");
+        }
+
+        // 4. Mark as closed so BondsModel and other logic ignore it (Rule 7.2.1)
+
+        ((PublicCompany_1817) comp).close();
+
+        net.sf.rails.common.ReportBuffer.add(gameManager, comp.getId() + " is moved to liquidation.");
+
+        // 5. Finalize the turn flags to prevent further actions
+        interestPaidThisTurn.set(true);
+        repayPhaseDoneThisTurn.set(true);
+        trainBuyingDone.set(true);
+
+        return true;
+    }
+    
 }
