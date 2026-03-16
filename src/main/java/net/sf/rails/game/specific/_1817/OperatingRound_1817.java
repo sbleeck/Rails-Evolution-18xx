@@ -20,6 +20,7 @@ import net.sf.rails.game.StartItem;
 import net.sf.rails.game.Player;
 import net.sf.rails.game.RailsItem;
 import net.sf.rails.game.financial.Bank;
+import net.sf.rails.game.model.BondsModel;
 import net.sf.rails.common.LocalText;
 import net.sf.rails.common.DisplayBuffer;
 import net.sf.rails.common.ReportBuffer;
@@ -408,7 +409,15 @@ public class OperatingRound_1817 extends OperatingRound {
                 } else {
                     log.info("1817_TRACE: Phase - Paying Interest.");
                     possibleActions.clear(); // Block train buying/done until interest is handled
-                    int interestDue = currentLoans * 5; // TODO: Dynamic rate
+
+                    int interestPerLoan = 5;
+                    net.sf.rails.game.model.BondsModel baseBm = ((GameManager_1817) gameManager).getBondsModel();
+                    if (baseBm instanceof BondsModel_1817) {
+                        interestPerLoan = ((BondsModel_1817) baseBm).getInterestRate();
+                    }
+
+                    int interestDue = currentLoans * interestPerLoan;
+
                     if (comp1817.getCash() >= interestDue) {
                         possibleActions.add(new net.sf.rails.game.specific._1817.action.PayLoanInterest_1817(getRoot(),
                                 comp1817.getId(), interestDue));

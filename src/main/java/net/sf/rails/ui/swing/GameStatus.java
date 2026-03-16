@@ -9,6 +9,7 @@ import net.sf.rails.game.PublicCompany;
 import net.sf.rails.game.financial.Bank;
 import net.sf.rails.game.financial.PublicCertificate;
 import net.sf.rails.game.financial.StockRound;
+import net.sf.rails.game.model.BondsModel;
 import net.sf.rails.game.model.PortfolioModel;
 import net.sf.rails.game.state.MoneyOwner;
 import net.sf.rails.sound.SoundManager;
@@ -2605,15 +2606,16 @@ compCashXOffset = ++lastX;
         if (bondsHeatbarPanel == null)
             return;
 
-        int totalLoans = 0;
-        if (companies != null) {
-            for (PublicCompany c : companies) {
-                if (c == null || c.isClosed())
-                    continue;
-                totalLoans += c.getNumberOfBonds();
+int totalLoans = 0;
+        net.sf.rails.game.GameManager gm = gameUIManager.getGameManager();
+        if (gm instanceof net.sf.rails.game.specific._1817.GameManager_1817) {
+            BondsModel bm = ((net.sf.rails.game.specific._1817.GameManager_1817) gm).getBondsModel();
+            if (bm != null) {
+                totalLoans = bm.getTotalLoansTaken();
             }
         }
         bondsHeatbarPanel.setTotalLoansTaken(totalLoans);
+
     }
 
     public void initTurn(int actorIndex, boolean myTurn) {

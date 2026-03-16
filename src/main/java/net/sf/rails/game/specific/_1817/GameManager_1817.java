@@ -3,7 +3,9 @@ package net.sf.rails.game.specific._1817;
 import net.sf.rails.game.GameManager;
 import net.sf.rails.game.OperatingRound;
 import net.sf.rails.game.financial.StockRound;
+import net.sf.rails.game.model.BondsModel;
 import net.sf.rails.game.Round;
+import net.sf.rails.game.model.BondsModel;
 import net.sf.rails.game.round.RoundFacade;
 import net.sf.rails.ui.swing.ORPanel;
 
@@ -12,6 +14,7 @@ import org.slf4j.LoggerFactory;
 
 public class GameManager_1817 extends GameManager {
 
+    protected BondsModel bondsModel;
     // Placeholder for the upcoming M&A class
     protected String mergerAndAcquisitionRoundClassName = "net.sf.rails.game.specific._1817.MergerAndAcquisitionRound_1817";
 
@@ -19,6 +22,18 @@ public class GameManager_1817 extends GameManager {
 
     public GameManager_1817(net.sf.rails.game.RailsRoot parent, String id) {
         super(parent, id);
+
+        log.info("1817_TRACE: BondsModel initialized in GameManager.");
+
+    }
+
+    public BondsModel getBondsModel() {
+if (bondsModel == null) {
+            net.sf.rails.game.financial.Bank bank = getRoot().getBank();
+            bondsModel = BondsModel.create(bank, bank);
+            log.info("1817_TRACE: BondsModel lazily initialized.");
+        }
+        return bondsModel;
     }
 
     @Override
