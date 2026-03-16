@@ -92,57 +92,87 @@ String displayValue;
         return text;
     }
 
-    /**
-     * Create the token objects based on the model of this stock field
-     *
-     * @return A list containing all tokens
-     */
-    private List<FXStockToken> createTokens() {
-        List<FXStockToken> tokens = new ArrayList<>();
+   /**
+* Create the token objects based on the model of this stock field
+*
+* @return A list containing all tokens
+*/
 
-        if (model.hasTokens()) {
-            List<PublicCompany> publicCompanies = Lists.reverse(model.getTokens());
+private List<FXStockToken> createTokens() {
+List<FXStockToken> tokens = new ArrayList<>();
 
-            for (int companyIndex = 0; companyIndex < publicCompanies.size(); companyIndex++) {
-                PublicCompany publicCompany = publicCompanies.get(companyIndex);
+    if (model.hasTokens()) {
+        List<PublicCompany> publicCompanies = Lists.reverse(model.getTokens());
+        boolean isLinear = model.getParent().getStockChartType() == net.sf.rails.game.financial.StockMarket.ChartType.LINEAR;
 
-                FXStockToken token = new FXStockToken(
-                        ColorUtils.toColor(publicCompany.getFgColour()),
-                        ColorUtils.toColor(publicCompany.getBgColour()),
-                        publicCompany.getId()
-                );
+        for (int companyIndex = 0; companyIndex < publicCompanies.size(); companyIndex++) {
+            PublicCompany publicCompany = publicCompanies.get(companyIndex);
 
-              
-                tokens.add(token);
+            FXStockToken token = new FXStockToken(
+                    ColorUtils.toColor(publicCompany.getFgColour()),
+                    ColorUtils.toColor(publicCompany.getBgColour()),
+                    publicCompany.getId()
+            );
+
+            if (isLinear) {
+                // 1817 Linear Layout
+                token.setStyle("-fx-border-color: black; -fx-border-width: 0;");
+                DoubleBinding diameter = Bindings.multiply(Bindings.min(widthProperty(), heightProperty()), 0.65);
+
+                token.minWidthProperty().bind(diameter);
+                token.prefWidthProperty().bind(diameter);
+                token.maxWidthProperty().bind(diameter);
+
+                token.minHeightProperty().bind(diameter);
+                token.prefHeightProperty().bind(diameter);
+                token.maxHeightProperty().bind(diameter);
+            } else {
+                // Standard 2D Overlapping Layout
+                DoubleBinding diameter = Bindings.multiply(Bindings.min(widthProperty(), heightProperty()), 0.5);
+
+                token.minWidthProperty().bind(diameter);
+                token.prefWidthProperty().bind(diameter);
+                token.maxWidthProperty().bind(diameter);
+
+                token.minHeightProperty().bind(diameter);
+                token.prefHeightProperty().bind(diameter);
+                token.maxHeightProperty().bind(diameter);
+
+                StackPane.setAlignment(token, Pos.TOP_RIGHT);
+                StackPane.setMargin(token, new Insets(5 + (companyIndex * 5), 5, 5, 5));
             }
-        }
 
-        return tokens;
+            tokens.add(token);
+        }
     }
 
+    return tokens;
+}
 
-    public void populate() {
-        getChildren().clear();
+public void populate() {
+    getChildren().clear();
 
-        VBox layout = new VBox(5); // Spacing between price and token stack
-// Anchor price to top to prevent vertical jumping when tokens appear
-        layout.setAlignment(Pos.TOP_CENTER);
-        layout.setPadding(new Insets(5, 0, 5, 0));
-                
+    if (model.getParent().getStockChartType() == net.sf.rails.game.financial.StockMarket.ChartType.LINEAR) {
+        // Linear Market: Use centered VBox to stack tokens cleanly without overlap
+        VBox layout = new VBox(5);
+        layout.setAlignment(Pos.CENTER);
+        
+                   layout.setAlignment(Pos.TOP_CENTER);
+            layout.setPadding(new Insets(5, 0, 5, 0)); // Add padding to keep text slightly off the top edge
+
         layout.getChildren().add(createStockSpacePrice());
         
         tokenContainer.getChildren().clear();
         tokenContainer.getChildren().addAll(createTokens());
         layout.getChildren().add(tokenContainer);
         
-// --- START FIX ---
-        // Force the StackPane to anchor the VBox to the top
-        StackPane.setAlignment(layout, Pos.TOP_CENTER);
-// --- END FIX ---
-
         getChildren().add(layout);
-
+    } else {
+        // Standard Market: Add directly to the StackPane root to allow margins and overlaps
+        getChildren().add(createStockSpacePrice());
+        getChildren().addAll(createTokens());
     }
+}
 
 
     

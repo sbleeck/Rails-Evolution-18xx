@@ -1,3 +1,4 @@
+
 package net.sf.rails.ui.swing;
 
 import net.sf.rails.algorithms.*;
@@ -258,9 +259,11 @@ public class ORPanel extends GridPanel
             } else if (pa instanceof BuyTrain && (phase == 0 || phase > 4)) {
                 phase = 4;
             } else if (pa instanceof TakeLoans || pa instanceof RepayLoans
-                    || pa instanceof rails.game.action.SpecialORAction) {
+                    || pa instanceof rails.game.action.SpecialORAction
+                    || pa.getClass().getSimpleName().contains("1817")) {
 
                 hasSpecialAction = true;
+
             } else if (pa instanceof NullAction) {
                 NullAction.Mode mode = ((NullAction) pa).getMode();
                 if (mode == NullAction.Mode.DONE || mode == NullAction.Mode.PASS) {
@@ -271,10 +274,10 @@ public class ORPanel extends GridPanel
         }
 
         if (phase == 0) {
-            if (hasDoneAction) {
-                phase = 6;
-            } else if (hasSpecialAction) {
+            if (hasSpecialAction) {
                 phase = 5;
+            } else if (hasDoneAction) {
+                phase = 6;
             }
         }
 
@@ -346,17 +349,17 @@ public class ORPanel extends GridPanel
 
             // --- D. CATCH-ALL (The Safety Net) ---
             else if (!(pa instanceof SetDividend) &&
-                    !(pa instanceof BuyTrain) &&
-                    !(pa instanceof NullAction) &&
-                    !(pa instanceof LayTile) &&
-                    !(pa instanceof LayToken) &&
-                    !(pa instanceof TakeLoans) &&
-                    !(pa instanceof RepayLoans) &&
-                    !(pa instanceof rails.game.action.SpecialORAction) &&
-                    !(pa instanceof LayBaseToken)) {
+                   !(pa instanceof NullAction) &&
+!(pa instanceof LayTile) &&
+!(pa instanceof LayToken) &&
+!(pa instanceof TakeLoans) &&
+!(pa instanceof RepayLoans) &&
+!(pa instanceof rails.game.action.SpecialORAction) &&
+!(pa instanceof LayBaseToken) &&
+!pa.getClass().getSimpleName().contains("1817")) {
 
-                labelToAdd = pa.getButtonLabel().toUpperCase();
-            }
+            labelToAdd = pa.getButtonLabel().toUpperCase();
+        }
 
             // --- E. ADD BUTTON (Deduplicated) ---
             if (labelToAdd != null) {
@@ -366,10 +369,6 @@ public class ORPanel extends GridPanel
                 }
             }
 
-if (pa instanceof TakeLoans || pa instanceof RepayLoans
-                    || pa instanceof rails.game.action.SpecialORAction) {
-                addSpecialActionButtonToPhase5(pa);
-            }
 
 
             // Continue with standard distribution...
@@ -386,13 +385,17 @@ if (pa instanceof TakeLoans || pa instanceof RepayLoans
                 addTrainBuyButton((BuyTrain) pa);
             } else if (pa instanceof NullAction) {
                 NullAction.Mode mode = ((NullAction) pa).getMode();
-                if (mode == NullAction.Mode.DONE || mode == NullAction.Mode.PASS) {
-                    setupButton(btnDone, pa);
-                    bindActionHotkey(btnDone, pa);
+                if (mode == NullAction.Mode.DONE || mode == NullAction.Mode.PASS || mode == NullAction.Mode.SKIP) {
+if (activePhase == 4 && btnTrainSkip != null) {
+setupButton(btnTrainSkip, pa);
+btnTrainSkip.setText(mode == NullAction.Mode.SKIP ? "Skip Buy" : "Done Buying");
+}
+setupButton(btnDone, pa);
+bindActionHotkey(btnDone, pa);
+donePa = pa;
+doneActionFound = true;
+}
 
-                    donePa = pa;
-                    doneActionFound = true;
-                }
             }
         }
         if (doneActionFound && donePa != null) {
@@ -440,12 +443,13 @@ if (pa instanceof TakeLoans || pa instanceof RepayLoans
                 BorderFactory.createLineBorder(Color.BLACK, 1),
                 BorderFactory.createEmptyBorder(3, 5, 3, 5)));
 
-        btn.setAlignmentX(Component.CENTER_ALIGNMENT);
-        btn.setMaximumSize(new Dimension(SIDEBAR_WIDTH - 10, 30));
-        btn.setPossibleAction(action);
-        btn.addActionListener(this);
+btn.setAlignmentX(Component.CENTER_ALIGNMENT);
+btn.setMaximumSize(new Dimension(SIDEBAR_WIDTH - 10, 30));
+btn.setPossibleAction(action);
+btn.setEnabled(true);
+btn.addActionListener(this);
 
-        if (specialActionsButtonPanel != null) {
+    if (specialActionsButtonPanel != null) {
             specialActionsButtonPanel.add(btn);
             specialActionsButtonPanel.add(Box.createVerticalStrut(4));
         }
@@ -2190,8 +2194,15 @@ if (pa instanceof TakeLoans || pa instanceof RepayLoans
 
         Company highlightTarget = null;
 
-        // 1. Extract Visual Signature via Interface
-        if (action instanceof GuiTargetedAction) {
+// 1. Extract Visual Signature
+if (action.getClass().getSimpleName().contains("1817")) {
+bgColor = new Color(255, 140, 0); // Vibrant Orange
+borderColor = Color.BLACK;
+textColor = Color.WHITE;
+label = action.getButtonLabel();
+if (label == null || label.isEmpty()) label = action.toString();
+} else if (action instanceof GuiTargetedAction) {
+    
             GuiTargetedAction gta = (GuiTargetedAction) action;
             label = gta.getButtonLabel();
 
@@ -2392,8 +2403,12 @@ if (pa instanceof TakeLoans || pa instanceof RepayLoans
             PossibleAction deferredNullAction = null;
 
             for (PossibleAction pa : actions) {
-                // If it implements the interface, it is definitely a special UI action
-                if (pa instanceof GuiTargetedAction) {
+                boolean is1817Special = pa.getClass().getSimpleName().contains("1817");
+
+                if (is1817Special) {
+                    specialActions.add(pa);
+                } else if (pa instanceof GuiTargetedAction && !(pa instanceof BuyTrain) && !(pa instanceof SetDividend)
+                        && !(pa instanceof LayTile) && !(pa instanceof LayToken)) {
                     specialActions.add(pa);
                     if (contextProvider == null)
                         contextProvider = (GuiTargetedAction) pa;
@@ -2409,15 +2424,6 @@ if (pa instanceof TakeLoans || pa instanceof RepayLoans
                 }
             }
 
-            // Post-Loop: Now we know if special actions exist, so we can safely decide on
-            // the Done button
-            if (deferredNullAction != null) {
-                // If we have special actions (like Discards), enable the Done button.
-                // Also enable it if it is an explicit PASS.
-                if (!specialActions.isEmpty() || ((NullAction) deferredNullAction).getMode() == NullAction.Mode.PASS) {
-                    specialActions.add(deferredNullAction);
-                }
-            }
 
             // 4. GENERIC CONTEXT SWITCH
             // If the special action dictates a specific actor (e.g. a Company discarding
