@@ -11,10 +11,11 @@ public class BondsModel_1817 extends BondsModel {
 
     private final RailsRoot root;
 
-public BondsModel_1817(PortfolioModel parent, net.sf.rails.game.RailsItem owner, RailsRoot root) {
+public BondsModel_1817(net.sf.rails.game.RailsItem parent, net.sf.rails.game.RailsItem owner, RailsRoot root) {
         super(parent, owner);
         this.root = root;
     }
+    
     /**
      * Calculates the interest rate based on the total number of loans in play.
      * Rule 6.1.1: 0-9: $10, 10-19: $15, 20-29: $20, 30-39: $25, 40+: $30.

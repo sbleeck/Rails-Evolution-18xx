@@ -30,8 +30,9 @@ public class GameManager_1817 extends GameManager {
     public BondsModel getBondsModel() {
 if (bondsModel == null) {
             net.sf.rails.game.financial.Bank bank = getRoot().getBank();
-            bondsModel = BondsModel.create(bank, bank);
-            log.info("1817_TRACE: BondsModel lazily initialized.");
+            // Explicitly call the 1817 constructor to ensure tiered interest logic is available
+            bondsModel = new BondsModel_1817(bank, bank, getRoot());
+            log.info("1817_TRACE: BondsModel_1817 (Subclass) lazily initialized for the Bank.");
         }
         return bondsModel;
     }

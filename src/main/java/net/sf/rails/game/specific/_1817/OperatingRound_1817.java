@@ -410,13 +410,19 @@ public class OperatingRound_1817 extends OperatingRound {
                     log.info("1817_TRACE: Phase - Paying Interest.");
                     possibleActions.clear(); // Block train buying/done until interest is handled
 
-                    int interestPerLoan = 5;
-                    net.sf.rails.game.model.BondsModel baseBm = ((GameManager_1817) gameManager).getBondsModel();
+                   net.sf.rails.game.model.BondsModel baseBm = ((GameManager_1817) gameManager).getBondsModel();
+                    int interestPerLoan = 1;
+                    
                     if (baseBm instanceof BondsModel_1817) {
                         interestPerLoan = ((BondsModel_1817) baseBm).getInterestRate();
+                        log.info("1817_TRACE: BondsModel_1817 confirmed. Tiered interest rate retrieved: $" + interestPerLoan);
+                    } else {
+                        log.error("1817_ERROR: Invalid model class instantiated: " + baseBm.getClass().getName() + ". Defaulting to $5.");
                     }
 
                     int interestDue = currentLoans * interestPerLoan;
+                    log.info("1817_TRACE: Processing " + currentLoans + " loans at $" + interestPerLoan + " each. Total due: $" + interestDue);
+
 
                     if (comp1817.getCash() >= interestDue) {
                         possibleActions.add(new net.sf.rails.game.specific._1817.action.PayLoanInterest_1817(getRoot(),
