@@ -167,6 +167,15 @@ public class OperatingRound_1817 extends OperatingRound {
         if (success && action.getType() != LayTile.CORRECTION) {
             // Rule 6.3: Prevent upgrading the exact same hex twice in one turn.
             hexesLaidThisTurn.add(hex);
+            
+            SpecialProperty specialProp = action.getSpecialProperty();
+            if (specialProp != null && specialProp.getParent() != null) {
+                if ("PSM40".equals(specialProp.getParent().getId())) {
+                    log.info("1817_TRACE: PSM40 special tile lay exercised on {}", hex.getId());
+                    specialProp.setExercised(true);
+                    tilesLaidThisTurn.set(tilesLaidThisTurn.value() + 1);
+                }
+            }
 
             // Rule 1.2.6: Mountain Engineers Bonus
             if ("Yellow".equalsIgnoreCase(lastLaidTileColour)) {
@@ -563,7 +572,7 @@ public class OperatingRound_1817 extends OperatingRound {
                 }
             }
         }
-        
+
         // --- 5. 1817 FINANCIAL LOGIC ---
         // Only proceed for specific 1817 financial classes.
         if (!(comp instanceof net.sf.rails.game.specific._1817.PublicCompany_1817)) {
@@ -632,9 +641,30 @@ public class OperatingRound_1817 extends OperatingRound {
             }
         }
 
-log.info("1817_DEBUG: FINAL ACTIONS LIST for OR Step: " + step.name());
+
+        log.info("1817_DEBUG: FINAL ACTIONS LIST for OR Step: " + step.name());
+        
+// 1. Check if the private companies in the portfolio hold the special property
+        log.info("1817_DEBUG: Checking Private Companies for Special Properties...");
+        for (net.sf.rails.game.PrivateCompany priv : comp.getPortfolioModel().getPrivateCompanies()) {
+            Collection<SpecialProperty> privSpecials = priv.getSpecialProperties();
+            log.info("1817_DEBUG:  -> Private " + priv.getId() + " has " + (privSpecials != null ? privSpecials.size() : 0) + " special properties.");
+            if (privSpecials != null) {
+                for (SpecialProperty sp : privSpecials) {
+                    log.info("1817_DEBUG:     - Property: " + sp.getClass().getSimpleName());
+                }
+            }
+        }
+
+        // 2. Inspect the generated actions
         for(rails.game.action.PossibleAction pa : possibleActions.getList()) {
-             log.info("1817_DEBUG:  - " + pa.getClass().getSimpleName());
+             if (pa instanceof LayTile) {
+                 LayTile lt = (LayTile) pa;
+                 SpecialProperty sp = lt.getSpecialProperty();
+                 log.info("1817_DEBUG:  - LayTile action. Attached SpecialProperty: " + (sp != null && sp.getParent() != null ? sp.getParent().getId() : "NONE"));
+             } else {
+                 log.info("1817_DEBUG:  - " + pa.getClass().getSimpleName());
+             }
         }
 
         return actionsAdded;
