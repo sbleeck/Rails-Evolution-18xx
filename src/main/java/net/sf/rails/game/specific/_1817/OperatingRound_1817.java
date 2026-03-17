@@ -490,6 +490,7 @@ return false;
         return super.process(action);
     }
 
+
     @Override
     public boolean setPossibleActions() {
 
@@ -497,9 +498,32 @@ return false;
         PublicCompany comp = operatingCompany.value();
         net.sf.rails.game.GameDef.OrStep step = getStep();
 
-        
+        // --- 1. BRIDGE PLACEMENT (Rule 1.2.6) ---
+        // Moved to the top: This depends on Private Company ownership, not Public Company class.
+        for (net.sf.rails.game.PrivateCompany p : comp.getPortfolioModel().getPrivateCompanies()) {
+            String pid = p.getId();
+            if (("OHB".equals(pid) || "UNB".equals(pid)) && getPlacedBridgeCount(pid) < getBridgeLimit(pid)) {
+                for (String hexId : BRIDGE_CITIES) {
+                    MapHex cityHex = gameManager.getRoot().getMapManager().getHex(hexId);
+                    boolean bridgeExists = false;
+                    if (cityHex != null && cityHex.getBonusTokens() != null) {
+                        for (net.sf.rails.game.BonusToken t : cityHex.getBonusTokens()) {
+                            if ("Bridge".equals(t.getName())) {
+                                bridgeExists = true;
+                                break;
+                            }
+                        }
+                    }
+                    if (cityHex != null && !bridgeExists) {
+                        log.info("1817_DEBUG: Adding Bridge Action for {} on {}", comp.getId(), hexId);
+                        possibleActions.add(new net.sf.rails.game.specific._1817.action.LayBridgeToken_1817(getRoot(), comp.getId(), hexId));
+                        actionsAdded = true;
+                    }
+                }
+            }
+        }
 
-        // 1. Evaluate if we need to trigger an interrupt (only if not already resolved)
+        // --- 2. COAL MINE INTERRUPT ---
         if ("Yellow".equalsIgnoreCase(lastLaidTileColour) && !hexesLaidThisTurn.isEmpty()) {
             MapHex lastHex = hexesLaidThisTurn.get(hexesLaidThisTurn.size() - 1);
             if (offeringCoalMineHex.value() == null && !resolvedCoalMineHexes.contains(lastHex.getId())) {
@@ -509,49 +533,46 @@ return false;
                         offeringCoalMineHex.set(lastHex.getId());
                         log.info("1817_TRACE: Interrupting engine to offer Coal Mine on {}", lastHex.getId());
                     } else {
-                        resolvedCoalMineHexes.add(lastHex.getId()); // Silently resolve if no mines left
+                        resolvedCoalMineHexes.add(lastHex.getId());
                     }
                 } else {
-                    resolvedCoalMineHexes.add(lastHex.getId()); // Silently resolve if invalid hex
+                    resolvedCoalMineHexes.add(lastHex.getId());
                 }
             }
         }
 
-        // 2. Enforce the interrupt by blocking all other actions
+        // Force the interrupt if a coal mine is being offered
         if (offeringCoalMineHex.value() != null) {
             possibleActions.clear();
             possibleActions.add(new net.sf.rails.game.specific._1817.action.LayCoalToken_1817(getRoot(), comp.getId(),
                     offeringCoalMineHex.value()));
             possibleActions.add(new net.sf.rails.game.specific._1817.action.DeclineCoalToken_1817(getRoot()));
-            return true; // Halt the engine and wait for the UI
+            return true;
         }
-        // 3. Normal engine execution
-        actionsAdded = super.setPossibleActions();
 
-        // --- TERMINAL ACTION CLEANUP ---
-        // If the engine provided a SKIP, but we are in a phase with agency (like Building),
-        // we convert it to DONE or ensure no duplicates exist.
+        // --- 3. CORE ENGINE ACTIONS ---
+        actionsAdded |= super.setPossibleActions();
+
+        // --- 4. TERMINAL ACTION CONSOLIDATION ---
+        // Ensure all companies have a clean 'DONE' exit instead of a 'SKIP/DONE' clash.
         List<NullAction> nulls = possibleActions.getType(NullAction.class);
-        if (nulls.size() > 1) {
-            log.info("1817_DEBUG: Removing duplicate NullActions. Count was: " + nulls.size());
+        if (nulls.size() > 1 || (nulls.size() == 1 && nulls.get(0).getMode() == NullAction.Mode.SKIP)) {
+            log.info("1817_DEBUG: Consolidating NullActions for " + comp.getId());
             possibleActions.removeAll(nulls);
             possibleActions.add(new NullAction(getRoot(), NullAction.Mode.DONE));
         }
 
-        if (!(comp instanceof net.sf.rails.game.specific._1817.PublicCompany_1817))
+        // --- 5. 1817 FINANCIAL LOGIC ---
+        // Only proceed for specific 1817 financial classes.
+        if (!(comp instanceof net.sf.rails.game.specific._1817.PublicCompany_1817)) {
             return actionsAdded;
-
+        }
         
-
-        if (!(comp instanceof net.sf.rails.game.specific._1817.PublicCompany_1817))
-            return actionsAdded;
         net.sf.rails.game.specific._1817.PublicCompany_1817 comp1817 = (net.sf.rails.game.specific._1817.PublicCompany_1817) comp;
-
         int currentLoans = comp1817.getNumberOfBonds();
         int maxLoans = comp1817.getShareCount();
 
-        // 1. Take Loans (Available until the final DONE, except in the interest-repay
-        // blackout)
+        // Take Loans availability
         boolean inBlackout = (interestPaidThisTurn.value() && !repayPhaseDoneThisTurn.value());
         if (!inBlackout && currentLoans < maxLoans) {
             possibleActions.add(
@@ -559,39 +580,17 @@ return false;
             actionsAdded = true;
         }
 
-        // 2. Financial Sequence Logic
         if (step == net.sf.rails.game.GameDef.OrStep.BUY_TRAIN) {
 
-            // State A: Buying Trains (Normal engine actions)
-            if (!trainBuyingDone.value()) {
-                log.info("1817_TRACE: Phase - Buying Trains.");
-                // Let super.setPossibleActions() handle BuyTrain actions
-            }
-
-            // State B: Interest Phase
+            // Interest Phase
             if (trainBuyingDone.value() && !interestPaidThisTurn.value()) {
                 if (currentLoans == 0) {
-                    log.info("1817_TRACE: 0 loans. Auto-advancing to Interest Paid.");
                     interestPaidThisTurn.set(true);
                 } else {
-                    log.info("1817_TRACE: Phase - Paying Interest.");
-                    possibleActions.clear(); // Block train buying/done until interest is handled
-
+                    possibleActions.clear();
                     net.sf.rails.game.model.BondsModel baseBm = ((GameManager_1817) gameManager).getBondsModel();
-                    int interestPerLoan = 1;
-
-                    if (baseBm instanceof BondsModel_1817) {
-                        interestPerLoan = ((BondsModel_1817) baseBm).getInterestRate();
-                        log.info("1817_TRACE: BondsModel_1817 confirmed. Tiered interest rate retrieved: $"
-                                + interestPerLoan);
-                    } else {
-                        log.error("1817_ERROR: Invalid model class instantiated: " + baseBm.getClass().getName()
-                                + ". Defaulting to $5.");
-                    }
-
+                    int interestPerLoan = (baseBm instanceof BondsModel_1817) ? ((BondsModel_1817) baseBm).getInterestRate() : 5;
                     int interestDue = currentLoans * interestPerLoan;
-                    log.info("1817_TRACE: Processing " + currentLoans + " loans at $" + interestPerLoan
-                            + " each. Total due: $" + interestDue);
 
                     if (comp1817.getCash() >= interestDue) {
                         possibleActions.add(new net.sf.rails.game.specific._1817.action.PayLoanInterest_1817(getRoot(),
@@ -604,64 +603,35 @@ return false;
                 }
             }
 
-            // State C: Repayment Phase
+            // Repayment Phase
             if (interestPaidThisTurn.value() && !repayPhaseDoneThisTurn.value()) {
                 if (currentLoans == 0 || comp1817.getCash() < 100) {
-                    log.info("1817_TRACE: Repayment impossible. Auto-advancing.");
                     repayPhaseDoneThisTurn.set(true);
                 } else {
-                    log.info("1817_TRACE: Phase - Repaying Loans.");
                     possibleActions.clear();
                     int maxRepay = Math.min(currentLoans, comp1817.getCash() / 100);
                     possibleActions.add(new net.sf.rails.game.specific._1817.action.RepayLoans_1817(getRoot(),
                             comp1817.getId(), maxRepay));
-                    possibleActions
-                            .add(new rails.game.action.NullAction(getRoot(), rails.game.action.NullAction.Mode.DONE));
+                    possibleActions.add(new NullAction(getRoot(), NullAction.Mode.DONE));
                     return true;
                 }
             }
 
-            // State D: Post-Repayment / Final Window
+            // Post-Repayment Final Window
             if (repayPhaseDoneThisTurn.value()) {
-                log.info("1817_TRACE: Phase - Post-Repayment Final Window.");
-                // Ensure only loans and a single DONE action are present
-                for (rails.game.action.BuyTrain pa : possibleActions.getType(rails.game.action.BuyTrain.class))
+                for (rails.game.action.BuyTrain pa : possibleActions.getType(rails.game.action.BuyTrain.class)) {
                     possibleActions.remove(pa);
-                if (!possibleActions.contains(rails.game.action.NullAction.class)) {
-                    possibleActions
-                            .add(new rails.game.action.NullAction(getRoot(), rails.game.action.NullAction.Mode.DONE));
+                }
+                if (!possibleActions.contains(NullAction.class)) {
+                    possibleActions.add(new NullAction(getRoot(), NullAction.Mode.DONE));
                 }
             }
         }
-
-        // Rule 1.2.6: Offer bridge placement if tokens are available
-        for (net.sf.rails.game.PrivateCompany p : comp.getPortfolioModel().getPrivateCompanies()) {
-            String pid = p.getId();
-            if (("OHB".equals(pid) || "UNB".equals(pid)) && getPlacedBridgeCount(pid) < getBridgeLimit(pid)) {
-                for (String hexId : BRIDGE_CITIES) {
-                    MapHex cityHex = gameManager.getRoot().getMapManager().getHex(hexId);
-                    // Replace missing .hasBonusToken() with an explicit check
-                    boolean bridgeExists = false;
-                    if (cityHex != null && cityHex.getBonusTokens() != null) {
-                        for (net.sf.rails.game.BonusToken t : cityHex.getBonusTokens()) {
-                            if ("Bridge".equals(t.getName())) {
-                                bridgeExists = true;
-                                break;
-                            }
-                        }
-                    }
-                    if (cityHex != null && !bridgeExists) {
-                        possibleActions.add(new net.sf.rails.game.specific._1817.action.LayBridgeToken_1817(getRoot(), comp.getId(), hexId));
-                        actionsAdded = true;
-                    }
-                }
-            }
-        }
-
 
         return actionsAdded;
     }
 
+    
     /**
      * Handles the immediate consequences of failing an interest payment (Rule 6.8).
      * The President pays the shortfall, and the marker moves to the liquidation
