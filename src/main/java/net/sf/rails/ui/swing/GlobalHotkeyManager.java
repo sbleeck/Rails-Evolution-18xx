@@ -23,7 +23,8 @@ private static final Logger log = LoggerFactory.getLogger(GlobalHotkeyManager.cl
 
 // State tracker to prevent "Machine Gun" auto-repeat (Looping)
     private boolean isLKeyPressed = false;
-
+private boolean isEnterKeyPressed = false;
+private boolean isAKeyPressed = false;
 
     public GlobalHotkeyManager(GameUIManager gameUIManager) {
         this.gameUIManager = gameUIManager;
@@ -36,6 +37,12 @@ private static final Logger log = LoggerFactory.getLogger(GlobalHotkeyManager.cl
         if (e.getID() == KeyEvent.KEY_RELEASED) {
             if (e.getKeyCode() == KeyEvent.VK_L) {
                 isLKeyPressed = false;
+            }
+            if (e.getKeyCode() == KeyEvent.VK_ENTER) {
+                isEnterKeyPressed = false;
+            }
+            if (e.getKeyCode() == KeyEvent.VK_A) {
+                isAKeyPressed = false;
             }
             return false; // Always let release events propagate
         }
@@ -76,8 +83,11 @@ private static final Logger log = LoggerFactory.getLogger(GlobalHotkeyManager.cl
         }
 
         // 4. AI MOVE (A)
-        if (!isCtrlDown && !e.isAltDown() && keyCode == KeyEvent.VK_A) {
-            triggerAI();
+       if (!isCtrlDown && !e.isAltDown() && keyCode == KeyEvent.VK_A) {
+            if (!isAKeyPressed) {
+                isAKeyPressed = true;
+                triggerAI();
+            }
             return true;
         }
 
@@ -89,19 +99,23 @@ private static final Logger log = LoggerFactory.getLogger(GlobalHotkeyManager.cl
 
 // 6. ENTER ('Smart Confirm' / 'Discard Train')
         if (!isCtrlDown && !e.isAltDown() && !e.isShiftDown() && keyCode == KeyEvent.VK_ENTER) {
-            if (focusOwner != null) {
-                // Guard 1: Yield to Text Fields (e.g. Chat or input boxes)
-                if (focusOwner instanceof JTextComponent && ((JTextComponent) focusOwner).isEditable()) {
-                    return false; 
+           if (!isEnterKeyPressed) {
+                isEnterKeyPressed = true; // Lock until release
+                if (focusOwner != null) {
+                    // Guard 1: Yield to Text Fields (e.g. Chat or input boxes)
+                    if (focusOwner instanceof JTextComponent && ((JTextComponent) focusOwner).isEditable()) {
+                        return false; 
+                    }
+                    // Guard 2: Yield if focus is inside a Modal/Dialog (e.g. Confirmation Popup)
+                    java.awt.Window activeWindow = javax.swing.SwingUtilities.getWindowAncestor(focusOwner);
+                    if (activeWindow instanceof javax.swing.JDialog) {
+                        return false;
+                    }
                 }
-                // Guard 2: Yield if focus is inside a Modal/Dialog (e.g. Confirmation Popup)
-                java.awt.Window activeWindow = javax.swing.SwingUtilities.getWindowAncestor(focusOwner);
-                if (activeWindow instanceof javax.swing.JDialog) {
-                    return false;
-                }
+                // We are in the main window. Intercept and route to smart handler so 'Done' is default.
+                triggerEnter();
             }
-            // We are in the main window. Intercept and route to smart handler so 'Done' is default.
-            triggerEnter();
+
             return true;
         }
 

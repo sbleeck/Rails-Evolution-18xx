@@ -32,10 +32,19 @@ public BondsModel_1817(net.sf.rails.game.RailsItem parent, net.sf.rails.game.Rai
         }
         
         // Tiered logic
-        if (totalLoans >= 40) return 30;
-        if (totalLoans >= 30) return 25;
-        if (totalLoans >= 20) return 20;
+        if (totalLoans >= 65) return 70;
+        if (totalLoans >= 60) return 65;
+        if (totalLoans >= 55) return 60;
+        if (totalLoans >= 50) return 55;
+        if (totalLoans >= 45) return 50;
+        if (totalLoans >= 40) return 45;
+        if (totalLoans >= 35) return 40;
+        if (totalLoans >= 30) return 35;
+        if (totalLoans >= 25) return 30;
+        if (totalLoans >= 20) return 25;
+        if (totalLoans >= 15) return 20;
         if (totalLoans >= 10) return 15;
-        return 10;
+        if (totalLoans >= 5) return 10;
+        return 5;
     }
 }

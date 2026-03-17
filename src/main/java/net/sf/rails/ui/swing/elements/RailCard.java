@@ -412,13 +412,17 @@ public void setState(State state) {
 
         switch (state) {
             case ACTIONABLE:
-                this.setBorder(BORDER_ACTIONABLE);
+               this.setBorder(BORDER_ACTIONABLE);
                 this.setBackground(COL_ACTIONABLE_BG);
                 break;
             case SELECTED:
                 this.setSelected(true);
                 this.setBorder(BORDER_SELECTED);
                 this.setBackground(COL_SELECTED_BG);
+                break;
+            case HIGHLIGHTED:
+                this.setBorder(BORDER_HIGHLIGHT);
+                this.setBackground(COL_HIGHLIGHT_BG);
                 break;
             case PASSIVE:
                 this.setBorder(BORDER_PASSIVE);
@@ -433,11 +437,7 @@ public void setState(State state) {
             case HIDDEN:
                 this.setVisible(false);
                 break;
-            // --- NEW CASE ---
-            case HIGHLIGHTED:
-                this.setBorder(BORDER_HIGHLIGHT);
-                this.setBackground(COL_HIGHLIGHT_BG);
-                break;
+            
         }
         updateView();
     }

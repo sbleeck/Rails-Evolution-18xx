@@ -31,6 +31,17 @@ public class BonusToken extends Token<BonusToken> implements Closeable, Configur
         return token;
     }
 
+    public void setName(String name) {
+        this.name = name;
+        this.description = name + " bonus token";
+    }
+    public void setValue(int value) {
+        this.value = value;
+        if (name != null) {
+            this.description = name + " +" + Bank.format(this, value) + " bonus token";
+        }
+    }
+
     @Override
     public void configureFromXML(Tag tag) throws ConfigurationException {
         Tag bonusTokenTag = tag.getChild("BonusToken");

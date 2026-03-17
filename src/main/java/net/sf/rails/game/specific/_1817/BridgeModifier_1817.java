@@ -14,30 +14,29 @@ import java.util.List;
 import java.util.HashSet;
 import java.util.Set;
 
-public class CoalMineModifier_1817 implements RevenueDynamicModifier {
+public class BridgeModifier_1817 implements RevenueDynamicModifier {
 
-    private static final Logger log = LoggerFactory.getLogger(CoalMineModifier_1817.class);
+    private static final Logger log = LoggerFactory.getLogger(BridgeModifier_1817.class);
     private int calculatedBonus = 0;
 
     @Override
     public boolean prepareModifier(RevenueAdapter revenueAdapter) {
-        log.info("1817_REVENUE: CoalMineModifier prepared.");
+        log.info("1817_REVENUE: BridgeModifier prepared.");
         return true;
     }
 
-
     @Override
     public int predictionValue(List<RevenueTrainRun> runs) {
-        return calculateCoalMineBonus(runs);
+        return calculateBridgeBonus(runs);
     }
 
     @Override
     public int evaluationValue(List<RevenueTrainRun> runs, boolean optimalRuns) {
-        int bonus = calculateCoalMineBonus(runs);
+        int bonus = calculateBridgeBonus(runs);
         if (optimalRuns) {
             calculatedBonus = bonus;
             if (bonus > 0) {
-                log.info("1817_REVENUE: Total Coal Bonus calculated: ${}", bonus);
+                log.info("1817_REVENUE: Total Bridge Bonus calculated: ${}", bonus);
             }
         }
         return bonus;
@@ -50,24 +49,18 @@ public class CoalMineModifier_1817 implements RevenueDynamicModifier {
     @Override
     public String prettyPrint(RevenueAdapter revenueAdapter) {
         if (calculatedBonus > 0) {
-            return " + $" + calculatedBonus + " (Coal Mine)";
+            return " + $" + calculatedBonus + " (Bridge)";
         }
         return null;
     }
 
-    // We are modifying CoalMineModifier_1817.java
-
-    private boolean hasCoalMineToken(MapHex hex) {
+    private boolean hasBridgeToken(MapHex hex) {
         if (hex == null || hex.getBonusTokens() == null)
             return false;
 
         for (BonusToken t : hex.getBonusTokens()) {
             if (t != null) {
-                // EMERGENCY LOG: See exactly what the modifier is looking at
-                log.info("1817_REVENUE: Hex {} has token. ID='{}', Name='{}'",
-                        hex.getId(), t.getId(), t.getName());
-
-                if ("CoalMine".equals(t.getName()) || "CoalMine".equals(t.getId())) {
+                if ("Bridge".equals(t.getName()) || "Bridge".equals(t.getId())) {
                     return true;
                 }
             }
@@ -75,16 +68,14 @@ public class CoalMineModifier_1817 implements RevenueDynamicModifier {
         return false;
     }
 
-
-
-private int calculateCoalMineBonus(List<RevenueTrainRun> runs) {
+    private int calculateBridgeBonus(List<RevenueTrainRun> runs) {
         int totalBonus = 0;
         if (runs == null) return 0;
         
         for (RevenueTrainRun run : runs) {
             Set<MapHex> visitedHexes = new HashSet<>();
             
-            // 1. Check hexes associated with explicit vertices (Cities/Off-maps)
+            // 1. Check hexes associated with explicit vertices (Cities like Louisville/Cincinnati)
             if (run.getRunVertices() != null) {
                 for (NetworkVertex v : run.getRunVertices()) {
                     if (v != null && v.getHex() != null) {
@@ -93,11 +84,10 @@ private int calculateCoalMineBonus(List<RevenueTrainRun> runs) {
                 }
             }
 
-            // 2. Check hexes associated with edges (Plain track/Mountains)
+            // 2. Check edges for hidden path hexes (if any)
             List<NetworkEdge> edges = run.getEdges(); 
             if (edges != null) {
                 for (NetworkEdge e : edges) {
-                    // getVertexPath() returns source, target, and all hidden track hexes
                     List<NetworkVertex> path = e.getVertexPath();
                     if (path != null) {
                         for (NetworkVertex v : path) {
@@ -109,23 +99,14 @@ private int calculateCoalMineBonus(List<RevenueTrainRun> runs) {
                 }
             }
             
-            // 3. Award $10 once per hex touched by this specific train run
+            // 3. Award $10 once per bridge hex touched by this train run
             for (MapHex hex : visitedHexes) {
-                if (hasCoalMineToken(hex)) {
+                if (hasBridgeToken(hex)) {
                     totalBonus += 10;
-                    log.info("1817_REVENUE: SUCCESS! Added $10 for Coal Mine on {}", hex.getId());
+                    log.info("1817_REVENUE: Bridge bonus applied for hex {}", hex.getId());
                 }
             }
         }
         return totalBonus;
     }
-
-
-
-
-
-
-
-
-
 }

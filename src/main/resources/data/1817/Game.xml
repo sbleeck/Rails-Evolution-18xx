@@ -120,6 +120,7 @@
 
 <Component name="RevenueManager" class="net.sf.rails.algorithms.RevenueManager">
 		<Modifier class="net.sf.rails.game.specific._1817.CoalMineModifier_1817"/>
+		<Modifier class="net.sf.rails.game.specific._1817.BridgeModifier_1817"/>
 	</Component>
 
 	

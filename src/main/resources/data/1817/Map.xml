@@ -3,6 +3,12 @@
 	<Image file="1817/1817B.svg" x="35" y="7" scale="0.94"/>
 
 
+    <Tokens>
+		<BonusToken name="CoalMine" svg="1817/CoalMine.svg" value="10" />
+		<BonusToken name="Bridge" svg="1817/Bridge.svg" value="10" />
+    </Tokens>
+
+
     <Hex name="A20" tile="-901" city="Montreal" value="20,30,50,60"/> 
     <Hex name="A28" tile="-901" city="Maritime Prov" value="20,30,50,60"/>
 
@@ -111,9 +117,9 @@
 	<Hex name="I2" tile="0"/>
 	<Hex name="I4" tile="0"/>
 	<Hex name="I6" tile="0"/>
-	<Hex name="I8" tile="0" cost="20" />
-	<Hex name="I10" tile="0" cost="20"/>
-	<Hex name="I12" tile="-10" cost="20" city="Blacksburg"/>
+	<Hex name="I8" tile="0" cost="15" />
+	<Hex name="I10" tile="0" cost="15"/>
+	<Hex name="I12" tile="-10" city="Blacksburg"/>
 	<Hex name="I14" tile="0"/>
 	<Hex name="I16" tile="-10" city="Richmond"/>
 	<Hex name="I18" tile="0"/>
@@ -125,7 +131,6 @@
 		<Hex name="J15" tile="-906" value="20,30,50,60" city="Raleigh-Durham">
 				<Access runThrough="no"/>
 	</Hex>
-
 
 
 		

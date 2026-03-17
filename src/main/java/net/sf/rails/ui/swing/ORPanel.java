@@ -370,8 +370,6 @@ public class ORPanel extends GridPanel
                 }
             }
 
-
-
             // Continue with standard distribution...
             if (pa instanceof SetDividend) {
                 SetDividend sd = (SetDividend) pa;
@@ -387,15 +385,15 @@ public class ORPanel extends GridPanel
             } else if (pa instanceof NullAction) {
                 NullAction.Mode mode = ((NullAction) pa).getMode();
                 if (mode == NullAction.Mode.DONE || mode == NullAction.Mode.PASS || mode == NullAction.Mode.SKIP) {
-if (activePhase == 4 && btnTrainSkip != null) {
-setupButton(btnTrainSkip, pa);
-btnTrainSkip.setText(mode == NullAction.Mode.SKIP ? "Skip Buy" : "Done Buying");
-}
-setupButton(btnDone, pa);
-bindActionHotkey(btnDone, pa);
-donePa = pa;
-doneActionFound = true;
-}
+                    if (activePhase == 4 && btnTrainSkip != null) {
+                        setupButton(btnTrainSkip, pa);
+                        btnTrainSkip.setText(mode == NullAction.Mode.SKIP ? "Skip Buy" : "Done Buying");
+                    }
+                    setupButton(btnDone, pa);
+                    bindActionHotkey(btnDone, pa);
+                    donePa = pa;
+                    doneActionFound = true;
+                }
 
             }
         }
@@ -444,13 +442,13 @@ doneActionFound = true;
                 BorderFactory.createLineBorder(Color.BLACK, 1),
                 BorderFactory.createEmptyBorder(3, 5, 3, 5)));
 
-btn.setAlignmentX(Component.CENTER_ALIGNMENT);
-btn.setMaximumSize(new Dimension(SIDEBAR_WIDTH - 10, 30));
-btn.setPossibleAction(action);
-btn.setEnabled(true);
-btn.addActionListener(this);
+        btn.setAlignmentX(Component.CENTER_ALIGNMENT);
+        btn.setMaximumSize(new Dimension(SIDEBAR_WIDTH - 10, 30));
+        btn.setPossibleAction(action);
+        btn.setEnabled(true);
+        btn.addActionListener(this);
 
-    if (specialActionsButtonPanel != null) {
+        if (specialActionsButtonPanel != null) {
             specialActionsButtonPanel.add(btn);
             specialActionsButtonPanel.add(Box.createVerticalStrut(4));
         }
@@ -535,12 +533,12 @@ btn.addActionListener(this);
         lblCompanyInfo.setForeground(fg);
         lblCompanyInfo.setVisible(true);
 
-        // MIDDLE: Player Name
-        // FIX: Increased font size from '3' to '6' and added bold
         if (lblPlayerInfo != null) {
-            lblPlayerInfo.setText("<html><center><font size='6'><b>" + playerName + "</b></font></center></html>");
-            lblPlayerInfo.setBackground(bg); // Applied Company BG
-            lblPlayerInfo.setForeground(fg); // Applied Company FG
+            lblPlayerInfo
+                    .setText("<html><center><font face='SansSerif' size='5'>" + playerName + "</font></center></html>");
+            lblPlayerInfo.setBackground(bg);
+            lblPlayerInfo.setForeground(fg);
+            lblPlayerInfo.setBorder(BorderFactory.createMatteBorder(0, 1, 0, 1, Color.DARK_GRAY));
             lblPlayerInfo.setVisible(true);
         }
 
@@ -577,49 +575,54 @@ btn.addActionListener(this);
     }
 
     private String getDoneButtonText() {
-String text = "END TURN";
-if (orComp == null && currentOperatingComp == null) return text;
+        String text = "END TURN";
+        if (orComp == null && currentOperatingComp == null)
+            return text;
 
-    PublicCompany compToCheck = (orComp != null) ? orComp : currentOperatingComp;
-    boolean is1817 = compToCheck.getClass().getSimpleName().contains("1817");
-    if (!is1817) return text;
+        PublicCompany compToCheck = (orComp != null) ? orComp : currentOperatingComp;
+        boolean is1817 = compToCheck.getClass().getSimpleName().contains("1817");
+        if (!is1817)
+            return text;
 
-    if (orUIManager != null && orUIManager.getGameUIManager() != null && orUIManager.getGameUIManager().getGameManager() != null) {
-        net.sf.rails.game.round.RoundFacade currentRound = orUIManager.getGameUIManager().getGameManager().getCurrentRound();
-        if (currentRound instanceof OperatingRound) {
-            OperatingRound or = (OperatingRound) currentRound;
-            net.sf.rails.game.GameDef.OrStep step = or.getStep();
-            
-            if (step.compareTo(net.sf.rails.game.GameDef.OrStep.BUY_TRAIN) < 0) {
-                return "Continue";
-            }
-            
-            try {
-                java.lang.reflect.Field field = or.getClass().getDeclaredField("repayPhaseDoneThisTurn");
-                field.setAccessible(true);
-                Object state = field.get(or);
-                java.lang.reflect.Method m = state.getClass().getMethod("value");
-                boolean isRepayDone = (Boolean) m.invoke(state);
-                if (!isRepayDone) {
+        if (orUIManager != null && orUIManager.getGameUIManager() != null
+                && orUIManager.getGameUIManager().getGameManager() != null) {
+            net.sf.rails.game.round.RoundFacade currentRound = orUIManager.getGameUIManager().getGameManager()
+                    .getCurrentRound();
+            if (currentRound instanceof OperatingRound) {
+                OperatingRound or = (OperatingRound) currentRound;
+                net.sf.rails.game.GameDef.OrStep step = or.getStep();
+
+                if (step.compareTo(net.sf.rails.game.GameDef.OrStep.BUY_TRAIN) < 0) {
                     return "Continue";
                 }
-            } catch (Exception e) {
-                rails.game.action.PossibleActions possibleActionsObj = orUIManager.getGameUIManager().getGameManager().getPossibleActions();
-                if (possibleActionsObj != null) {
-                    for (PossibleAction pa : possibleActionsObj.getList()) {
-                        if (pa instanceof BuyTrain || 
-                            pa.getClass().getSimpleName().contains("RepayLoans") || 
-                            pa.getClass().getSimpleName().contains("PayLoanInterest") ||
-                            pa.getClass().getSimpleName().contains("LiquidateCompany")) {
-                            return "Continue";
+
+                try {
+                    java.lang.reflect.Field field = or.getClass().getDeclaredField("repayPhaseDoneThisTurn");
+                    field.setAccessible(true);
+                    Object state = field.get(or);
+                    java.lang.reflect.Method m = state.getClass().getMethod("value");
+                    boolean isRepayDone = (Boolean) m.invoke(state);
+                    if (!isRepayDone) {
+                        return "Continue";
+                    }
+                } catch (Exception e) {
+                    rails.game.action.PossibleActions possibleActionsObj = orUIManager.getGameUIManager()
+                            .getGameManager().getPossibleActions();
+                    if (possibleActionsObj != null) {
+                        for (PossibleAction pa : possibleActionsObj.getList()) {
+                            if (pa instanceof BuyTrain ||
+                                    pa.getClass().getSimpleName().contains("RepayLoans") ||
+                                    pa.getClass().getSimpleName().contains("PayLoanInterest") ||
+                                    pa.getClass().getSimpleName().contains("LiquidateCompany")) {
+                                return "Continue";
+                            }
                         }
                     }
                 }
             }
         }
+        return text;
     }
-    return text;
-}
 
     private void colorizeActivePhase(Color unused) {
         resetPhasePanel(phase1Panel, btnTileConfirm);
@@ -753,7 +756,7 @@ if (orComp == null && currentOperatingComp == null) return text;
                 btnDone.setFont(new Font("SansSerif", Font.BOLD, 14));
             }
         }
-   
+
         // ALWAYS evaluate Phase 5 (Special Actions) independently!
         boolean hasSpecialActions = specialActionsButtonPanel != null
                 && specialActionsButtonPanel.getComponentCount() > 0;
@@ -1555,6 +1558,19 @@ if (orComp == null && currentOperatingComp == null) return text;
             if (isRevenueValueToBeSet) {
                 // Pass the 'special' value (Mine Revenue) from the calculator to the button.
                 setRevenue(orCompIndex, best, special);
+                // Re-enable the Revenue buttons now that calculations are done
+                if (finalRes) {
+                    if (btnRevPayout != null && btnRevPayout.getPossibleActions() != null
+                            && !btnRevPayout.getPossibleActions().isEmpty())
+                        btnRevPayout.setEnabled(true);
+                    if (btnRevWithhold != null && btnRevWithhold.getPossibleActions() != null
+                            && !btnRevWithhold.getPossibleActions().isEmpty())
+                        btnRevWithhold.setEnabled(true);
+                    if (btnRevSplit != null && btnRevSplit.getPossibleActions() != null
+                            && !btnRevSplit.getPossibleActions().isEmpty())
+                        btnRevSplit.setEnabled(true);
+                    updateDefaultButton(); // Refresh focus targets
+                }
             }
 
             if (finalRes && isDisplayCurrentRoutes()) {
@@ -1603,6 +1619,15 @@ if (orComp == null && currentOperatingComp == null) return text;
     private void updateCurrentRoutes(boolean isSetRevenueStep) {
         if (orComp != null && !orComp.isClosed()) {
             isRevenueValueToBeSet = isSetRevenueStep;
+            // Temporarily disable Revenue buttons while calculating
+            if (isSetRevenueStep) {
+                if (btnRevPayout != null)
+                    btnRevPayout.setEnabled(false);
+                if (btnRevWithhold != null)
+                    btnRevWithhold.setEnabled(false);
+                if (btnRevSplit != null)
+                    btnRevSplit.setEnabled(false);
+            }
             RailsRoot root = orUIManager.getGameUIManager().getRoot();
             if (revenueThread != null)
                 revenueThread.interrupt();
@@ -1953,13 +1978,14 @@ if (orComp == null && currentOperatingComp == null) return text;
 
         if (lblCompanyInfo != null) {
             String playerInfo = (orComp.getPresident() != null) ? orComp.getPresident().getName() : "";
-            // TOP LABEL: Company Info
+
+            // TOP LABEL: Company Info ONLY
             String topText = "<html><center>" +
-                    "<font face='SansSerif' size='6'><b>" + orComp.getId() + "</b></font><br>" +
-                    "<font face='SansSerif' size='5'>" + playerInfo + "</font>" +
+                    "<font face='SansSerif' size='6'><b>" + orComp.getId() + "</b></font>" +
                     "</center></html>";
 
             lblCompanyInfo.setText(topText);
+
             lblCompanyInfo.setBackground(orComp.getBgColour());
             lblCompanyInfo.setForeground(orComp.getFgColour());
 
@@ -1967,11 +1993,15 @@ if (orComp == null && currentOperatingComp == null) return text;
             lblCompanyInfo.setBorder(BorderFactory.createMatteBorder(1, 1, 0, 1, Color.DARK_GRAY));
             lblCompanyInfo.setVisible(true);
 
-            // Hide the special mode player label to prevent "hangovers" from previous
-            // rounds
             if (lblPlayerInfo != null) {
-                lblPlayerInfo.setVisible(false);
+                lblPlayerInfo.setText(
+                        "<html><center><font face='SansSerif' size='5'>" + playerInfo + "</font></center></html>");
+                lblPlayerInfo.setBackground(orComp.getBgColour());
+                lblPlayerInfo.setForeground(orComp.getFgColour());
+                lblPlayerInfo.setBorder(BorderFactory.createMatteBorder(0, 1, 0, 1, Color.DARK_GRAY));
+                lblPlayerInfo.setVisible(true);
             }
+
             // BOTTOM LABEL: Instruction
             // Reverted to match Company Logo colors (Unified Header)
             String bottomText = "<html><center><font face='SansSerif' size='4'><b>" + instruction
@@ -2094,7 +2124,8 @@ if (orComp == null && currentOperatingComp == null) return text;
                 processTakeLoans_1817((net.sf.rails.game.specific._1817.action.LoanAction) executedActions.get(0));
                 return;
             } else if (executedActions.get(0) instanceof net.sf.rails.game.specific._1817.action.RepayLoans_1817) {
-                processRepayLoans_1817((net.sf.rails.game.specific._1817.action.RepayLoans_1817) executedActions.get(0));
+                processRepayLoans_1817(
+                        (net.sf.rails.game.specific._1817.action.RepayLoans_1817) executedActions.get(0));
                 return;
             } else {
                 orUIManager.processAction(command, executedActions, source);
@@ -2119,8 +2150,9 @@ if (orComp == null && currentOperatingComp == null) return text;
     private void processRepayLoans_1817(net.sf.rails.game.specific._1817.action.RepayLoans_1817 action) {
         String compId = action.getCompanyId();
         int max = action.getMaxRepayable();
-        
-        if (max <= 0) return;
+
+        if (max <= 0)
+            return;
 
         String[] options = new String[max];
         for (int i = 0; i < max; i++) {
@@ -2133,18 +2165,19 @@ if (orComp == null && currentOperatingComp == null) return text;
 
         if (selected != null) {
             action.setLoansToRepay(Integer.parseInt(selected));
-            orUIManager.processAction("RepayLoans", java.util.Collections.singletonList((rails.game.action.PossibleAction) action), this);
+            orUIManager.processAction("RepayLoans",
+                    java.util.Collections.singletonList((rails.game.action.PossibleAction) action), this);
         } else {
-             if (specialActionsButtonPanel != null) {
-                 for (Component c : specialActionsButtonPanel.getComponents()) {
-                     if (c instanceof ActionButton) {
-                         ((ActionButton) c).setEnabled(true);
-                     }
-                 }
-             }
+            if (specialActionsButtonPanel != null) {
+                for (Component c : specialActionsButtonPanel.getComponents()) {
+                    if (c instanceof ActionButton) {
+                        ((ActionButton) c).setEnabled(true);
+                    }
+                }
+            }
         }
     }
-    
+
     private void processTakeLoans_1817(net.sf.rails.game.specific._1817.action.LoanAction action) {
         String compId = action.getCompanyId();
         int max = action.getMaxLoansAllowed();
@@ -2242,15 +2275,16 @@ if (orComp == null && currentOperatingComp == null) return text;
 
         Company highlightTarget = null;
 
-// 1. Extract Visual Signature
-if (action.getClass().getSimpleName().contains("1817")) {
-bgColor = new Color(255, 140, 0); // Vibrant Orange
-borderColor = Color.BLACK;
-textColor = Color.WHITE;
-label = action.getButtonLabel();
-if (label == null || label.isEmpty()) label = action.toString();
-} else if (action instanceof GuiTargetedAction) {
-    
+        // 1. Extract Visual Signature
+        if (action.getClass().getSimpleName().contains("1817")) {
+            bgColor = new Color(255, 140, 0); // Vibrant Orange
+            borderColor = Color.BLACK;
+            textColor = Color.WHITE;
+            label = action.getButtonLabel();
+            if (label == null || label.isEmpty())
+                label = action.toString();
+        } else if (action instanceof GuiTargetedAction) {
+
             GuiTargetedAction gta = (GuiTargetedAction) action;
             label = gta.getButtonLabel();
 
@@ -2472,7 +2506,6 @@ if (label == null || label.isEmpty()) label = action.toString();
                 }
             }
 
-
             // 4. GENERIC CONTEXT SWITCH
             // If the special action dictates a specific actor (e.g. a Company discarding
             // out of turn),
@@ -2497,18 +2530,20 @@ if (label == null || label.isEmpty()) label = action.toString();
                 if (contextProvider != null) {
                     updateSpecialHeader(contextProvider);
                 } else if (isMaARound && this.orComp != null) {
-                    lblCompanyInfo.setText(
-                            "<html><center><font size='6'><b>" + this.orComp.getId() + "</b></font></center></html>");
+                    lblCompanyInfo.setText("<html><center><font face='SansSerif' size='6'><b>" + this.orComp.getId()
+                            + "</b></font></center></html>");
                     lblCompanyInfo.setBackground(this.orComp.getBgColour());
                     lblCompanyInfo.setForeground(this.orComp.getFgColour());
                     lblCompanyInfo.setVisible(true);
 
-                    if (lblPhaseInstruction != null) {
-                        lblPhaseInstruction
-                                .setText("<html><center><font size='4'><b>M&A Actions</b></font></center></html>");
-                        lblPhaseInstruction.setBackground(this.orComp.getBgColour());
-                        lblPhaseInstruction.setForeground(this.orComp.getFgColour());
-                        lblPhaseInstruction.setVisible(true);
+                    if (lblPlayerInfo != null) {
+                        String pName = (this.orComp.getPresident() != null) ? this.orComp.getPresident().getName() : "";
+                        lblPlayerInfo.setText(
+                                "<html><center><font face='SansSerif' size='5'>" + pName + "</font></center></html>");
+                        lblPlayerInfo.setBackground(this.orComp.getBgColour());
+                        lblPlayerInfo.setForeground(this.orComp.getFgColour());
+                        lblPlayerInfo.setBorder(BorderFactory.createMatteBorder(0, 1, 0, 1, Color.DARK_GRAY));
+                        lblPlayerInfo.setVisible(true);
                     }
                 }
 

@@ -3332,6 +3332,10 @@ int totalLoans = 0;
                             log.error("Failed to bind 1817 IPO action", e);
                         }
                     }
+
+
+                    
+
                 }
             }
 
@@ -3360,21 +3364,15 @@ int totalLoans = 0;
      * A Custom Flat Progress Bar for Certificate Limits.
      * Visualizes "Held vs Limit" with color coding and text overlay.
      */
-    private static class CertLimitGauge extends JPanel {
-        private int held = 0;
-        private int limit = 1;
-        private String text = "-/-";
-
+private static class CertLimitGauge extends JLabel {
         public CertLimitGauge() {
             setOpaque(true);
             setFont(new Font("SansSerif", Font.BOLD, 12));
+            setHorizontalAlignment(SwingConstants.CENTER);
         }
 
         public void update(int held, int limit) {
-            this.held = held;
-            this.limit = limit;
-            this.text = held + "/" + limit;
-            repaint();
+            setText(held + "/" + limit);
         }
     }
 
