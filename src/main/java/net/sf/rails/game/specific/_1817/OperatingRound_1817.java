@@ -116,6 +116,10 @@ public class OperatingRound_1817 extends OperatingRound {
         if (hexesLaidThisTurn.contains(hex)) {
             return false;
         }
+
+        if (hasCoalMineToken(hex)) {
+            return false;
+        }
         return true;
     }
 
@@ -130,7 +134,9 @@ public class OperatingRound_1817 extends OperatingRound {
         if (tilesLaidThisTurn.value() > 0) {
             int extraCost = 20;
             cost += extraCost;
-        } else {
+        }
+        if (standardCost == 15 && isLayingCoalMine.value()) {
+            cost -= 15;
         }
 
         return cost;
@@ -229,6 +235,48 @@ public class OperatingRound_1817 extends OperatingRound {
     public boolean processGameSpecificAction(PossibleAction action) {
         log.info("1817_TRACE: processGameSpecificAction() called with action: {}", action.getClass().getSimpleName());
 
+        if (action instanceof net.sf.rails.game.specific._1817.action.LayCoalToken_1817) {
+            net.sf.rails.game.specific._1817.action.LayCoalToken_1817 coalAction = (net.sf.rails.game.specific._1817.action.LayCoalToken_1817) action;
+            PublicCompany comp = companyManager.getPublicCompany(coalAction.getCompanyId());
+            MapHex hex = gameManager.getRoot().getMapManager().getHex(coalAction.getHexId());
+
+           
+            if (comp != null && hex != null) {
+                // Refund the $15 paid during the standard LayTile action
+                if (comp instanceof net.sf.rails.game.specific._1817.PublicCompany_1817) {
+                    ((net.sf.rails.game.specific._1817.PublicCompany_1817) comp).addCashFromBank(15, gameManager.getRoot().getBank());
+                }
+
+                // Identify the specific coal mine private company to use as the token's parent
+                net.sf.rails.game.PrivateCompany coalPrivate = null;
+                for (net.sf.rails.game.PrivateCompany priv : comp.getPortfolioModel().getPrivateCompanies()) {
+                    if (priv != null) {
+                        String id = priv.getId();
+                        if ("MIN30".equals(id) || "COA60".equals(id) || "MAJ90".equals(id)) {
+                            coalPrivate = priv;
+                            break;
+                        }
+                    }
+                }
+
+                if (coalPrivate != null) {
+                    // Place the token using the private company as the root item
+                    net.sf.rails.game.BonusToken coalToken = net.sf.rails.game.BonusToken.create(coalPrivate);
+                    hex.layBonusToken(coalToken, gameManager.getRoot().getPhaseManager());
+                } else {
+                    log.error("1817_ERROR: Could not find Coal Mine private company in {} portfolio.", comp.getId());
+                }
+
+
+                net.sf.rails.common.ReportBuffer.add(this, comp.getId() + " places a Coal Mine on " + hex.getId() + " and is refunded $15.");
+                log.info("1817_TRACE: Placed coal mine on hex {}. Refunded $15 to {}.", hex.getId(), comp.getId());
+
+                return true;
+            }
+
+            return false;
+        }
+
         if (action instanceof net.sf.rails.game.specific._1817.action.TakeLoans_1817) {
             net.sf.rails.game.specific._1817.action.TakeLoans_1817 tlAction = (net.sf.rails.game.specific._1817.action.TakeLoans_1817) action;
             PublicCompany comp = companyManager.getPublicCompany(tlAction.getCompanyId());
@@ -323,7 +371,7 @@ public class OperatingRound_1817 extends OperatingRound {
                 }
             }
             return true;
-        } 
+        }
         if (action instanceof net.sf.rails.game.specific._1817.action.LiquidateCompany_1817) {
             return handleImmediateLiquidation((net.sf.rails.game.specific._1817.action.LiquidateCompany_1817) action);
         }
@@ -333,9 +381,7 @@ public class OperatingRound_1817 extends OperatingRound {
         return super.processGameSpecificAction(action);
     }
 
-
     // We are modifying OperatingRound_1817.java 'TEST'
-
 
     @Override
     protected void initTurn() {
@@ -380,6 +426,20 @@ public class OperatingRound_1817 extends OperatingRound {
         PublicCompany comp = operatingCompany.value();
         net.sf.rails.game.GameDef.OrStep step = getStep();
 
+        // 1817 Coal Mine logic: Inject action if a yellow tile was just laid on a $15
+        // mountain
+        if ("Yellow".equalsIgnoreCase(lastLaidTileColour) && !hexesLaidThisTurn.isEmpty()) {
+            MapHex lastHex = hexesLaidThisTurn.get(hexesLaidThisTurn.size() - 1);
+            Integer baseCost = hexBaseCosts.get(lastHex.getId());
+            if (baseCost != null && baseCost == 15 && !hasCoalMineToken(lastHex)) {
+                if (hasAvailableCoalMine(comp)) {
+                    possibleActions.add(new net.sf.rails.game.specific._1817.action.LayCoalToken_1817(getRoot(),
+                            comp.getId(), lastHex.getId()));
+                    actionsAdded = true;
+                }
+            }
+        }
+
         if (!(comp instanceof net.sf.rails.game.specific._1817.PublicCompany_1817))
             return actionsAdded;
         net.sf.rails.game.specific._1817.PublicCompany_1817 comp1817 = (net.sf.rails.game.specific._1817.PublicCompany_1817) comp;
@@ -414,19 +474,21 @@ public class OperatingRound_1817 extends OperatingRound {
                     log.info("1817_TRACE: Phase - Paying Interest.");
                     possibleActions.clear(); // Block train buying/done until interest is handled
 
-                   net.sf.rails.game.model.BondsModel baseBm = ((GameManager_1817) gameManager).getBondsModel();
+                    net.sf.rails.game.model.BondsModel baseBm = ((GameManager_1817) gameManager).getBondsModel();
                     int interestPerLoan = 1;
-                    
+
                     if (baseBm instanceof BondsModel_1817) {
                         interestPerLoan = ((BondsModel_1817) baseBm).getInterestRate();
-                        log.info("1817_TRACE: BondsModel_1817 confirmed. Tiered interest rate retrieved: $" + interestPerLoan);
+                        log.info("1817_TRACE: BondsModel_1817 confirmed. Tiered interest rate retrieved: $"
+                                + interestPerLoan);
                     } else {
-                        log.error("1817_ERROR: Invalid model class instantiated: " + baseBm.getClass().getName() + ". Defaulting to $5.");
+                        log.error("1817_ERROR: Invalid model class instantiated: " + baseBm.getClass().getName()
+                                + ". Defaulting to $5.");
                     }
 
                     int interestDue = currentLoans * interestPerLoan;
-                    log.info("1817_TRACE: Processing " + currentLoans + " loans at $" + interestPerLoan + " each. Total due: $" + interestDue);
-
+                    log.info("1817_TRACE: Processing " + currentLoans + " loans at $" + interestPerLoan
+                            + " each. Total due: $" + interestDue);
 
                     if (comp1817.getCash() >= interestDue) {
                         possibleActions.add(new net.sf.rails.game.specific._1817.action.PayLoanInterest_1817(getRoot(),
@@ -472,23 +534,25 @@ public class OperatingRound_1817 extends OperatingRound {
     }
     // --- END FIX ---
 
-// ... (at the end of the class) ...
+    // ... (at the end of the class) ...
 
-// --- START FIX ---
+    // --- START FIX ---
     /**
      * Handles the immediate consequences of failing an interest payment (Rule 6.8).
-     * The President pays the shortfall, and the marker moves to the liquidation space.
+     * The President pays the shortfall, and the marker moves to the liquidation
+     * space.
      */
-private boolean handleImmediateLiquidation(net.sf.rails.game.specific._1817.action.LiquidateCompany_1817 action) {
+    private boolean handleImmediateLiquidation(net.sf.rails.game.specific._1817.action.LiquidateCompany_1817 action) {
         PublicCompany comp = companyManager.getPublicCompany(action.getCompanyName());
-        if (comp == null) return false;
+        if (comp == null)
+            return false;
 
         int totalInterestDue = action.getShortfall();
         int compCash = comp.getCash();
         int playerShortfall = Math.max(0, totalInterestDue - compCash);
         net.sf.rails.game.Player president = (net.sf.rails.game.Player) comp.getPresident();
 
-        log.info("1817_TRACE: Liquidating {}. Interest due: ${}, Company cash: ${}", 
+        log.info("1817_TRACE: Liquidating {}. Interest due: ${}, Company cash: ${}",
                 comp.getId(), totalInterestDue, compCash);
 
         // 1. Drain company treasury to pay what it can (Rule 6.8)
@@ -499,12 +563,14 @@ private boolean handleImmediateLiquidation(net.sf.rails.game.specific._1817.acti
         // 2. President personally pays the remaining shortfall (Rule 6.8)
         if (playerShortfall > 0 && president != null) {
             net.sf.rails.game.state.Currency.toBank(president, playerShortfall);
-            net.sf.rails.common.ReportBuffer.add(gameManager, 
-                president.getName() + " personally pays $" + playerShortfall + " interest shortfall for " + comp.getId() + ".");
+            net.sf.rails.common.ReportBuffer.add(gameManager,
+                    president.getName() + " personally pays $" + playerShortfall + " interest shortfall for "
+                            + comp.getId() + ".");
         }
 
         // 3. Move marker to the Red Liquidation space (price 0)
-        net.sf.rails.game.financial.StockMarket market = (net.sf.rails.game.financial.StockMarket) getRoot().getStockMarket();
+        net.sf.rails.game.financial.StockMarket market = (net.sf.rails.game.financial.StockMarket) getRoot()
+                .getStockMarket();
         net.sf.rails.game.financial.StockSpace liquidationSpace = null;
         for (int r = 0; r < market.getNumberOfRows(); r++) {
             for (int c = 0; c < market.getNumberOfColumns(); c++) {
@@ -514,7 +580,8 @@ private boolean handleImmediateLiquidation(net.sf.rails.game.specific._1817.acti
                     break;
                 }
             }
-            if (liquidationSpace != null) break;
+            if (liquidationSpace != null)
+                break;
         }
 
         if (liquidationSpace != null) {
@@ -536,5 +603,45 @@ private boolean handleImmediateLiquidation(net.sf.rails.game.specific._1817.acti
 
         return true;
     }
-    
+
+    // State to track if the current tile lay is accompanied by a coal mine token
+    // placement
+    protected final net.sf.rails.game.state.BooleanState isLayingCoalMine = new net.sf.rails.game.state.BooleanState(
+            this, "isLayingCoalMine", false);
+
+    /**
+     * Helper to check if a hex contains any Coal Mine token.
+     */
+    private boolean hasCoalMineToken(MapHex hex) {
+        if (hex == null || hex.getBonusTokens() == null)
+            return false;
+
+        for (net.sf.rails.game.BonusToken t : hex.getBonusTokens()) {
+            if (t != null && t.getParent() != null) {
+                String id = t.getParent().getId();
+                if ("MIN30".equals(id) || "COA60".equals(id) || "MAJ90".equals(id)) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Helper to verify if the company owns a coal mine private company.
+     */
+    private boolean hasAvailableCoalMine(PublicCompany comp) {
+        if (comp == null || comp.getPortfolioModel() == null)
+            return false;
+        for (net.sf.rails.game.PrivateCompany priv : comp.getPortfolioModel().getPrivateCompanies()) {
+            if (priv != null) {
+                String id = priv.getId();
+                if ("MIN30".equals(id) || "COA60".equals(id) || "MAJ90".equals(id)) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
 }

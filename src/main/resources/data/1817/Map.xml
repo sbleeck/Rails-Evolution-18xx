@@ -27,7 +27,6 @@
 	<Hex name="C6" tile="0"/>
 	<Hex name="C8" tile="11111" label="B" cost="20" city="Detroit"/>
 	<Hex name="C10" tile="0" impassable="D11"/>
-	<Hex name="C12" tile="0"/>
 	<Hex name="C14" tile="-10" city="Buffalo"/>
 	<Hex name="C16" tile="0"/>
 	<Hex name="C18" tile="0"/>
@@ -44,7 +43,7 @@
 
 	<Hex name="D3" tile="0"/>
 	<Hex name="D5" tile="0"/>
-	<Hex name="D7" tile="-10" cost="10" city="Toledo"/>
+	<Hex name="D7" tile="-10" cost="20" city="Toledo"/>
 
 	<Hex name="D9" tile="-912"  city="Cleveland" value="30,40,50,60" >
 		<Access runThrough="yes"/>
@@ -117,6 +116,7 @@
 	<Hex name="I12" tile="-10" cost="20" city="Blacksburg"/>
 	<Hex name="I14" tile="0"/>
 	<Hex name="I16" tile="-10" city="Richmond"/>
+	<Hex name="I18" tile="0"/>
 
 
 	<Hex name="J7" tile="-905" value="20,30,50,60" city="Atlanta">
