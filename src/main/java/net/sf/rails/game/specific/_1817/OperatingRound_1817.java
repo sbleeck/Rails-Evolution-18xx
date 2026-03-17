@@ -247,16 +247,15 @@ public class OperatingRound_1817 extends OperatingRound {
                     ((net.sf.rails.game.specific._1817.PublicCompany_1817) comp).addCashFromBank(15, gameManager.getRoot().getBank());
                 }
 
-                // Identify the specific coal mine private company to use as the token's parent
-                net.sf.rails.game.PrivateCompany coalPrivate = null;
-                for (net.sf.rails.game.PrivateCompany priv : comp.getPortfolioModel().getPrivateCompanies()) {
-                    if (priv != null) {
-                        String id = priv.getId();
-                        if ("MIN30".equals(id) || "COA60".equals(id) || "MAJ90".equals(id)) {
-                            coalPrivate = priv;
-                            break;
-                        }
-                    }
+// Identify the specific coal mine private company to use as the token's parent
+                net.sf.rails.game.PrivateCompany coalPrivate = getAvailableCoalMine(comp);
+
+                if (coalPrivate != null) {
+                    // Place the token using the private company as the root item
+                    net.sf.rails.game.BonusToken coalToken = net.sf.rails.game.BonusToken.create(coalPrivate);
+                    hex.layBonusToken(coalToken, gameManager.getRoot().getPhaseManager());
+                } else {
+                    log.error("1817_ERROR: Could not find an available Coal Mine private company in {} portfolio.", comp.getId());
                 }
 
                 if (coalPrivate != null) {
@@ -426,17 +425,24 @@ public class OperatingRound_1817 extends OperatingRound {
         PublicCompany comp = operatingCompany.value();
         net.sf.rails.game.GameDef.OrStep step = getStep();
 
-        // 1817 Coal Mine logic: Inject action if a yellow tile was just laid on a $15
-        // mountain
+// 1817 Coal Mine logic: Inject action if a yellow tile was just laid on a $15 mountain
+        log.info("1817_TRACE: Evaluating Coal Mine logic. lastLaidTileColour={}, hexesLaidThisTurn.size()={}", lastLaidTileColour, hexesLaidThisTurn.size());
         if ("Yellow".equalsIgnoreCase(lastLaidTileColour) && !hexesLaidThisTurn.isEmpty()) {
             MapHex lastHex = hexesLaidThisTurn.get(hexesLaidThisTurn.size() - 1);
             Integer baseCost = hexBaseCosts.get(lastHex.getId());
+            log.info("1817_TRACE: lastHex={}, baseCost={}", lastHex.getId(), baseCost);
+            
             if (baseCost != null && baseCost == 15 && !hasCoalMineToken(lastHex)) {
-                if (hasAvailableCoalMine(comp)) {
-                    possibleActions.add(new net.sf.rails.game.specific._1817.action.LayCoalToken_1817(getRoot(),
-                            comp.getId(), lastHex.getId()));
+                log.info("1817_TRACE: Hex is a valid $15 mountain without a coal token.");
+                if (getAvailableCoalMine(comp) != null) {
+                    possibleActions.add(new net.sf.rails.game.specific._1817.action.LayCoalToken_1817(getRoot(), comp.getId(), lastHex.getId()));
                     actionsAdded = true;
+                    log.info("1817_TRACE: Successfully added LayCoalToken_1817 to possibleActions.");
+                } else {
+                    log.info("1817_TRACE: Company does not have an available Coal Mine private.");
                 }
+            } else {
+                log.info("1817_TRACE: Hex failed validation: baseCost != 15 or already has a token.");
             }
         }
 
@@ -612,36 +618,58 @@ public class OperatingRound_1817 extends OperatingRound {
     /**
      * Helper to check if a hex contains any Coal Mine token.
      */
-    private boolean hasCoalMineToken(MapHex hex) {
-        if (hex == null || hex.getBonusTokens() == null)
-            return false;
-
+private boolean hasCoalMineToken(MapHex hex) {
+        if (hex == null || hex.getBonusTokens() == null) return false;
+        
         for (net.sf.rails.game.BonusToken t : hex.getBonusTokens()) {
             if (t != null && t.getParent() != null) {
                 String id = t.getParent().getId();
-                if ("MIN30".equals(id) || "COA60".equals(id) || "MAJ90".equals(id)) {
-                    return true;
+if ("MIN30".equals(id) || "COA60".equals(id) || "MJM90".equals(id)) {
+                        return true;
                 }
             }
         }
         return false;
     }
 
-    /**
-     * Helper to verify if the company owns a coal mine private company.
-     */
-    private boolean hasAvailableCoalMine(PublicCompany comp) {
-        if (comp == null || comp.getPortfolioModel() == null)
-            return false;
-        for (net.sf.rails.game.PrivateCompany priv : comp.getPortfolioModel().getPrivateCompanies()) {
-            if (priv != null) {
-                String id = priv.getId();
-                if ("MIN30".equals(id) || "COA60".equals(id) || "MAJ90".equals(id)) {
-                    return true;
+private int getCoalTokenLimit(String privId) {
+        if ("MIN30".equals(privId)) return 1;
+        if ("COA60".equals(privId)) return 2;
+        if ("MJM90".equals(privId)) return 3;
+        return 0;
+    }
+
+private int getPlacedCoalTokensCount(String privId) {
+        int count = 0;
+        for (MapHex hex : gameManager.getRoot().getMapManager().getHexes()) {
+            if (hex.getBonusTokens() != null) {
+                for (net.sf.rails.game.BonusToken t : hex.getBonusTokens()) {
+                    if (t.getParent() != null && privId.equals(t.getParent().getId())) {
+                        count++;
+                    }
                 }
             }
         }
-        return false;
+        return count;
     }
+
+private net.sf.rails.game.PrivateCompany getAvailableCoalMine(PublicCompany comp) {
+        if (comp == null || comp.getPortfolioModel() == null) return null;
+        for (net.sf.rails.game.PrivateCompany priv : comp.getPortfolioModel().getPrivateCompanies()) {
+            if (priv != null) {
+                String id = priv.getId();
+                int limit = getCoalTokenLimit(id);
+                log.info("1817_TRACE: Checking PrivateCompany {}. Limit: {}, Placed: {}", id, limit, limit > 0 ? getPlacedCoalTokensCount(id) : 0);
+                if (limit > 0) {
+                    if (getPlacedCoalTokensCount(id) < limit) {
+                        log.info("1817_TRACE: Found available Coal Mine: {}", id);
+                        return priv;
+                    }
+                }
+            }
+        }
+        return null;
+    }
+
 
 }

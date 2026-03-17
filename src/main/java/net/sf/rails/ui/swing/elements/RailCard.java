@@ -323,6 +323,7 @@ public net.sf.rails.game.Train getTrain() {
 
         }
 
+        /*
         // Adjust content panel padding to prevent text overlapping the right-side stripe
         int rightPadding = 0;
         java.awt.Color stripeColor = null;
@@ -363,7 +364,7 @@ public net.sf.rails.game.Train getTrain() {
         }
         
         contentPanel.setBorder(BorderFactory.createEmptyBorder(0, 0, 0, rightPadding));
-
+*/
 
         contentPanel.revalidate();
         contentPanel.repaint();
@@ -667,6 +668,7 @@ if (info != null) {
     protected void paintComponent(java.awt.Graphics g) {
         super.paintComponent(g);
 
+        /*
         java.awt.Color stripeColor = null;
         boolean isPresident = false;
 
@@ -715,6 +717,7 @@ if (info != null) {
             g.setColor(java.awt.Color.BLACK);
             g.drawLine(stripeX, innerY, stripeX, innerY + innerHeight - 1);
         }
+            */
     }
 
 }
