@@ -69,7 +69,7 @@ public class OperatingRound_1817 extends OperatingRound {
     protected final net.sf.rails.game.state.BooleanState loansRepaidThisTurn = new net.sf.rails.game.state.BooleanState(
             this, "loansRepaidThisTurn", false);
 
-            private static final String[] BRIDGE_CITIES = {"H3", "G6", "H9"};
+    private static final String[] BRIDGE_CITIES = { "H3", "G6", "H9" };
 
     public OperatingRound_1817(GameManager gameManager, String roundId) {
         super(gameManager, roundId);
@@ -142,10 +142,10 @@ public class OperatingRound_1817 extends OperatingRound {
             cost -= 15;
         }
 
-// Rule 1.2.6: Bridge companies allow laying yellow on rivers ($10) for free
+        // Rule 1.2.6: Bridge companies allow laying yellow on rivers ($10) for free
         if (standardCost == 10) {
             for (net.sf.rails.game.PrivateCompany priv : company.getPortfolioModel().getPrivateCompanies()) {
-                if ("OHB".equals(priv.getId()) || "UNB".equals(priv.getId())) {
+                if ("OBC40".equals(priv.getId()) || "UBC80".equals(priv.getId())) {
                     cost -= 10;
                     log.info("1817_TRACE: {} river fee waived via {}", company.getId(), priv.getId());
                     break;
@@ -272,7 +272,7 @@ public class OperatingRound_1817 extends OperatingRound {
                 net.sf.rails.game.PrivateCompany coalPrivate = getAvailableCoalMine(comp);
 
                 if (coalPrivate != null) {
-                   // Use the factory to ensure a unique internal URI/ID
+                    // Use the factory to ensure a unique internal URI/ID
                     net.sf.rails.game.BonusToken coalToken = net.sf.rails.game.BonusToken.create(coalPrivate);
 
                     if (coalToken != null) {
@@ -280,7 +280,7 @@ public class OperatingRound_1817 extends OperatingRound {
                         coalToken.setName("CoalMine");
                         coalToken.setValue(10);
                         // Explicitly direct the coal mine to the 'CoalMine' slot
-                    
+
                         hex.layBonusToken(coalToken, gameManager.getRoot().getPhaseManager());
                         log.info("1817_TRACE: Created token with URI: {} and Name: {}, Value: {}",
                                 coalToken.getFullURI(), coalToken.getName(), coalToken.getValue());
@@ -345,20 +345,24 @@ public class OperatingRound_1817 extends OperatingRound {
                     return true;
                 }
             }
-return false;
+            return false;
         }
 
         if (action instanceof net.sf.rails.game.specific._1817.action.LayBridgeToken_1817) {
             net.sf.rails.game.specific._1817.action.LayBridgeToken_1817 ba = (net.sf.rails.game.specific._1817.action.LayBridgeToken_1817) action;
             PublicCompany comp = companyManager.getPublicCompany(ba.getCompanyId());
 
-
             MapHex hex = gameManager.getRoot().getMapManager().getHex(ba.getHexId());
-            
+            log.info("1817_DEBUG: === PROCESSING LAY BRIDGE TOKEN ACTION ===");
+            log.info("1817_DEBUG: Company: {}, Target Hex: {}", comp.getId(), hex != null ? hex.getId() : "NULL");
+
             // Find the correct private company with inventory
             net.sf.rails.game.PrivateCompany bridgePriv = null;
             for (net.sf.rails.game.PrivateCompany p : comp.getPortfolioModel().getPrivateCompanies()) {
-                if (("OHB".equals(p.getId()) || "UNB".equals(p.getId())) && getPlacedBridgeCount(p.getId()) < getBridgeLimit(p.getId())) {
+
+                String pid = p.getId();
+                // Aligning with XML IDs: OBC40 and UBC80
+                if ("OBC40".equals(pid) || "UBC80".equals(pid)) {
                     bridgePriv = p;
                     break;
                 }
@@ -369,13 +373,14 @@ return false;
                 bridgeToken.setName("Bridge");
                 bridgeToken.setValue(10);
                 hex.layBonusToken(bridgeToken, gameManager.getRoot().getPhaseManager());
-                
+
                 net.sf.rails.common.ReportBuffer.add(this, comp.getId() + " places a Bridge Token on " + hex.getId());
                 log.info("1817_TRACE: Bridge placed on {} by {}.", hex.getId(), comp.getId());
                 return true;
             }
-
-
+            log.error("1817_DEBUG: FAILED TO PLACE BRIDGE! bridgePriv is {}, hex is {}",
+                    bridgePriv != null ? bridgePriv.getId() : "NULL",
+                    hex != null ? hex.getId() : "NULL");
 
             return false;
         }
@@ -439,18 +444,18 @@ return false;
         return super.processGameSpecificAction(action);
     }
 
-
     private boolean hasCoalMineToken(MapHex hex) {
-        if (hex == null || hex.getBonusTokens() == null) return false;
+        if (hex == null || hex.getBonusTokens() == null)
+            return false;
         for (BonusToken t : hex.getBonusTokens()) {
             // LOG EVERYTHING on the hex to see why we miss it
-            log.info("1817_REVENUE: Hex {} contains Token ID: '{}', Name: '{}'", 
-                     hex.getId(), t.getId(), t.getName());
-            if ("CoalMine".equals(t.getName())) return true;
+            log.info("1817_REVENUE: Hex {} contains Token ID: '{}', Name: '{}'",
+                    hex.getId(), t.getId(), t.getName());
+            if ("CoalMine".equals(t.getName()))
+                return true;
         }
         return false;
     }
-
 
     @Override
     protected void initTurn() {
@@ -490,39 +495,13 @@ return false;
         return super.process(action);
     }
 
-
-    @Override
     public boolean setPossibleActions() {
 
         boolean actionsAdded = false;
         PublicCompany comp = operatingCompany.value();
         net.sf.rails.game.GameDef.OrStep step = getStep();
 
-        // --- 1. BRIDGE PLACEMENT (Rule 1.2.6) ---
-        // Moved to the top: This depends on Private Company ownership, not Public Company class.
-        for (net.sf.rails.game.PrivateCompany p : comp.getPortfolioModel().getPrivateCompanies()) {
-            String pid = p.getId();
-            if (("OHB".equals(pid) || "UNB".equals(pid)) && getPlacedBridgeCount(pid) < getBridgeLimit(pid)) {
-                for (String hexId : BRIDGE_CITIES) {
-                    MapHex cityHex = gameManager.getRoot().getMapManager().getHex(hexId);
-                    boolean bridgeExists = false;
-                    if (cityHex != null && cityHex.getBonusTokens() != null) {
-                        for (net.sf.rails.game.BonusToken t : cityHex.getBonusTokens()) {
-                            if ("Bridge".equals(t.getName())) {
-                                bridgeExists = true;
-                                break;
-                            }
-                        }
-                    }
-                    if (cityHex != null && !bridgeExists) {
-                        log.info("1817_DEBUG: Adding Bridge Action for {} on {}", comp.getId(), hexId);
-                        possibleActions.add(new net.sf.rails.game.specific._1817.action.LayBridgeToken_1817(getRoot(), comp.getId(), hexId));
-                        actionsAdded = true;
-                    }
-                }
-            }
-        }
-
+       
         // --- 2. COAL MINE INTERRUPT ---
         if ("Yellow".equalsIgnoreCase(lastLaidTileColour) && !hexesLaidThisTurn.isEmpty()) {
             MapHex lastHex = hexesLaidThisTurn.get(hexesLaidThisTurn.size() - 1);
@@ -553,21 +532,44 @@ return false;
         // --- 3. CORE ENGINE ACTIONS ---
         actionsAdded |= super.setPossibleActions();
 
-        // --- 4. TERMINAL ACTION CONSOLIDATION ---
-        // Ensure all companies have a clean 'DONE' exit instead of a 'SKIP/DONE' clash.
-        List<NullAction> nulls = possibleActions.getType(NullAction.class);
-        if (nulls.size() > 1 || (nulls.size() == 1 && nulls.get(0).getMode() == NullAction.Mode.SKIP)) {
-            log.info("1817_DEBUG: Consolidating NullActions for " + comp.getId());
-            possibleActions.removeAll(nulls);
-            possibleActions.add(new NullAction(getRoot(), NullAction.Mode.DONE));
+        // --- 4. BRIDGE ACTIONS ---
+        // Evaluation moved here to prevent erasure by super.setPossibleActions()
+        java.util.Collection<net.sf.rails.game.PrivateCompany> privates = comp.getPortfolioModel().getPrivateCompanies();
+        if (privates != null && !privates.isEmpty()) {
+            for (net.sf.rails.game.PrivateCompany p : privates) {
+                String pid = p.getId();
+                if ("OBC40".equals(pid) || "UBC80".equals(pid)) {
+                    int placedCount = getPlacedBridgeCount(pid);
+                    int limit = getBridgeLimit(pid);
+                    if (placedCount < limit) {
+                        for (String hexId : BRIDGE_CITIES) {
+                            MapHex cityHex = gameManager.getRoot().getMapManager().getHex(hexId);
+                            if (cityHex == null) continue;
+                            boolean bridgeExists = false;
+                            if (cityHex.getBonusTokens() != null) {
+                                for (net.sf.rails.game.BonusToken t : cityHex.getBonusTokens()) {
+                                    if ("Bridge".equals(t.getName())) {
+                                        bridgeExists = true;
+                                        break;
+                                    }
+                                }
+                            }
+                            if (!bridgeExists) {
+                                possibleActions.add(new net.sf.rails.game.specific._1817.action.LayBridgeToken_1817(getRoot(), comp.getId(), hexId));
+                                actionsAdded = true;
+                            }
+                        }
+                    }
+                }
+            }
         }
-
+        
         // --- 5. 1817 FINANCIAL LOGIC ---
         // Only proceed for specific 1817 financial classes.
         if (!(comp instanceof net.sf.rails.game.specific._1817.PublicCompany_1817)) {
             return actionsAdded;
         }
-        
+
         net.sf.rails.game.specific._1817.PublicCompany_1817 comp1817 = (net.sf.rails.game.specific._1817.PublicCompany_1817) comp;
         int currentLoans = comp1817.getNumberOfBonds();
         int maxLoans = comp1817.getShareCount();
@@ -589,7 +591,9 @@ return false;
                 } else {
                     possibleActions.clear();
                     net.sf.rails.game.model.BondsModel baseBm = ((GameManager_1817) gameManager).getBondsModel();
-                    int interestPerLoan = (baseBm instanceof BondsModel_1817) ? ((BondsModel_1817) baseBm).getInterestRate() : 5;
+                    int interestPerLoan = (baseBm instanceof BondsModel_1817)
+                            ? ((BondsModel_1817) baseBm).getInterestRate()
+                            : 5;
                     int interestDue = currentLoans * interestPerLoan;
 
                     if (comp1817.getCash() >= interestDue) {
@@ -628,10 +632,14 @@ return false;
             }
         }
 
+log.info("1817_DEBUG: FINAL ACTIONS LIST for OR Step: " + step.name());
+        for(rails.game.action.PossibleAction pa : possibleActions.getList()) {
+             log.info("1817_DEBUG:  - " + pa.getClass().getSimpleName());
+        }
+
         return actionsAdded;
     }
 
-    
     /**
      * Handles the immediate consequences of failing an interest payment (Rule 6.8).
      * The President pays the shortfall, and the marker moves to the liquidation
@@ -712,19 +720,6 @@ return false;
     protected final net.sf.rails.game.state.ArrayListState<String> resolvedCoalMineHexes = new net.sf.rails.game.state.ArrayListState<>(
             this, "resolvedCoalMineHexes");
 
-
-
-
-    private int getCoalTokenLimit(String privId) {
-        if ("MIN30".equals(privId))
-            return 1;
-        if ("COA60".equals(privId))
-            return 2;
-        if ("MJM90".equals(privId))
-            return 3;
-        return 0;
-    }
-
     private int getPlacedCoalTokensCount(String privId) {
         int count = 0;
         for (MapHex hex : gameManager.getRoot().getMapManager().getHexes()) {
@@ -760,8 +755,20 @@ return false;
     }
 
     private int getBridgeLimit(String privId) {
-        if ("OHB".equals(privId)) return 1; // Ohio Bridge: 1 token
-        if ("UNB".equals(privId)) return 2; // Union Bridge: 2 tokens
+        if ("OBC40".equals(privId))
+            return 1; // Was "OHB"
+        if ("UBC80".equals(privId))
+            return 2; // Was "UNB"
+        return 0;
+    }
+
+    private int getCoalTokenLimit(String privId) {
+        if ("MNM30".equals(privId))
+            return 1; // Was "MIN30"
+        if ("CLM60".equals(privId))
+            return 2; // Was "COA60"
+        if ("MJM90".equals(privId))
+            return 3; // Was "MJM90" (Correct)
         return 0;
     }
 
@@ -779,8 +786,5 @@ return false;
         }
         return count;
     }
-
-
-
 
 }

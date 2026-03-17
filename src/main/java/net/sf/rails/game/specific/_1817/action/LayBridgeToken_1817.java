@@ -16,4 +16,11 @@ public class LayBridgeToken_1817 extends PossibleAction {
 
     public String getCompanyId() { return companyId; }
     public String getHexId() { return hexId; }
+
+    // --- START FIX ---
+    @Override
+    public String getButtonLabel() {
+        return "Lay Bridge (" + hexId + ")";
+    }
+    // --- END FIX ---
 }
