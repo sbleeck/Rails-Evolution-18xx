@@ -13,8 +13,9 @@ public class SelectPurchasingCompany_1817 extends PossibleAction {
 
     public String getCompanyId() { return companyId; }
 
-    @Override
-    public String toString() {
-        return "Select " + companyId + " to acquire target";
+@Override
+    public String toString() { 
+        return "BANK".equals(companyId) ? "Bank liquidates company" : "Select " + companyId + " to purchase"; 
     }
 }
+

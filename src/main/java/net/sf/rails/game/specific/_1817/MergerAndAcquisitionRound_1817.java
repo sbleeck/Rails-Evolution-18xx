@@ -236,6 +236,12 @@ public class MergerAndAcquisitionRound_1817 extends Round {
             }
             return true;
 
+       } else if (action instanceof net.sf.rails.game.specific._1817.action.ConvertCompany_1817) {
+            net.sf.rails.game.specific._1817.action.ConvertCompany_1817 convertAction = (net.sf.rails.game.specific._1817.action.ConvertCompany_1817) action;
+            PublicCompany comp = convertAction.getCompany();
+            log.info("M&A ROUND: Processing CONVERT action for: " + comp.getId());
+            executeConversion(comp);
+            return true;
         } else if (action instanceof rails.game.action.BuyCertificate) {
             PublicCompany comp = operatingCompany.value();
             net.sf.rails.game.Player player;
@@ -356,6 +362,29 @@ public class MergerAndAcquisitionRound_1817 extends Round {
         return false;
     }
 
+
+    private void executeConversion(PublicCompany comp) {
+        log.info(">>> Executing Conversion for: " + comp.getId());
+        PublicCompany_1817 comp1817 = (PublicCompany_1817) comp;
+
+        int currentShares = comp1817.getShareCount();
+        if (currentShares == 2) {
+            comp1817.setShareCount(5);
+            log.info("CONVERSION: Upgraded " + comp.getId() + " from 2-share to 5-share. ");
+        } else if (currentShares == 5) {
+            comp1817.setShareCount(10);
+            log.info("CONVERSION: Upgraded " + comp.getId() + " from 5-share to 10-share. ");
+        }
+
+        // Mark as merged/converted this round so it cannot merge again [cite: 708, 709]
+        mergedThisRound.add(comp.getId());
+
+        // Initiate Post-Merger Phase (same as mergers) [cite: 715]
+        calculateValidMergerPairs();
+        startPostMergerPhase();
+    }
+
+    
     private void execute2ShareMerger(PublicCompany initiator, PublicCompany target) {
         log.info(">>> Executing Merger: " + initiator.getId() + " absorbs " + target.getId());
 
@@ -789,7 +818,10 @@ public class MergerAndAcquisitionRound_1817 extends Round {
             int current = comp.getNumberOfBonds();
 
             if (current < limit) {
-possibleActions.add(new TakeLoans_1817(getRoot(), comp.getId(), limit));
+
+                possibleActions.add(new TakeLoans_1817(getRoot(), comp.getId(), limit));
+                // Add a DONE action so the player can choose NOT to take a loan
+                possibleActions.add(new NullAction(gameManagerRef.getRoot(), NullAction.Mode.DONE));
                 log.info("M&A ROUND: Offering loans to " + comp.getId() + " (Current: " + current + ", Max: " + limit
                         + ")");
             } else {
@@ -864,8 +896,18 @@ possibleActions.add(new TakeLoans_1817(getRoot(), comp.getId(), limit));
                 log.info("M&A ROUND: Added TakeLoans_1817 action for " + company.getId() + " with max loans: "
                         + maxLoans);
             }
+
+            // Check for Conversions (White zone only, > $30) 
+            if (company.getCurrentSpace() != null && company.getCurrentSpace().getPrice() > 30) {
+                if (comp1817.getShareCount() == 2 || comp1817.getShareCount() == 5) {
+                    possibleActions.add(new net.sf.rails.game.specific._1817.action.ConvertCompany_1817(company));
+                    log.info("M&A ROUND: Added ConvertCompany_1817 action for " + company.getId());
+                }
+            }
+
         }
 
+        
         addPassAction(company);
         log.info("M&A ROUND: Total possible actions generated: " + possibleActions.getList().size());
     }

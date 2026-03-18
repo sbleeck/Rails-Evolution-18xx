@@ -100,7 +100,7 @@
 	<Hex name="G16" tile="0" />
 	<Hex name="G18" tile="11111" label="B" pic="11111" orientation="0" city="Baltimore"/>
 	<Hex name="G20" tile="0" cost="20"/>
-	<Hex name="G22" tile="0"/>
+
 
 	<Hex name="H1" tile="-903"   value="20,30,50,60" city="St Louis">
 			<Access runThrough="no"/>
@@ -119,7 +119,7 @@
 	<Hex name="I6" tile="0"/>
 	<Hex name="I8" tile="0" cost="15" />
 	<Hex name="I10" tile="0" cost="15"/>
-	<Hex name="I12" tile="-10" city="Blacksburg"/>
+	<Hex name="I12" tile="-10" cost="15" city="Blacksburg"/>
 	<Hex name="I14" tile="0"/>
 	<Hex name="I16" tile="-10" city="Richmond"/>
 	<Hex name="I18" tile="0"/>

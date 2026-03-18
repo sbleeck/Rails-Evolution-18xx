@@ -25,6 +25,15 @@ public class AuctionRound_1817 extends Round {
 
     private static final Logger log = LoggerFactory.getLogger(AuctionRound_1817.class);
 
+    public enum AuctionType {
+        IPO,
+        LIQUIDATION,
+        ACQUISITION,
+        FRIENDLY_SALE
+    }
+
+    protected final GenericState<AuctionType> auctionType;
+    protected final IntegerState minNextBidIncrement; // Usually 5 for IPO, 10 for M&A
     protected final GenericState<PublicCompany_1817> auctionedCompany;
     protected final GenericState<String> targetHexId;
     protected final IntegerState currentBid;
@@ -36,6 +45,8 @@ public class AuctionRound_1817 extends Round {
 
     public AuctionRound_1817(GameManager parent, String id) {
         super(parent, id);
+        this.auctionType = new GenericState<>(this, "auctionType_" + id, AuctionType.IPO);
+        this.minNextBidIncrement = IntegerState.create(this, "minNextBidIncrement_" + id, 5);
         this.auctionedCompany = new GenericState<>(this, "auctionedCompany_" + id);
         this.targetHexId = new GenericState<>(this, "targetHexId_" + id);
         this.currentBid = IntegerState.create(this, "currentBid_" + id, 0);
@@ -45,6 +56,65 @@ public class AuctionRound_1817 extends Round {
         this.currentPlayerIndex = IntegerState.create(this, "currentPlayerIndex_" + id, 0);
         this.targetStationNumber = IntegerState.create(this, "targetStationNumber_" + id, -1);
 
+    }
+
+    public AuctionType getAuctionType() {
+        return auctionType.value();
+    }
+
+    // Existing setup for IPO
+    public void setupAuction(PublicCompany_1817 company, String hexId, int stationNumber, int startingBid,
+            Player startingPlayer,
+            List<Player> allPlayers) {
+        setupAuctionInternal(AuctionType.IPO, company, hexId, stationNumber, startingBid, startingPlayer, allPlayers,
+                5);
+    }
+
+    // New setup for M&A
+    public void setupMAAuction(AuctionType type, PublicCompany_1817 company, int startingBid, Player startingPlayer,
+            List<Player> allPlayers) {
+        setupAuctionInternal(type, company, null, -1, startingBid, startingPlayer, allPlayers, 10);
+    }
+
+    private void setupAuctionInternal(AuctionType type, PublicCompany_1817 company, String hexId, int stationNumber,
+            int startingBid, Player startingPlayer, List<Player> allPlayers, int bidIncrement) {
+        log.info("AUCTION_LOG: === NEW {} AUCTION INITIATED ===", type);
+        log.info("AUCTION_LOG: Company: {} | Target Hex: {} | Initiator: {} | Starting Bid: ${}",
+                company.getId(), hexId, startingPlayer.getName(), startingBid);
+        this.auctionType.set(type);
+        this.minNextBidIncrement.set(bidIncrement);
+        this.auctionedCompany.set(company);
+        this.targetHexId.set(hexId);
+        this.targetStationNumber.set(stationNumber);
+
+        // In Liquidation, the Bank makes the initial $0 bid, so there might not be an
+        // initiating player yet.
+        if (type == AuctionType.LIQUIDATION && startingBid == 0) {
+            this.currentBid.set(0);
+            this.highestBidder.set(null); // Bank is highest bidder initially
+            this.initiator.set(startingPlayer); // The player who was supposed to act next starts the bidding
+        } else {
+            this.currentBid.set(startingBid);
+            this.initiator.set(startingPlayer);
+            this.highestBidder.set(startingPlayer);
+        }
+
+        this.activeBidders.clear();
+        for (Player p : allPlayers) {
+            this.activeBidders.add(p);
+        }
+
+        int startIndex = allPlayers.indexOf(startingPlayer);
+        // If not liquidation, the initiator already bid, so next player acts.
+        if (type != AuctionType.LIQUIDATION || startingBid > 0) {
+            startIndex = (startIndex + 1) % allPlayers.size();
+        }
+
+        this.currentPlayerIndex.set(startIndex);
+        advanceToNextValidBidder();
+        log.info("AUCTION_LOG: Active bidders post-prune: {}. Next to act: {}",
+                this.activeBidders.size(),
+                (this.activeBidders.isEmpty() ? "None" : getActingPlayer().getName()));
     }
 
     public int getCurrentBid() {
@@ -57,33 +127,6 @@ public class AuctionRound_1817 extends Round {
 
     public PublicCompany_1817 getAuctionedCompany() {
         return auctionedCompany.value();
-    }
-
-    public void setupAuction(PublicCompany_1817 company, String hexId, int stationNumber, int startingBid,
-            Player startingPlayer,
-            List<Player> allPlayers) {
-        log.info("AUCTION_LOG: === NEW IPO AUCTION INITIATED ===");
-        log.info("AUCTION_LOG: Company: {} | Target Hex: {} | Initiator: {} | Starting Bid: ${}",
-                company.getId(), hexId, startingPlayer.getName(), startingBid);
-        this.auctionedCompany.set(company);
-        this.targetHexId.set(hexId);
-        this.targetStationNumber.set(stationNumber);
-        this.currentBid.set(startingBid);
-        this.initiator.set(startingPlayer);
-        this.highestBidder.set(startingPlayer);
-
-        this.activeBidders.clear();
-        for (Player p : allPlayers) {
-            this.activeBidders.add(p);
-        }
-
-        int startIndex = (allPlayers.indexOf(startingPlayer) + 1) % allPlayers.size();
-        this.currentPlayerIndex.set(startIndex);
-        advanceToNextValidBidder();
-        log.info("AUCTION_LOG: Active bidders post-prune: {}. Next to act: {}",
-                this.activeBidders.size(),
-                (this.activeBidders.isEmpty() ? "None" : getActingPlayer().getName()));
-
     }
 
     public Player getActingPlayer() {
@@ -116,6 +159,41 @@ public class AuctionRound_1817 extends Round {
                         currentBid.value(),
                         2));
             }
+            if (auctionType.value() == AuctionType.IPO) {
+                if (winner != null && auctionedCompany.value() != null) {
+                    log.info("AUCTION_LOG: Generating Settlement Action for winner {} at ${}", winner.getName(),
+                            currentBid.value());
+                    // Generate the settlement action for the UI to populate
+                    possibleActions.add(new SettleIPO_1817(
+                            gameManager.getRoot(),
+                            auctionedCompany.value().getId(),
+                            new java.util.ArrayList<String>(),
+                            currentBid.value(),
+                            2));
+                }
+            } else {
+                // It's an M&A Auction.
+                // The winner must now select which of their companies makes the purchase.
+                if (winner != null) {
+                    for (net.sf.rails.game.PublicCompany comp : gameManager.getRoot().getCompanyManager()
+                            .getAllPublicCompanies()) {
+                        if (comp.getPresident() != null && comp.getPresident().equals(winner)
+                                && !comp.equals(auctionedCompany.value())) {
+                            // Predators must not be in the liquidation or acquisition zones ($30 or less)
+                            if (comp.getCurrentSpace() != null && comp.getCurrentSpace().getPrice() > 30) {
+                                possibleActions
+                                        .add(new net.sf.rails.game.specific._1817.action.SelectPurchasingCompany_1817(
+                                                gameManager.getRoot(), comp.getId()));
+                            }
+                        }
+                    }
+                } else if (auctionType.value() == AuctionType.LIQUIDATION) {
+                    // Bank won the liquidation (Bid was $0, no player bid).
+                    // We need a specific action to finalize the bank liquidation.
+                    possibleActions.add(new net.sf.rails.game.specific._1817.action.SelectPurchasingCompany_1817(
+                            gameManager.getRoot(), "BANK"));
+                }
+            }
             return true;
         }
 
@@ -123,10 +201,37 @@ public class AuctionRound_1817 extends Round {
         Player currentPlayer = getActingPlayer();
         possibleActions.add(new NullAction(gameManager.getRoot(), NullAction.Mode.PASS));
 
-        int minNextBid = currentBid.value() + 5;
-        if (currentPlayer != null && currentPlayer.getCash() >= minNextBid) {
-            possibleActions.add(new Bid1817IPO(gameManager.getRoot(), minNextBid));
+        int minNextBid = currentBid.value() == 0 && highestBidder.value() == null ? currentBid.value()
+                : currentBid.value() + minNextBidIncrement.value();
+
+        // M&A auctions restrict bidding if you don't have an eligible predator company
+        boolean canAfford = false;
+        if (auctionType.value() != AuctionType.IPO) {
+            for (net.sf.rails.game.PublicCompany comp : gameManager.getRoot().getCompanyManager()
+                    .getAllPublicCompanies()) {
+                if (comp.getPresident() != null && comp.getPresident().equals(currentPlayer)
+                        && !comp.equals(auctionedCompany.value())) {
+                    if (comp.getCurrentSpace() != null && comp.getCurrentSpace().getPrice() > 30) {
+                        canAfford = true;
+                        break;
+                    }
+                }
+            }
+        } else {
+            // IPO bidding is based on personal cash
+            canAfford = currentPlayer != null && currentPlayer.getCash() >= minNextBid;
         }
+
+        if (currentPlayer != null && canAfford) {
+            int actualMaxBid = 9990;
+            // The president of the company being sold in M&A can only bid +10
+            if (auctionType.value() != AuctionType.IPO && currentPlayer.equals(auctionedCompany.value().getPresident())
+                    && highestBidder.value() != null) {
+                actualMaxBid = currentBid.value() + 10;
+            }
+            possibleActions.add(new Bid1817IPO(gameManager.getRoot(), minNextBid, actualMaxBid));
+        }
+
         return true;
     }
 
@@ -257,6 +362,22 @@ public class AuctionRound_1817 extends Round {
             return true;
         }
 
+        if (action instanceof net.sf.rails.game.specific._1817.action.SelectPurchasingCompany_1817) {
+            net.sf.rails.game.specific._1817.action.SelectPurchasingCompany_1817 spc = (net.sf.rails.game.specific._1817.action.SelectPurchasingCompany_1817) action;
+            String predatorId = spc.getCompanyId();
+            PublicCompany_1817 predator = null;
+
+            if (!"BANK".equals(predatorId)) {
+                predator = (PublicCompany_1817) gameManager.getRoot().getCompanyManager().getPublicCompany(predatorId);
+            }
+
+            executeSale(auctionedCompany.value(), predator, currentBid.value(), auctionType.value());
+
+            // Return to the M&A Round
+            gameManager.nextRound(this);
+            return true;
+        }
+
         if (action instanceof Bid1817IPO) {
             int amount = ((Bid1817IPO) action).getBidAmount();
             log.info("AUCTION_LOG: Player {} BID ${}.", actor.getName(), amount);
@@ -298,6 +419,115 @@ public class AuctionRound_1817 extends Round {
                 currentPlayerIndex.set(index % activeBidders.size());
             }
         }
+    }
+
+    private void executeSale(PublicCompany_1817 target, PublicCompany_1817 predator, int finalBid, AuctionType type) {
+        log.info(">>> Executing M&A Sale: {} bought by {} for ${}", target.getId(),
+                (predator != null ? predator.getId() : "BANK"), finalBid);
+
+        // 1. Treasury Processing (Shares to Open Market) [cite: 827, 829]
+        int treasuryShares = 0;
+        for (net.sf.rails.game.financial.PublicCertificate cert : new java.util.ArrayList<>(target.getCertificates())) {
+            if (cert.getOwner() == target && !cert.isPresidentShare()) {
+                cert.moveTo(gameManager.getRoot().getBank().getPool());
+                treasuryShares += (cert.getShare() / target.getShareUnit());
+            }
+        }
+
+        // Friendly Sale Treasury Compensation [cite: 830]
+        if (type == AuctionType.FRIENDLY_SALE && treasuryShares > 0) {
+            int infusion = treasuryShares * target.getMarketPrice();
+            target.setCash_AI(target.getCash() + infusion);
+            log.info("M&A SALE: Friendly sale treasury compensation: ${}", infusion);
+        }
+
+        // Snapshot pre-transfer values
+        int targetCash = target.getCash();
+        int targetLoans = target.getCurrentNumberOfLoans();
+
+        // 2. Predator Transfer (Trains, Stations, Privates, Cash, Loans) [cite: 835]
+        if (predator != null) {
+            predator.setCash_AI(predator.getCash() - finalBid); // Predator pays Bank [cite: 836]
+            predator.transferAssetsFrom(target);
+
+            if (targetLoans > 0) {
+                predator.addLoans(targetLoans);
+                target.addLoans(-targetLoans); // Clear from target
+
+                // Move predator stock left 1 space per loan [cite: 838, 839]
+                for (int i = 0; i < targetLoans; i++) {
+                    // Note: Ensure your 1817 StockMarket implementation handles this move.
+                    // gameManager.getRoot().getStockMarket().moveLeft(predator);
+                }
+            }
+        } else {
+
+           // Bank Liquidation: Assets (Trains, Tokens, Privates) are discarded.
+for (net.sf.rails.game.BaseToken token : new java.util.ArrayList<>(target.getLaidBaseTokens())) {
+// Moving the token back to the company automatically removes it from the MapHex Stop
+token.moveTo(target);
+}
+
+        for (net.sf.rails.game.Train train : new java.util.ArrayList<>(target.getTrains())) {
+            train.moveTo(gameManager.getRoot().getBank().getPool()); // Discard train
+        }
+        
+        for (net.sf.rails.game.PrivateCompany pc : new java.util.ArrayList<>(target.getPrivates())) {
+            pc.setClosed(); // Close private company
+        }
+
+        target.setCash_AI(0); // Bank takes the cash for debt settlement
+    }
+
+    // 3. Debt Resolution (Liquidation specific)
+    int surplusForShareholders = finalBid;
+    if (type == AuctionType.LIQUIDATION) {
+        int totalDebt = targetLoans * 100;
+        int availableFunds = targetCash + finalBid;
+        
+        if (availableFunds >= totalDebt) {
+            surplusForShareholders = availableFunds - totalDebt;
+            log.info("M&A SALE: Liquidation debts cleared. Surplus: ${}", surplusForShareholders);
+        } else {
+            surplusForShareholders = 0;
+            int shortfall = totalDebt - availableFunds;
+            Player president = target.getPresident();
+            log.warn("M&A SALE: Liquidation shortfall of ${}. President {} must pay.", shortfall, president.getName());
+            // Deduct from president. If cash goes negative, Cash Crisis handles it later.
+            president.setCash_AI(president.getCash() - shortfall);
+        }
+    }
+
+    // 4. Shareholder and Short Seller Settlement
+    int shareCount = target.getShareCount();
+    int payoutPerShare = surplusForShareholders / shareCount;
+    
+    for (Player p : gameManager.getRoot().getPlayerManager().getPlayers()) {
+        int sharesOwned = 0;
+        
+        List<net.sf.rails.game.financial.PublicCertificate> certs = new java.util.ArrayList<>(p.getPortfolioModel().getCertificates(target));
+        for (net.sf.rails.game.financial.PublicCertificate cert : certs) {
+            // TODO: Implement specific ShortCertificate_1817 logic here once the class is created.
+            // if (cert instanceof net.sf.rails.game.specific._1817.financial.ShortCertificate_1817) {
+            //     int shortShares = cert.getShare() / target.getShareUnit();
+            //     int debt = shortShares * payoutPerShare;
+            //     p.setCash_AI(p.getCash() - debt);
+            //     cert.moveTo(gameManager.getRoot().getBank().getPool());
+            //     continue;
+            // }
+
+            // Assume all remaining certs are standard long shares for now
+            sharesOwned += cert.getShare() / target.getShareUnit();
+            cert.moveTo(gameManager.getRoot().getBank().getPool()); // Return to bank
+        }
+        
+        if (sharesOwned > 0) {
+            p.setCash_AI(p.getCash() + (sharesOwned * payoutPerShare));
+            log.info("M&A SALE: Paid {} ${} for {} shares.", p.getName(), sharesOwned * payoutPerShare, sharesOwned);
+        }
+    }
+        // 5. Close Company [cite: 852]
+        target.setClosed();
     }
 
 }

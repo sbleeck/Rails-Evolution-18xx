@@ -31,6 +31,7 @@ import rails.game.action.BuyStartItem;
 import rails.game.action.StartItemAction;
 import rails.game.action.NullAction;
 
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 
@@ -76,11 +77,97 @@ public class OperatingRound_1817 extends OperatingRound {
     }
 
     @Override
+    public void start() {
+        super.start();
+
+        // Rule 1.2.6: Mail Contracts only pay if the company has one or more trains.
+        // If the base engine paid them out automatically, we refund the bank and log
+        // it.
+        for (PublicCompany comp : gameManager.getAllPublicCompanies()) {
+            if (comp.hasStarted() && !comp.isClosed() && comp.getPortfolioModel().getNumberOfTrains() == 0) {
+                for (net.sf.rails.game.PrivateCompany priv : comp.getPortfolioModel().getPrivateCompanies()) {
+                    String pid = priv.getId();
+                    int refund = 0;
+                    if (pid.startsWith("MNM"))
+                        refund = 10;
+                    else if (pid.startsWith("MLC"))
+                        refund = 15;
+                    else if (pid.startsWith("MJM"))
+                        refund = 20;
+
+                    if (refund > 0) {
+                        net.sf.rails.game.state.Currency.toBank(comp, refund);
+                        net.sf.rails.common.ReportBuffer.add(gameManager,
+                                comp.getId() + " refunds $" + refund + " for " + pid + " (no trains).");
+                        log.info("1817_TRACE: Refunded ${} to {} due to no trains.", refund, comp.getId());
+                    }
+                }
+            }
+        }
+    }
+
+    @Override
     protected void finishTurn() {
         // This method is called when the player clicks "Done" or the turn is forced to
         // end.
 
+        // Rule 6.10: Check for Liquidation if no trains
+        PublicCompany comp = operatingCompany.value();
+        if (comp != null && !comp.isClosed() && comp.getPortfolioModel().getNumberOfTrains() == 0) {
+            log.info("1817_TRACE: Company {} ended turn with no trains. Liquidating.", comp.getId());
+            net.sf.rails.common.ReportBuffer.add(this,
+                    comp.getId() + " ends its turn without a train and goes into liquidation.");
+            handleImmediateLiquidation(
+                    new net.sf.rails.game.specific._1817.action.LiquidateCompany_1817(getRoot(), comp.getId(), 0));
+        }
+
         super.finishTurn();
+    }
+
+    @Override
+    public void setBuyableTrains() {
+        super.setBuyableTrains();
+
+        PublicCompany comp = operatingCompany.value();
+        if (comp == null)
+            return;
+
+        int cash = comp.getCash();
+        List<PossibleAction> toRemove = new ArrayList<>();
+
+        for (PossibleAction pa : possibleActions.getList()) {
+            if (pa instanceof rails.game.action.BuyTrain) {
+                rails.game.action.BuyTrain bt = (rails.game.action.BuyTrain) pa;
+
+                // Rule 6.7: Public Companies are never required to purchase a train,
+                // and thus the president may not contribute cash.
+                bt.setForcedBuyIfHasRoute(false);
+                bt.setForcedBuyIfNoRoute(false);
+                bt.setPresidentMustAddCash(0);
+
+                // Remove trains that are strictly unaffordable by the company itself.
+                int cost = bt.getFixedCost();
+                if (bt.getFixedCostMode() == rails.game.action.BuyTrain.Mode.FIXED ||
+                        bt.getFixedCostMode() == rails.game.action.BuyTrain.Mode.MIN) {
+                    if (cost > cash) {
+                        toRemove.add(bt);
+                    }
+                } else if (bt.getFixedCostMode() != rails.game.action.BuyTrain.Mode.FREE) {
+                    // For variable pricing (trading between companies), the minimum price is
+                    // usually 1.
+                    if (cash < 1) {
+                        toRemove.add(bt);
+                    }
+                }
+            }
+        }
+
+        for (PossibleAction pa : toRemove) {
+            possibleActions.remove(pa);
+        }
+
+        // Ensure skip/done is always allowed since train purchase is never forced.
+        doneAllowed.set(true);
     }
 
     /**
@@ -167,7 +254,7 @@ public class OperatingRound_1817 extends OperatingRound {
         if (success && action.getType() != LayTile.CORRECTION) {
             // Rule 6.3: Prevent upgrading the exact same hex twice in one turn.
             hexesLaidThisTurn.add(hex);
-            
+
             SpecialProperty specialProp = action.getSpecialProperty();
             if (specialProp != null && specialProp.getParent() != null) {
                 if ("PSM40".equals(specialProp.getParent().getId())) {
@@ -345,9 +432,30 @@ public class OperatingRound_1817 extends OperatingRound {
                     int loanAmount = count * 100;
                     comp1817.addCashFromBank(loanAmount, gameManager.getRoot().getBank());
 
-                    // TODO: Implement stock price movement left one space (unless in leftmost gray
-                    // area)
-                    log.warn("1817_TODO: Move stock price left for {} loans taken by {}.", count, comp.getId());
+                    log.info("1817_OR: {} took {} loans. Triggering LEFT move.", comp.getId(), count);
+                    // Rule 6.1: Move the stock price left one space at the time each loan is taken.
+                    net.sf.rails.game.financial.StockMarket market = getRoot().getStockMarket();
+                    net.sf.rails.game.financial.StockSpace space = comp.getCurrentSpace();
+                    
+                    int row = space.getRow();
+                    int col = space.getColumn();
+                    for (int i = 0; i < count; i++) {
+                        int nextRow = row - 1;
+                        while (nextRow > 0 && market.getStockSpace(nextRow, col) == null) {
+                            nextRow--;
+                        }
+                        net.sf.rails.game.financial.StockSpace pot = market.getStockSpace(nextRow, col);
+                        if (pot != null && !pot.getId().equalsIgnoreCase("A1")) {
+                            row = nextRow;
+                        }
+                    }
+                    net.sf.rails.game.financial.StockSpace target = market.getStockSpace(row, col);
+//
+                    
+                    if (target != null && target != space) {
+                        market.correctStockPrice(comp, target);
+                    }
+
 
                     net.sf.rails.common.ReportBuffer.add(this, comp.getId() + " took " + count + " loans.");
                     log.info("1817_TRACE: TakeLoans_1817 successful for {}.", comp.getId());
@@ -430,8 +538,21 @@ public class OperatingRound_1817 extends OperatingRound {
                         net.sf.rails.game.specific._1817.PublicCompany_1817 comp1817 = (net.sf.rails.game.specific._1817.PublicCompany_1817) comp;
                         comp1817.setNumberOfBonds(comp1817.getNumberOfBonds() - count);
 
-                        // TODO: Implement stock price movement right one space (unless at $600)
-                        log.warn("1817_TODO: Move stock price right for {} loans repaid by {}.", count, comp.getId());
+                        // Rule 6.9: Stock price is moved one space to the right as each loan is paid off.
+                        net.sf.rails.game.financial.StockMarket market = getRoot().getStockMarket();
+                        net.sf.rails.game.financial.StockSpace space = comp.getCurrentSpace();
+                        int row = space.getRow();
+                        int col = space.getColumn();
+                        for (int i = 0; i < count; i++) {
+                            if (market.getStockSpace(row, col + 1) != null) {
+                                col++;
+                            }
+                        }
+                        net.sf.rails.game.financial.StockSpace target = market.getStockSpace(row, col);
+                        if (target != null && target != space) {
+                            market.correctStockPrice(comp, target);
+                        }
+
                     }
                     net.sf.rails.common.ReportBuffer.add(this,
                             comp.getId() + " repays " + count + " loan(s) for $" + cost + ".");
@@ -501,6 +622,78 @@ public class OperatingRound_1817 extends OperatingRound {
                 }
             }
         }
+        if (action instanceof rails.game.action.SetDividend) {
+            rails.game.action.SetDividend sd = (rails.game.action.SetDividend) action;
+            PublicCompany comp = sd.getCompany();
+            net.sf.rails.game.financial.StockSpace oldSpace = comp.getCurrentSpace();
+
+            // Execute the superclass logic ONCE to handle standard movement
+            boolean result = super.process(sd);
+
+            if (result && oldSpace != null) {
+                log.info("1817_OR: Processing Dividend Movement for {}. Revenue: {}, Alloc: {}",
+                        comp.getId(), sd.getActualRevenue(), sd.getRevenueAllocation());
+
+                int revenue = sd.getActualRevenue();
+                int alloc = sd.getRevenueAllocation();
+                int shareCount = (comp instanceof net.sf.rails.game.specific._1817.PublicCompany_1817)
+                        ? ((net.sf.rails.game.specific._1817.PublicCompany_1817) comp).getShareCount()
+                        : 10;
+
+                int paidToShareholders = 0;
+                if (alloc == rails.game.action.SetDividend.PAYOUT) {
+                    paidToShareholders = revenue;
+                } else if (alloc == rails.game.action.SetDividend.SPLIT) {
+                    if (shareCount == 10) {
+                        paidToShareholders = (((revenue / 2) + 9) / 10) * 10;
+                    } else {
+                        paidToShareholders = revenue / 2;
+                    }
+                }
+
+                int refPrice = Math.max(40, oldSpace.getPrice());
+                int moves = 0;
+                if (paidToShareholders == 0)
+                    moves = -1;
+                else if (paidToShareholders >= refPrice * 2)
+                    moves = 2;
+                else if (paidToShareholders >= refPrice)
+                    moves = 1;
+
+                net.sf.rails.game.financial.StockMarket market = getRoot().getStockMarket();
+                if (market instanceof net.sf.rails.game.specific._1817.StockMarket_1817) {
+                    net.sf.rails.game.specific._1817.StockMarket_1817 m1817 = (net.sf.rails.game.specific._1817.StockMarket_1817) market;
+                    int row = oldSpace.getRow();
+                    int col = oldSpace.getColumn();
+
+                    if (moves > 0) {
+                        for (int i = 0; i < moves; i++) {
+                            int nextRow = row + 1;
+                            while (nextRow < m1817.getNumberOfRows() && m1817.getStockSpace(nextRow, col) == null) {
+                                nextRow++;
+                            }
+                            if (m1817.getStockSpace(nextRow, col) != null) row = nextRow;
+                        }
+                    } else if (moves < 0) {
+                        for (int i = 0; i < -moves; i++) {
+                            int nextRow = row - 1;
+                            while (nextRow > 0 && m1817.getStockSpace(nextRow, col) == null) {
+                                nextRow--;
+                            }
+                            net.sf.rails.game.financial.StockSpace pot = m1817.getStockSpace(nextRow, col);
+                            if (pot != null && !pot.getId().equalsIgnoreCase("A1")) row = nextRow;
+                        }
+                    }
+
+                    net.sf.rails.game.financial.StockSpace target = m1817.getStockSpace(row, col);
+                    if (target != null && comp.getCurrentSpace() != target) {
+                        m1817.correctStockPrice(comp, target);
+                    }
+                }
+            }
+            return result;
+        }
+
         return super.process(action);
     }
 
@@ -510,7 +703,6 @@ public class OperatingRound_1817 extends OperatingRound {
         PublicCompany comp = operatingCompany.value();
         net.sf.rails.game.GameDef.OrStep step = getStep();
 
-       
         // --- 2. COAL MINE INTERRUPT ---
         if ("Yellow".equalsIgnoreCase(lastLaidTileColour) && !hexesLaidThisTurn.isEmpty()) {
             MapHex lastHex = hexesLaidThisTurn.get(hexesLaidThisTurn.size() - 1);
@@ -543,7 +735,8 @@ public class OperatingRound_1817 extends OperatingRound {
 
         // --- 4. BRIDGE ACTIONS ---
         // Evaluation moved here to prevent erasure by super.setPossibleActions()
-        java.util.Collection<net.sf.rails.game.PrivateCompany> privates = comp.getPortfolioModel().getPrivateCompanies();
+        java.util.Collection<net.sf.rails.game.PrivateCompany> privates = comp.getPortfolioModel()
+                .getPrivateCompanies();
         if (privates != null && !privates.isEmpty()) {
             for (net.sf.rails.game.PrivateCompany p : privates) {
                 String pid = p.getId();
@@ -553,7 +746,8 @@ public class OperatingRound_1817 extends OperatingRound {
                     if (placedCount < limit) {
                         for (String hexId : BRIDGE_CITIES) {
                             MapHex cityHex = gameManager.getRoot().getMapManager().getHex(hexId);
-                            if (cityHex == null) continue;
+                            if (cityHex == null)
+                                continue;
                             boolean bridgeExists = false;
                             if (cityHex.getBonusTokens() != null) {
                                 for (net.sf.rails.game.BonusToken t : cityHex.getBonusTokens()) {
@@ -564,7 +758,8 @@ public class OperatingRound_1817 extends OperatingRound {
                                 }
                             }
                             if (!bridgeExists) {
-                                possibleActions.add(new net.sf.rails.game.specific._1817.action.LayBridgeToken_1817(getRoot(), comp.getId(), hexId));
+                                possibleActions.add(new net.sf.rails.game.specific._1817.action.LayBridgeToken_1817(
+                                        getRoot(), comp.getId(), hexId));
                                 actionsAdded = true;
                             }
                         }
@@ -641,14 +836,14 @@ public class OperatingRound_1817 extends OperatingRound {
             }
         }
 
-
         log.info("1817_DEBUG: FINAL ACTIONS LIST for OR Step: " + step.name());
-        
-// 1. Check if the private companies in the portfolio hold the special property
+
+        // 1. Check if the private companies in the portfolio hold the special property
         log.info("1817_DEBUG: Checking Private Companies for Special Properties...");
         for (net.sf.rails.game.PrivateCompany priv : comp.getPortfolioModel().getPrivateCompanies()) {
             Collection<SpecialProperty> privSpecials = priv.getSpecialProperties();
-            log.info("1817_DEBUG:  -> Private " + priv.getId() + " has " + (privSpecials != null ? privSpecials.size() : 0) + " special properties.");
+            log.info("1817_DEBUG:  -> Private " + priv.getId() + " has "
+                    + (privSpecials != null ? privSpecials.size() : 0) + " special properties.");
             if (privSpecials != null) {
                 for (SpecialProperty sp : privSpecials) {
                     log.info("1817_DEBUG:     - Property: " + sp.getClass().getSimpleName());
@@ -657,14 +852,15 @@ public class OperatingRound_1817 extends OperatingRound {
         }
 
         // 2. Inspect the generated actions
-        for(rails.game.action.PossibleAction pa : possibleActions.getList()) {
-             if (pa instanceof LayTile) {
-                 LayTile lt = (LayTile) pa;
-                 SpecialProperty sp = lt.getSpecialProperty();
-                 log.info("1817_DEBUG:  - LayTile action. Attached SpecialProperty: " + (sp != null && sp.getParent() != null ? sp.getParent().getId() : "NONE"));
-             } else {
-                 log.info("1817_DEBUG:  - " + pa.getClass().getSimpleName());
-             }
+        for (rails.game.action.PossibleAction pa : possibleActions.getList()) {
+            if (pa instanceof LayTile) {
+                LayTile lt = (LayTile) pa;
+                SpecialProperty sp = lt.getSpecialProperty();
+                log.info("1817_DEBUG:  - LayTile action. Attached SpecialProperty: "
+                        + (sp != null && sp.getParent() != null ? sp.getParent().getId() : "NONE"));
+            } else {
+                log.info("1817_DEBUG:  - " + pa.getClass().getSimpleName());
+            }
         }
 
         return actionsAdded;
@@ -722,10 +918,6 @@ public class OperatingRound_1817 extends OperatingRound {
         } else {
             log.error("1817_ERROR: Could not find a StockSpace with price 0 for Liquidation.");
         }
-
-        // 4. Mark as closed so BondsModel and other logic ignore it (Rule 7.2.1)
-
-        ((PublicCompany_1817) comp).close();
 
         net.sf.rails.common.ReportBuffer.add(gameManager, comp.getId() + " is moved to liquidation.");
 
