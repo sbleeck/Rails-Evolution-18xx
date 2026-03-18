@@ -1619,14 +1619,13 @@ public class ORPanel extends GridPanel
     private void updateCurrentRoutes(boolean isSetRevenueStep) {
         if (orComp != null && !orComp.isClosed()) {
             isRevenueValueToBeSet = isSetRevenueStep;
-            // Temporarily disable Revenue buttons while calculating
-            if (isSetRevenueStep) {
-                if (btnRevPayout != null)
-                    btnRevPayout.setEnabled(false);
-                if (btnRevWithhold != null)
-                    btnRevWithhold.setEnabled(false);
-                if (btnRevSplit != null)
-                    btnRevSplit.setEnabled(false);
+
+            // Only disable buttons for 1817 to prevent lockouts in other games if a calculation fails
+            boolean is1817 = orComp.getClass().getSimpleName().contains("1817");
+            if (isSetRevenueStep && is1817) {
+                if (btnRevPayout != null) btnRevPayout.setEnabled(false);
+                if (btnRevWithhold != null) btnRevWithhold.setEnabled(false);
+                if (btnRevSplit != null) btnRevSplit.setEnabled(false);
             }
             RailsRoot root = orUIManager.getGameUIManager().getRoot();
             if (revenueThread != null)
