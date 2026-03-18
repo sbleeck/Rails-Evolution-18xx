@@ -5017,9 +5017,43 @@ private static class CertLimitGauge extends JLabel {
 
     }
 
+    // ... (lines of unchanged context code) ...
     protected void initGameSpecificActions() {
-   
+// --- START FIX ---
+        if (possibleActions == null || possibleActions.getList() == null) {
+            log.info("DEBUG-GSA: possibleActions is null or empty");
+            return;
+        }
+
+        for (PossibleAction pa : possibleActions.getList()) {
+            if (pa instanceof GuiTargetedAction && !(pa instanceof BuyTrain) && !(pa instanceof DiscardTrain)) {
+                GuiTargetedAction gta = (GuiTargetedAction) pa;
+                Object target = gta.getTarget();
+                
+                log.info("DEBUG-GSA: Found GuiTargetedAction: {} | Target: {}", pa.getClass().getSimpleName(), (target != null ? target.toString() : "null"));
+                
+                if (target != null) {
+                    net.sf.rails.ui.swing.elements.RailCard card = findRailCardFor(target);
+                    log.info("DEBUG-GSA: findRailCardFor returned: {}", (card != null ? "FOUND" : "NOT FOUND"));
+                    
+                    if (card != null) {
+                        card.addPossibleAction(pa);
+                        
+                        Color bg = gta.getHighlightBackgroundColor();
+                        Color border = gta.getHighlightBorderColor();
+                        
+                        if (bg != null) card.setBackground(bg);
+                        if (border != null) card.setBorder(BorderFactory.createLineBorder(border, 3));
+                        
+                        card.setEnabled(true);
+                        card.setVisible(true);
+                    }
+                }
+            }
+        }
+// --- END FIX ---
     }
+
 
     private ClickField createSpecialActionButton(PossibleAction action) {
         String label = action.getButtonLabel();
@@ -5105,15 +5139,29 @@ private static class CertLimitGauge extends JLabel {
         // B. If Target is a COMPANY (Public or Private) - usually for Mergers/Exchange
         if (target instanceof net.sf.rails.game.Company) {
             net.sf.rails.game.Company targetComp = (net.sf.rails.game.Company) target;
+           
+            // Identify the true owner to target the correct player column
+            Player trueOwner = null;
+            if (targetComp instanceof net.sf.rails.game.PublicCompany) {
+                trueOwner = ((net.sf.rails.game.PublicCompany) targetComp).getPresident();
+            } else if (targetComp instanceof net.sf.rails.game.PrivateCompany) {
+                net.sf.rails.game.state.Owner o = ((net.sf.rails.game.PrivateCompany) targetComp).getOwner();
+                if (o instanceof Player) {
+                    trueOwner = (Player) o;
+                }
+            }
 
             // 1. Scan Player Shares (The most common target for "Exchange Share")
             if (playerShareCards != null) {
                 for (int i = 0; i < nc; i++) {
                     for (int j = 0; j < np; j++) {
                         RailCard card = playerShareCards[i][j];
-                        // Match Found? Return immediately.
-                        if (card != null && card.isVisible() && card.getCompany() == targetComp) {
-                            return card;
+                        if (card != null && card.getCompany() == targetComp) {
+                            if (trueOwner != null) {
+                                if (players.getPlayerByPosition(j) == trueOwner) return card;
+                            } else {
+                                return card; // Fallback for bank/pool
+                            }
                         }
                     }
                 }
@@ -5126,14 +5174,19 @@ private static class CertLimitGauge extends JLabel {
                         for (Component c : playerPrivatesPanel[j].getComponents()) {
                             if (c instanceof RailCard) {
                                 RailCard card = (RailCard) c;
-                                if (card.getCompany() == targetComp)
-                                    return card;
+                                if (card.getCompany() == targetComp) {
+                                    if (trueOwner != null) {
+                                        if (players.getPlayerByPosition(j) == trueOwner) return card;
+                                    } else {
+                                        return card;
+                                    }
+                                }
                             }
                         }
                     }
                 }
             }
-
+            
             // 3. Scan Company Privates
             if (compPrivatesPanel != null) {
                 for (int i = 0; i < nc; i++) {
@@ -5141,14 +5194,18 @@ private static class CertLimitGauge extends JLabel {
                         for (Component c : compPrivatesPanel[i].getComponents()) {
                             if (c instanceof RailCard) {
                                 RailCard card = (RailCard) c;
-                                if (card.getCompany() == targetComp)
+                                if (card.getCompany() == targetComp) {
+                                    log.info("DEBUG-FRC: Found Match in compPrivatesPanel[{}]", i);
                                     return card;
+                                }
                             }
                         }
                     }
                 }
             }
+// --- END FIX ---
         }
+
 
         return null;
     }

@@ -27,11 +27,27 @@ public class StartPrussian extends PossibleAction implements GuiTargetedAction {
         return companyToFold;
     }
 
-    @Override
-    public Owner getActor() { return companyToFold; }
+  @Override
+    public Owner getActor() { 
+        if (companyToFold instanceof net.sf.rails.game.PrivateCompany) {
+            return ((net.sf.rails.game.PrivateCompany) companyToFold).getOwner();
+        } else if (companyToFold instanceof net.sf.rails.game.PublicCompany) {
+            return ((net.sf.rails.game.PublicCompany) companyToFold).getPresident();
+        }
+        return companyToFold; 
+    }
+
 
     @Override
-    public String getGroupLabel() { return "Prussian Formation"; }
+    public String getGroupLabel() { 
+        return "Open Prussia?"; 
+    }
+    
+
+    @Override
+    public Object getTarget() {
+        return companyToFold;
+    }
 
     @Override
     public String getButtonLabel() { return "Start (Fold " + companyToFold.getId() + ")"; }

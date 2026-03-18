@@ -510,15 +510,48 @@ public class ORPanel extends GridPanel
         // TOP: The Company Name (ID)
         String companyName = (actor != null) ? actor.getId() : "Game";
 
-        // MIDDLE: The Player Name (from our new interface method)
+// MIDDLE: The Player Name (from our new interface method)
         String playerName = context.getPlayerName();
+        // Suppress duplicate player names when the Player is the primary Actor
+        if (actor instanceof net.sf.rails.game.Player || companyName.equals(playerName)) {
+            playerName = ""; 
+        }
+
+        // 2. Determine Colors (Prioritize Action Signature over Actor defaults)
+        Color bg = context.getHighlightBackgroundColor();
+        if (bg == null) bg = BG_SPECIAL_HEADER;
+        
+        Color fg = context.getHighlightTextColor();
+        if (fg == null) fg = Color.BLACK;
+
+        if (actor instanceof PublicCompany && context.getHighlightBackgroundColor() == null) {
+            bg = ((PublicCompany) actor).getBgColour();
+            fg = ((PublicCompany) actor).getFgColour();
+        }
+
+        // 3. Update Components
+
+        // TOP: Company Name
+        lblCompanyInfo.setText("<html><center><font size='6'><b>" + companyName + "</b></font></center></html>");
+        lblCompanyInfo.setBackground(bg);
+        lblCompanyInfo.setForeground(fg);
+        lblCompanyInfo.setVisible(true);
+
+        if (lblPlayerInfo != null) {
+            if (playerName == null || playerName.isEmpty()) {
+                lblPlayerInfo.setVisible(false);
+            } else {
+                lblPlayerInfo.setText("<html><center><font face='SansSerif' size='5'>" + playerName + "</font></center></html>");
+                lblPlayerInfo.setBackground(bg);
+                lblPlayerInfo.setForeground(fg);
+                lblPlayerInfo.setBorder(BorderFactory.createMatteBorder(0, 1, 0, 1, Color.DARK_GRAY));
+                lblPlayerInfo.setVisible(true);
+            }
+        }
 
         // BOTTOM: The Action Text
         String actionTitle = context.getGroupLabel();
 
-        // 2. Determine Colors (Company Styling for ALL panels)
-        Color bg = BG_SPECIAL_HEADER;
-        Color fg = Color.BLACK;
 
         if (actor instanceof PublicCompany) {
             bg = ((PublicCompany) actor).getBgColour();
@@ -2452,8 +2485,9 @@ public class ORPanel extends GridPanel
                 net.sf.rails.game.round.RoundFacade rf = orUIManager.getGameUIManager().getGameManager()
                         .getCurrentRound();
                 if (rf != null) {
-                    isMaARound = rf.getClass().getSimpleName().contains("Merger");
-                    if (rf instanceof net.sf.rails.game.OperatingRound) {
+isMaARound = rf.getClass().getSimpleName().contains("Merger") || 
+                                 rf.getClass().getSimpleName().contains("Formation");
+                                                     if (rf instanceof net.sf.rails.game.OperatingRound) {
                         engineActiveComp = ((net.sf.rails.game.OperatingRound) rf).getOperatingCompany();
                     } else {
                         try {
@@ -2551,6 +2585,9 @@ public class ORPanel extends GridPanel
                     specialPanel.removeAll();
                     for (PossibleAction spa : specialActions) {
                         addSpecialActionButton(spa);
+                    }
+                    if (deferredNullAction != null) {
+                        addSpecialActionButton(deferredNullAction);
                     }
                     specialPanel.revalidate();
                     specialPanel.repaint();

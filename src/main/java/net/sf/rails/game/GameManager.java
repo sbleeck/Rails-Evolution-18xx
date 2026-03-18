@@ -2020,9 +2020,11 @@ log.info("1817_DEBUG: GameManager.createRound requested for Class: " + roundClas
         if (!dir.exists())
             dir.mkdirs();
 
-        // Generate filename using the official persistent move counter (actionCount)
-        // instead of the transient absoluteActionCounter.
-        String filename = String.format("autosave_%05d.rails", actionCount.value());
+
+
+
+        String dateStr = new java.text.SimpleDateFormat("yyyyMMdd_HHmmss").format(new java.util.Date());
+        String filename = String.format("%s_%s_%05d.rails", getGameName(), dateStr, actionCount.value());
         File saveFile = new File(dir, filename);
 
         GameSaver gameSaver = new GameSaver(getRoot().getGameData(), executedActions.view());
@@ -2030,15 +2032,19 @@ log.info("1817_DEBUG: GameManager.createRound requested for Class: " + roundClas
             // Save the new file
             gameSaver.saveGame(saveFile);
 
-            // Delete old autosave files to keep only the latest
+            // Delete old autosave files only for this specific game
+            final String gamePrefix = getGameName() + "_";
             File[] oldFiles = dir.listFiles(
-                    (d, name) -> name.startsWith("autosave_") && name.endsWith(".rails") && !name.equals(filename));
+                    (d, name) -> name.startsWith(gamePrefix) && name.endsWith(".rails") && !name.equals(filename));
 
             if (oldFiles != null) {
                 for (File f : oldFiles) {
+                    // --- DELETE --- f.delete();
                     f.delete();
                 }
             }
+
+            
             // Automatically persist UI window states during the recovery autosave cycle
             if (gameUIManager != null) {
                 gameUIManager.saveWindowSettings(getGameName());

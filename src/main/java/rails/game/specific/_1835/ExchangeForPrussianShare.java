@@ -27,11 +27,27 @@ public class ExchangeForPrussianShare extends PossibleAction implements GuiTarge
         return companyToExchange;
     }
 
-    @Override
-    public Owner getActor() { return companyToExchange; }
 
     @Override
-    public String getGroupLabel() { return "Minor Exchange"; }
+    public Owner getActor() { 
+        if (companyToExchange instanceof net.sf.rails.game.PrivateCompany) {
+            return ((net.sf.rails.game.PrivateCompany) companyToExchange).getOwner();
+        } else if (companyToExchange instanceof net.sf.rails.game.PublicCompany) {
+            return ((net.sf.rails.game.PublicCompany) companyToExchange).getPresident();
+        }
+        return companyToExchange; 
+    }
+
+    @Override
+    public Object getTarget() {
+        return companyToExchange;
+    }
+
+    @Override
+    public String getGroupLabel() { 
+        return "Merge with Prussia?"; 
+    }
+
 
     @Override
     public String getButtonLabel() { return "Exchange " + companyToExchange.getId(); }
