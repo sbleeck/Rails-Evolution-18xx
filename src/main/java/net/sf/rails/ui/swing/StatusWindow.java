@@ -1807,6 +1807,122 @@ public class StatusWindow extends JFrame implements ActionListener, ActionPerfor
 
                     dynamicButtonPanel.revalidate();
                     dynamicButtonPanel.repaint();
+
+                    } else if (currentRound instanceof net.sf.rails.game.specific._1817.MergerAndAcquisitionRound_1817 
+                           && (((net.sf.rails.game.specific._1817.MergerAndAcquisitionRound_1817) currentRound).getCurrentStep() == net.sf.rails.game.specific._1817.MergerAndAcquisitionRound_1817.MaAStep.SALES_AUCTION || 
+                               ((net.sf.rails.game.specific._1817.MergerAndAcquisitionRound_1817) currentRound).getCurrentStep() == net.sf.rails.game.specific._1817.MergerAndAcquisitionRound_1817.MaAStep.SALES_SELECT_BUYER)) {
+                    
+                    net.sf.rails.game.specific._1817.MergerAndAcquisitionRound_1817 maRound = (net.sf.rails.game.specific._1817.MergerAndAcquisitionRound_1817) currentRound;
+                    net.sf.rails.game.specific._1817.MergerAndAcquisitionRound_1817.MaAStep step = maRound.getCurrentStep();
+                    
+                    dynamicButtonPanel.setBackground(new Color(230, 240, 255));
+                    dynamicButtonPanel.setOpaque(true);
+                    dynamicButtonPanel.setBorder(BorderFactory.createLineBorder(Color.BLUE, 1));
+                    dynamicButtonPanel.setLayout(new FlowLayout(FlowLayout.LEFT, 8, 2));
+                    
+                    String highBidderName = (maRound.getHighestBiddingPlayer() != null) ? maRound.getHighestBiddingPlayer().getName() : "None";
+                    JLabel highBidLabel = new JLabel("High: " + highBidderName + " ($" + maRound.getHighestBid() + ")");
+                    highBidLabel.setFont(new Font("SansSerif", Font.BOLD, 13));
+                    highBidLabel.setForeground(new Color(0, 102, 204));
+                    dynamicButtonPanel.add(highBidLabel);
+                    
+                    JSeparator sep = new JSeparator(JSeparator.VERTICAL);
+                    sep.setPreferredSize(new Dimension(2, 25));
+                    dynamicButtonPanel.add(sep);
+                    
+                    String actorName = (maRound.getActingPlayer() != null) ? maRound.getActingPlayer().getName() : "Someone";
+                    if (step == net.sf.rails.game.specific._1817.MergerAndAcquisitionRound_1817.MaAStep.SALES_SELECT_BUYER) {
+                        actorName = highBidderName; 
+                    }
+                    String companyId = (maRound.getOperatingCompany() != null) ? maRound.getOperatingCompany().getId() : "Company";
+                    
+                    net.sf.rails.game.specific._1817.action.BidOnCompany_1817 bidAction = null;
+                    NullAction passAction = null;
+                    
+                    if (possibleActions != null && possibleActions.getList() != null) {
+                        for (PossibleAction pa : possibleActions.getList()) {
+                            if (pa instanceof net.sf.rails.game.specific._1817.action.BidOnCompany_1817)
+                                bidAction = (net.sf.rails.game.specific._1817.action.BidOnCompany_1817) pa;
+                            else if (pa instanceof NullAction && ((NullAction) pa).getMode() == NullAction.Mode.PASS)
+                                passAction = (NullAction) pa;
+                        }
+                    }
+                    
+                    if (step == net.sf.rails.game.specific._1817.MergerAndAcquisitionRound_1817.MaAStep.SALES_SELECT_BUYER) {
+                        if (myTurn) {
+                            dynamicButtonPanel.add(new JLabel(actorName + ", select company to purchase " + companyId + ":"));
+                            if (possibleActions != null && possibleActions.getList() != null) {
+                                for (PossibleAction pa : possibleActions.getList()) {
+                                    if (pa instanceof net.sf.rails.game.specific._1817.action.SelectPurchasingCompany_1817) {
+                                        final net.sf.rails.game.specific._1817.action.SelectPurchasingCompany_1817 sel = (net.sf.rails.game.specific._1817.action.SelectPurchasingCompany_1817) pa;
+                                        JButton btn = new JButton(sel.getCompanyId());
+                                        btn.addActionListener(e -> process(sel));
+                                        dynamicButtonPanel.add(btn);
+                                    }
+                                }
+                            }
+                        } else {
+                            dynamicButtonPanel.add(new JLabel("Waiting for " + actorName + " to select purchasing company for " + companyId + "..."));
+                        }
+                    } else {
+                        if (myTurn) {
+                            if (bidSpinner == null) {
+                                bidSpinner = new JSpinner(new SpinnerNumberModel(10, 0, 10000, 10));
+                                bidSpinner.setPreferredSize(new Dimension(65, 30));
+                            }
+                            
+                            int currentHighestBid = maRound.getHighestBid();
+                            boolean hasBidder = maRound.getHighestBiddingPlayer() != null;
+                            int minNextBid = (currentHighestBid == 0 && !hasBidder) ? currentHighestBid : currentHighestBid + 10;
+                            if (currentHighestBid > 0 && !hasBidder) minNextBid = currentHighestBid;
+                            
+                            ((SpinnerNumberModel) bidSpinner.getModel()).setMinimum(minNextBid);
+                            if ((Integer) bidSpinner.getValue() < minNextBid)
+                                bidSpinner.setValue(minNextBid);
+
+                            JLabel bidPrompt = new JLabel(actorName + " bids: $");
+                            bidPrompt.setFont(new Font("SansSerif", Font.PLAIN, 13));
+                            dynamicButtonPanel.add(bidPrompt);
+                            dynamicButtonPanel.add(bidSpinner);
+
+                            if (auctionBidButton == null)
+                                auctionBidButton = new JButton("Place Bid");
+                            auctionBidButton.setPreferredSize(new Dimension(90, 28));
+
+                            final net.sf.rails.game.specific._1817.action.BidOnCompany_1817 finalBid = bidAction;
+                            for (java.awt.event.ActionListener al : auctionBidButton.getActionListeners())
+                                auctionBidButton.removeActionListener(al);
+                            auctionBidButton.addActionListener(e -> {
+                                if (finalBid != null) {
+                                    try {
+                                        java.lang.reflect.Method setBid = finalBid.getClass().getMethod("setBidAmount", int.class);
+                                        setBid.invoke(finalBid, (Integer) bidSpinner.getValue());
+                                    } catch (Exception ex) {
+                                        log.error("Failed to set bid amount", ex);
+                                    }
+                                    process(finalBid);
+                                }
+                            });
+                            dynamicButtonPanel.add(auctionBidButton);
+
+                            if (auctionPassButton == null)
+                                auctionPassButton = new JButton("Pass");
+                            auctionPassButton.setPreferredSize(new Dimension(70, 28));
+                            auctionPassButton.setForeground(Color.RED);
+                            
+                            final NullAction finalPass = passAction;
+                            for (java.awt.event.ActionListener al : auctionPassButton.getActionListeners())
+                                auctionPassButton.removeActionListener(al);
+                            auctionPassButton.addActionListener(e -> process(finalPass));
+                            dynamicButtonPanel.add(auctionPassButton);
+                        } else {
+                            dynamicButtonPanel.add(new JLabel("Waiting for " + actorName + " to bid for " + companyId + "..."));
+                        }
+                    }
+                    
+                    dynamicButtonPanel.revalidate();
+                    dynamicButtonPanel.repaint();
+                    
                 } else {
                 
 

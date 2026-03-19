@@ -78,4 +78,6 @@ int row = oldsquare.getRow();
         log.info("1817_MARKET: Move DOWN/LEFT (Price Decrease). End: {}", newsquare.getId());
         prepareMove(company, oldsquare, newsquare);
     }
+
+    
 }

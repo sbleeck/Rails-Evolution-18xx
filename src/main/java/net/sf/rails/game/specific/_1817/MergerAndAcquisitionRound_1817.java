@@ -54,6 +54,16 @@ public class MergerAndAcquisitionRound_1817 extends Round {
     private final ArrayListState<net.sf.rails.game.Player> activeBidders;
     private final GenericState<Integer> auctionPlayerIndex;
 
+    public int getHighestBid() { return highestBid.value(); }
+    public net.sf.rails.game.Player getHighestBiddingPlayer() { return highestBiddingPlayer.value(); }
+    public PublicCompany getOperatingCompany() { return operatingCompany.value(); }
+    public net.sf.rails.game.Player getActingPlayer() {
+        if (activeBidders.isEmpty()) return null;
+        return activeBidders.get(auctionPlayerIndex.value());
+    }
+    public MaAStep getCurrentStep() { return currentStep.value(); }
+
+    
     public MergerAndAcquisitionRound_1817(GameManager parent, String id) {
         super(parent, id);
         this.gameManagerRef = parent;
@@ -74,8 +84,9 @@ public class MergerAndAcquisitionRound_1817 extends Round {
     public void start() {
         operatingCompanies.clear();
         log.info("M&A ROUND: start() invoked.");
-        List<PublicCompany> allCompanies = gameManagerRef.getRoot().getCompanyManager().getAllPublicCompanies();
-        for (PublicCompany comp : allCompanies) {
+
+        List<PublicCompany> sortedComps = gameManagerRef.getCompaniesInRunningOrder();
+        for (PublicCompany comp : sortedComps) {
             if (comp.hasFloated() && !comp.isClosed()) {
                 operatingCompanies.add(comp);
                 log.info("M&A ROUND: Added operating company: " + comp.getId());
@@ -103,6 +114,11 @@ public class MergerAndAcquisitionRound_1817 extends Round {
                 if (mergedThisRound.contains(c1.getId()) || mergedThisRound.contains(c2.getId()))
                     continue;
 
+                if (c1.getCurrentSpace() == null || c1.getCurrentSpace().getPrice() <= 30 ||
+                        c2.getCurrentSpace() == null || c2.getCurrentSpace().getPrice() <= 30) {
+                    continue;
+                }
+
                 int shares1 = ((PublicCompany_1817) c1).getShareCount();
                 int shares2 = ((PublicCompany_1817) c2).getShareCount();
 
@@ -127,15 +143,48 @@ public class MergerAndAcquisitionRound_1817 extends Round {
         log.info("M&A ROUND: processNextCompany() invoked. Starting at index " + index);
         while (index < operatingCompanies.size()) {
             PublicCompany comp = operatingCompanies.get(index);
-            boolean hasOptions = false;
+            log.info("M&A ROUND ORDER TEST: Array Index " + index + " -> " + comp.getId() + " (President: "
+                    + (comp.getPresident() != null ? comp.getPresident().getName() : "None") + ", Price: "
+                    + (comp.getCurrentSpace() != null ? comp.getCurrentSpace().getPrice() : "N/A") + ")");
+
+            boolean canMerge = false;
             for (String pair : validMergerPairs.view()) {
                 if (pair.startsWith(comp.getId() + ",")) {
-                    hasOptions = true;
+                    canMerge = true;
                     break;
                 }
             }
-            if (mergedThisRound.contains(comp.getId()) || !hasOptions) {
-                log.info("M&A ROUND: Skipping " + comp.getId() + " (already merged or zero valid pairs).");
+
+            boolean canConvert = false;
+            if (comp instanceof PublicCompany_1817 && comp.getCurrentSpace() != null
+                    && comp.getCurrentSpace().getPrice() > 30) {
+                int shares = ((PublicCompany_1817) comp).getShareCount();
+                if (shares == 2 || shares == 5) {
+                    canConvert = true;
+                }
+            }
+
+            boolean canLoan = false;
+            if (comp instanceof PublicCompany_1817
+                    && comp.getNumberOfBonds() < ((PublicCompany_1817) comp).getShareCount()) {
+                canLoan = true;
+            }
+
+            // --- DELETE --- boolean hasOptions = false;
+            // --- DELETE --- for (String pair : validMergerPairs.view()) {
+            // --- DELETE --- if (pair.startsWith(comp.getId() + ",")) {
+            // --- DELETE --- hasOptions = true;
+            // --- DELETE --- break;
+            // --- DELETE --- }
+            // --- DELETE --- }
+            // --- DELETE --- if (mergedThisRound.contains(comp.getId()) || !hasOptions) {
+            // --- DELETE --- log.info("M&A ROUND: Skipping " + comp.getId() + " (already
+            // merged or zero valid pairs).");
+
+            if (mergedThisRound.contains(comp.getId()) || (!canMerge && !canConvert && !canLoan)) {
+                log.info("M&A ROUND: Skipping " + comp.getId()
+                        + " (Already merged, or lacks valid merge/convert/loan options).");
+
                 index++;
             } else {
                 log.info("M&A ROUND: Selected " + comp.getId() + " as the next operating company.");
@@ -145,9 +194,9 @@ public class MergerAndAcquisitionRound_1817 extends Round {
         companyIndex.set(index);
 
         if (index >= operatingCompanies.size()) {
-            log.info("M&A ROUND: Reached end of company list. Finishing round.");
-            currentStep.set(MaAStep.FINISHED);
-            gameManagerRef.nextRound(this);
+            log.info("M&A ROUND: Reached end of company list for conversions/mergers. Starting sales phase.");
+            startSalesPhase();
+
             return;
         }
 
@@ -177,8 +226,13 @@ public class MergerAndAcquisitionRound_1817 extends Round {
             } else if (currentStep.value() == MaAStep.POST_MERGER_PRESIDENT) {
                 initPostMergerPlayers();
                 return true;
+
             } else if (currentStep.value() == MaAStep.POST_MERGER_PLAYERS) {
                 advancePostMergerPlayer();
+                return true;
+            } else if (currentStep.value() == MaAStep.LOAN_TAKING) {
+                currentStep.set(MaAStep.TOKEN_PURCHASE);
+                executeMandatoryTokenPurchase();
                 return true;
             } else if (currentStep.value() == MaAStep.SALES_FRIENDLY) {
                 log.info("M&A ROUND: President declined friendly sale for " + operatingCompany.value().getId());
@@ -210,7 +264,10 @@ public class MergerAndAcquisitionRound_1817 extends Round {
                 advancePostMergerPlayer();
                 return true;
             } else if (currentStep.value() == MaAStep.LOAN_TAKING) {
-                setupPostMergerLoanActions();
+
+                currentStep.set(MaAStep.TOKEN_PURCHASE);
+                executeMandatoryTokenPurchase();
+                return true;
 
             } else if (currentStep.value() == MaAStep.SALES_FRIENDLY) {
                 log.info("M&A ROUND: President offered " + operatingCompany.value().getId() + " for Friendly Sale.");
@@ -236,7 +293,7 @@ public class MergerAndAcquisitionRound_1817 extends Round {
             }
             return true;
 
-       } else if (action instanceof net.sf.rails.game.specific._1817.action.ConvertCompany_1817) {
+        } else if (action instanceof net.sf.rails.game.specific._1817.action.ConvertCompany_1817) {
             net.sf.rails.game.specific._1817.action.ConvertCompany_1817 convertAction = (net.sf.rails.game.specific._1817.action.ConvertCompany_1817) action;
             PublicCompany comp = convertAction.getCompany();
             log.info("M&A ROUND: Processing CONVERT action for: " + comp.getId());
@@ -253,8 +310,9 @@ public class MergerAndAcquisitionRound_1817 extends Round {
 
             for (net.sf.rails.game.financial.PublicCertificate cert : comp.getCertificates()) {
                 if (cert.getOwner() == comp && !cert.isPresidentShare()) {
-                    player.setCash_AI(player.getCash() - comp.getMarketPrice());
-                    comp.setCash_AI(comp.getCash() + comp.getMarketPrice());
+
+                    net.sf.rails.game.state.Currency.wire(player, comp.getMarketPrice(), comp);
+
                     cert.moveTo(player.getPortfolioModel());
                     log.info("M&A ROUND: " + player.getName() + " bought 1 share of " + comp.getId()
                             + " from Treasury.");
@@ -323,9 +381,12 @@ public class MergerAndAcquisitionRound_1817 extends Round {
 
             log.info("M&A ROUND: " + comp.getId() + " took " + amount + " loans.");
 
-            // Proceed to mandatory token check
-            currentStep.set(MaAStep.TOKEN_PURCHASE);
-            executeMandatoryTokenPurchase();
+            if (currentStep.value() == MaAStep.COMPANY_ACTIONS || currentStep.value() == MaAStep.LOAN_TAKING) {
+                setPossibleActions();
+            } else {
+                currentStep.set(MaAStep.TOKEN_PURCHASE);
+                executeMandatoryTokenPurchase();
+            }
             return true;
         } else if (action instanceof net.sf.rails.game.specific._1817.action.BidOnCompany_1817) {
             net.sf.rails.game.specific._1817.action.BidOnCompany_1817 bidAction = (net.sf.rails.game.specific._1817.action.BidOnCompany_1817) action;
@@ -362,7 +423,6 @@ public class MergerAndAcquisitionRound_1817 extends Round {
         return false;
     }
 
-
     private void executeConversion(PublicCompany comp) {
         log.info(">>> Executing Conversion for: " + comp.getId());
         PublicCompany_1817 comp1817 = (PublicCompany_1817) comp;
@@ -384,7 +444,6 @@ public class MergerAndAcquisitionRound_1817 extends Round {
         startPostMergerPhase();
     }
 
-    
     private void execute2ShareMerger(PublicCompany initiator, PublicCompany target) {
         log.info(">>> Executing Merger: " + initiator.getId() + " absorbs " + target.getId());
 
@@ -859,12 +918,17 @@ public class MergerAndAcquisitionRound_1817 extends Round {
             if (comp.getCash() >= cost) {
                 comp.setCash_AI(comp.getCash() - cost);
                 log.info("M&A ROUND: " + comp.getId() + " paid $" + cost + " for mandatory station markers.");
-                // TODO: Logic to physically add the new BaseToken objects to the model
             } else {
                 log.warn("M&A ROUND: " + comp.getId() + " cannot afford mandatory markers. LIQUIDATING.");
-                // TODO: Implement the specific 1817 StockMarket liquidation call here [cite:
-                // 720]
-                // comp.setClosed();
+                net.sf.rails.game.financial.StockSpace liquidationSpace = gameManagerRef.getRoot().getStockMarket()
+                        .getStartSpace(0);
+                if (liquidationSpace != null) {
+                    if (comp.getCurrentSpace() != null) {
+                        comp.getCurrentSpace().removeToken(comp);
+                    }
+                    liquidationSpace.addToken(comp);
+                    comp.setCurrentSpace(liquidationSpace);
+                }
             }
         }
 
@@ -876,7 +940,7 @@ public class MergerAndAcquisitionRound_1817 extends Round {
         log.info("M&A ROUND: setupCompanyActions() invoked for " + company.getId());
         for (String pair : validMergerPairs.view()) {
             String[] ids = pair.split(",");
-            // --- START FIX ---
+
             if (ids[0].equals(company.getId())) {
                 PublicCompany target = gameManagerRef.getRoot().getCompanyManager().getPublicCompany(ids[1]);
                 if (target != null) {
@@ -892,12 +956,13 @@ public class MergerAndAcquisitionRound_1817 extends Round {
             PublicCompany_1817 comp1817 = (PublicCompany_1817) company;
             int maxLoans = comp1817.getShareCount();
             if (company.getNumberOfBonds() < maxLoans) {
-                possibleActions.add(new net.sf.rails.game.specific._1817.action.TakeLoans_1817(getRoot(), company.getId(), maxLoans));
+                possibleActions.add(new net.sf.rails.game.specific._1817.action.TakeLoans_1817(getRoot(),
+                        company.getId(), maxLoans));
                 log.info("M&A ROUND: Added TakeLoans_1817 action for " + company.getId() + " with max loans: "
                         + maxLoans);
             }
 
-            // Check for Conversions (White zone only, > $30) 
+            // Check for Conversions (White zone only, > $30)
             if (company.getCurrentSpace() != null && company.getCurrentSpace().getPrice() > 30) {
                 if (comp1817.getShareCount() == 2 || comp1817.getShareCount() == 5) {
                     possibleActions.add(new net.sf.rails.game.specific._1817.action.ConvertCompany_1817(company));
@@ -907,7 +972,6 @@ public class MergerAndAcquisitionRound_1817 extends Round {
 
         }
 
-        
         addPassAction(company);
         log.info("M&A ROUND: Total possible actions generated: " + possibleActions.getList().size());
     }
@@ -917,18 +981,17 @@ public class MergerAndAcquisitionRound_1817 extends Round {
      */
     private void startSalesPhase() {
         log.info("M&A ROUND: Starting Sales Phase (Reverse Operating Order).");
-        List<PublicCompany> allComps = gameManagerRef.getRoot().getCompanyManager().getAllPublicCompanies();
 
-        // Sort in reverse operating order (lowest price first)
-        List<PublicCompany> sortedComps = allComps.stream()
-                .filter(c -> c.hasFloated() && !c.isClosed())
-                .sorted((c1, c2) -> Integer.compare(c1.getMarketPrice(), c2.getMarketPrice()))
-                .collect(java.util.stream.Collectors.toList());
+        List<PublicCompany> sortedComps = new java.util.ArrayList<>(gameManagerRef.getCompaniesInRunningOrder());
+        java.util.Collections.reverse(sortedComps);
 
         operatingCompanies.clear();
         for (PublicCompany c : sortedComps) {
-            operatingCompanies.add(c);
+            if (c.hasFloated() && !c.isClosed()) {
+                operatingCompanies.add(c);
+            }
         }
+
         companyIndex.set(0);
         currentStep.set(MaAStep.SALES_LIQUIDATION);
         processNextSale();

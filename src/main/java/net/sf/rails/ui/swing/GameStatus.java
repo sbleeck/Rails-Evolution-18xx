@@ -5017,11 +5017,10 @@ private static class CertLimitGauge extends JLabel {
 
     }
 
-    // ... (lines of unchanged context code) ...
+
     protected void initGameSpecificActions() {
-// --- START FIX ---
+
         if (possibleActions == null || possibleActions.getList() == null) {
-            log.info("DEBUG-GSA: possibleActions is null or empty");
             return;
         }
 
@@ -5030,11 +5029,9 @@ private static class CertLimitGauge extends JLabel {
                 GuiTargetedAction gta = (GuiTargetedAction) pa;
                 Object target = gta.getTarget();
                 
-                log.info("DEBUG-GSA: Found GuiTargetedAction: {} | Target: {}", pa.getClass().getSimpleName(), (target != null ? target.toString() : "null"));
                 
                 if (target != null) {
                     net.sf.rails.ui.swing.elements.RailCard card = findRailCardFor(target);
-                    log.info("DEBUG-GSA: findRailCardFor returned: {}", (card != null ? "FOUND" : "NOT FOUND"));
                     
                     if (card != null) {
                         card.addPossibleAction(pa);

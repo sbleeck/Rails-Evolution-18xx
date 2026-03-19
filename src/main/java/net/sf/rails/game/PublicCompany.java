@@ -1335,6 +1335,14 @@ return list;
             Currency.wireAll(otherCompany, this);
         }
         portfolio.transferAssetsFrom(otherCompany.getPortfolioModel());
+       for (PrivateCompany priv : new java.util.ArrayList<>(otherCompany.getPrivates())) {
+            priv.moveTo(this.getPortfolioModel());
+            
+            java.util.Set<net.sf.rails.game.special.SpecialProperty> sps = priv.getSpecialProperties();
+            if (sps != null && !sps.isEmpty()) {
+                getRoot().getGameManager().allocateSpecialProperties(this, sps);
+            }
+        }
     }
 
     /**

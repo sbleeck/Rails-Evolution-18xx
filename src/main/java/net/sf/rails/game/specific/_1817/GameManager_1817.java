@@ -186,4 +186,26 @@ private void payMailContracts() {
         guiParameters.put(net.sf.rails.common.GuiDef.Parm.CAN_ANY_COMPANY_HOLD_OWN_SHARES, true);
     }
 
+    @Override
+    public java.util.List<net.sf.rails.game.PublicCompany> getCompaniesInRunningOrder() {
+        java.util.List<net.sf.rails.game.PublicCompany> runningOrder = new java.util.ArrayList<>(super.getCompaniesInRunningOrder());
+        
+        // 1817 Rule 6.2: "If the stock values of two or more companies are equal, 
+        // then the one whose stock marker was placed in that space first operates first."
+        runningOrder.sort((c1, c2) -> {
+            net.sf.rails.game.financial.StockSpace s1 = c1.getCurrentSpace();
+            net.sf.rails.game.financial.StockSpace s2 = c2.getCurrentSpace();
+            
+            if (s1 != null && s2 != null && s1.equals(s2)) {
+                java.util.List<?> stack = s1.getTokens();
+                int idx1 = stack.indexOf(c1);
+                int idx2 = stack.indexOf(c2);
+                return Integer.compare(idx1, idx2);
+            }
+            return 0; // Maintain superclass order (price descending) for all other comparisons
+        });
+        
+        return runningOrder;
+    }
+    
 }
