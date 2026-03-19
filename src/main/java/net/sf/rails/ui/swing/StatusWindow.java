@@ -740,7 +740,8 @@ public class StatusWindow extends JFrame implements ActionListener, ActionPerfor
             actions = ((ActionTaker) actor.getSource()).getPossibleActions();
         }
         PossibleAction executedAction = null;
-        if (actions != null && actions.size() > 0) {
+
+if (actions != null && !actions.isEmpty()) {
             executedAction = actions.get(0);
         }
 
@@ -1947,10 +1948,12 @@ public class StatusWindow extends JFrame implements ActionListener, ActionPerfor
 
                 } else {
 
-                    boolean hasSpecialActions = false;
+
+
+boolean hasSpecialActions = false;
                     java.util.List<PossibleAction> specialActions = new java.util.ArrayList<>();
+                    java.util.List<PossibleAction> shortActions = new java.util.ArrayList<>();
                     GuiTargetedAction contextProvider = null;
-                    NullAction specialNullAction = null;
 
                     if (possibleActions != null && possibleActions.getList() != null) {
                         for (PossibleAction pa : possibleActions.getList()) {
@@ -1959,87 +1962,83 @@ public class StatusWindow extends JFrame implements ActionListener, ActionPerfor
                                 hasSpecialActions = true;
                                 if (contextProvider == null)
                                     contextProvider = (GuiTargetedAction) pa;
-                            } else if (pa instanceof NullAction && (((NullAction) pa).getMode() == NullAction.Mode.PASS
-                                    || ((NullAction) pa).getMode() == NullAction.Mode.DONE)) {
-                                specialNullAction = (NullAction) pa;
+                            } else if (pa.getClass().getSimpleName().equals("Short1817")) {
+                                shortActions.add(pa);
                             }
                         }
                     }
 
-                    if (hasSpecialActions) {
-                        dynamicButtonPanel.setBackground(new Color(230, 240, 255));
-                        dynamicButtonPanel.setOpaque(true);
-                        dynamicButtonPanel.setBorder(BorderFactory.createLineBorder(Color.BLUE, 1));
+                    if (hasSpecialActions || !shortActions.isEmpty()) {
+                        dynamicButtonPanel.setBackground(null);
+                        dynamicButtonPanel.setOpaque(false);
+                        dynamicButtonPanel.setBorder(BorderFactory.createEmptyBorder(0, 10, 0, 0));
                         dynamicButtonPanel.setLayout(new FlowLayout(FlowLayout.LEFT, 8, 2));
 
-                        String actorName = (effectivePlayer != null) ? effectivePlayer.getName() : "Player";
-                        net.sf.rails.game.state.Owner actorOwner = contextProvider.getActor();
-                        String companyPrefix = "";
-                        if (actorOwner instanceof net.sf.rails.game.Company) {
-                            companyPrefix = " (" + ((net.sf.rails.game.Company) actorOwner).getId() + ")";
-                        }
+                        if (hasSpecialActions && contextProvider != null) {
+                            String actorName = (effectivePlayer != null) ? effectivePlayer.getName() : "Player";
+                            JLabel promptLabel = new JLabel("<html><b>" + actorName + "</b>: " + contextProvider.getGroupLabel() + "</html>");
+                            promptLabel.setForeground(new Color(0, 102, 204));
+                            dynamicButtonPanel.add(promptLabel);
 
-                        String title = contextProvider.getGroupLabel();
-                        if (title == null || title.isEmpty())
-                            title = "Special Action";
-
-                        JLabel promptLabel = new JLabel(
-                                "<html><b>" + actorName + companyPrefix + "</b>, " + title + ":</html>");
-
-                        promptLabel.setForeground(new Color(0, 102, 204));
-                        dynamicButtonPanel.add(promptLabel);
-
-                        JSeparator sep = new JSeparator(JSeparator.VERTICAL);
-                        sep.setPreferredSize(new Dimension(2, 25));
-                        dynamicButtonPanel.add(sep);
-
-                        for (PossibleAction spa : specialActions) {
-                            GuiTargetedAction gta = (GuiTargetedAction) spa;
-                            ActionButton btn = new ActionButton(null);
-
-                            String labelText = gta.getButtonLabel();
-                            if (labelText != null && labelText.length() > 20) {
-                                labelText = labelText.substring(0, 20) + "...";
+                            for (PossibleAction spa : specialActions) {
+                                GuiTargetedAction gta = (GuiTargetedAction) spa;
+                                ActionButton btn = new ActionButton(null);
+                                btn.setText(gta.getButtonLabel());
+                                btn.setPossibleAction(spa);
+                                btn.addActionListener(this);
+                                dynamicButtonPanel.add(btn);
                             }
-                            btn.setText(labelText);
-
-                            btn.setBackground(gta.getHighlightBackgroundColor());
-                            btn.setForeground(gta.getHighlightTextColor());
-                            btn.setBorder(BorderFactory.createCompoundBorder(
-                                    BorderFactory.createLineBorder(gta.getHighlightBorderColor(), 2),
-                                    BorderFactory.createEmptyBorder(2, 5, 2, 5)));
-                            btn.setOpaque(true);
-                            btn.setFont(new Font("SansSerif", Font.BOLD, 12));
-                            btn.setPossibleAction(spa);
-                            btn.setActionCommand("SpecialAction");
-                            btn.addActionListener(this);
-                            dynamicButtonPanel.add(btn);
                         }
 
-                        if (specialNullAction != null) {
-                            ActionButton declineBtn = new ActionButton(null);
-                            declineBtn
-                                    .setText(specialNullAction.getMode() == NullAction.Mode.PASS ? "Decline" : "Done");
-                            declineBtn.setBackground(new Color(255, 69, 0)); // SYS_RED
-                            declineBtn.setForeground(Color.WHITE);
-                            declineBtn.setBorder(BorderFactory.createCompoundBorder(
-                                    BorderFactory.createLineBorder(new Color(200, 0, 0), 2),
-                                    BorderFactory.createEmptyBorder(2, 5, 2, 5)));
-                            declineBtn.setOpaque(true);
-                            declineBtn.setFont(new Font("SansSerif", Font.BOLD, 12));
-                            declineBtn.setPossibleAction(specialNullAction);
-                            declineBtn.setActionCommand(
-                                    specialNullAction.getMode() == NullAction.Mode.PASS ? PASS_CMD : DONE_CMD);
-                            declineBtn.addActionListener(this);
-                            dynamicButtonPanel.add(declineBtn);
+                        // Short Selling Logic
+                        if (!shortActions.isEmpty() && myTurn) {
+                            if (hasSpecialActions)
+                                dynamicButtonPanel.add(new JSeparator(JSeparator.VERTICAL));
+
+                            JLabel shortLabel = new JLabel("Sell Short:");
+                            shortLabel.setForeground(new Color(200, 0, 100));
+                            shortLabel.setFont(new Font("SansSerif", Font.BOLD, 12));
+                            dynamicButtonPanel.add(shortLabel);
+
+                            for (final PossibleAction pa : shortActions) {
+                                String compId = pa.toString().replace("Sell Short", "").trim();
+                                JButton shortBtn = new JButton(compId);
+                                shortBtn.setBackground(Color.PINK);
+                                shortBtn.setOpaque(true);
+                                shortBtn.setBorder(BorderFactory.createLineBorder(new Color(255, 105, 180), 2));
+                                shortBtn.addActionListener(e -> process(pa));
+                                dynamicButtonPanel.add(shortBtn);
+                            }
+                        }
+                        if (myTurn) {
+                            List<NullAction> nullActions = possibleActions.getType(NullAction.class);
+                            if (nullActions != null) {
+                                for (NullAction na : nullActions) {
+                                    if (na.getMode() == NullAction.Mode.PASS || na.getMode() == NullAction.Mode.DONE) {
+                                        dynamicButtonPanel.add(new JSeparator(JSeparator.VERTICAL));
+                                        ActionButton declineBtn = new ActionButton(null);
+                                        declineBtn.setText(na.getMode() == NullAction.Mode.PASS ? "Decline / Pass" : "Done");
+                                        declineBtn.setForeground(Color.RED);
+                                        declineBtn.setPossibleAction(na);
+                                        declineBtn.addActionListener(this);
+                                        dynamicButtonPanel.add(declineBtn);
+                                        break;
+                                    }
+                                }
+                            }
                         }
                     } else {
+
+
+
+
+
+
                         dynamicButtonPanel.setBackground(null);
                         dynamicButtonPanel.setOpaque(false);
                         dynamicButtonPanel.setBorder(BorderFactory.createEmptyBorder(0, 10, 0, 0));
                     }
                 }
-
             }
 
             boolean passFound = false;

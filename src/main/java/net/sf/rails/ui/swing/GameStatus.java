@@ -577,22 +577,19 @@ public class GameStatus extends GridPanel {
         certInPoolXOffset = ++lastX;
         certInPoolYOffset = lastY;
 
-                if (compCanHoldOwnShares) {
+        if (compCanHoldOwnShares) {
             certInTreasuryXOffset = ++lastX;
             certInTreasuryYOffset = lastY;
         }
-        
+
         if (hasParPrices) {
             parPriceXOffset = ++lastX;
             parPriceYOffset = lastY;
         }
 
-
         // New Sequence: Treasury -> Trains -> Dividend -> Retained -> Markers
-compCashXOffset = ++lastX;
+        compCashXOffset = ++lastX;
         compTrainsXOffset = ++lastX;
-
-
 
         compRevenueXOffset = ++lastX;
         compRetainedXOffset = ++lastX;
@@ -1298,7 +1295,7 @@ compCashXOffset = ++lastX;
                 chosenAction = actions.get(0);
             } else if (actions.get(0) instanceof BuyTrain) {
                 chosenAction = handleBuyTrain((BuyTrain) actions.get(0));
- } else if (actions.get(0).getClass().getName().endsWith("Initiate1817IPO")) {
+            } else if (actions.get(0).getClass().getName().endsWith("Initiate1817IPO")) {
                 chosenAction = handle1817IPO(actions.get(0));
             } else if (actions.get(0).getClass().getName().endsWith("TakeLoans_1817")) {
                 processTakeLoans(actions.get(0));
@@ -2439,10 +2436,15 @@ compCashXOffset = ++lastX;
                 int count = 0;
                 int cost = 0;
 
+                net.sf.rails.game.Train repTrain = null;
+
                 for (net.sf.rails.game.Train t : ipoInventory) {
                     if (t.getName().replaceAll("_\\d+$", "").equals(tctName)) {
                         count++;
                         cost = t.getCost();
+                        if (repTrain == null) {
+                            repTrain = t;
+                        }
                     }
                 }
 
@@ -2454,6 +2456,9 @@ compCashXOffset = ++lastX;
                 }
 
                 btn.reset();
+                if (repTrain != null) {
+                    btn.setTrain(repTrain);
+                }
                 btn.setCustomLabel(getAbbreviatedTrainName(tctName));
                 btn.setName(tctName); // Store normalized name
 
@@ -2606,7 +2611,7 @@ compCashXOffset = ++lastX;
         if (bondsHeatbarPanel == null)
             return;
 
-int totalLoans = 0;
+        int totalLoans = 0;
         net.sf.rails.game.GameManager gm = gameUIManager.getGameManager();
         if (gm instanceof net.sf.rails.game.specific._1817.GameManager_1817) {
             BondsModel bm = ((net.sf.rails.game.specific._1817.GameManager_1817) gm).getBondsModel();
@@ -2743,6 +2748,10 @@ int totalLoans = 0;
             if (poolShareCards[i] != null) {
                 if (stickyFont != null)
                     poolShareCards[i].setFont(stickyFont);
+
+                poolShareCards[i].getCertificates().clear();
+                poolShareCards[i].getCertificates().addAll(pool.getCertificates(c));
+
                 String shareTxt = pool.getShareModel(c).toText();
                 if (shareTxt == null)
                     shareTxt = "";
@@ -2796,6 +2805,9 @@ int totalLoans = 0;
             if (ipoShareCards[i] != null) {
                 if (stickyFont != null)
                     ipoShareCards[i].setFont(stickyFont);
+
+                ipoShareCards[i].getCertificates().clear();
+                ipoShareCards[i].getCertificates().addAll(ipo.getCertificates(c));
 
                 String shareTxt = ipo.getShareModel(c).toText(); // Get text from model
                 if (shareTxt == null)
@@ -3018,6 +3030,10 @@ int totalLoans = 0;
 
                         // Get Content
                         Player player = players.getPlayerByPosition(pIdx);
+
+                        card.getCertificates().clear();
+                        card.getCertificates().addAll(player.getPortfolioModel().getCertificates(c));
+
                         String raw = player.getPortfolioModel().getShareModel(c).toText();
                         if (raw == null)
                             raw = "";
@@ -3333,9 +3349,6 @@ int totalLoans = 0;
                         }
                     }
 
-
-                    
-
                 }
             }
 
@@ -3364,7 +3377,7 @@ int totalLoans = 0;
      * A Custom Flat Progress Bar for Certificate Limits.
      * Visualizes "Held vs Limit" with color coding and text overlay.
      */
-private static class CertLimitGauge extends JLabel {
+    private static class CertLimitGauge extends JLabel {
         public CertLimitGauge() {
             setOpaque(true);
             setFont(new Font("SansSerif", Font.BOLD, 12));
@@ -3965,7 +3978,7 @@ private static class CertLimitGauge extends JLabel {
         compRevenueXOffset = col++;
         compRetainedXOffset = col++;
         compTokensXOffset = col++;
-        
+
         if (compCanBuyPrivates)
             compPrivatesXOffset = col++;
         if (hasCompanyLoans)
@@ -4042,7 +4055,7 @@ private static class CertLimitGauge extends JLabel {
         dummyButton = new ClickField("", "", "", this, buySellGroup);
         updateTrainCosts();
 
-        }
+    }
 
     protected void initHeaders() {
         for (int i = 0; i < np; i++) {
@@ -5017,7 +5030,6 @@ private static class CertLimitGauge extends JLabel {
 
     }
 
-
     protected void initGameSpecificActions() {
 
         if (possibleActions == null || possibleActions.getList() == null) {
@@ -5028,29 +5040,29 @@ private static class CertLimitGauge extends JLabel {
             if (pa instanceof GuiTargetedAction && !(pa instanceof BuyTrain) && !(pa instanceof DiscardTrain)) {
                 GuiTargetedAction gta = (GuiTargetedAction) pa;
                 Object target = gta.getTarget();
-                
-                
+
                 if (target != null) {
                     net.sf.rails.ui.swing.elements.RailCard card = findRailCardFor(target);
-                    
+
                     if (card != null) {
                         card.addPossibleAction(pa);
-                        
+
                         Color bg = gta.getHighlightBackgroundColor();
                         Color border = gta.getHighlightBorderColor();
-                        
-                        if (bg != null) card.setBackground(bg);
-                        if (border != null) card.setBorder(BorderFactory.createLineBorder(border, 3));
-                        
+
+                        if (bg != null)
+                            card.setBackground(bg);
+                        if (border != null)
+                            card.setBorder(BorderFactory.createLineBorder(border, 3));
+
                         card.setEnabled(true);
                         card.setVisible(true);
                     }
                 }
             }
         }
-// --- END FIX ---
+        // --- END FIX ---
     }
-
 
     private ClickField createSpecialActionButton(PossibleAction action) {
         String label = action.getButtonLabel();
@@ -5071,7 +5083,6 @@ private static class CertLimitGauge extends JLabel {
             textColor = Color.WHITE;
         }
 
-       
         if (label != null && label.length() > 15 && !label.toLowerCase().startsWith("<html>")) {
             label = label.substring(0, 15) + "...";
         }
@@ -5101,7 +5112,6 @@ private static class CertLimitGauge extends JLabel {
         return btn;
     }
 
-
     /**
      * Central Registry: Locates the RailCard UI component for any game object.
      * Scans: Player Shares, IPO, Pool, Treasury, Trains, and Privates.
@@ -5124,11 +5134,15 @@ private static class CertLimitGauge extends JLabel {
                     }
                 }
             }
-            // 2. Scan Pool Trains
-            if (poolTrainButtons != null) {
-                for (RailCard card : poolTrainButtons) {
-                    if (card != null && card.getTrain() == targetTrain)
-                        return card;
+            // 3. Scan IPO Trains
+            if (newTrainButtons != null) {
+                for (RailCard card : newTrainButtons) {
+                    if (card != null && card.getTrain() != null) {
+                        // Compare type names, as actions often target the generic type in the IPO
+                        if (card.getTrain().getType().getName().equals(targetTrain.getType().getName())) {
+                            return card;
+                        }
+                    }
                 }
             }
         }
@@ -5136,7 +5150,7 @@ private static class CertLimitGauge extends JLabel {
         // B. If Target is a COMPANY (Public or Private) - usually for Mergers/Exchange
         if (target instanceof net.sf.rails.game.Company) {
             net.sf.rails.game.Company targetComp = (net.sf.rails.game.Company) target;
-           
+
             // Identify the true owner to target the correct player column
             Player trueOwner = null;
             if (targetComp instanceof net.sf.rails.game.PublicCompany) {
@@ -5155,7 +5169,8 @@ private static class CertLimitGauge extends JLabel {
                         RailCard card = playerShareCards[i][j];
                         if (card != null && card.getCompany() == targetComp) {
                             if (trueOwner != null) {
-                                if (players.getPlayerByPosition(j) == trueOwner) return card;
+                                if (players.getPlayerByPosition(j) == trueOwner)
+                                    return card;
                             } else {
                                 return card; // Fallback for bank/pool
                             }
@@ -5173,7 +5188,8 @@ private static class CertLimitGauge extends JLabel {
                                 RailCard card = (RailCard) c;
                                 if (card.getCompany() == targetComp) {
                                     if (trueOwner != null) {
-                                        if (players.getPlayerByPosition(j) == trueOwner) return card;
+                                        if (players.getPlayerByPosition(j) == trueOwner)
+                                            return card;
                                     } else {
                                         return card;
                                     }
@@ -5183,7 +5199,7 @@ private static class CertLimitGauge extends JLabel {
                     }
                 }
             }
-            
+
             // 3. Scan Company Privates
             if (compPrivatesPanel != null) {
                 for (int i = 0; i < nc; i++) {
@@ -5200,9 +5216,8 @@ private static class CertLimitGauge extends JLabel {
                     }
                 }
             }
-// --- END FIX ---
+            // --- END FIX ---
         }
-
 
         return null;
     }

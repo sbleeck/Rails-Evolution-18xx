@@ -21,7 +21,6 @@ public class CoalMineModifier_1817 implements RevenueDynamicModifier {
 
     @Override
     public boolean prepareModifier(RevenueAdapter revenueAdapter) {
-        log.info("1817_REVENUE: CoalMineModifier prepared.");
         return true;
     }
 
@@ -37,7 +36,6 @@ public class CoalMineModifier_1817 implements RevenueDynamicModifier {
         if (optimalRuns) {
             calculatedBonus = bonus;
             if (bonus > 0) {
-                log.info("1817_REVENUE: Total Coal Bonus calculated: ${}", bonus);
             }
         }
         return bonus;
@@ -63,10 +61,6 @@ public class CoalMineModifier_1817 implements RevenueDynamicModifier {
 
         for (BonusToken t : hex.getBonusTokens()) {
             if (t != null) {
-                // EMERGENCY LOG: See exactly what the modifier is looking at
-                log.info("1817_REVENUE: Hex {} has token. ID='{}', Name='{}'",
-                        hex.getId(), t.getId(), t.getName());
-
                 if ("CoalMine".equals(t.getName()) || "CoalMine".equals(t.getId())) {
                     return true;
                 }
@@ -113,7 +107,6 @@ private int calculateCoalMineBonus(List<RevenueTrainRun> runs) {
             for (MapHex hex : visitedHexes) {
                 if (hasCoalMineToken(hex)) {
                     totalBonus += 10;
-                    log.info("1817_REVENUE: SUCCESS! Added $10 for Coal Mine on {}", hex.getId());
                 }
             }
         }

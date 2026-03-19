@@ -281,8 +281,7 @@ public class OperatingRound_1817 extends OperatingRound {
                             .getPrivateCompanies()) {
                         if ("MNE40".equals(priv.getId())) {
                             int bonus = 20;
-                            log.info("1817_DEBUG: Mountain Engineers (MNE40) triggered for {} on hex {}. Paying $20.",
-                                    activeCompany.getId(), hex.getId());
+
                             net.sf.rails.common.ReportBuffer.add(gameManager,
                                     activeCompany.getId() + " receives $" + bonus
                                             + " from Mountain Engineers for tile on " + hex.getId());
@@ -476,8 +475,6 @@ public class OperatingRound_1817 extends OperatingRound {
             PublicCompany comp = companyManager.getPublicCompany(ba.getCompanyId());
 
             MapHex hex = gameManager.getRoot().getMapManager().getHex(ba.getHexId());
-            log.info("1817_DEBUG: === PROCESSING LAY BRIDGE TOKEN ACTION ===");
-            log.info("1817_DEBUG: Company: {}, Target Hex: {}", comp.getId(), hex != null ? hex.getId() : "NULL");
 
             // Find the correct private company with inventory
             net.sf.rails.game.PrivateCompany bridgePriv = null;
@@ -501,9 +498,7 @@ public class OperatingRound_1817 extends OperatingRound {
                 log.info("1817_TRACE: Bridge placed on {} by {}.", hex.getId(), comp.getId());
                 return true;
             }
-            log.error("1817_DEBUG: FAILED TO PLACE BRIDGE! bridgePriv is {}, hex is {}",
-                    bridgePriv != null ? bridgePriv.getId() : "NULL",
-                    hex != null ? hex.getId() : "NULL");
+
 
             return false;
         }
@@ -584,9 +579,7 @@ public class OperatingRound_1817 extends OperatingRound {
         if (hex == null || hex.getBonusTokens() == null)
             return false;
         for (BonusToken t : hex.getBonusTokens()) {
-            // LOG EVERYTHING on the hex to see why we miss it
-            log.info("1817_REVENUE: Hex {} contains Token ID: '{}', Name: '{}'",
-                    hex.getId(), t.getId(), t.getName());
+
             if ("CoalMine".equals(t.getName()))
                 return true;
         }
@@ -938,18 +931,13 @@ actionsAdded |= super.setPossibleActions();
             }
         }
 
-        log.info("1817_DEBUG: FINAL ACTIONS LIST for OR Step: " + step.name());
 
         // 1. Check if the private companies in the portfolio hold the special property
-        log.info("1817_DEBUG: Checking Private Companies for Special Properties...");
         for (net.sf.rails.game.PrivateCompany priv : comp.getPortfolioModel().getPrivateCompanies()) {
             Collection<SpecialProperty> privSpecials = priv.getSpecialProperties();
-            log.info("1817_DEBUG:  -> Private " + priv.getId() + " has "
-                    + (privSpecials != null ? privSpecials.size() : 0) + " special properties.");
+
             if (privSpecials != null) {
-                for (SpecialProperty sp : privSpecials) {
-                    log.info("1817_DEBUG:     - Property: " + sp.getClass().getSimpleName());
-                }
+
             }
         }
 
@@ -958,10 +946,8 @@ actionsAdded |= super.setPossibleActions();
             if (pa instanceof LayTile) {
                 LayTile lt = (LayTile) pa;
                 SpecialProperty sp = lt.getSpecialProperty();
-                log.info("1817_DEBUG:  - LayTile action. Attached SpecialProperty: "
-                        + (sp != null && sp.getParent() != null ? sp.getParent().getId() : "NONE"));
+               
             } else {
-                log.info("1817_DEBUG:  - " + pa.getClass().getSimpleName());
             }
         }
 

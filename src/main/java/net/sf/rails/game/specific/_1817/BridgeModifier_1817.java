@@ -21,7 +21,6 @@ public class BridgeModifier_1817 implements RevenueDynamicModifier {
 
     @Override
     public boolean prepareModifier(RevenueAdapter revenueAdapter) {
-        log.info("1817_REVENUE: BridgeModifier prepared.");
         return true;
     }
 
@@ -36,7 +35,6 @@ public class BridgeModifier_1817 implements RevenueDynamicModifier {
         if (optimalRuns) {
             calculatedBonus = bonus;
             if (bonus > 0) {
-                log.info("1817_REVENUE: Total Bridge Bonus calculated: ${}", bonus);
             }
         }
         return bonus;
@@ -103,7 +101,6 @@ public class BridgeModifier_1817 implements RevenueDynamicModifier {
             for (MapHex hex : visitedHexes) {
                 if (hasBridgeToken(hex)) {
                     totalBonus += 10;
-                    log.info("1817_REVENUE: Bridge bonus applied for hex {}", hex.getId());
                 }
             }
         }

@@ -112,7 +112,6 @@ private void payMailContracts() {
                         else if ("MJM12".equals(priv.getId())) bonus = 20;
 
                         if (bonus > 0) {
-                            log.info("1817_DEBUG: Paying Mail Contract {} to {}. Amount: ${}", priv.getId(), comp1817.getId(), bonus);
                             net.sf.rails.common.ReportBuffer.add(this, comp1817.getId() + " receives $" + bonus + " from " + priv.getLongName());
                             comp1817.addCashFromBank(bonus, getRoot().getBank());
                         }

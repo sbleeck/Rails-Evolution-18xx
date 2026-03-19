@@ -1360,11 +1360,9 @@ public Integer getRoundStart(int currentIndex) {
 
         // Force 1817 specific Operating Round if the game is 1817
         if (getGameName().equals("1817") && roundClass.equals(OperatingRound.class)) {
-            log.info("1817_DEBUG: Intercepting standard OR and forcing OperatingRound_1817");
             roundClass = (Class<T>) net.sf.rails.game.specific._1817.OperatingRound_1817.class;
         }
 
-log.info("1817_DEBUG: GameManager.createRound requested for Class: " + roundClass.getName() + " with ID: " + id);
 
         T round = null;
         try {

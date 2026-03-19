@@ -39,12 +39,17 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.Map;
 import java.util.TreeMap;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * RailCard - Dynamic Geometry Edition.
  * Sizes are calculated strictly based on the Font metrics.
  */
 public class RailCard extends ClickField {
+
+        private static final Logger log = LoggerFactory.getLogger(RailCard.class);
+
 
     private static final long serialVersionUID = 1L;
 
@@ -238,9 +243,20 @@ public net.sf.rails.game.Train getTrain() {
         boolean isDimmed = (currentState == State.DISABLED);
         Color fgColor = isDimmed ? COL_FG_DIMMED : Color.BLACK;
 
+       // 1. Determine if this card represents a Short Share
+        boolean isShortShare = isShortShare();
+
+        // 2. Override the base background if it is a short share
+        if (isShortShare) {
+            this.setBackground(Color.PINK);
+            contentPanel.setBackground(Color.PINK);
+            contentPanel.setOpaque(true);
+        }
+
         if (compactMode) {
             String labelText = getFirstAvailableLabel();
-            JLabel lbl = createStyledLabel(labelText, null, fgColor, true);
+            Color compactBg = isShortShare ? Color.PINK : null;
+            JLabel lbl = createStyledLabel(labelText, compactBg, fgColor, true);
             contentPanel.add(lbl);
 
         } else {
@@ -443,6 +459,37 @@ public void setState(State state) {
     }
 
 
+public boolean isShortShare() {
+        boolean isShort = false;
+        if (customLabel != null && (customLabel.toLowerCase().contains("short") || customLabel.contains("-"))) {
+            isShort = true;
+        } else if (certificates != null) {
+            for (Certificate c : certificates) {
+                if (isShortCertificate(c)) {
+                    isShort = true;
+                    break;
+                }
+            }
+        }
+        return isShort;
+    }
+
+    @Override
+    public void setBackground(Color bg) {
+        // Intercept standard beige assignments if this is a Short Share to maintain the Pink color.
+        if (bg != null && bg.equals(COL_BG_BEIGE) && isShortShare()) {
+            super.setBackground(Color.PINK);
+            if (contentPanel != null) {
+                contentPanel.setBackground(Color.PINK);
+            }
+        } else {
+            super.setBackground(bg);
+            if (contentPanel != null) {
+                contentPanel.setBackground(bg);
+            }
+        }
+    }
+
     /**
      * Robust Identification: Checks if this card holds the specific certificate object.
      * Use this instead of comparing string IDs or labels.
@@ -510,9 +557,10 @@ public static Dimension calculateBaseSize(Font f, boolean compactMode, double sc
     public Dimension getPreferredSize() {
         Dimension base = calculateBaseSize(getFont(), compactMode, scaleFactor);
 
-        if (scaleFactor == 1.0) {
+       if (scaleFactor == 1.0) {
             // Normal behavior (GameStatus, ORPanel)
-            int items = Math.max(1, certificates.size() + trains.size() + privates.size());
+            // Compact mode condenses everything into one label, so it should only be 1 item wide.
+            int items = compactMode ? 1 : Math.max(1, certificates.size() + trains.size() + privates.size());
             if (items > 1) base.width *= items;
         } else {
             // Start Round Window Mode (Scaled > 1.0)
@@ -540,15 +588,6 @@ public static Dimension calculateBaseSize(Font f, boolean compactMode, double sc
         return getPreferredSize();
     }
 
-    private Color getCertColor(Certificate cert) {
-        if (cert instanceof PublicCertificate) {
-            PublicCertificate pubCert = (PublicCertificate) cert;
-            PublicCompany pc = pubCert.getCompany();
-            if (pc != null)
-                return pc.getBgColour();
-        }
-        return null;
-    }
 
     private boolean isDark(Color c) {
         if (c == null)
@@ -632,6 +671,30 @@ if (info != null) {
         setToolTipText(info);
     }
 
+
+     private boolean isShortCertificate(Certificate cert) {
+        if (cert == null)
+            return false;
+
+        // 1. Try Reflection (Safest if there's an explicit flag)
+        try {
+            java.lang.reflect.Method m = cert.getClass().getMethod("isShort");
+            if (m != null) {
+                return Boolean.TRUE.equals(m.invoke(cert));
+            }
+        } catch (Exception e) {
+        }
+
+        // 2. Fallbacks (Naming conventions)
+        if (cert.getClass().getSimpleName().contains("Short"))
+            return true;
+        if (cert.getId() != null && cert.getId().toLowerCase().contains("short"))
+            return true;
+
+        return false;
+    }
+
+   
 
     public String getUniqueId() {
         if (associatedCompany != null) {
@@ -718,6 +781,32 @@ if (info != null) {
             g.drawLine(stripeX, innerY, stripeX, innerY + innerHeight - 1);
         }
             */
+    }
+
+private Color getCertColor(Certificate cert) {
+
+        if (cert != null) {
+            String id = cert.getId();
+            String strRep = cert.toString();
+
+           
+            // Aggressive failsafe: Check ID, class name, and string representation
+            if ((id != null && id.contains("_SHORT_")) || 
+                (strRep != null && strRep.contains("Short "))) {
+                   log.info("in PINK");
+
+                    return Color.PINK;
+            }
+        }
+        
+        if (cert instanceof PublicCertificate) {
+            PublicCertificate pubCert = (PublicCertificate) cert;
+            PublicCompany pc = pubCert.getCompany();
+            if (pc != null) {
+                return pc.getBgColour();
+            }
+        }
+        return null;
     }
 
 }
