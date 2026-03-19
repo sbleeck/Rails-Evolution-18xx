@@ -76,35 +76,6 @@ public class OperatingRound_1817 extends OperatingRound {
         super(gameManager, roundId);
     }
 
-    @Override
-    public void start() {
-        super.start();
-
-        // Rule 1.2.6: Mail Contracts only pay if the company has one or more trains.
-        // If the base engine paid them out automatically, we refund the bank and log
-        // it.
-        for (PublicCompany comp : gameManager.getAllPublicCompanies()) {
-            if (comp.hasStarted() && !comp.isClosed() && comp.getPortfolioModel().getNumberOfTrains() == 0) {
-                for (net.sf.rails.game.PrivateCompany priv : comp.getPortfolioModel().getPrivateCompanies()) {
-                    String pid = priv.getId();
-                    int refund = 0;
-                    if (pid.startsWith("MNM"))
-                        refund = 10;
-                    else if (pid.startsWith("MLC"))
-                        refund = 15;
-                    else if (pid.startsWith("MJM"))
-                        refund = 20;
-
-                    if (refund > 0) {
-                        net.sf.rails.game.state.Currency.toBank(comp, refund);
-                        net.sf.rails.common.ReportBuffer.add(gameManager,
-                                comp.getId() + " refunds $" + refund + " for " + pid + " (no trains).");
-                        log.info("1817_TRACE: Refunded ${} to {} due to no trains.", refund, comp.getId());
-                    }
-                }
-            }
-        }
-    }
 
     @Override
     protected void finishTurn() {
@@ -627,29 +598,100 @@ public class OperatingRound_1817 extends OperatingRound {
             PublicCompany comp = sd.getCompany();
             net.sf.rails.game.financial.StockSpace oldSpace = comp.getCurrentSpace();
 
-            // Execute the superclass logic ONCE to handle standard movement
-            boolean result = super.process(sd);
+            
 
-            if (result && oldSpace != null) {
-                log.info("1817_OR: Processing Dividend Movement for {}. Revenue: {}, Alloc: {}",
-                        comp.getId(), sd.getActualRevenue(), sd.getRevenueAllocation());
+// 1. Record cash states before base engine messes it up
+int preCompCash = comp.getCash();
+net.sf.rails.game.financial.Bank bank = getRoot().getBank();
+List<net.sf.rails.game.Player> players = getRoot().getPlayerManager().getPlayers();
+java.util.Map<net.sf.rails.game.Player, Integer> prePlayerCash = new java.util.HashMap<>();
+for (net.sf.rails.game.Player p : players) prePlayerCash.put(p, p.getCash());
 
-                int revenue = sd.getActualRevenue();
-                int alloc = sd.getRevenueAllocation();
-                int shareCount = (comp instanceof net.sf.rails.game.specific._1817.PublicCompany_1817)
-                        ? ((net.sf.rails.game.specific._1817.PublicCompany_1817) comp).getShareCount()
-                        : 10;
+        // Execute the superclass logic ONCE to advance game state
+        boolean result = super.process(sd);
+        
+        if (result && oldSpace != null) {
+            log.info("1817_OR: Processing Dividend Movement for {}. Revenue: {}, Alloc: {}",
+                    comp.getId(), sd.getActualRevenue(), sd.getRevenueAllocation());
 
-                int paidToShareholders = 0;
-                if (alloc == rails.game.action.SetDividend.PAYOUT) {
-                    paidToShareholders = revenue;
-                } else if (alloc == rails.game.action.SetDividend.SPLIT) {
-                    if (shareCount == 10) {
-                        paidToShareholders = (((revenue / 2) + 9) / 10) * 10;
+            // 2. Revert base engine cash changes
+            int diffComp = comp.getCash() - preCompCash;
+            if (diffComp > 0) net.sf.rails.game.state.Currency.toBank(comp, diffComp);
+            else if (diffComp < 0) net.sf.rails.game.state.Currency.wire(bank, -diffComp, comp);
+
+            for (net.sf.rails.game.Player p : players) {
+                int diffP = p.getCash() - prePlayerCash.get(p);
+                if (diffP > 0) net.sf.rails.game.state.Currency.toBank(p, diffP);
+                else if (diffP < 0) net.sf.rails.game.state.Currency.wire(bank, -diffP, p);
+            }
+
+            // 3. Apply strict 1817 cash distributions
+            int revenue = sd.getActualRevenue();
+            int alloc = sd.getRevenueAllocation();
+            int shareCount = (comp instanceof net.sf.rails.game.specific._1817.PublicCompany_1817)
+                    ? ((net.sf.rails.game.specific._1817.PublicCompany_1817) comp).getShareCount()
+                    : 10;
+
+            int trueTreasuryAmount = 0;
+            int truePerShare = 0;
+
+            if (alloc == rails.game.action.SetDividend.PAYOUT) {
+                trueTreasuryAmount = 0;
+                truePerShare = revenue / shareCount;
+            } else if (alloc == rails.game.action.SetDividend.SPLIT) {
+                if (shareCount == 10) {
+                    truePerShare = (((revenue / 2) + 9) / 10);
+                    trueTreasuryAmount = revenue - (truePerShare * 10);
+                } else {
+                    trueTreasuryAmount = revenue / 2;
+                    int totalToShares = revenue - trueTreasuryAmount;
+                    truePerShare = totalToShares / shareCount;
+                }
+            } else {
+                trueTreasuryAmount = revenue;
+                truePerShare = 0;
+            }
+
+            if (trueTreasuryAmount > 0) {
+                net.sf.rails.game.state.Currency.wire(bank, trueTreasuryAmount, comp);
+            }
+            
+            // Pay treasury for its own shares
+            int treasuryShares = 0;
+            for (net.sf.rails.game.financial.PublicCertificate cert : comp.getCertificates()) {
+                if (cert.getOwner() == comp && !cert.isPresidentShare()) {
+                    treasuryShares += cert.getShare() / comp.getShareUnit();
+                }
+            }
+            if (treasuryShares > 0 && truePerShare > 0) {
+                net.sf.rails.game.state.Currency.wire(bank, treasuryShares * truePerShare, comp);
+            }
+
+            for (net.sf.rails.game.Player p : players) {
+                int sharesOwned = 0;
+                int shortShares = 0;
+                for (net.sf.rails.game.financial.PublicCertificate cert : p.getPortfolioModel().getCertificates(comp)) {
+                    if (cert.getClass().getSimpleName().contains("Short")) {
+                        shortShares += 1;
                     } else {
-                        paidToShareholders = revenue / 2;
+                        sharesOwned += cert.getShare() / comp.getShareUnit();
                     }
                 }
+
+                if (sharesOwned > 0 && truePerShare > 0) {
+                    net.sf.rails.game.state.Currency.wire(bank, sharesOwned * truePerShare, p);
+                }
+                if (shortShares > 0 && truePerShare > 0) {
+                    int debt = shortShares * truePerShare;
+                    net.sf.rails.game.state.Currency.toBank(p, debt);
+                    net.sf.rails.common.ReportBuffer.add(this, p.getName() + " pays $" + debt + " for short shares of " + comp.getId());
+                }
+            }
+
+            int paidToShareholders = truePerShare * shareCount;
+
+
+
 
                 int refPrice = Math.max(40, oldSpace.getPrice());
                 int moves = 0;
@@ -730,8 +772,33 @@ public class OperatingRound_1817 extends OperatingRound {
             return true;
         }
 
-        // --- 3. CORE ENGINE ACTIONS ---
-        actionsAdded |= super.setPossibleActions();
+actionsAdded |= super.setPossibleActions();
+
+// 1817 Rule 6.6: Companies may pay full, pay half, or withhold dividends.
+        for (rails.game.action.PossibleAction pa : possibleActions.getList()) {
+            if (pa instanceof rails.game.action.SetDividend) {
+                rails.game.action.SetDividend sd = (rails.game.action.SetDividend) pa;
+                int[] currentAllocs = sd.getAllowedRevenueAllocations();
+                boolean hasSplit = false;
+                if (currentAllocs != null) {
+                    for (int alloc : currentAllocs) {
+                        if (alloc == rails.game.action.SetDividend.SPLIT) {
+                            hasSplit = true;
+                            break;
+                        }
+                    }
+                }
+                if (!hasSplit) {
+                    int len = (currentAllocs == null) ? 0 : currentAllocs.length;
+                    int[] newAllocs = new int[len + 1];
+                    if (currentAllocs != null) {
+                        System.arraycopy(currentAllocs, 0, newAllocs, 0, len);
+                    }
+                    newAllocs[len] = rails.game.action.SetDividend.SPLIT;
+                    sd.setAllowedRevenueAllocations(newAllocs);
+                }
+            }
+        }
 
         // --- 4. BRIDGE ACTIONS ---
         // Evaluation moved here to prevent erasure by super.setPossibleActions()

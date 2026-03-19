@@ -1808,37 +1808,45 @@ public class StatusWindow extends JFrame implements ActionListener, ActionPerfor
                     dynamicButtonPanel.revalidate();
                     dynamicButtonPanel.repaint();
 
-                    } else if (currentRound instanceof net.sf.rails.game.specific._1817.MergerAndAcquisitionRound_1817 
-                           && (((net.sf.rails.game.specific._1817.MergerAndAcquisitionRound_1817) currentRound).getCurrentStep() == net.sf.rails.game.specific._1817.MergerAndAcquisitionRound_1817.MaAStep.SALES_AUCTION || 
-                               ((net.sf.rails.game.specific._1817.MergerAndAcquisitionRound_1817) currentRound).getCurrentStep() == net.sf.rails.game.specific._1817.MergerAndAcquisitionRound_1817.MaAStep.SALES_SELECT_BUYER)) {
-                    
+                } else if (currentRound instanceof net.sf.rails.game.specific._1817.MergerAndAcquisitionRound_1817
+                        && (((net.sf.rails.game.specific._1817.MergerAndAcquisitionRound_1817) currentRound)
+                                .getCurrentStep() == net.sf.rails.game.specific._1817.MergerAndAcquisitionRound_1817.MaAStep.SALES_AUCTION
+                                ||
+                                ((net.sf.rails.game.specific._1817.MergerAndAcquisitionRound_1817) currentRound)
+                                        .getCurrentStep() == net.sf.rails.game.specific._1817.MergerAndAcquisitionRound_1817.MaAStep.SALES_SELECT_BUYER)) {
+
                     net.sf.rails.game.specific._1817.MergerAndAcquisitionRound_1817 maRound = (net.sf.rails.game.specific._1817.MergerAndAcquisitionRound_1817) currentRound;
-                    net.sf.rails.game.specific._1817.MergerAndAcquisitionRound_1817.MaAStep step = maRound.getCurrentStep();
-                    
+                    net.sf.rails.game.specific._1817.MergerAndAcquisitionRound_1817.MaAStep step = maRound
+                            .getCurrentStep();
+
                     dynamicButtonPanel.setBackground(new Color(230, 240, 255));
                     dynamicButtonPanel.setOpaque(true);
                     dynamicButtonPanel.setBorder(BorderFactory.createLineBorder(Color.BLUE, 1));
                     dynamicButtonPanel.setLayout(new FlowLayout(FlowLayout.LEFT, 8, 2));
-                    
-                    String highBidderName = (maRound.getHighestBiddingPlayer() != null) ? maRound.getHighestBiddingPlayer().getName() : "None";
+
+                    String highBidderName = (maRound.getHighestBiddingPlayer() != null)
+                            ? maRound.getHighestBiddingPlayer().getName()
+                            : "None";
                     JLabel highBidLabel = new JLabel("High: " + highBidderName + " ($" + maRound.getHighestBid() + ")");
                     highBidLabel.setFont(new Font("SansSerif", Font.BOLD, 13));
                     highBidLabel.setForeground(new Color(0, 102, 204));
                     dynamicButtonPanel.add(highBidLabel);
-                    
+
                     JSeparator sep = new JSeparator(JSeparator.VERTICAL);
                     sep.setPreferredSize(new Dimension(2, 25));
                     dynamicButtonPanel.add(sep);
-                    
-                    String actorName = (maRound.getActingPlayer() != null) ? maRound.getActingPlayer().getName() : "Someone";
+
+                    String actorName = (maRound.getActingPlayer() != null) ? maRound.getActingPlayer().getName()
+                            : "Someone";
                     if (step == net.sf.rails.game.specific._1817.MergerAndAcquisitionRound_1817.MaAStep.SALES_SELECT_BUYER) {
-                        actorName = highBidderName; 
+                        actorName = highBidderName;
                     }
-                    String companyId = (maRound.getOperatingCompany() != null) ? maRound.getOperatingCompany().getId() : "Company";
-                    
+                    String companyId = (maRound.getOperatingCompany() != null) ? maRound.getOperatingCompany().getId()
+                            : "Company";
+
                     net.sf.rails.game.specific._1817.action.BidOnCompany_1817 bidAction = null;
                     NullAction passAction = null;
-                    
+
                     if (possibleActions != null && possibleActions.getList() != null) {
                         for (PossibleAction pa : possibleActions.getList()) {
                             if (pa instanceof net.sf.rails.game.specific._1817.action.BidOnCompany_1817)
@@ -1847,10 +1855,11 @@ public class StatusWindow extends JFrame implements ActionListener, ActionPerfor
                                 passAction = (NullAction) pa;
                         }
                     }
-                    
+
                     if (step == net.sf.rails.game.specific._1817.MergerAndAcquisitionRound_1817.MaAStep.SALES_SELECT_BUYER) {
                         if (myTurn) {
-                            dynamicButtonPanel.add(new JLabel(actorName + ", select company to purchase " + companyId + ":"));
+                            dynamicButtonPanel
+                                    .add(new JLabel(actorName + ", select company to purchase " + companyId + ":"));
                             if (possibleActions != null && possibleActions.getList() != null) {
                                 for (PossibleAction pa : possibleActions.getList()) {
                                     if (pa instanceof net.sf.rails.game.specific._1817.action.SelectPurchasingCompany_1817) {
@@ -1862,173 +1871,174 @@ public class StatusWindow extends JFrame implements ActionListener, ActionPerfor
                                 }
                             }
                         } else {
-                            dynamicButtonPanel.add(new JLabel("Waiting for " + actorName + " to select purchasing company for " + companyId + "..."));
+                            dynamicButtonPanel.add(new JLabel("Waiting for " + actorName
+                                    + " to select purchasing company for " + companyId + "..."));
                         }
                     } else {
                         if (myTurn) {
-                            if (bidSpinner == null) {
-                                bidSpinner = new JSpinner(new SpinnerNumberModel(10, 0, 10000, 10));
-                                bidSpinner.setPreferredSize(new Dimension(65, 30));
-                            }
-                            
-                            int currentHighestBid = maRound.getHighestBid();
-                            boolean hasBidder = maRound.getHighestBiddingPlayer() != null;
-                            int minNextBid = (currentHighestBid == 0 && !hasBidder) ? currentHighestBid : currentHighestBid + 10;
-                            if (currentHighestBid > 0 && !hasBidder) minNextBid = currentHighestBid;
-                            
-                            ((SpinnerNumberModel) bidSpinner.getModel()).setMinimum(minNextBid);
-                            if ((Integer) bidSpinner.getValue() < minNextBid)
-                                bidSpinner.setValue(minNextBid);
-
-                            JLabel bidPrompt = new JLabel(actorName + " bids: $");
-                            bidPrompt.setFont(new Font("SansSerif", Font.PLAIN, 13));
-                            dynamicButtonPanel.add(bidPrompt);
-                            dynamicButtonPanel.add(bidSpinner);
-
-                            if (auctionBidButton == null)
-                                auctionBidButton = new JButton("Place Bid");
-                            auctionBidButton.setPreferredSize(new Dimension(90, 28));
-
-                            final net.sf.rails.game.specific._1817.action.BidOnCompany_1817 finalBid = bidAction;
-                            for (java.awt.event.ActionListener al : auctionBidButton.getActionListeners())
-                                auctionBidButton.removeActionListener(al);
-                            auctionBidButton.addActionListener(e -> {
-                                if (finalBid != null) {
-                                    try {
-                                        java.lang.reflect.Method setBid = finalBid.getClass().getMethod("setBidAmount", int.class);
-                                        setBid.invoke(finalBid, (Integer) bidSpinner.getValue());
-                                    } catch (Exception ex) {
-                                        log.error("Failed to set bid amount", ex);
-                                    }
-                                    process(finalBid);
+                            if (bidAction != null) {
+                                if (bidSpinner == null) {
+                                    bidSpinner = new JSpinner(new SpinnerNumberModel(10, 0, 10000, 10));
+                                    bidSpinner.setPreferredSize(new Dimension(65, 30));
                                 }
-                            });
-                            dynamicButtonPanel.add(auctionBidButton);
 
-                            if (auctionPassButton == null)
-                                auctionPassButton = new JButton("Pass");
-                            auctionPassButton.setPreferredSize(new Dimension(70, 28));
-                            auctionPassButton.setForeground(Color.RED);
-                            
-                            final NullAction finalPass = passAction;
-                            for (java.awt.event.ActionListener al : auctionPassButton.getActionListeners())
-                                auctionPassButton.removeActionListener(al);
-                            auctionPassButton.addActionListener(e -> process(finalPass));
-                            dynamicButtonPanel.add(auctionPassButton);
+                                int currentHighestBid = maRound.getHighestBid();
+                                boolean hasBidder = maRound.getHighestBiddingPlayer() != null;
+                                int minNextBid = (currentHighestBid == 0 && !hasBidder) ? currentHighestBid
+                                        : currentHighestBid + 10;
+                                if (currentHighestBid > 0 && !hasBidder)
+                                    minNextBid = currentHighestBid;
+
+                                int maxNextBid = bidAction.getMaxBid();
+
+                                ((SpinnerNumberModel) bidSpinner.getModel()).setMinimum(minNextBid);
+                                ((SpinnerNumberModel) bidSpinner.getModel()).setMaximum(maxNextBid);
+
+                                if ((Integer) bidSpinner.getValue() < minNextBid)
+                                    bidSpinner.setValue(minNextBid);
+                                if ((Integer) bidSpinner.getValue() > maxNextBid)
+                                    bidSpinner.setValue(maxNextBid);
+
+                                JLabel bidPrompt = new JLabel(actorName + " bids: $");
+                                bidPrompt.setFont(new Font("SansSerif", Font.PLAIN, 13));
+                                dynamicButtonPanel.add(bidPrompt);
+                                dynamicButtonPanel.add(bidSpinner);
+
+                                if (auctionBidButton == null)
+                                    auctionBidButton = new JButton("Place Bid");
+                                auctionBidButton.setPreferredSize(new Dimension(90, 28));
+
+                                final net.sf.rails.game.specific._1817.action.BidOnCompany_1817 finalBid = bidAction;
+                                for (java.awt.event.ActionListener al : auctionBidButton.getActionListeners())
+                                    auctionBidButton.removeActionListener(al);
+                                auctionBidButton.addActionListener(e -> {
+                                    finalBid.setBidAmount((Integer) bidSpinner.getValue());
+                                    process(finalBid);
+                                });
+                                dynamicButtonPanel.add(auctionBidButton);
+                            } else {
+                                JLabel noBidLabel = new JLabel("(No eligible companies to bid)");
+                                noBidLabel.setFont(new Font("SansSerif", Font.ITALIC, 13));
+                                noBidLabel.setForeground(Color.GRAY);
+                                dynamicButtonPanel.add(noBidLabel);
+                            }
+
+                            if (passAction != null) {
+                                if (auctionPassButton == null)
+                                    auctionPassButton = new JButton("Pass");
+                                auctionPassButton.setPreferredSize(new Dimension(70, 28));
+                                auctionPassButton.setForeground(Color.RED);
+
+                                final NullAction finalPass = passAction;
+                                for (java.awt.event.ActionListener al : auctionPassButton.getActionListeners())
+                                    auctionPassButton.removeActionListener(al);
+                                auctionPassButton.addActionListener(e -> process(finalPass));
+                                dynamicButtonPanel.add(auctionPassButton);
+                            }
+
                         } else {
-                            dynamicButtonPanel.add(new JLabel("Waiting for " + actorName + " to bid for " + companyId + "..."));
+                            dynamicButtonPanel
+                                    .add(new JLabel("Waiting for " + actorName + " to bid for " + companyId + "..."));
                         }
                     }
-                    
+
                     dynamicButtonPanel.revalidate();
                     dynamicButtonPanel.repaint();
-                    
+
                 } else {
-                
 
-boolean hasSpecialActions = false;
-                        java.util.List<PossibleAction> specialActions = new java.util.ArrayList<>();
-                        GuiTargetedAction contextProvider = null;
-                        NullAction specialNullAction = null;
+                    boolean hasSpecialActions = false;
+                    java.util.List<PossibleAction> specialActions = new java.util.ArrayList<>();
+                    GuiTargetedAction contextProvider = null;
+                    NullAction specialNullAction = null;
 
-                        if (possibleActions != null && possibleActions.getList() != null) {
-                            for (PossibleAction pa : possibleActions.getList()) {
-                                if (pa instanceof GuiTargetedAction) {
-                                    specialActions.add(pa);
-                                    hasSpecialActions = true;
-                                    if (contextProvider == null) contextProvider = (GuiTargetedAction) pa;
-                                } else if (pa instanceof NullAction && (((NullAction) pa).getMode() == NullAction.Mode.PASS || ((NullAction) pa).getMode() == NullAction.Mode.DONE)) {
-                                    specialNullAction = (NullAction) pa;
-                                }
+                    if (possibleActions != null && possibleActions.getList() != null) {
+                        for (PossibleAction pa : possibleActions.getList()) {
+                            if (pa instanceof GuiTargetedAction) {
+                                specialActions.add(pa);
+                                hasSpecialActions = true;
+                                if (contextProvider == null)
+                                    contextProvider = (GuiTargetedAction) pa;
+                            } else if (pa instanceof NullAction && (((NullAction) pa).getMode() == NullAction.Mode.PASS
+                                    || ((NullAction) pa).getMode() == NullAction.Mode.DONE)) {
+                                specialNullAction = (NullAction) pa;
                             }
-                        }
-
-                        if (hasSpecialActions) {
-                            dynamicButtonPanel.setBackground(new Color(230, 240, 255));
-                            dynamicButtonPanel.setOpaque(true);
-                            dynamicButtonPanel.setBorder(BorderFactory.createLineBorder(Color.BLUE, 1));
-                            dynamicButtonPanel.setLayout(new FlowLayout(FlowLayout.LEFT, 8, 2));
-
-                          
-                          
-
-                            String actorName = (effectivePlayer != null) ? effectivePlayer.getName() : "Player";
-                            net.sf.rails.game.state.Owner actorOwner = contextProvider.getActor();
-                            String companyPrefix = "";
-                            if (actorOwner instanceof net.sf.rails.game.Company) {
-                                companyPrefix = " (" + ((net.sf.rails.game.Company) actorOwner).getId() + ")";
-                            }
-                            
-                            String title = contextProvider.getGroupLabel();
-                            if (title == null || title.isEmpty()) title = "Special Action";
-                            
-                            JLabel promptLabel = new JLabel("<html><b>" + actorName + companyPrefix + "</b>, " + title + ":</html>");
-
-
-                            promptLabel.setForeground(new Color(0, 102, 204));
-                            dynamicButtonPanel.add(promptLabel);
-
-                            JSeparator sep = new JSeparator(JSeparator.VERTICAL);
-                            sep.setPreferredSize(new Dimension(2, 25));
-                            dynamicButtonPanel.add(sep);
-
-                            for (PossibleAction spa : specialActions) {
-                                GuiTargetedAction gta = (GuiTargetedAction) spa;
-                                ActionButton btn = new ActionButton(null);
-                                
-                                String labelText = gta.getButtonLabel();
-                                if (labelText != null && labelText.length() > 20) {
-                                    labelText = labelText.substring(0, 20) + "...";
-                                }
-                                btn.setText(labelText);
-                                
-                                btn.setBackground(gta.getHighlightBackgroundColor());
-                                btn.setForeground(gta.getHighlightTextColor());
-                                btn.setBorder(BorderFactory.createCompoundBorder(
-                                        BorderFactory.createLineBorder(gta.getHighlightBorderColor(), 2),
-                                        BorderFactory.createEmptyBorder(2, 5, 2, 5)));
-                                btn.setOpaque(true);
-                                btn.setFont(new Font("SansSerif", Font.BOLD, 12));
-                                btn.setPossibleAction(spa);
-                                btn.setActionCommand("SpecialAction");
-                                btn.addActionListener(this);
-                                dynamicButtonPanel.add(btn);
-                            }
-                            
-                            if (specialNullAction != null) {
-                                ActionButton declineBtn = new ActionButton(null);
-                                declineBtn.setText(specialNullAction.getMode() == NullAction.Mode.PASS ? "Decline" : "Done");
-                                declineBtn.setBackground(new Color(255, 69, 0)); // SYS_RED
-                                declineBtn.setForeground(Color.WHITE);
-                                declineBtn.setBorder(BorderFactory.createCompoundBorder(
-                                        BorderFactory.createLineBorder(new Color(200, 0, 0), 2),
-                                        BorderFactory.createEmptyBorder(2, 5, 2, 5)));
-                                declineBtn.setOpaque(true);
-                                declineBtn.setFont(new Font("SansSerif", Font.BOLD, 12));
-                                declineBtn.setPossibleAction(specialNullAction);
-                                declineBtn.setActionCommand(specialNullAction.getMode() == NullAction.Mode.PASS ? PASS_CMD : DONE_CMD);
-                                declineBtn.addActionListener(this);
-                                dynamicButtonPanel.add(declineBtn);
-                            }
-                        } else {
-                            dynamicButtonPanel.setBackground(null);
-                            dynamicButtonPanel.setOpaque(false);
-                            dynamicButtonPanel.setBorder(BorderFactory.createEmptyBorder(0, 10, 0, 0));
                         }
                     }
 
+                    if (hasSpecialActions) {
+                        dynamicButtonPanel.setBackground(new Color(230, 240, 255));
+                        dynamicButtonPanel.setOpaque(true);
+                        dynamicButtonPanel.setBorder(BorderFactory.createLineBorder(Color.BLUE, 1));
+                        dynamicButtonPanel.setLayout(new FlowLayout(FlowLayout.LEFT, 8, 2));
 
+                        String actorName = (effectivePlayer != null) ? effectivePlayer.getName() : "Player";
+                        net.sf.rails.game.state.Owner actorOwner = contextProvider.getActor();
+                        String companyPrefix = "";
+                        if (actorOwner instanceof net.sf.rails.game.Company) {
+                            companyPrefix = " (" + ((net.sf.rails.game.Company) actorOwner).getId() + ")";
+                        }
 
+                        String title = contextProvider.getGroupLabel();
+                        if (title == null || title.isEmpty())
+                            title = "Special Action";
 
+                        JLabel promptLabel = new JLabel(
+                                "<html><b>" + actorName + companyPrefix + "</b>, " + title + ":</html>");
 
+                        promptLabel.setForeground(new Color(0, 102, 204));
+                        dynamicButtonPanel.add(promptLabel);
 
+                        JSeparator sep = new JSeparator(JSeparator.VERTICAL);
+                        sep.setPreferredSize(new Dimension(2, 25));
+                        dynamicButtonPanel.add(sep);
 
+                        for (PossibleAction spa : specialActions) {
+                            GuiTargetedAction gta = (GuiTargetedAction) spa;
+                            ActionButton btn = new ActionButton(null);
 
+                            String labelText = gta.getButtonLabel();
+                            if (labelText != null && labelText.length() > 20) {
+                                labelText = labelText.substring(0, 20) + "...";
+                            }
+                            btn.setText(labelText);
 
+                            btn.setBackground(gta.getHighlightBackgroundColor());
+                            btn.setForeground(gta.getHighlightTextColor());
+                            btn.setBorder(BorderFactory.createCompoundBorder(
+                                    BorderFactory.createLineBorder(gta.getHighlightBorderColor(), 2),
+                                    BorderFactory.createEmptyBorder(2, 5, 2, 5)));
+                            btn.setOpaque(true);
+                            btn.setFont(new Font("SansSerif", Font.BOLD, 12));
+                            btn.setPossibleAction(spa);
+                            btn.setActionCommand("SpecialAction");
+                            btn.addActionListener(this);
+                            dynamicButtonPanel.add(btn);
+                        }
 
-
-
-
+                        if (specialNullAction != null) {
+                            ActionButton declineBtn = new ActionButton(null);
+                            declineBtn
+                                    .setText(specialNullAction.getMode() == NullAction.Mode.PASS ? "Decline" : "Done");
+                            declineBtn.setBackground(new Color(255, 69, 0)); // SYS_RED
+                            declineBtn.setForeground(Color.WHITE);
+                            declineBtn.setBorder(BorderFactory.createCompoundBorder(
+                                    BorderFactory.createLineBorder(new Color(200, 0, 0), 2),
+                                    BorderFactory.createEmptyBorder(2, 5, 2, 5)));
+                            declineBtn.setOpaque(true);
+                            declineBtn.setFont(new Font("SansSerif", Font.BOLD, 12));
+                            declineBtn.setPossibleAction(specialNullAction);
+                            declineBtn.setActionCommand(
+                                    specialNullAction.getMode() == NullAction.Mode.PASS ? PASS_CMD : DONE_CMD);
+                            declineBtn.addActionListener(this);
+                            dynamicButtonPanel.add(declineBtn);
+                        }
+                    } else {
+                        dynamicButtonPanel.setBackground(null);
+                        dynamicButtonPanel.setOpaque(false);
+                        dynamicButtonPanel.setBorder(BorderFactory.createEmptyBorder(0, 10, 0, 0));
+                    }
+                }
 
             }
 
