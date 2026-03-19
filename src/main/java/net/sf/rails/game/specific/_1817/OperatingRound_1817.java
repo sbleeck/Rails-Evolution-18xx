@@ -77,6 +77,41 @@ public class OperatingRound_1817 extends OperatingRound {
     }
 
 
+    // ... (lines of unchanged context code) ...
+    @Override
+    public void start() {
+        super.start();
+
+        // Rule 1.2.6: Mail Contracts only pay if the company has one or more trains.
+        // Rule 6.2: This is paid at the start of the OR.
+        for (PublicCompany comp : gameManager.getAllPublicCompanies()) {
+            if (comp.hasStarted() && !comp.isClosed() && comp.getPortfolioModel().getNumberOfTrains() == 0) {
+                for (net.sf.rails.game.PrivateCompany priv : comp.getPortfolioModel().getPrivateCompanies()) {
+                    String pid = priv.getId();
+                    int refund = 0;
+
+                    // Assuming XML IDs: MMC (Minor), MC (Regular), MaMC (Major)
+                    // Rule 1.2.6: $10, $15, $20 payouts [cite: 259]
+                    if (pid.startsWith("MMC"))
+                        refund = 10;
+                    else if (pid.startsWith("MC") && !pid.startsWith("MJM")) // Avoid MJM coal mine
+                        refund = 15;
+                    else if (pid.startsWith("MaMC"))
+                        refund = 20;
+
+
+                    if (refund > 0) {
+                        net.sf.rails.game.state.Currency.toBank(comp, refund);
+                        net.sf.rails.common.ReportBuffer.add(gameManager,
+                                comp.getId() + " refunds $" + refund + " for " + pid + " (no trains).");
+                        log.info("1817_TRACE: Refunded ${} to {} due to no trains.", refund, comp.getId());
+                    }
+                }
+            }
+        }
+    }
+// ... (rest of the method) ...
+
     @Override
     protected void finishTurn() {
         // This method is called when the player clicks "Done" or the turn is forced to

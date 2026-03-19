@@ -36,6 +36,16 @@ this.shareCount = IntegerState.create(this, "shareCount", 2);
     @Override
     public void finishConfiguration(RailsRoot root) throws ConfigurationException {
         super.finishConfiguration(root);
+       // Rule 1.2.7: Initialize the 5 required short certificates with unique indices
+        for (int i = 1; i <= 5; i++) {
+            ShortCertificate sc = new ShortCertificate(this, i);
+            
+            // We must use the internal CertificatesModel to find the mutable portfolio
+            getPortfolioModel().getCertificatesModel().getPortfolio().add(sc);
+            
+            // Now that it's registered with the company, sequester it
+            sc.moveTo(root.getBank().getUnavailable());
+        }
         // Initial certificate setup for all companies
         adjustCertificates();
             }

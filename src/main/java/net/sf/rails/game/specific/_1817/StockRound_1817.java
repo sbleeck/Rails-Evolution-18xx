@@ -3,6 +3,7 @@ package net.sf.rails.game.specific._1817;
 import java.util.ArrayList;
 import java.util.List;
 
+import net.sf.rails.game.Company;
 import net.sf.rails.game.GameManager;
 import net.sf.rails.game.PublicCompany;
 import rails.game.action.PossibleAction;
@@ -98,20 +99,52 @@ possibleActions.add(new TakeLoans_1817(getRoot(), comp.getId(), maxLoans));
                     // 2. Player must own zero shares
                     boolean ownsZeroShares = currentPlayer.getPortfolioModel().getShare(comp) == 0;
 
-                    // 3. Max 5 short shares in play
-                    // We check if there are shares available in the pool to short
-                    int poolShares = pool.getShare(comp);
-                    boolean underShortLimit = poolShares > 0;
+                  // 3. Max 5 short shares in play (Rule 5.3)
+                    int activeShorts = 0;
+                    int availableShorts = 0;
+
+                    // Count Available Shorts (Iterate through the Bank's Unavailable Portfolio)
+// This is exactly where you moved them in PublicCompany_1817.finishConfiguration()
+net.sf.rails.game.model.PortfolioModel unavailablePortfolio = getRoot().getBank().getUnavailable().getPortfolioModel();
+for (net.sf.rails.game.financial.PublicCertificate c : unavailablePortfolio.getCertificates()) {
+    if (c instanceof net.sf.rails.game.specific._1817.ShortCertificate && c.getCompany() == comp1817) {
+        availableShorts++;
+    }
+}
+
+// Count Active Shorts (Iterate through all players to find issued short certs)
+for (net.sf.rails.game.Player p : getRoot().getPlayerManager().getPlayers()) {
+    for (net.sf.rails.game.financial.PublicCertificate c : p.getPortfolioModel().getCertificates()) {
+        if (c instanceof net.sf.rails.game.specific._1817.ShortCertificate && c.getCompany() == comp1817) {
+            activeShorts++;
+        }
+    }
+}
+
+// Check pool availability (Iteration approach for robustness)
+boolean hasPoolShare = false;
+for (net.sf.rails.game.financial.PublicCertificate c : pool.getCertificates()) {
+    if (c.getCompany() == comp) {
+        hasPoolShare = true;
+        break;
+    }
+}
+
+boolean underShortLimit = (activeShorts < 5 && availableShorts > 0);
 
                     // 4. Prohibited in acquisition/liquidation zones
-                    // Shares are only buyable in the 'white' or 'green' areas
                     boolean notInAcquisitionZone = comp.isBuyable();
 
-                    // 5. Prohibited in Phase 8
-                    String phaseId = gameManager.getCurrentPhase().getId();
-                    boolean notPhase8 = phaseId != null && !phaseId.startsWith("8");
+                    // 5. Prohibited in Phase 8 (Safely handle null phase IDs)
+                    String phaseId = (gameManager.getCurrentPhase() != null) ? gameManager.getCurrentPhase().getId() : "";
+                    boolean notPhase8 = (phaseId == null || !phaseId.startsWith("8"));
 
-                    if (isLargeEnough && ownsZeroShares && underShortLimit && notInAcquisitionZone && notPhase8) {
+                    // Log the fixed state
+                    log.info("DIAG [{}]: Large={}, ZeroOwn={}, UnderLimit={}(act:{},avai:{}), Pool={}, NotAcq={}, NotP8={}", 
+                             comp.getId(), isLargeEnough, ownsZeroShares, underShortLimit, activeShorts, availableShorts, hasPoolShare, notInAcquisitionZone, notPhase8);
+
+                    if (isLargeEnough && ownsZeroShares && underShortLimit && hasPoolShare && notInAcquisitionZone && notPhase8) {
+                        
                         possibleActions.add(new net.sf.rails.game.specific._1817.action.Short1817(gameManager.getRoot(),
                                 comp.getId()));
                     }
@@ -197,36 +230,60 @@ possibleActions.add(new TakeLoans_1817(getRoot(), comp.getId(), maxLoans));
             return true;
 
         }
+
+
         if (action instanceof net.sf.rails.game.specific._1817.action.Short1817) {
             net.sf.rails.game.specific._1817.action.Short1817 sAction = (net.sf.rails.game.specific._1817.action.Short1817) action;
-            // Use companyManager (inherited from Round) instead of gameManager for company
-            // lookups
             PublicCompany comp = companyManager.getPublicCompany(sAction.getCompanyId());
 
             if (comp != null && comp.hasStockPrice()) {
-                // 1. Calculate price and cash transfer
-                int price = comp.getCurrentSpace().getPrice() / comp.getShareUnitsForSharePrice();
+                // 1. Calculate price (The market price is the per-share value in 1817)
+                int price = comp.getCurrentSpace().getPrice();
 
-                // Use the static Currency state utility to transfer cash from the Bank to the
-                // player
-                net.sf.rails.game.state.Currency.fromBank(price, currentPlayer);
-
-                // 2. Move certificate from Pool to sequestered portfolio
-                // 1817 sequestering typically uses the Bank's Unavailable portfolio
-                net.sf.rails.game.financial.PublicCertificate cert = pool.findCertificate(comp, 1, false);
-                if (cert != null) {
-                    cert.moveTo(getRoot().getBank().getUnavailable());
+                
+                // 1. Rule 5.3: Check if this is the "First Short" for this company
+                // If no short certificates are in the Unavailable pile, they might already be in Open Short Interest
+                // We check if we need to sequester the 5 regular shares.
+                int regularSharesInOSI = 0;
+                for (net.sf.rails.game.financial.PublicCertificate c : getRoot().getBank().getUnavailable().getPortfolioModel().getCertificates()) {
+                    if (!(c instanceof ShortCertificate) && c.getCompany() == comp) {
+                        regularSharesInOSI++;
+                    }
                 }
 
-                // 3. Adjust stock price (drop one space)
-                stockMarket.sell(comp, currentPlayer, 1);
+                if (regularSharesInOSI == 0) {
+                    // Move 5 regular shares from the Pool to Unavailable (OSI)
+                    for (int i = 0; i < 5; i++) {
+                        net.sf.rails.game.financial.PublicCertificate regCert = pool.findCertificate(comp, 1, false);
+                        if (regCert != null) {
+                            regCert.moveTo(getRoot().getBank().getUnavailable());
+                        }
+                    }
+                }
 
-                // 4. Record action and report
-                net.sf.rails.common.ReportBuffer.add(this, net.sf.rails.common.LocalText.getText("SHORT_SELL_LOG",
-                        currentPlayer.getId(), comp.getId(), net.sf.rails.game.financial.Bank.format(this, price)));
+                // 2. Find the ShortCertificate to give to the player
+                net.sf.rails.game.financial.PublicCertificate shortCert = null;
+                for (net.sf.rails.game.financial.PublicCertificate c : getRoot().getBank().getUnavailable().getPortfolioModel().getCertificates()) {
+                    if (c instanceof net.sf.rails.game.specific._1817.ShortCertificate && c.getCompany() == comp) {
+                        shortCert = c;
+                        break;
+                    }
+                }
 
-                hasActed.set(true);
-                return true;
+                if (shortCert != null) {
+                    // 3. Complete the sale: Player gets the Liability (Short Cert) and the Cash
+                    shortCert.moveTo(currentPlayer.getPortfolioModel());
+                    net.sf.rails.game.state.Currency.fromBank(price, currentPlayer);
+
+                    // Note: Price movement is DEFERRED until the end of the Stock Round (Rule 5.3/5.7)
+                    // 
+                    // 5. Record the action and report
+                    net.sf.rails.common.ReportBuffer.add(this, net.sf.rails.common.LocalText.getText("SHORT_SELL_LOG",
+                            currentPlayer.getId(), comp.getId(), net.sf.rails.game.financial.Bank.format(this, price)));
+
+                    hasActed.set(true);
+                    return true;
+                }
             }
         }
 
@@ -288,5 +345,6 @@ possibleActions.add(new TakeLoans_1817(getRoot(), comp.getId(), maxLoans));
         AuctionRound_1817 auctionRound = gameManager.createRound(AuctionRound_1817.class, "Auction_" + comp.getId());
         auctionRound.setupAuction(comp, hexId, stationNumber, bid, initiator, gameManager.getPlayers());
     }
+
 
 }
