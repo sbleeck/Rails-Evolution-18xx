@@ -33,7 +33,7 @@
              description="Allows building the unique Pittsburgh tile. Yellow lay, no connectivity required.">
         <SpecialProperties>
             <SpecialProperty condition="ifOwnedByCompany" when="tileLayingStep" class="net.sf.rails.game.special.SpecialSingleTileLay">
-                <SpecialSingleTileLay id="PSM40_Lay" location="F13" tile="43800" connects="no" extra="yes" />
+				<SpecialSingleTileLay location="F13" tile="43800" colour="yellow" connects="no" extra="yes" />
             </SpecialProperty>
         </SpecialProperties>
     </Company>

@@ -132,52 +132,6 @@ public class OperatingRound_1817 extends OperatingRound {
         super.finishTurn();
     }
 
-    @Override
-    public void setBuyableTrains() {
-        super.setBuyableTrains();
-
-        PublicCompany comp = operatingCompany.value();
-        if (comp == null)
-            return;
-
-        int cash = comp.getCash();
-        List<PossibleAction> toRemove = new ArrayList<>();
-
-        for (PossibleAction pa : possibleActions.getList()) {
-            if (pa instanceof rails.game.action.BuyTrain) {
-                rails.game.action.BuyTrain bt = (rails.game.action.BuyTrain) pa;
-
-                // Rule 6.7: Public Companies are never required to purchase a train,
-                // and thus the president may not contribute cash.
-                bt.setForcedBuyIfHasRoute(false);
-                bt.setForcedBuyIfNoRoute(false);
-                bt.setPresidentMustAddCash(0);
-
-                // Remove trains that are strictly unaffordable by the company itself.
-                int cost = bt.getFixedCost();
-                if (bt.getFixedCostMode() == rails.game.action.BuyTrain.Mode.FIXED ||
-                        bt.getFixedCostMode() == rails.game.action.BuyTrain.Mode.MIN) {
-                    if (cost > cash) {
-                        toRemove.add(bt);
-                    }
-                } else if (bt.getFixedCostMode() != rails.game.action.BuyTrain.Mode.FREE) {
-                    // For variable pricing (trading between companies), the minimum price is
-                    // usually 1.
-                    if (cash < 1) {
-                        toRemove.add(bt);
-                    }
-                }
-            }
-        }
-
-        for (PossibleAction pa : toRemove) {
-            possibleActions.remove(pa);
-        }
-
-        // Ensure skip/done is always allowed since train purchase is never forced.
-        doneAllowed.set(true);
-    }
-
     /**
      * Helper to check if the current company has a token on the specified hex name.
      */
@@ -788,14 +742,15 @@ public class OperatingRound_1817 extends OperatingRound {
         log.info("1817_DEBUG: Entering setPossibleActions for {}, step: {}", (comp != null ? comp.getId() : "null"),
                 step);
         if (comp != null) {
-Collection<net.sf.rails.game.PrivateCompany> compPrivs = comp.getPortfolioModel().getPrivateCompanies();
+            Collection<net.sf.rails.game.PrivateCompany> compPrivs = comp.getPortfolioModel().getPrivateCompanies();
             log.info("1817_DEBUG: Company {} privates count: {}", comp.getId(), compPrivs.size());
             for (net.sf.rails.game.PrivateCompany p : compPrivs) {
                 log.info("1817_DEBUG: -> Company has private: {}", p.getId());
             }
 
             if (comp.getPresident() != null) {
-Collection<net.sf.rails.game.PrivateCompany> presPrivs = comp.getPresident().getPortfolioModel().getPrivateCompanies();
+                Collection<net.sf.rails.game.PrivateCompany> presPrivs = comp.getPresident().getPortfolioModel()
+                        .getPrivateCompanies();
 
                 log.info("1817_DEBUG: President {} privates count: {}", comp.getPresident().getName(),
                         presPrivs.size());
@@ -962,62 +917,6 @@ Collection<net.sf.rails.game.PrivateCompany> presPrivs = comp.getPresident().get
             }
         }
 
-       
-// 1. Check if the private companies in the portfolio hold the special property
-Collection<net.sf.rails.game.PrivateCompany> allPossiblePrivates = new ArrayList<>();
-if (comp != null) {
-allPossiblePrivates.addAll(comp.getPortfolioModel().getPrivateCompanies());
-if (comp.getPresident() != null) {
-allPossiblePrivates.addAll(comp.getPresident().getPortfolioModel().getPrivateCompanies());
-}
-}
-
-    log.info("1817_DEBUG: Scanning {} privates for SpecialTileLay", allPossiblePrivates.size());
-    
-    for (net.sf.rails.game.PrivateCompany priv : allPossiblePrivates) {
-        Collection<SpecialProperty> privSpecials = priv.getSpecialProperties();
-        log.info("1817_DEBUG: Private {} has {} special properties", priv.getId(), (privSpecials == null ? "null" : privSpecials.size()));
-
-        if (privSpecials != null) {
-            for (SpecialProperty sp : privSpecials) {
-                log.info("1817_DEBUG: -> Checking SpecialProperty: id={}, class={}, exercised={}", 
-                         sp.getId(), sp.getClass().getSimpleName(), sp.isExercised());
-
-                if (sp instanceof SpecialTileLay) {
-                    if (!sp.isExercised()) {
-                        log.info("1817_DEBUG: Found unexercised SpecialTileLay on private {}", priv.getId());
-                        
-                        if (getStep() == net.sf.rails.game.GameDef.OrStep.LAY_TRACK || getStep() == net.sf.rails.game.GameDef.OrStep.INITIAL) {
-                            if (tilesLaidThisTurn.value() < 2) {
-                                List<LayTile> specialLays = getSpecialTileLays(true);
-                                
-                                boolean alreadyAdded = false;
-                                for (LayTile lt : specialLays) {
-                                    if (lt.getSpecialProperty() == sp) {
-                                        alreadyAdded = true;
-                                        break;
-                                    }
-                                }
-
-                                possibleActions.addAll(specialLays);
-                                
-                                if (!alreadyAdded) {
-                                    log.info("1817_DEBUG: Injecting LayTile action for PSM40 manually.");
-                                    possibleActions.add(new LayTile((SpecialTileLay) sp));
-                                }
-                                actionsAdded = true;
-                            }
-                        }
-                    } else {
-                        log.info("1817_DEBUG: SpecialTileLay {} is already exercised.", sp.getId());
-                    }
-                }
-            }
-        }
-    }
-
-
-
         // 2. Inspect the generated actions
         for (rails.game.action.PossibleAction pa : possibleActions.getList()) {
             if (pa instanceof LayTile) {
@@ -1170,4 +1069,92 @@ allPossiblePrivates.addAll(comp.getPresident().getPortfolioModel().getPrivateCom
         return count;
     }
 
+    @Override
+    public void setBuyableTrains() {
+        super.setBuyableTrains();
+
+        PublicCompany comp = operatingCompany.value();
+        if (comp == null)
+            return;
+
+        int cash = comp.getCash();
+        List<PossibleAction> toRemove = new ArrayList<>();
+        net.sf.rails.game.Player currentPresident = comp.getPresident();
+
+        for (PossibleAction pa : possibleActions.getList()) {
+            if (pa instanceof rails.game.action.BuyTrain) {
+                rails.game.action.BuyTrain bt = (rails.game.action.BuyTrain) pa;
+
+                // Disable standard 1830-style emergency contributions
+                bt.setForcedBuyIfHasRoute(false);
+                bt.setForcedBuyIfNoRoute(false);
+                bt.setPresidentMustAddCash(0);
+
+                // Enforce House Rule: Remove trains sold by companies not owned by the same
+                // president
+net.sf.rails.game.state.Owner seller = bt.getTrain().getOwner();
+                if (seller instanceof PublicCompany && seller != comp) {
+                    PublicCompany sellingComp = (PublicCompany) seller;
+                    if (sellingComp.getPresident() != currentPresident) {
+                        toRemove.add(bt);
+                        continue;
+                    }
+                }
+
+                // Remove trains that are strictly unaffordable by the company itself
+                int cost = bt.getFixedCost();
+                if (bt.getFixedCostMode() == rails.game.action.BuyTrain.Mode.FIXED ||
+                        bt.getFixedCostMode() == rails.game.action.BuyTrain.Mode.MIN) {
+                    if (cost > cash) {
+                        toRemove.add(bt);
+                    }
+                } else if (bt.getFixedCostMode() != rails.game.action.BuyTrain.Mode.FREE) {
+                    if (cash < 1) {
+                        toRemove.add(bt);
+                    }
+                }
+            }
+        }
+
+        for (PossibleAction pa : toRemove) {
+            possibleActions.remove(pa);
+        }
+
+        // Phase Exemption: Manually inject BuyTrain actions for valid cross-company
+        // purchases
+        // if the base engine suppressed them due to phase restrictions.
+        if (currentPresident != null) {
+            for (PublicCompany otherComp : gameManager.getAllPublicCompanies()) {
+                if (otherComp != comp && otherComp.hasStarted() && !otherComp.isClosed()
+                        && otherComp.getPresident() == currentPresident) {
+                    for (net.sf.rails.game.Train t : otherComp.getPortfolioModel().getTrainList()) {
+                        // Only add real trains, skip private papers/contracts
+                        if (t.getName() != null && t.getName().matches(".*\\d.*")) {
+                            boolean exists = false;
+                            for (PossibleAction pa : possibleActions.getList()) {
+                                if (pa instanceof rails.game.action.BuyTrain) {
+                                    if (((rails.game.action.BuyTrain) pa).getTrain() == t) {
+                                        exists = true;
+                                        break;
+                                    }
+                                }
+                            }
+                            if (!exists && cash >= 1) {
+rails.game.action.BuyTrain newBt = new rails.game.action.BuyTrain(t, otherComp, 1);
+                                // Set up flexible pricing for inter-company purchases
+                                newBt.setFixedCostMode(rails.game.action.BuyTrain.Mode.MIN);
+                                newBt.setFixedCost(1);
+                                newBt.setForcedBuyIfHasRoute(false);
+                                newBt.setForcedBuyIfNoRoute(false);
+                                newBt.setPresidentMustAddCash(0);
+                                String label = "'" + t.getName() + "' from " + otherComp.getId() + " (1-" + Math.max(1, cash) + ")";
+                                possibleActions.add(newBt);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+    }
 }
