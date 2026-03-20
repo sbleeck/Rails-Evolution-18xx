@@ -699,7 +699,7 @@ for (net.sf.rails.game.Player p : players) prePlayerCash.put(p, p.getCash());
                 int sharesOwned = 0;
                 int shortShares = 0;
                 for (net.sf.rails.game.financial.PublicCertificate cert : p.getPortfolioModel().getCertificates(comp)) {
-                    if (cert.getClass().getSimpleName().contains("Short")) {
+if (cert instanceof net.sf.rails.game.specific._1817.ShortCertificate) {
                         shortShares += 1;
                     } else {
                         sharesOwned += cert.getShare() / comp.getShareUnit();
@@ -711,8 +711,23 @@ for (net.sf.rails.game.Player p : players) prePlayerCash.put(p, p.getCash());
                 }
                 if (shortShares > 0 && truePerShare > 0) {
                     int debt = shortShares * truePerShare;
+                    // Rule 7.4: Cash Crisis Trigger
+  
+  // Deduct the cash first
                     net.sf.rails.game.state.Currency.toBank(p, debt);
                     net.sf.rails.common.ReportBuffer.add(this, p.getName() + " pays $" + debt + " for short shares of " + comp.getId());
+
+                    // Rule 7.4: Cash Crisis Trigger Check
+                    if (p.getCash() < 0) {
+                        log.warn("1817_OR: CASH CRISIS triggered for {}. Shortfall: ${}", p.getName(), Math.abs(p.getCash()));
+                        net.sf.rails.common.ReportBuffer.add(this, "CASH CRISIS: " + p.getName() + " must raise funds. Shortfall: $" + Math.abs(p.getCash()));
+                        
+                        // Interrupt the current round and spawn the Cash Crisis wrapper
+                        CashCrisisRound_1817 crisisRound = gameManager.createRound(CashCrisisRound_1817.class, "CashCrisis_" + p.getId());
+                        gameManager.setInterruptedRound(this);
+                        crisisRound.start(p);
+                    }
+                
                 }
             }
 

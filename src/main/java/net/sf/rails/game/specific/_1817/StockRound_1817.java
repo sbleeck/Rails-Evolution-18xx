@@ -253,6 +253,35 @@ public class StockRound_1817 extends StockRound {
 
     }
 
+@Override
+public boolean mayPlayerSellShareOfCompany(net.sf.rails.game.PublicCompany company) {
+if (!super.mayPlayerSellShareOfCompany(company)) {
+return false;
+}
+
+    if (company instanceof PublicCompany_1817) {
+        // Rule 5.2: Shares of a 2-share company may not be sold.
+        if (((PublicCompany_1817) company).getShareCount() == 2) {
+            return false;
+        }
+    }
+
+    // Rule 5.3: Short certificates are liabilities, not sellable assets.
+    // Due to Mandatory Reconciliation, if a player holds a short, they hold NO regular shares.
+    net.sf.rails.game.Player currentPlayer = gameManager.getCurrentPlayer();
+    if (currentPlayer != null) {
+        for (net.sf.rails.game.financial.PublicCertificate c : currentPlayer.getPortfolioModel().getCertificates(company)) {
+            if (c instanceof net.sf.rails.game.specific._1817.ShortCertificate) {
+                return false;
+            }
+        }
+    }
+
+    return true;
+}
+
+
+    
     // ... (lines of unchanged context code) ...
     @Override
     protected boolean processGameSpecificAction(PossibleAction action) {

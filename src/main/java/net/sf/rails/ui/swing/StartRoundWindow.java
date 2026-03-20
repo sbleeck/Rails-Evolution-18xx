@@ -472,6 +472,18 @@ if (upperPlayerCaption[j][i] != null) {
         undoButton.setEnabled(false);
         buttonPanel.add(undoButton);
 
+        if (round instanceof net.sf.rails.game.specific._1817.StartRound_1817) {
+            net.sf.rails.game.specific._1817.StartRound_1817 sr1817 = (net.sf.rails.game.specific._1817.StartRound_1817) round;
+            JPanel seedPanel = new JPanel(new java.awt.FlowLayout(java.awt.FlowLayout.CENTER));
+            JLabel seedLabel = new JLabel("  Seed Money: ");
+            seedLabel.setFont(new Font("SansSerif", Font.BOLD, currentFontSize));
+            Field seedField = new Field(sr1817.getSeedMoneyModel());
+            seedField.setFont(new Font("SansSerif", Font.BOLD, currentFontSize));
+            seedPanel.add(seedLabel);
+            seedPanel.add(seedField);
+            buttonPanel.add(seedPanel);
+        }
+
         buttonPanel.setOpaque(true);
 
         gbc = new GridBagConstraints();
@@ -895,6 +907,21 @@ if (cardWrappers[i] != null) {
                 passButton.setEnabled(true);
                 passButton.setPossibleAction(act);
             }
+        }
+
+        if (round instanceof net.sf.rails.game.specific._1817.StartRound_1817) {
+            javax.swing.SwingUtilities.invokeLater(() -> {
+                net.sf.rails.game.specific._1817.StartRound_1817 sr1817 = (net.sf.rails.game.specific._1817.StartRound_1817) round;
+                int currentSeed = sr1817.getSeedMoneyModel().value();
+                for (int i = 0; i < round.getNumberOfStartItems(); i++) {
+                    if (minBid != null && i < minBid.length && minBid[i] != null) {
+                        net.sf.rails.game.StartItem si = round.getStartItem(i);
+                        int bid = si.getBid();
+                        int min = (si.getBidder() != null) ? bid + 5 : Math.max(5, si.getBasePrice() - currentSeed);
+                        minBid[i].setText(String.valueOf(min));
+                    }
+                }
+            });
         }
 
         // 6. Final UI and Map Refresh

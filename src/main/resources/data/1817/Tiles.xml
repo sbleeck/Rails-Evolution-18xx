@@ -68,10 +68,10 @@
 
 
 <Tile colour="red" id="-912" name="Cleveland">
-    <Station id="city1" position="1" slots="1" type="OffMapCity" value="-1" mutexId="Cleveland">
+    <Station id="city1" position="408" slots="1" type="OffMapCity" value="-1" mutexId="Cleveland">
         <Location x="-42" y="0"/>
     </Station>
-    <Station id="city2" position="3" slots="1" type="OffMapCity" value="-1" mutexId="Cleveland">
+    <Station id="city2" position="108" slots="1" type="OffMapCity" value="-1" mutexId="Cleveland">
         <Location x="42" y="0"/>
     </Station>
     <Track from="city1" to="side2"/>
