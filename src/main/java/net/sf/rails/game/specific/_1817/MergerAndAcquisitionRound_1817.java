@@ -396,25 +396,12 @@ public class MergerAndAcquisitionRound_1817 extends Round {
 
             TakeLoans_1817 loanAction = (TakeLoans_1817) action;
             PublicCompany comp = operatingCompany.value();
-            int amount = loanAction.getLoansToTake();
 
-            if (amount > 0) {
 
-                if (comp instanceof PublicCompany_1817) {
-                    PublicCompany_1817 comp1817 = (PublicCompany_1817) comp;
-                    comp1817.setNumberOfBonds(comp1817.getNumberOfBonds() + amount);
-                    net.sf.rails.game.financial.Bank bank = gameManagerRef.getRoot().getBank();
-                    comp1817.addCashFromBank(amount * 100, bank);
-                }
-
-                // Move stock one space left per loan
-                for (int i = 0; i < amount; i++) {
-                    // TODO: Replace with your specific 1817 StockMarket method to move left
-                    // gameManagerRef.getRoot().getStockMarket().moveSpace(comp, -1);
-                }
+            if (comp instanceof PublicCompany_1817) {
+                ((PublicCompany_1817) comp).executeLoan();
             }
-
-            log.info("M&A ROUND: " + comp.getId() + " took " + amount + " loans.");
+            log.info("M&A ROUND: " + comp.getId() + " took 1 loan.");
 
             if (currentStep.value() == MaAStep.COMPANY_ACTIONS || currentStep.value() == MaAStep.LOAN_TAKING) {
                 setPossibleActions();
@@ -959,7 +946,7 @@ public class MergerAndAcquisitionRound_1817 extends Round {
 
             if (current < limit) {
 
-                possibleActions.add(new TakeLoans_1817(getRoot(), comp.getId(), limit));
+possibleActions.add(new TakeLoans_1817(getRoot(), comp.getId()));
                 // Add a DONE action so the player can choose NOT to take a loan
                 possibleActions.add(new NullAction(gameManagerRef.getRoot(), NullAction.Mode.DONE));
                 log.info("M&A ROUND: Offering loans to " + comp.getId() + " (Current: " + current + ", Max: " + limit
@@ -1038,8 +1025,8 @@ public class MergerAndAcquisitionRound_1817 extends Round {
             PublicCompany_1817 comp1817 = (PublicCompany_1817) company;
             int maxLoans = comp1817.getShareCount();
             if (company.getNumberOfBonds() < maxLoans) {
-                possibleActions.add(new net.sf.rails.game.specific._1817.action.TakeLoans_1817(getRoot(),
-                        company.getId(), maxLoans));
+possibleActions.add(new net.sf.rails.game.specific._1817.action.TakeLoans_1817(getRoot(),
+                        company.getId()));
                 log.info("M&A ROUND: Added TakeLoans_1817 action for " + company.getId() + " with max loans: "
                         + maxLoans);
             }

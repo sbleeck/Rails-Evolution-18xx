@@ -1348,9 +1348,7 @@ public class GameStatus extends GridPanel {
                 chosenAction = handleBuyTrain((BuyTrain) actions.get(0));
             } else if (actions.get(0).getClass().getName().endsWith("Initiate1817IPO")) {
                 chosenAction = handle1817IPO(actions.get(0));
-            } else if (actions.get(0).getClass().getName().endsWith("TakeLoans_1817")) {
-                processTakeLoans(actions.get(0));
-                return;
+            
             } else if (actions.get(0).getClass().getSimpleName().equals("StartPrussian")) {
                 // Explicitly handle StartPrussian to ensure it triggers
                 chosenAction = actions.get(0);
@@ -1392,8 +1390,6 @@ public class GameStatus extends GridPanel {
         return null;
     }
 
-    protected void processTakeLoans(PossibleAction action) {
-    }
 
     /**
      * Handles the logic for buying a train, including the UI for negotiating price
@@ -5288,33 +5284,6 @@ public class GameStatus extends GridPanel {
         return null;
     }
 
-    private void processTakeLoans(net.sf.rails.game.specific._1817.action.TakeLoans_1817 action) {
-        String compId = action.getCompanyId();
-        CompanyManager cm = gameUIManager.getRoot().getCompanyManager();
-        PublicCompany comp = cm.getPublicCompany(compId);
-        int current = comp.getNumberOfBonds();
-        int max = action.getMaxLoansAllowed();
-        int available = max - current;
-
-        if (available <= 0) {
-            JOptionPane.showMessageDialog(this, comp.getId() + " is at its loan limit (" + max + ").");
-            return;
-        }
-
-        // Create options: "1", "2", etc.
-        String[] options = new String[available];
-        for (int i = 0; i < available; i++) {
-            options[i] = String.valueOf(i + 1);
-        }
-
-        String selected = (String) JOptionPane.showInputDialog(this,
-                "Select number of loans for " + comp.getId() + ":\n(Current: " + current + ", Max: " + max + ")",
-                "Take Loans", JOptionPane.QUESTION_MESSAGE, null, options, options[0]);
-
-        if (selected != null) {
-            action.setLoansToTake(Integer.parseInt(selected));
-            gameUIManager.processAction(action);
-        }
-    }
+    
 
 }

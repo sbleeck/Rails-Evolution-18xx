@@ -99,11 +99,11 @@
      inkscape:zoom="0.64"
      inkscape:cx="928.90625"
      inkscape:cy="527.34375"
-     inkscape:window-width="2560"
-     inkscape:window-height="1302"
+     inkscape:window-width="2519"
+     inkscape:window-height="1144"
      inkscape:window-x="0"
-     inkscape:window-y="25"
-     inkscape:window-maximized="1"
+     inkscape:window-y="31"
+     inkscape:window-maximized="0"
      inkscape:current-layer="g1"
      showguides="false" />
   <g
@@ -14068,7 +14068,7 @@
        y="836.71875"
        id="text2"><tspan
          sodipodi:role="line"
-         id="tspan2"></tspan></text>
+         id="tspan2" /></text>
     <g
        id="g2-7"
        transform="matrix(1.1231108,0,0,1.1813247,184.73256,-28.57265)">
@@ -14214,6 +14214,60 @@
            transform="scale(1.0669952,0.93721133)"><tspan
              sodipodi:role="line"
              id="tspan176-0-6-3-57-87-7-0-5"
+             x="225.00325"
+             y="938.76276"
+             style="fill:#ffffff;fill-opacity:1;stroke:#ffffff;stroke-width:0.776333;stroke-opacity:1">$20</tspan></text>
+      </g>
+    </g>
+    <g
+       id="g3-7-1-0"
+       transform="translate(1088.2188,74.875)">
+      <g
+         id="g2-7-00-3-5-2"
+         transform="matrix(1.1231108,0,0,1.1813247,240.60756,-487.69765)">
+        <rect
+           style="fill:#0000ff;fill-opacity:1;stroke:#000000;stroke-width:0.413714;stroke-dasharray:none;stroke-opacity:1"
+           id="rect176-3-0-5-3-8-18-9-7-5-4"
+           width="40.738113"
+           height="23.35067"
+           x="236.25764"
+           y="863.12384" />
+        <text
+           xml:space="preserve"
+           style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:16.2731px;font-family:Sans;-inkscape-font-specification:'Sans, Normal';font-variant-ligatures:normal;font-variant-caps:normal;font-variant-numeric:normal;font-variant-east-asian:normal;writing-mode:lr-tb;direction:ltr;fill:#ffffff;fill-opacity:1;stroke:#ffffff;stroke-width:0.776333;stroke-dasharray:none;stroke-opacity:1"
+           x="225.00325"
+           y="938.76276"
+           id="text176-7-8-7-6-7-3-5-8-8"
+           transform="scale(1.0669952,0.93721133)"><tspan
+             sodipodi:role="line"
+             id="tspan176-0-6-3-57-87-7-0-5-3"
+             x="225.00325"
+             y="938.76276"
+             style="fill:#ffffff;fill-opacity:1;stroke:#ffffff;stroke-width:0.776333;stroke-opacity:1">$20</tspan></text>
+      </g>
+    </g>
+    <g
+       id="g3-7-1-0-2"
+       transform="translate(928.7813,326.1875)">
+      <g
+         id="g2-7-00-3-5-2-7"
+         transform="matrix(1.1231108,0,0,1.1813247,240.60756,-487.69765)">
+        <rect
+           style="fill:#0000ff;fill-opacity:1;stroke:#000000;stroke-width:0.413714;stroke-dasharray:none;stroke-opacity:1"
+           id="rect176-3-0-5-3-8-18-9-7-5-4-3"
+           width="40.738113"
+           height="23.35067"
+           x="236.25764"
+           y="863.12384" />
+        <text
+           xml:space="preserve"
+           style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:16.2731px;font-family:Sans;-inkscape-font-specification:'Sans, Normal';font-variant-ligatures:normal;font-variant-caps:normal;font-variant-numeric:normal;font-variant-east-asian:normal;writing-mode:lr-tb;direction:ltr;fill:#ffffff;fill-opacity:1;stroke:#ffffff;stroke-width:0.776333;stroke-dasharray:none;stroke-opacity:1"
+           x="225.00325"
+           y="938.76276"
+           id="text176-7-8-7-6-7-3-5-8-8-7"
+           transform="scale(1.0669952,0.93721133)"><tspan
+             sodipodi:role="line"
+             id="tspan176-0-6-3-57-87-7-0-5-3-9"
              x="225.00325"
              y="938.76276"
              style="fill:#ffffff;fill-opacity:1;stroke:#ffffff;stroke-width:0.776333;stroke-opacity:1">$20</tspan></text>

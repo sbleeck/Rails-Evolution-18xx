@@ -2152,9 +2152,7 @@ public class ORPanel extends GridPanel
             }
             List<PossibleAction> executedActions = ((ActionTaker) source).getPossibleActions();
             if (executedActions == null || executedActions.isEmpty()) {
-            } else if (executedActions.get(0) instanceof net.sf.rails.game.specific._1817.action.LoanAction) {
-                processTakeLoans_1817((net.sf.rails.game.specific._1817.action.LoanAction) executedActions.get(0));
-                return;
+           
             } else if (executedActions.get(0) instanceof net.sf.rails.game.specific._1817.action.RepayLoans_1817) {
                 processRepayLoans_1817(
                         (net.sf.rails.game.specific._1817.action.RepayLoans_1817) executedActions.get(0));
@@ -2210,77 +2208,6 @@ public class ORPanel extends GridPanel
         }
     }
 
-    private void processTakeLoans_1817(net.sf.rails.game.specific._1817.action.LoanAction action) {
-        String compId = action.getCompanyId();
-        int max = action.getMaxLoansAllowed();
-
-        net.sf.rails.game.CompanyManager cm = orUIManager.getGameUIManager().getRoot().getCompanyManager();
-        net.sf.rails.game.PublicCompany comp = cm.getPublicCompany(compId);
-        int current = comp.getNumberOfBonds();
-        int available = max - current;
-
-        if (available <= 0) {
-            javax.swing.JOptionPane.showMessageDialog(this, comp.getId() + " is at its loan limit (" + max + ").");
-            return;
-        }
-
-        String[] options = new String[available];
-        for (int i = 0; i < available; i++) {
-            options[i] = String.valueOf(i + 1);
-        }
-
-        String selected = (String) javax.swing.JOptionPane.showInputDialog(this,
-                "Select number of loans for " + comp.getId() + ":\n(Current: " + current + ", Max: " + max + ")",
-                "Take Loans", javax.swing.JOptionPane.QUESTION_MESSAGE, null, options, options[0]);
-
-        if (selected != null) {
-            action.setLoansToTake(Integer.parseInt(selected));
-            // Cast back to PossibleAction for the manager
-            orUIManager.processAction("TakeLoans",
-                    java.util.Collections.singletonList((rails.game.action.PossibleAction) action), this);
-        }
-    }
-
-    private void processTakeLoans_1817(PossibleAction action) {
-        try {
-            String compId = (String) action.getClass().getMethod("getCompanyId").invoke(action);
-            int max = (Integer) action.getClass().getMethod("getMaxLoansAllowed").invoke(action);
-            net.sf.rails.game.CompanyManager cm = orUIManager.getGameUIManager().getRoot().getCompanyManager();
-            net.sf.rails.game.PublicCompany comp = cm.getPublicCompany(compId);
-            int current = comp.getNumberOfBonds();
-            int available = max - current;
-
-            if (available <= 0) {
-                JOptionPane.showMessageDialog(this, comp.getId() + " is at its loan limit (" + max + ").");
-                return;
-            }
-
-            String[] options = new String[available];
-            for (int i = 0; i < available; i++) {
-                options[i] = String.valueOf(i + 1);
-            }
-
-            String selected = (String) JOptionPane.showInputDialog(this,
-                    "Select number of loans for " + comp.getId() + ":\n(Current: " + current + ", Max: " + max + ")",
-                    "Take Loans", JOptionPane.QUESTION_MESSAGE, null, options, options[0]);
-
-            if (selected != null) {
-                action.getClass().getMethod("setLoansToTake", int.class).invoke(action, Integer.parseInt(selected));
-                orUIManager.processAction("TakeLoans", java.util.Collections.singletonList(action), this);
-            } else {
-                // Re-enable the button if the user cancels the dialog
-                if (specialActionsButtonPanel != null) {
-                    for (Component c : specialActionsButtonPanel.getComponents()) {
-                        if (c instanceof ActionButton) {
-                            ((ActionButton) c).setEnabled(true);
-                        }
-                    }
-                }
-            }
-        } catch (Exception ex) {
-            log.error("Failed to process TakeLoans_1817 in ORPanel", ex);
-        }
-    }
 
     private boolean isActionListEmpty(ActionButton btn) {
         return btn.getPossibleActions() == null || btn.getPossibleActions().isEmpty();

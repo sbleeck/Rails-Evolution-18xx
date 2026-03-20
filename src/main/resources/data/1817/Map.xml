@@ -76,7 +76,7 @@
 	<Hex name="E16" tile="0" cost="15"/>
 	<Hex name="E18" tile="0" cost="15"/>
 	<Hex name="E20" tile="0"/>	
-<Hex name="E22" tile="212121" orientation="1" city="New York"/>
+<Hex name="E22" tile="212121" orientation="1" cost="20" city="New York"/>
 
 	<Hex name="F1" tile="-910"/>	
 	<Hex name="F3" tile="-10" city="Indianapolis"/>

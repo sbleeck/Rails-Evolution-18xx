@@ -218,10 +218,9 @@ public class AuctionRound_1817 extends Round {
                 }
             }
         } else {
-            // IPO bidding is based on personal cash
-            canAfford = currentPlayer != null && currentPlayer.getCash() >= minNextBid;
+            // IPO bidding is based on purchase power (cash + private companies)
+            canAfford = currentPlayer != null && getPurchasePower(currentPlayer) >= minNextBid;
         }
-
         if (currentPlayer != null && canAfford) {
             int actualMaxBid = 9990;
             // The president of the company being sold in M&A can only bid +10
@@ -233,6 +232,16 @@ public class AuctionRound_1817 extends Round {
         }
 
         return true;
+    }
+
+    private int getPurchasePower(Player player) {
+        if (player == null)
+            return 0;
+        int power = player.getCash();
+        for (net.sf.rails.game.PrivateCompany pc : player.getPortfolioModel().getPrivateCompanies()) {
+            power += pc.getBasePrice();
+        }
+        return power;
     }
 
     @Override
@@ -407,12 +416,10 @@ public class AuctionRound_1817 extends Round {
             int index = currentPlayerIndex.value() % activeBidders.size();
             Player candidate = activeBidders.get(index);
 
-            if (candidate.getCash() >= minNextBid) {
+            if (getPurchasePower(candidate) >= minNextBid) {
                 return;
             }
 
-            log.info("AUCTION_LOG: Auto-skipping {} (insufficient funds: has ${}, needs ${}).",
-                    candidate.getName(), candidate.getCash(), minNextBid);
             activeBidders.remove(index);
 
             if (!activeBidders.isEmpty()) {
@@ -462,70 +469,76 @@ public class AuctionRound_1817 extends Round {
             }
         } else {
 
-           // Bank Liquidation: Assets (Trains, Tokens, Privates) are discarded.
-for (net.sf.rails.game.BaseToken token : new java.util.ArrayList<>(target.getLaidBaseTokens())) {
-// Moving the token back to the company automatically removes it from the MapHex Stop
-token.moveTo(target);
-}
+            // Bank Liquidation: Assets (Trains, Tokens, Privates) are discarded.
+            for (net.sf.rails.game.BaseToken token : new java.util.ArrayList<>(target.getLaidBaseTokens())) {
+                // Moving the token back to the company automatically removes it from the MapHex
+                // Stop
+                token.moveTo(target);
+            }
 
-        for (net.sf.rails.game.Train train : new java.util.ArrayList<>(target.getTrains())) {
-            train.moveTo(gameManager.getRoot().getBank().getPool()); // Discard train
-        }
-        
-        for (net.sf.rails.game.PrivateCompany pc : new java.util.ArrayList<>(target.getPrivates())) {
-            pc.setClosed(); // Close private company
+            for (net.sf.rails.game.Train train : new java.util.ArrayList<>(target.getTrains())) {
+                train.moveTo(gameManager.getRoot().getBank().getPool()); // Discard train
+            }
+
+            for (net.sf.rails.game.PrivateCompany pc : new java.util.ArrayList<>(target.getPrivates())) {
+                pc.setClosed(); // Close private company
+            }
+
+            target.setCash_AI(0); // Bank takes the cash for debt settlement
         }
 
-        target.setCash_AI(0); // Bank takes the cash for debt settlement
-    }
+        // 3. Debt Resolution (Liquidation specific)
+        int surplusForShareholders = finalBid;
+        if (type == AuctionType.LIQUIDATION) {
+            int totalDebt = targetLoans * 100;
+            int availableFunds = targetCash + finalBid;
 
-    // 3. Debt Resolution (Liquidation specific)
-    int surplusForShareholders = finalBid;
-    if (type == AuctionType.LIQUIDATION) {
-        int totalDebt = targetLoans * 100;
-        int availableFunds = targetCash + finalBid;
-        
-        if (availableFunds >= totalDebt) {
-            surplusForShareholders = availableFunds - totalDebt;
-            log.info("M&A SALE: Liquidation debts cleared. Surplus: ${}", surplusForShareholders);
-        } else {
-            surplusForShareholders = 0;
-            int shortfall = totalDebt - availableFunds;
-            Player president = target.getPresident();
-            log.warn("M&A SALE: Liquidation shortfall of ${}. President {} must pay.", shortfall, president.getName());
-            // Deduct from president. If cash goes negative, Cash Crisis handles it later.
-            president.setCash_AI(president.getCash() - shortfall);
+            if (availableFunds >= totalDebt) {
+                surplusForShareholders = availableFunds - totalDebt;
+                log.info("M&A SALE: Liquidation debts cleared. Surplus: ${}", surplusForShareholders);
+            } else {
+                surplusForShareholders = 0;
+                int shortfall = totalDebt - availableFunds;
+                Player president = target.getPresident();
+                log.warn("M&A SALE: Liquidation shortfall of ${}. President {} must pay.", shortfall,
+                        president.getName());
+                // Deduct from president. If cash goes negative, Cash Crisis handles it later.
+                president.setCash_AI(president.getCash() - shortfall);
+            }
         }
-    }
 
-    // 4. Shareholder and Short Seller Settlement
-    int shareCount = target.getShareCount();
-    int payoutPerShare = surplusForShareholders / shareCount;
-    
-    for (Player p : gameManager.getRoot().getPlayerManager().getPlayers()) {
-        int sharesOwned = 0;
-        
-        List<net.sf.rails.game.financial.PublicCertificate> certs = new java.util.ArrayList<>(p.getPortfolioModel().getCertificates(target));
-        for (net.sf.rails.game.financial.PublicCertificate cert : certs) {
-            // TODO: Implement specific ShortCertificate_1817 logic here once the class is created.
-            // if (cert instanceof net.sf.rails.game.specific._1817.financial.ShortCertificate_1817) {
-            //     int shortShares = cert.getShare() / target.getShareUnit();
-            //     int debt = shortShares * payoutPerShare;
-            //     p.setCash_AI(p.getCash() - debt);
-            //     cert.moveTo(gameManager.getRoot().getBank().getPool());
-            //     continue;
-            // }
+        // 4. Shareholder and Short Seller Settlement
+        int shareCount = target.getShareCount();
+        int payoutPerShare = surplusForShareholders / shareCount;
 
-            // Assume all remaining certs are standard long shares for now
-            sharesOwned += cert.getShare() / target.getShareUnit();
-            cert.moveTo(gameManager.getRoot().getBank().getPool()); // Return to bank
+        for (Player p : gameManager.getRoot().getPlayerManager().getPlayers()) {
+            int sharesOwned = 0;
+
+            List<net.sf.rails.game.financial.PublicCertificate> certs = new java.util.ArrayList<>(
+                    p.getPortfolioModel().getCertificates(target));
+            for (net.sf.rails.game.financial.PublicCertificate cert : certs) {
+                // TODO: Implement specific ShortCertificate_1817 logic here once the class is
+                // created.
+                // if (cert instanceof
+                // net.sf.rails.game.specific._1817.financial.ShortCertificate_1817) {
+                // int shortShares = cert.getShare() / target.getShareUnit();
+                // int debt = shortShares * payoutPerShare;
+                // p.setCash_AI(p.getCash() - debt);
+                // cert.moveTo(gameManager.getRoot().getBank().getPool());
+                // continue;
+                // }
+
+                // Assume all remaining certs are standard long shares for now
+                sharesOwned += cert.getShare() / target.getShareUnit();
+                cert.moveTo(gameManager.getRoot().getBank().getPool()); // Return to bank
+            }
+
+            if (sharesOwned > 0) {
+                p.setCash_AI(p.getCash() + (sharesOwned * payoutPerShare));
+                log.info("M&A SALE: Paid {} ${} for {} shares.", p.getName(), sharesOwned * payoutPerShare,
+                        sharesOwned);
+            }
         }
-        
-        if (sharesOwned > 0) {
-            p.setCash_AI(p.getCash() + (sharesOwned * payoutPerShare));
-            log.info("M&A SALE: Paid {} ${} for {} shares.", p.getName(), sharesOwned * payoutPerShare, sharesOwned);
-        }
-    }
         // 5. Close Company [cite: 852]
         target.setClosed();
     }

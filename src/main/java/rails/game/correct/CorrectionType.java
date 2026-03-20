@@ -16,6 +16,11 @@ public enum CorrectionType {
         public CorrectionManager newCorrectionManager(GameManager gm)
         {return MapCorrectionManager.create(gm);}
     },
+
+    MOVE_PRIVATE {
+public CorrectionManager newCorrectionManager(GameManager gm)
+{return PrivateMoveCorrectionManager.create(gm);}
+},
     
     CORRECT_TRAINS {
         public CorrectionManager newCorrectionManager(GameManager gm)

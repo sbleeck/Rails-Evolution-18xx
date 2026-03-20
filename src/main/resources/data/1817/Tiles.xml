@@ -9,7 +9,7 @@
 <Tiles>
     <Tile colour="white" id="0" name="empty"/>
     <Tile colour="white" id="-10" name="1 city">
-        <Station id="city1" position="302" slots="1" type="City"/>
+        <Station id="city1" position="0" slots="1" type="City"/>
     </Tile>
 
     <Tile colour="red" id="-5" name="Chicago">

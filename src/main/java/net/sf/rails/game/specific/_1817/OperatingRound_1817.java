@@ -77,21 +77,20 @@ public class OperatingRound_1817 extends OperatingRound {
     }
 
 
-    // ... (lines of unchanged context code) ...
-    @Override
+ @Override
     public void start() {
         super.start();
 
-        // Rule 1.2.6: Mail Contracts only pay if the company has one or more trains.
-        // Rule 6.2: This is paid at the start of the OR.
+        // The base engine automatically pays out private company revenues at the start of the OR.
+        // We unconditionally refund the automatic payout here so we can pay it conditionally
+        // at the start of each company's turn as requested.
         for (PublicCompany comp : gameManager.getAllPublicCompanies()) {
-            if (comp.hasStarted() && !comp.isClosed() && comp.getPortfolioModel().getNumberOfTrains() == 0) {
+            if (comp.hasStarted() && !comp.isClosed()) {
                 for (net.sf.rails.game.PrivateCompany priv : comp.getPortfolioModel().getPrivateCompanies()) {
                     String pid = priv.getId();
                     int refund = 0;
 
                     // Assuming XML IDs: MMC (Minor), MC (Regular), MaMC (Major)
-                    // Rule 1.2.6: $10, $15, $20 payouts [cite: 259]
                     if (pid.startsWith("MMC"))
                         refund = 10;
                     else if (pid.startsWith("MC") && !pid.startsWith("MJM")) // Avoid MJM coal mine
@@ -99,18 +98,13 @@ public class OperatingRound_1817 extends OperatingRound {
                     else if (pid.startsWith("MaMC"))
                         refund = 20;
 
-
                     if (refund > 0) {
                         net.sf.rails.game.state.Currency.toBank(comp, refund);
-                        net.sf.rails.common.ReportBuffer.add(gameManager,
-                                comp.getId() + " refunds $" + refund + " for " + pid + " (no trains).");
-                        log.info("1817_TRACE: Refunded ${} to {} due to no trains.", refund, comp.getId());
                     }
                 }
             }
         }
     }
-// ... (rest of the method) ...
 
     @Override
     protected void finishTurn() {
@@ -120,7 +114,6 @@ public class OperatingRound_1817 extends OperatingRound {
         // Rule 6.10: Check for Liquidation if no trains
         PublicCompany comp = operatingCompany.value();
         if (comp != null && !comp.isClosed() && comp.getPortfolioModel().getNumberOfTrains() == 0) {
-            log.info("1817_TRACE: Company {} ended turn with no trains. Liquidating.", comp.getId());
             net.sf.rails.common.ReportBuffer.add(this,
                     comp.getId() + " ends its turn without a train and goes into liquidation.");
             handleImmediateLiquidation(
@@ -240,7 +233,6 @@ public class OperatingRound_1817 extends OperatingRound {
             for (net.sf.rails.game.PrivateCompany priv : company.getPortfolioModel().getPrivateCompanies()) {
                 if ("OBC40".equals(priv.getId()) || "UBC80".equals(priv.getId())) {
                     cost -= 10;
-                    log.info("1817_TRACE: {} river fee waived via {}", company.getId(), priv.getId());
                     break;
                 }
             }
@@ -264,7 +256,6 @@ public class OperatingRound_1817 extends OperatingRound {
             SpecialProperty specialProp = action.getSpecialProperty();
             if (specialProp != null && specialProp.getParent() != null) {
                 if ("PSM40".equals(specialProp.getParent().getId())) {
-                    log.info("1817_TRACE: PSM40 special tile lay exercised on {}", hex.getId());
                     specialProp.setExercised(true);
                     tilesLaidThisTurn.set(tilesLaidThisTurn.value() + 1);
                 }
@@ -300,7 +291,6 @@ public class OperatingRound_1817 extends OperatingRound {
             // We must reset this flag to trick the UI into accepting the second click.
             if (tilesLaidThisTurn.value() < 2) {
                 normalTileLaidThisTurn.set(false);
-                log.info("1817_TRACE: Reset normalTileLaidThisTurn to unblock UI MapWindow.");
             }
         }
 
@@ -348,10 +338,8 @@ public class OperatingRound_1817 extends OperatingRound {
 
     @Override
     public boolean processGameSpecificAction(PossibleAction action) {
-        log.info("1817_TRACE: processGameSpecificAction() called with action: {}", action.getClass().getSimpleName());
         if (action instanceof net.sf.rails.game.specific._1817.action.DeclineCoalToken_1817) {
             if (offeringCoalMineHex.value() != null) {
-                log.info("1817_TRACE: Player declined Coal Mine on {}", offeringCoalMineHex.value());
                 resolvedCoalMineHexes.add(offeringCoalMineHex.value());
                 offeringCoalMineHex.set(null); // Release the interrupt lock
             }
@@ -383,14 +371,11 @@ public class OperatingRound_1817 extends OperatingRound {
                         // Explicitly direct the coal mine to the 'CoalMine' slot
 
                         hex.layBonusToken(coalToken, gameManager.getRoot().getPhaseManager());
-                        log.info("1817_TRACE: Created token with URI: {} and Name: {}, Value: {}",
-                                coalToken.getFullURI(), coalToken.getName(), coalToken.getValue());
                     }
                 }
 
                 net.sf.rails.common.ReportBuffer
                         .add(this, comp.getId() + " places a Coal Mine on " + hex.getId() + " and is refunded $15.");
-                log.info("1817_TRACE: Placed coal mine on hex {}. Refunded $15 to {}.", hex.getId(), comp.getId());
 
                 // Release the interrupt lock
                 if (offeringCoalMineHex.value() != null) {
@@ -407,67 +392,31 @@ public class OperatingRound_1817 extends OperatingRound {
         if (action instanceof net.sf.rails.game.specific._1817.action.TakeLoans_1817) {
             net.sf.rails.game.specific._1817.action.TakeLoans_1817 tlAction = (net.sf.rails.game.specific._1817.action.TakeLoans_1817) action;
             PublicCompany comp = companyManager.getPublicCompany(tlAction.getCompanyId());
+
             int count = tlAction.getLoansToTake();
 
-            log.info("1817_TRACE: Processing TakeLoans_1817. Company: {}, Count: {}", comp.getId(), count);
+            if (comp.isClosed() || (comp.hasStockPrice() && comp.getCurrentSpace().getPrice() == 0)) {
+                log.error("1817_ERROR: Company {} in liquidation cannot take loans.", comp.getId());
+                return false;
+            }
 
-            if (count > 0) {
-                if (comp.isClosed() || (comp.hasStockPrice() && comp.getCurrentSpace().getPrice() == 0)) {
-                    log.error("1817_ERROR: Company {} in liquidation cannot take loans.", comp.getId());
-                    return false;
-                }
+            // Rule 6.1: Cannot take loans between paying interest and repaying loans
+            if (interestPaidThisTurn.value() && !repayPhaseDoneThisTurn.value()) {
+                log.error("1817_ERROR: Company {} attempted to take loans during the blackout period.", comp.getId());
+                return false;
+            }
 
-                // Rule 6.1: Cannot take loans between paying interest and repaying loans
-                if (interestPaidThisTurn.value() && !repayPhaseDoneThisTurn.value()) {
-                    log.error("1817_ERROR: Company {} attempted to take loans during the blackout period.",
-                            comp.getId());
-                    return false;
-                }
+            if (comp instanceof net.sf.rails.game.specific._1817.PublicCompany_1817) {
+                net.sf.rails.game.specific._1817.PublicCompany_1817 comp1817 = (net.sf.rails.game.specific._1817.PublicCompany_1817) comp;
 
-                int currentLoans = comp.getNumberOfBonds();
-                if (currentLoans + count > tlAction.getMaxLoansAllowed()) {
-                    log.error("1817_ERROR: {} loan capacity exceeded. Current: {}, Requested: {}, Max: {}",
-                            comp.getId(), currentLoans, count, tlAction.getMaxLoansAllowed());
-                    return false;
-                }
+                // Execute the centralized loan logic
+                comp1817.executeLoan();
 
-                if (comp instanceof net.sf.rails.game.specific._1817.PublicCompany_1817) {
-                    net.sf.rails.game.specific._1817.PublicCompany_1817 comp1817 = (net.sf.rails.game.specific._1817.PublicCompany_1817) comp;
-                    comp1817.setNumberOfBonds(currentLoans + count);
-                    int loanAmount = count * 100;
-                    comp1817.addCashFromBank(loanAmount, gameManager.getRoot().getBank());
-
-                    log.info("1817_OR: {} took {} loans. Triggering LEFT move.", comp.getId(), count);
-                    // Rule 6.1: Move the stock price left one space at the time each loan is taken.
-                    net.sf.rails.game.financial.StockMarket market = getRoot().getStockMarket();
-                    net.sf.rails.game.financial.StockSpace space = comp.getCurrentSpace();
-                    
-                    int row = space.getRow();
-                    int col = space.getColumn();
-                    for (int i = 0; i < count; i++) {
-                        int nextRow = row - 1;
-                        while (nextRow > 0 && market.getStockSpace(nextRow, col) == null) {
-                            nextRow--;
-                        }
-                        net.sf.rails.game.financial.StockSpace pot = market.getStockSpace(nextRow, col);
-                        if (pot != null && !pot.getId().equalsIgnoreCase("A1")) {
-                            row = nextRow;
-                        }
-                    }
-                    net.sf.rails.game.financial.StockSpace target = market.getStockSpace(row, col);
-//
-                    
-                    if (target != null && target != space) {
-                        market.correctStockPrice(comp, target);
-                    }
-
-
-                    net.sf.rails.common.ReportBuffer.add(this, comp.getId() + " took " + count + " loans.");
-                    log.info("1817_TRACE: TakeLoans_1817 successful for {}.", comp.getId());
-                    return true;
-                }
+                net.sf.rails.common.ReportBuffer.add(this, comp.getId() + " took 1 loan.");
+                return true;
             }
             return false;
+            // --- END FIX ---
         }
 
         if (action instanceof net.sf.rails.game.specific._1817.action.LayBridgeToken_1817) {
@@ -495,10 +444,8 @@ public class OperatingRound_1817 extends OperatingRound {
                 hex.layBonusToken(bridgeToken, gameManager.getRoot().getPhaseManager());
 
                 net.sf.rails.common.ReportBuffer.add(this, comp.getId() + " places a Bridge Token on " + hex.getId());
-                log.info("1817_TRACE: Bridge placed on {} by {}.", hex.getId(), comp.getId());
                 return true;
             }
-
 
             return false;
         }
@@ -507,15 +454,13 @@ public class OperatingRound_1817 extends OperatingRound {
             net.sf.rails.game.specific._1817.action.PayLoanInterest_1817 payAction = (net.sf.rails.game.specific._1817.action.PayLoanInterest_1817) action;
             PublicCompany comp = companyManager.getPublicCompany(payAction.getCompanyName());
 
-            log.info("1817_TRACE: Processing PayLoanInterest_1817. Company: {}, Interest Due: {}, Cash: {}",
-                    comp.getId(), payAction.getInterestDue(), comp.getCash());
+
 
             if (comp.getCash() >= payAction.getInterestDue()) {
                 net.sf.rails.game.state.Currency.toBank(comp, payAction.getInterestDue());
                 net.sf.rails.common.ReportBuffer.add(this,
                         comp.getId() + " pays $" + payAction.getInterestDue() + " in loan interest.");
                 interestPaidThisTurn.set(true);
-                log.info("1817_TRACE: PayLoanInterest_1817 successful. State interestPaidThisTurn set to TRUE.");
                 return true;
             } else {
                 log.error("1817_ERROR: {} does not have enough cash (${}) to pay interest (${}).", comp.getId(),
@@ -529,7 +474,6 @@ public class OperatingRound_1817 extends OperatingRound {
             net.sf.rails.game.PublicCompany comp = companyManager.getPublicCompany(rlAction.getCompanyId());
             int count = rlAction.getLoansToRepay();
 
-            log.info("1817_TRACE: Processing RepayLoans_1817. Company: {}, Loans to Repay: {}", comp.getId(), count);
 
             if (count > 0) {
                 int cost = count * 100;
@@ -539,7 +483,8 @@ public class OperatingRound_1817 extends OperatingRound {
                         net.sf.rails.game.specific._1817.PublicCompany_1817 comp1817 = (net.sf.rails.game.specific._1817.PublicCompany_1817) comp;
                         comp1817.setNumberOfBonds(comp1817.getNumberOfBonds() - count);
 
-                        // Rule 6.9: Stock price is moved one space to the right as each loan is paid off.
+                        // Rule 6.9: Stock price is moved one space to the right as each loan is paid
+                        // off.
                         net.sf.rails.game.financial.StockMarket market = getRoot().getStockMarket();
                         net.sf.rails.game.financial.StockSpace space = comp.getCurrentSpace();
                         int row = space.getRow();
@@ -557,7 +502,6 @@ public class OperatingRound_1817 extends OperatingRound {
                     }
                     net.sf.rails.common.ReportBuffer.add(this,
                             comp.getId() + " repays " + count + " loan(s) for $" + cost + ".");
-                    log.info("1817_TRACE: RepayLoans_1817 successful for {}.", comp.getId());
                     return true;
                 } else {
                     log.error("1817_ERROR: {} lacks cash to repay {} loans. Needed: {}, Has: {}", comp.getId(), count,
@@ -570,8 +514,7 @@ public class OperatingRound_1817 extends OperatingRound {
             return handleImmediateLiquidation((net.sf.rails.game.specific._1817.action.LiquidateCompany_1817) action);
         }
 
-        log.info("1817_TRACE: Action {} not handled by processGameSpecificAction, delegating to superclass.",
-                action.getClass().getSimpleName());
+
         return super.processGameSpecificAction(action);
     }
 
@@ -596,7 +539,48 @@ public class OperatingRound_1817 extends OperatingRound {
         upgradesThisTurn.set(0);
         hexesLaidThisTurn.clear();
         offeringCoalMineHex.set(null);
-        log.info("1817_TRACE: Turn initialized for {}. Flags reset.", operatingCompany.value().getId());
+
+        // Mail Contracts pay out at the beginning of the company's turn if it has a real train.
+       // We explicitly iterate over the train portfolio to filter out "private papers" (e.g., Mail Contracts) 
+        // that the base engine might be incorrectly classifying as trains.
+        PublicCompany comp = operatingCompany.value();
+        if (comp != null && !comp.isClosed()) {
+            boolean hasRealTrain = false;
+            if (comp.getPortfolioModel() != null && comp.getPortfolioModel().getTrainList() != null) {
+                for (net.sf.rails.game.Train t : comp.getPortfolioModel().getTrainList()) {
+                    // 1817 trains always contain a digit (2, 2+, 3, etc.). Private papers do not.
+                    if (t.getName() != null && t.getName().matches(".*\\d.*")) {
+                        hasRealTrain = true;
+                        break;
+                    }
+                }
+            }
+            if (hasRealTrain) {
+                for (net.sf.rails.game.PrivateCompany priv : comp.getPortfolioModel().getPrivateCompanies()) {
+                    String pid = priv.getId();
+                    int payout = 0;
+
+                    if (pid.startsWith("MMC"))
+                        payout = 10;
+                    else if (pid.startsWith("MC") && !pid.startsWith("MJM"))
+                        payout = 15;
+                    else if (pid.startsWith("MaMC"))
+                        payout = 20;
+
+                    if (payout > 0) {
+                        if (comp instanceof net.sf.rails.game.specific._1817.PublicCompany_1817) {
+                            ((net.sf.rails.game.specific._1817.PublicCompany_1817) comp).addCashFromBank(payout,
+                                    gameManager.getRoot().getBank());
+                        } else {
+                            net.sf.rails.game.state.Currency.wire(gameManager.getRoot().getBank(), payout, comp);
+                        }
+                        net.sf.rails.common.ReportBuffer.add(this,
+                                comp.getId() + " receives $" + payout + " for " + pid + " (Mail Contract).");
+                    }
+                }
+            }
+        }
+
     }
 
     @Override
@@ -608,13 +592,11 @@ public class OperatingRound_1817 extends OperatingRound {
                 if (getStep() == net.sf.rails.game.GameDef.OrStep.BUY_TRAIN) {
 
                     if (!trainBuyingDone.value()) {
-                        log.info("1817_TRACE: Intercepted DONE/SKIP. Finalizing Train Phase.");
                         trainBuyingDone.set(true);
                         return true; // Stay in OR to process interest
                     }
 
                     if (interestPaidThisTurn.value() && !repayPhaseDoneThisTurn.value()) {
-                        log.info("1817_TRACE: Intercepted DONE/SKIP. Finalizing Repayment Phase.");
                         repayPhaseDoneThisTurn.set(true);
                         return true; // Stay in OR for post-repayment loan window
                     }
@@ -626,115 +608,120 @@ public class OperatingRound_1817 extends OperatingRound {
             PublicCompany comp = sd.getCompany();
             net.sf.rails.game.financial.StockSpace oldSpace = comp.getCurrentSpace();
 
-            
+            // 1. Record cash states before base engine messes it up
+            int preCompCash = comp.getCash();
+            net.sf.rails.game.financial.Bank bank = getRoot().getBank();
+            List<net.sf.rails.game.Player> players = getRoot().getPlayerManager().getPlayers();
+            java.util.Map<net.sf.rails.game.Player, Integer> prePlayerCash = new java.util.HashMap<>();
+            for (net.sf.rails.game.Player p : players)
+                prePlayerCash.put(p, p.getCash());
 
-// 1. Record cash states before base engine messes it up
-int preCompCash = comp.getCash();
-net.sf.rails.game.financial.Bank bank = getRoot().getBank();
-List<net.sf.rails.game.Player> players = getRoot().getPlayerManager().getPlayers();
-java.util.Map<net.sf.rails.game.Player, Integer> prePlayerCash = new java.util.HashMap<>();
-for (net.sf.rails.game.Player p : players) prePlayerCash.put(p, p.getCash());
+            // Execute the superclass logic ONCE to advance game state
+            boolean result = super.process(sd);
 
-        // Execute the superclass logic ONCE to advance game state
-        boolean result = super.process(sd);
-        
-        if (result && oldSpace != null) {
-            log.info("1817_OR: Processing Dividend Movement for {}. Revenue: {}, Alloc: {}",
-                    comp.getId(), sd.getActualRevenue(), sd.getRevenueAllocation());
+            if (result && oldSpace != null) {
+                log.info("1817_OR: Processing Dividend Movement for {}. Revenue: {}, Alloc: {}",
+                        comp.getId(), sd.getActualRevenue(), sd.getRevenueAllocation());
 
-            // 2. Revert base engine cash changes
-            int diffComp = comp.getCash() - preCompCash;
-            if (diffComp > 0) net.sf.rails.game.state.Currency.toBank(comp, diffComp);
-            else if (diffComp < 0) net.sf.rails.game.state.Currency.wire(bank, -diffComp, comp);
+                // 2. Revert base engine cash changes
+                int diffComp = comp.getCash() - preCompCash;
+                if (diffComp > 0)
+                    net.sf.rails.game.state.Currency.toBank(comp, diffComp);
+                else if (diffComp < 0)
+                    net.sf.rails.game.state.Currency.wire(bank, -diffComp, comp);
 
-            for (net.sf.rails.game.Player p : players) {
-                int diffP = p.getCash() - prePlayerCash.get(p);
-                if (diffP > 0) net.sf.rails.game.state.Currency.toBank(p, diffP);
-                else if (diffP < 0) net.sf.rails.game.state.Currency.wire(bank, -diffP, p);
-            }
-
-            // 3. Apply strict 1817 cash distributions
-            int revenue = sd.getActualRevenue();
-            int alloc = sd.getRevenueAllocation();
-            int shareCount = (comp instanceof net.sf.rails.game.specific._1817.PublicCompany_1817)
-                    ? ((net.sf.rails.game.specific._1817.PublicCompany_1817) comp).getShareCount()
-                    : 10;
-
-            int trueTreasuryAmount = 0;
-            int truePerShare = 0;
-
-            if (alloc == rails.game.action.SetDividend.PAYOUT) {
-                trueTreasuryAmount = 0;
-                truePerShare = revenue / shareCount;
-            } else if (alloc == rails.game.action.SetDividend.SPLIT) {
-                if (shareCount == 10) {
-                    truePerShare = (((revenue / 2) + 9) / 10);
-                    trueTreasuryAmount = revenue - (truePerShare * 10);
-                } else {
-                    trueTreasuryAmount = revenue / 2;
-                    int totalToShares = revenue - trueTreasuryAmount;
-                    truePerShare = totalToShares / shareCount;
+                for (net.sf.rails.game.Player p : players) {
+                    int diffP = p.getCash() - prePlayerCash.get(p);
+                    if (diffP > 0)
+                        net.sf.rails.game.state.Currency.toBank(p, diffP);
+                    else if (diffP < 0)
+                        net.sf.rails.game.state.Currency.wire(bank, -diffP, p);
                 }
-            } else {
-                trueTreasuryAmount = revenue;
-                truePerShare = 0;
-            }
 
-            if (trueTreasuryAmount > 0) {
-                net.sf.rails.game.state.Currency.wire(bank, trueTreasuryAmount, comp);
-            }
-            
-            // Pay treasury for its own shares
-            int treasuryShares = 0;
-            for (net.sf.rails.game.financial.PublicCertificate cert : comp.getCertificates()) {
-                if (cert.getOwner() == comp && !cert.isPresidentShare()) {
-                    treasuryShares += cert.getShare() / comp.getShareUnit();
-                }
-            }
-            if (treasuryShares > 0 && truePerShare > 0) {
-                net.sf.rails.game.state.Currency.wire(bank, treasuryShares * truePerShare, comp);
-            }
+                // 3. Apply strict 1817 cash distributions
+                int revenue = sd.getActualRevenue();
+                int alloc = sd.getRevenueAllocation();
+                int shareCount = (comp instanceof net.sf.rails.game.specific._1817.PublicCompany_1817)
+                        ? ((net.sf.rails.game.specific._1817.PublicCompany_1817) comp).getShareCount()
+                        : 10;
 
-            for (net.sf.rails.game.Player p : players) {
-                int sharesOwned = 0;
-                int shortShares = 0;
-                for (net.sf.rails.game.financial.PublicCertificate cert : p.getPortfolioModel().getCertificates(comp)) {
-if (cert instanceof net.sf.rails.game.specific._1817.ShortCertificate) {
-                        shortShares += 1;
+                int trueTreasuryAmount = 0;
+                int truePerShare = 0;
+
+                if (alloc == rails.game.action.SetDividend.PAYOUT) {
+                    trueTreasuryAmount = 0;
+                    truePerShare = revenue / shareCount;
+                } else if (alloc == rails.game.action.SetDividend.SPLIT) {
+                    if (shareCount == 10) {
+                        truePerShare = (((revenue / 2) + 9) / 10);
+                        trueTreasuryAmount = revenue - (truePerShare * 10);
                     } else {
-                        sharesOwned += cert.getShare() / comp.getShareUnit();
+                        trueTreasuryAmount = revenue / 2;
+                        int totalToShares = revenue - trueTreasuryAmount;
+                        truePerShare = totalToShares / shareCount;
+                    }
+                } else {
+                    trueTreasuryAmount = revenue;
+                    truePerShare = 0;
+                }
+
+                if (trueTreasuryAmount > 0) {
+                    net.sf.rails.game.state.Currency.wire(bank, trueTreasuryAmount, comp);
+                }
+
+                // Pay treasury for its own shares
+                int treasuryShares = 0;
+                for (net.sf.rails.game.financial.PublicCertificate cert : comp.getCertificates()) {
+                    if (cert.getOwner() == comp && !cert.isPresidentShare()) {
+                        treasuryShares += cert.getShare() / comp.getShareUnit();
+                    }
+                }
+                if (treasuryShares > 0 && truePerShare > 0) {
+                    net.sf.rails.game.state.Currency.wire(bank, treasuryShares * truePerShare, comp);
+                }
+
+                for (net.sf.rails.game.Player p : players) {
+                    int sharesOwned = 0;
+                    int shortShares = 0;
+                    for (net.sf.rails.game.financial.PublicCertificate cert : p.getPortfolioModel()
+                            .getCertificates(comp)) {
+                        if (cert instanceof net.sf.rails.game.specific._1817.ShortCertificate) {
+                            shortShares += 1;
+                        } else {
+                            sharesOwned += cert.getShare() / comp.getShareUnit();
+                        }
+                    }
+
+                    if (sharesOwned > 0 && truePerShare > 0) {
+                        net.sf.rails.game.state.Currency.wire(bank, sharesOwned * truePerShare, p);
+                    }
+                    if (shortShares > 0 && truePerShare > 0) {
+                        int debt = shortShares * truePerShare;
+                        // Rule 7.4: Cash Crisis Trigger
+
+                        // Deduct the cash first
+                        net.sf.rails.game.state.Currency.toBank(p, debt);
+                        net.sf.rails.common.ReportBuffer.add(this,
+                                p.getName() + " pays $" + debt + " for short shares of " + comp.getId());
+
+                        // Rule 7.4: Cash Crisis Trigger Check
+                        if (p.getCash() < 0) {
+                            log.warn("1817_OR: CASH CRISIS triggered for {}. Shortfall: ${}", p.getName(),
+                                    Math.abs(p.getCash()));
+                            net.sf.rails.common.ReportBuffer.add(this, "CASH CRISIS: " + p.getName()
+                                    + " must raise funds. Shortfall: $" + Math.abs(p.getCash()));
+
+                            // Interrupt the current round and spawn the Cash Crisis wrapper
+                            CashCrisisRound_1817 crisisRound = gameManager.createRound(CashCrisisRound_1817.class,
+                                    "CashCrisis_" + p.getId());
+                            gameManager.setInterruptedRound(this);
+                            crisisRound.start(p);
+                        }
+
                     }
                 }
 
-                if (sharesOwned > 0 && truePerShare > 0) {
-                    net.sf.rails.game.state.Currency.wire(bank, sharesOwned * truePerShare, p);
-                }
-                if (shortShares > 0 && truePerShare > 0) {
-                    int debt = shortShares * truePerShare;
-                    // Rule 7.4: Cash Crisis Trigger
-  
-  // Deduct the cash first
-                    net.sf.rails.game.state.Currency.toBank(p, debt);
-                    net.sf.rails.common.ReportBuffer.add(this, p.getName() + " pays $" + debt + " for short shares of " + comp.getId());
-
-                    // Rule 7.4: Cash Crisis Trigger Check
-                    if (p.getCash() < 0) {
-                        log.warn("1817_OR: CASH CRISIS triggered for {}. Shortfall: ${}", p.getName(), Math.abs(p.getCash()));
-                        net.sf.rails.common.ReportBuffer.add(this, "CASH CRISIS: " + p.getName() + " must raise funds. Shortfall: $" + Math.abs(p.getCash()));
-                        
-                        // Interrupt the current round and spawn the Cash Crisis wrapper
-                        CashCrisisRound_1817 crisisRound = gameManager.createRound(CashCrisisRound_1817.class, "CashCrisis_" + p.getId());
-                        gameManager.setInterruptedRound(this);
-                        crisisRound.start(p);
-                    }
-                
-                }
-            }
-
-            int paidToShareholders = truePerShare * shareCount;
-
-
-
+                int paidToShareholders = truePerShare * shareCount;
 
                 int refPrice = Math.max(40, oldSpace.getPrice());
                 int moves = 0;
@@ -757,7 +744,8 @@ if (cert instanceof net.sf.rails.game.specific._1817.ShortCertificate) {
                             while (nextRow < m1817.getNumberOfRows() && m1817.getStockSpace(nextRow, col) == null) {
                                 nextRow++;
                             }
-                            if (m1817.getStockSpace(nextRow, col) != null) row = nextRow;
+                            if (m1817.getStockSpace(nextRow, col) != null)
+                                row = nextRow;
                         }
                     } else if (moves < 0) {
                         for (int i = 0; i < -moves; i++) {
@@ -766,7 +754,8 @@ if (cert instanceof net.sf.rails.game.specific._1817.ShortCertificate) {
                                 nextRow--;
                             }
                             net.sf.rails.game.financial.StockSpace pot = m1817.getStockSpace(nextRow, col);
-                            if (pot != null && !pot.getId().equalsIgnoreCase("A1")) row = nextRow;
+                            if (pot != null && !pot.getId().equalsIgnoreCase("A1"))
+                                row = nextRow;
                         }
                     }
 
@@ -796,7 +785,6 @@ if (cert instanceof net.sf.rails.game.specific._1817.ShortCertificate) {
                 if (baseCost != null && baseCost == 15 && !hasCoalMineToken(lastHex)) {
                     if (getAvailableCoalMine(comp) != null) {
                         offeringCoalMineHex.set(lastHex.getId());
-                        log.info("1817_TRACE: Interrupting engine to offer Coal Mine on {}", lastHex.getId());
                     } else {
                         resolvedCoalMineHexes.add(lastHex.getId());
                     }
@@ -815,9 +803,9 @@ if (cert instanceof net.sf.rails.game.specific._1817.ShortCertificate) {
             return true;
         }
 
-actionsAdded |= super.setPossibleActions();
+        actionsAdded |= super.setPossibleActions();
 
-// 1817 Rule 6.6: Companies may pay full, pay half, or withhold dividends.
+        // 1817 Rule 6.6: Companies may pay full, pay half, or withhold dividends.
         for (rails.game.action.PossibleAction pa : possibleActions.getList()) {
             if (pa instanceof rails.game.action.SetDividend) {
                 rails.game.action.SetDividend sd = (rails.game.action.SetDividend) pa;
@@ -892,7 +880,7 @@ actionsAdded |= super.setPossibleActions();
         boolean inBlackout = (interestPaidThisTurn.value() && !repayPhaseDoneThisTurn.value());
         if (!inBlackout && currentLoans < maxLoans) {
             possibleActions.add(
-                    new net.sf.rails.game.specific._1817.action.TakeLoans_1817(getRoot(), comp1817.getId(), maxLoans));
+                    new net.sf.rails.game.specific._1817.action.TakeLoans_1817(getRoot(), comp1817.getId()));
             actionsAdded = true;
         }
 
@@ -946,7 +934,6 @@ actionsAdded |= super.setPossibleActions();
             }
         }
 
-
         // 1. Check if the private companies in the portfolio hold the special property
         for (net.sf.rails.game.PrivateCompany priv : comp.getPortfolioModel().getPrivateCompanies()) {
             Collection<SpecialProperty> privSpecials = priv.getSpecialProperties();
@@ -961,7 +948,7 @@ actionsAdded |= super.setPossibleActions();
             if (pa instanceof LayTile) {
                 LayTile lt = (LayTile) pa;
                 SpecialProperty sp = lt.getSpecialProperty();
-               
+
             } else {
             }
         }
@@ -984,8 +971,7 @@ actionsAdded |= super.setPossibleActions();
         int playerShortfall = Math.max(0, totalInterestDue - compCash);
         net.sf.rails.game.Player president = (net.sf.rails.game.Player) comp.getPresident();
 
-        log.info("1817_TRACE: Liquidating {}. Interest due: ${}, Company cash: ${}",
-                comp.getId(), totalInterestDue, compCash);
+
 
         // 1. Drain company treasury to pay what it can (Rule 6.8)
         if (compCash > 0) {
@@ -1066,11 +1052,9 @@ actionsAdded |= super.setPossibleActions();
             if (priv != null) {
                 String id = priv.getId();
                 int limit = getCoalTokenLimit(id);
-                log.info("1817_TRACE: Checking PrivateCompany {}. Limit: {}, Placed: {}", id, limit,
-                        limit > 0 ? getPlacedCoalTokensCount(id) : 0);
+
                 if (limit > 0) {
                     if (getPlacedCoalTokensCount(id) < limit) {
-                        log.info("1817_TRACE: Found available Coal Mine: {}", id);
                         return priv;
                     }
                 }

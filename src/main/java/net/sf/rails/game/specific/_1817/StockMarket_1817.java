@@ -46,7 +46,6 @@ int row = oldsquare.getRow();
         }
         
         StockSpace newsquare = getStockSpace(row, col);
-        log.info("1817_MARKET: Move UP/RIGHT (Price Increase). End: {}", newsquare.getId());
         prepareMove(company, oldsquare, newsquare);
     }
 
@@ -69,13 +68,11 @@ int row = oldsquare.getRow();
             if (potential != null && !potential.getId().equalsIgnoreCase("A1")) {
                 row = nextRow;
             } else {
-                log.info("1817_MARKET: Down move blocked at boundary/A1.");
                 break;
             }
         }
         
         StockSpace newsquare = getStockSpace(row, col);
-        log.info("1817_MARKET: Move DOWN/LEFT (Price Decrease). End: {}", newsquare.getId());
         prepareMove(company, oldsquare, newsquare);
     }
 

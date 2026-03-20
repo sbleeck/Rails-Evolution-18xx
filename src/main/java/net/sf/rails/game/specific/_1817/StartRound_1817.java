@@ -39,7 +39,6 @@ public class StartRound_1817 extends StartRound {
         setPossibleActions();
     }
 
-    
     @Override
     protected boolean pass(NullAction action, String playerName) {
         Player player = playerManager.getCurrentPlayer();
@@ -65,6 +64,7 @@ public class StartRound_1817 extends StartRound {
                 numPasses.set(0);
                 foldedPlayers.clear();
 
+                // 1817 Rule: Play proceeds to the left of the player that started the auction.
                 playerManager.setCurrentPlayer(lastInitiator.value());
                 playerManager.setCurrentToNextPlayer();
             } else {
@@ -137,13 +137,9 @@ public class StartRound_1817 extends StartRound {
                 int minBid = hasBidder ? currentBid + bidIncrement
                         : Math.max(bidIncrement, activeAuction.getBasePrice() - seedMoney.value());
 
-                // --- START FIX ---
-                if (minBid <= activeAuction.getBasePrice()) {
-                    if (currentPlayer.getFreeCash() + activeAuction.getBid(currentPlayer) >= minBid) {
-                        possibleActions.add(new BidStartItem(activeAuction, minBid, bidIncrement, true));
-                    }
+                if (currentPlayer.getFreeCash() + activeAuction.getBid(currentPlayer) >= minBid) {
+                    possibleActions.add(new BidStartItem(activeAuction, minBid, bidIncrement, true));
                 }
-                // --- END FIX ---
 
                 // Do not auto-skip during an active auction. Let the player explicitly pass.
                 break;
@@ -184,7 +180,6 @@ public class StartRound_1817 extends StartRound {
         int previousBid = item.getBid(player);
         int bidAmount = bidItem.getActualBid();
 
-
         while (true) {
             if (!playerName.equals(player.getId())) {
                 errMsg = LocalText.getText("WrongPlayer", playerName, player.getId());
@@ -196,11 +191,6 @@ public class StartRound_1817 extends StartRound {
             if (bidAmount < maxSubsidizedBid) {
                 errMsg = "Minimum cash bid is " + Bank.format(this, maxSubsidizedBid) + " (Face: " + item.getBasePrice()
                         + " - Seed: " + seedMoney.value() + ")";
-                break;
-            }
-
-            if (bidAmount > item.getBasePrice()) {
-                errMsg = "Bid cannot exceed the face value of the company.";
                 break;
             }
 
@@ -236,26 +226,9 @@ public class StartRound_1817 extends StartRound {
             foldedPlayers.clear(); // Reset folds for the new auction
         }
 
-        if (bidAmount >= item.getBasePrice()) {
-            // Generate a round of passes for all other remaining active players to formally
-            // close the auction
-            for (Player p : playerManager.getNextPlayersAfter(player, false, false)) {
-                if (!foldedPlayers.contains(p)) {
-                    ReportBuffer.add(this, LocalText.getText("PASSES", p.getId()));
-                }
-            }
+        numPasses.set(0);
+        setNextBiddingPlayer(item);
 
-            assignItem(player, item, bidAmount, 0);
-            auctionItemState.set(null);
-            numPasses.set(0);
-            foldedPlayers.clear();
-            playerManager.setCurrentPlayer(lastInitiator.value());
-            playerManager.setCurrentToNextPlayer();
-        } else {
-            numPasses.set(0);
-            setNextBiddingPlayer(item);
-        }
         return true;
     }
-
 }

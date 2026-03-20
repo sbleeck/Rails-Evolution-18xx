@@ -59,7 +59,32 @@ this.shareCount = IntegerState.create(this, "shareCount", 2);
         bondsState.set(bonds);
     }
 
+/**
+     * Executes a single loan transaction for the company.
+     * Increments the bond count, transfers $100 from the Bank,
+     * and moves the stock price one space to the left/down.
+     */
+    public void executeLoan() {
+        if (getNumberOfBonds() >= getMaxNumberOfLoans()) {
+            log.warn("1817_WARNING: Cannot take loan. " + getId() + " is at maximum capacity.");
+            return;
+        }
 
+        // 1. Update internal bond count
+        setNumberOfBonds(getNumberOfBonds() + 1);
+
+        // 2. Transfer cash from the Bank
+        addCashFromBank(100, getRoot().getBank());
+
+        // 3. Move stock price left (Rule 1.2.5)
+        net.sf.rails.game.financial.StockMarket market = getRoot().getStockMarket();
+        if (market instanceof net.sf.rails.game.specific._1817.StockMarket_1817) {
+            ((net.sf.rails.game.specific._1817.StockMarket_1817) market).moveLeftOrDown(this, 1);
+        }
+        
+        // Note: The global 70-loan limit decrement should be handled by the Bank's 
+        // BondsModel listening to changes in this company's bondsState.
+    }
 
     /**
      * Transfers cash from the Bank to the Company treasury.
@@ -211,7 +236,6 @@ this.shareCount = IntegerState.create(this, "shareCount", 2);
      */
     public void close() {
         getIsClosedModel().set(true);
-        log.info("1817_TRACE: Company " + getId() + " has been marked as closed (Zombie state for M&A).");
     }
 
 

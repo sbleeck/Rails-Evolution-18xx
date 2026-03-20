@@ -114,39 +114,6 @@ public class GameStatus_1817 extends GameStatus {
     }
 
     
-    @Override
-    protected void processTakeLoans(PossibleAction action) {
-        if (!(action instanceof net.sf.rails.game.specific._1817.action.TakeLoans_1817)) return;
-        
-        net.sf.rails.game.specific._1817.action.TakeLoans_1817 tlAction = 
-            (net.sf.rails.game.specific._1817.action.TakeLoans_1817) action;
-
-        String compId = tlAction.getCompanyId();
-        CompanyManager cm = gameUIManager.getRoot().getCompanyManager();
-        PublicCompany comp = cm.getPublicCompany(compId);
-        int current = comp.getNumberOfBonds();
-        int max = tlAction.getMaxLoansAllowed();
-        int available = max - current;
-
-        if (available <= 0) {
-            JOptionPane.showMessageDialog(this, comp.getId() + " is at its loan limit (" + max + ").");
-            return;
-        }
-
-        String[] options = new String[available];
-        for (int i = 0; i < available; i++) {
-            options[i] = String.valueOf(i + 1);
-        }
-
-        String selected = (String) JOptionPane.showInputDialog(this,
-                "Select number of loans for " + comp.getId() + ":\n(Current: " + current + ", Max: " + max + ")",
-                "Take Loans", JOptionPane.QUESTION_MESSAGE, null, options, options[0]);
-
-        if (selected != null) {
-            tlAction.setLoansToTake(Integer.parseInt(selected));
-            gameUIManager.processAction(tlAction);
-        }
-    }
 
 
 }
