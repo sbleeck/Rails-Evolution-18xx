@@ -10,17 +10,18 @@ import net.sf.rails.game.CompanyManager;
 public class BondsModel_1817 extends BondsModel {
 
     private final RailsRoot root;
+    protected final net.sf.rails.game.state.IntegerState currentInterestRate;
 
-public BondsModel_1817(net.sf.rails.game.RailsItem parent, net.sf.rails.game.RailsItem owner, RailsRoot root) {
+    public BondsModel_1817(net.sf.rails.game.RailsItem parent, net.sf.rails.game.RailsItem owner, RailsRoot root) {
         super(parent, owner);
         this.root = root;
+        currentInterestRate = net.sf.rails.game.state.IntegerState.create(this, "currentInterestRate", 5);
     }
     
     /**
-     * Calculates the interest rate based on the total number of loans in play.
-     * Rule 6.1.1: 0-9: $10, 10-19: $15, 20-29: $20, 30-39: $25, 40+: $30.
+     * Calculates and locks in the interest rate based on the total number of loans in play.
      */
-    public int getInterestRate() {
+    public void updateInterestRate() {
         int totalLoans = 0;
         CompanyManager cm = root.getCompanyManager();
         if (cm != null) {
@@ -32,19 +33,25 @@ public BondsModel_1817(net.sf.rails.game.RailsItem parent, net.sf.rails.game.Rai
         }
         
         // Tiered logic
-        if (totalLoans >= 65) return 70;
-        if (totalLoans >= 60) return 65;
-        if (totalLoans >= 55) return 60;
-        if (totalLoans >= 50) return 55;
-        if (totalLoans >= 45) return 50;
-        if (totalLoans >= 40) return 45;
-        if (totalLoans >= 35) return 40;
-        if (totalLoans >= 30) return 35;
-        if (totalLoans >= 25) return 30;
-        if (totalLoans >= 20) return 25;
-        if (totalLoans >= 15) return 20;
-        if (totalLoans >= 10) return 15;
-        if (totalLoans >= 5) return 10;
-        return 5;
+        int newRate = 5;
+        if (totalLoans >= 65) newRate = 70;
+        else if (totalLoans >= 60) newRate = 65;
+        else if (totalLoans >= 55) newRate = 60;
+        else if (totalLoans >= 50) newRate = 55;
+        else if (totalLoans >= 45) newRate = 50;
+        else if (totalLoans >= 40) newRate = 45;
+        else if (totalLoans >= 35) newRate = 40;
+        else if (totalLoans >= 30) newRate = 35;
+        else if (totalLoans >= 25) newRate = 30;
+        else if (totalLoans >= 20) newRate = 25;
+        else if (totalLoans >= 15) newRate = 20;
+        else if (totalLoans >= 10) newRate = 15;
+        else if (totalLoans >= 5) newRate = 10;
+        
+        currentInterestRate.set(newRate);
+    }
+
+    public int getInterestRate() {
+        return currentInterestRate.value();
     }
 }
