@@ -76,13 +76,22 @@ public class OperatingRound_1817 extends OperatingRound {
         super(gameManager, roundId);
     }
 
-
- @Override
+    @Override
     public void start() {
         super.start();
 
-        // The base engine automatically pays out private company revenues at the start of the OR.
-        // We unconditionally refund the automatic payout here so we can pay it conditionally
+        // 1817 Rule 1.2.5: The loan fee is set at the start of each operating round.
+        if (gameManager instanceof GameManager_1817) {
+            net.sf.rails.game.model.BondsModel bm = ((GameManager_1817) gameManager).getBondsModel();
+            if (bm instanceof BondsModel_1817) {
+                ((BondsModel_1817) bm).updateInterestRate();
+            }
+        }
+
+        // The base engine automatically pays out private company revenues at the start
+        // of the OR.
+        // We unconditionally refund the automatic payout here so we can pay it
+        // conditionally
         // at the start of each company's turn as requested.
         for (PublicCompany comp : gameManager.getAllPublicCompanies()) {
             if (comp.hasStarted() && !comp.isClosed()) {
@@ -454,8 +463,6 @@ public class OperatingRound_1817 extends OperatingRound {
             net.sf.rails.game.specific._1817.action.PayLoanInterest_1817 payAction = (net.sf.rails.game.specific._1817.action.PayLoanInterest_1817) action;
             PublicCompany comp = companyManager.getPublicCompany(payAction.getCompanyName());
 
-
-
             if (comp.getCash() >= payAction.getInterestDue()) {
                 net.sf.rails.game.state.Currency.toBank(comp, payAction.getInterestDue());
                 net.sf.rails.common.ReportBuffer.add(this,
@@ -473,7 +480,6 @@ public class OperatingRound_1817 extends OperatingRound {
             net.sf.rails.game.specific._1817.action.RepayLoans_1817 rlAction = (net.sf.rails.game.specific._1817.action.RepayLoans_1817) action;
             net.sf.rails.game.PublicCompany comp = companyManager.getPublicCompany(rlAction.getCompanyId());
             int count = rlAction.getLoansToRepay();
-
 
             if (count > 0) {
                 int cost = count * 100;
@@ -514,7 +520,6 @@ public class OperatingRound_1817 extends OperatingRound {
             return handleImmediateLiquidation((net.sf.rails.game.specific._1817.action.LiquidateCompany_1817) action);
         }
 
-
         return super.processGameSpecificAction(action);
     }
 
@@ -532,6 +537,8 @@ public class OperatingRound_1817 extends OperatingRound {
     @Override
     protected void initTurn() {
         super.initTurn();
+        log.info("1817_DEBUG: initTurn() started for company: {}",
+                (operatingCompany.value() != null ? operatingCompany.value().getId() : "null"));
         interestPaidThisTurn.set(false);
         repayPhaseDoneThisTurn.set(false);
         trainBuyingDone.set(false);
@@ -540,8 +547,10 @@ public class OperatingRound_1817 extends OperatingRound {
         hexesLaidThisTurn.clear();
         offeringCoalMineHex.set(null);
 
-        // Mail Contracts pay out at the beginning of the company's turn if it has a real train.
-       // We explicitly iterate over the train portfolio to filter out "private papers" (e.g., Mail Contracts) 
+        // Mail Contracts pay out at the beginning of the company's turn if it has a
+        // real train.
+        // We explicitly iterate over the train portfolio to filter out "private papers"
+        // (e.g., Mail Contracts)
         // that the base engine might be incorrectly classifying as trains.
         PublicCompany comp = operatingCompany.value();
         if (comp != null && !comp.isClosed()) {
@@ -776,6 +785,25 @@ public class OperatingRound_1817 extends OperatingRound {
         boolean actionsAdded = false;
         PublicCompany comp = operatingCompany.value();
         net.sf.rails.game.GameDef.OrStep step = getStep();
+        log.info("1817_DEBUG: Entering setPossibleActions for {}, step: {}", (comp != null ? comp.getId() : "null"),
+                step);
+        if (comp != null) {
+Collection<net.sf.rails.game.PrivateCompany> compPrivs = comp.getPortfolioModel().getPrivateCompanies();
+            log.info("1817_DEBUG: Company {} privates count: {}", comp.getId(), compPrivs.size());
+            for (net.sf.rails.game.PrivateCompany p : compPrivs) {
+                log.info("1817_DEBUG: -> Company has private: {}", p.getId());
+            }
+
+            if (comp.getPresident() != null) {
+Collection<net.sf.rails.game.PrivateCompany> presPrivs = comp.getPresident().getPortfolioModel().getPrivateCompanies();
+
+                log.info("1817_DEBUG: President {} privates count: {}", comp.getPresident().getName(),
+                        presPrivs.size());
+                for (net.sf.rails.game.PrivateCompany p : presPrivs) {
+                    log.info("1817_DEBUG: -> President has private: {}", p.getId());
+                }
+            }
+        }
 
         // --- 2. COAL MINE INTERRUPT ---
         if ("Yellow".equalsIgnoreCase(lastLaidTileColour) && !hexesLaidThisTurn.isEmpty()) {
@@ -934,21 +962,69 @@ public class OperatingRound_1817 extends OperatingRound {
             }
         }
 
-        // 1. Check if the private companies in the portfolio hold the special property
-        for (net.sf.rails.game.PrivateCompany priv : comp.getPortfolioModel().getPrivateCompanies()) {
-            Collection<SpecialProperty> privSpecials = priv.getSpecialProperties();
+       
+// 1. Check if the private companies in the portfolio hold the special property
+Collection<net.sf.rails.game.PrivateCompany> allPossiblePrivates = new ArrayList<>();
+if (comp != null) {
+allPossiblePrivates.addAll(comp.getPortfolioModel().getPrivateCompanies());
+if (comp.getPresident() != null) {
+allPossiblePrivates.addAll(comp.getPresident().getPortfolioModel().getPrivateCompanies());
+}
+}
 
-            if (privSpecials != null) {
+    log.info("1817_DEBUG: Scanning {} privates for SpecialTileLay", allPossiblePrivates.size());
+    
+    for (net.sf.rails.game.PrivateCompany priv : allPossiblePrivates) {
+        Collection<SpecialProperty> privSpecials = priv.getSpecialProperties();
+        log.info("1817_DEBUG: Private {} has {} special properties", priv.getId(), (privSpecials == null ? "null" : privSpecials.size()));
 
+        if (privSpecials != null) {
+            for (SpecialProperty sp : privSpecials) {
+                log.info("1817_DEBUG: -> Checking SpecialProperty: id={}, class={}, exercised={}", 
+                         sp.getId(), sp.getClass().getSimpleName(), sp.isExercised());
+
+                if (sp instanceof SpecialTileLay) {
+                    if (!sp.isExercised()) {
+                        log.info("1817_DEBUG: Found unexercised SpecialTileLay on private {}", priv.getId());
+                        
+                        if (getStep() == net.sf.rails.game.GameDef.OrStep.LAY_TRACK || getStep() == net.sf.rails.game.GameDef.OrStep.INITIAL) {
+                            if (tilesLaidThisTurn.value() < 2) {
+                                List<LayTile> specialLays = getSpecialTileLays(true);
+                                
+                                boolean alreadyAdded = false;
+                                for (LayTile lt : specialLays) {
+                                    if (lt.getSpecialProperty() == sp) {
+                                        alreadyAdded = true;
+                                        break;
+                                    }
+                                }
+
+                                possibleActions.addAll(specialLays);
+                                
+                                if (!alreadyAdded) {
+                                    log.info("1817_DEBUG: Injecting LayTile action for PSM40 manually.");
+                                    possibleActions.add(new LayTile((SpecialTileLay) sp));
+                                }
+                                actionsAdded = true;
+                            }
+                        }
+                    } else {
+                        log.info("1817_DEBUG: SpecialTileLay {} is already exercised.", sp.getId());
+                    }
+                }
             }
         }
+    }
+
+
 
         // 2. Inspect the generated actions
         for (rails.game.action.PossibleAction pa : possibleActions.getList()) {
             if (pa instanceof LayTile) {
                 LayTile lt = (LayTile) pa;
                 SpecialProperty sp = lt.getSpecialProperty();
-
+                // Intentionally left blank; filtering is handled organically by the base engine
+                // since connects="no" is already specified in CompanyManager.xml for PSM40_Lay.
             } else {
             }
         }
@@ -970,8 +1046,6 @@ public class OperatingRound_1817 extends OperatingRound {
         int compCash = comp.getCash();
         int playerShortfall = Math.max(0, totalInterestDue - compCash);
         net.sf.rails.game.Player president = (net.sf.rails.game.Player) comp.getPresident();
-
-
 
         // 1. Drain company treasury to pay what it can (Rule 6.8)
         if (compCash > 0) {

@@ -3001,12 +3001,40 @@ public class GameStatus extends GridPanel {
                         // Fallback
                     }
 
-                    // Use ClickField's setText directly (ClickField often wraps its label)
-                    if (compLoans[i] instanceof ClickField) {
-                        ((ClickField) compLoans[i]).setText(currentBonds + "/" + maxBonds);
-                    } else if (compLoans[i] instanceof JLabel) {
-                        ((JLabel) compLoans[i]).setText(currentBonds + "/" + maxBonds);
+                    // Calculate Interest Cost using the BondsModel_1817 rate
+                    int interestRate = 0;
+if (gameUIManager.getGameManager() instanceof net.sf.rails.game.specific._1817.GameManager_1817) {
+                        net.sf.rails.game.model.BondsModel bm = ((net.sf.rails.game.specific._1817.GameManager_1817) gameUIManager.getGameManager()).getBondsModel();
+                        if (bm instanceof net.sf.rails.game.specific._1817.BondsModel_1817) {
+                            interestRate = ((net.sf.rails.game.specific._1817.BondsModel_1817) bm).getInterestRate();
+                        }
                     }
+                    int totalInterestCost = currentBonds * interestRate;
+
+                    // Build the Visual Dot String
+                    StringBuilder sb = new StringBuilder("<html><center>");
+                    // Red dots for loans taken
+                    for (int b = 0; b < currentBonds; b++) {
+                        sb.append("<font color='red'>●</font>");
+                    }
+                    // Grey circles for available slots
+                    for (int b = 0; b < (maxBonds - currentBonds); b++) {
+                        sb.append("<font color='#888888'>○</font>");
+                    }
+                    // Append interest cost
+                    sb.append("&nbsp;<font color='black' size='2'>($").append(totalInterestCost).append(")</font>");
+                    sb.append("</center></html>");
+
+                    String loanDisplay = sb.toString();
+
+                    if (compLoans[i] instanceof ClickField) {
+                        ((ClickField) compLoans[i]).setText(loanDisplay);
+                    } else if (compLoans[i] instanceof JLabel) {
+                        ((JLabel) compLoans[i]).setText(loanDisplay);
+                    }
+
+
+                    
 
                     if (possibleActions != null && possibleActions.getList() != null) {
                         for (PossibleAction pa : possibleActions.getList()) {

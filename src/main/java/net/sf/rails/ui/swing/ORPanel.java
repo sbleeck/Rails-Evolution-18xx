@@ -2064,7 +2064,34 @@ public class ORPanel extends GridPanel
             } catch (Exception e) {
                 // Fallback
             }
-            lblLoans.setText(currentBonds + "/" + maxBonds);
+
+
+// Calculate Interest Cost using the BondsModel_1817 rate
+            int interestRate = 0;
+            GameUIManager gum = orUIManager.getGameUIManager();
+            if (gum != null && gum.getGameManager() instanceof net.sf.rails.game.specific._1817.GameManager_1817) {
+                net.sf.rails.game.model.BondsModel bm = ((net.sf.rails.game.specific._1817.GameManager_1817) gum.getGameManager()).getBondsModel();
+                if (bm instanceof net.sf.rails.game.specific._1817.BondsModel_1817) {
+                    interestRate = ((net.sf.rails.game.specific._1817.BondsModel_1817) bm).getInterestRate();
+                }
+            }
+            int totalInterestCost = currentBonds * interestRate;
+
+            // Build the Visual Dot String
+            StringBuilder sb = new StringBuilder("<html><center>");
+            for (int b = 0; b < currentBonds; b++) {
+                sb.append("<font color='red'>●</font>");
+            }
+            for (int b = 0; b < (maxBonds - currentBonds); b++) {
+                sb.append("<font color='#888888'>○</font>");
+            }
+            sb.append("&nbsp;<font color='black' size='4'>($").append(totalInterestCost).append(")</font>");
+            sb.append("</center></html>");
+
+            lblLoans.setText(sb.toString());
+
+
+
         }
 
         if (tokenDisplay != null) {
