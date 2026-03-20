@@ -1060,6 +1060,21 @@ public class GameStatus extends GridPanel {
         updatePlayerTime(playerIndex, newTime);
     }
 
+    private boolean allSameBaseAction(List<PossibleAction> actions) {
+        if (actions == null || actions.isEmpty())
+            return true;
+        Class<?> first = actions.get(0).getClass();
+        for (PossibleAction a : actions) {
+            if (!a.getClass().equals(first)) {
+                if (actions.get(0) instanceof BuyCertificate && a instanceof BuyCertificate) {
+                    continue;
+                }
+                return false;
+            }
+        }
+        return true;
+    }
+
     @Override
     public void actionPerformed(ActionEvent actor) {
         JComponent source = (JComponent) actor.getSource();
@@ -1084,12 +1099,48 @@ public class GameStatus extends GridPanel {
 
             SoundManager.notifyOfClickFieldSelection(actions.isEmpty() ? null : actions.get(0));
 
-            // log.info("UI Click Detected on: " + source.getClass().getSimpleName());
-            // log.info("Primary Action Payload Type: " +
-            // actions.get(0).getClass().getName());
+            log.info("=== UI CLICK DETECTED ===");
+            if (actions != null) {
+                log.info("Number of actions bound to this UI element: " + actions.size());
+                for (PossibleAction pa : actions) {
+                    log.info(" -> Bound Action: " + pa.toString() + " (Class: " + pa.getClass().getSimpleName() + ")");
+                }
+            } else {
+                log.warn("Actions list is null for clicked component.");
+            }
 
             if (actions.size() == 0) {
-                // log.warn("No ClickField action found");
+                log.warn("No ClickField action found");
+            } else if (actions.size() > 1 && !allSameBaseAction(actions)) {
+                // Generic disambiguation for heterogeneous actions on a single UI element
+                List<String> options = new ArrayList<>();
+                for (PossibleAction pa : actions) {
+                    if (pa instanceof BuyCertificate) {
+                        BuyCertificate bc = (BuyCertificate) pa;
+                        options.add(bc.getPlayerName() + " buys 1 share of " + bc.getCompany().getId());
+                    } else {
+                        options.add(pa.toString());
+                    }
+                }
+
+                String sp = (String) JOptionPane.showInputDialog(this,
+                        LocalText.getText("PleaseSelect"),
+                        "Multiple Actions Available",
+                        JOptionPane.QUESTION_MESSAGE,
+                        null, options.toArray(new String[0]),
+                        options.get(0));
+
+                int index = options.indexOf(sp);
+                if (index >= 0) {
+                    chosenAction = actions.get(index);
+                    // Ensure the number bought is set safely if a standard BuyCertificate is
+                    // selected through this shortcut
+                    if (chosenAction instanceof BuyCertificate && !(chosenAction instanceof StartCompany)) {
+                        ((BuyCertificate) chosenAction).setNumberBought(1);
+                    }
+                } else {
+                    return; // user canceled
+                }
             } else if (actions.get(0) instanceof SellShares) {
 
                 // INTELLIGENT SELLING LOGIC
@@ -1934,11 +1985,8 @@ public class GameStatus extends GridPanel {
         String shareTxt = pool.getShareModel(companies[i]).toText();
         poolShareCards[i].setVisible(shareTxt != null && !shareTxt.isEmpty());
 
-        poolShareCards[i].clearPossibleActions();
-
         if (clickable && o != null) {
-            // ACTIVE - Beige Background with Thick Colored Borders
-            if (o instanceof BuyCertificate) {
+            if (o instanceof BuyCertificate || o.getClass().getName().endsWith("CompanyBuyOpenMarketShare_1817")) {
                 poolShareCards[i].setBackground(BG_CARD_PASSIVE);
                 poolShareCards[i].setBorder(BorderFactory.createLineBorder(BORDER_COL_BUY, BORDER_THICKNESS));
             } else if (o instanceof SellShares) {
@@ -1953,6 +2001,7 @@ public class GameStatus extends GridPanel {
 
         } else {
             // PASSIVE
+            poolShareCards[i].clearPossibleActions();
             poolShareCards[i].setBackground(BG_CARD_PASSIVE);
             poolShareCards[i].setBorder(BorderFactory.createCompoundBorder(
                     BorderFactory.createLineBorder(Color.BLACK, 1),
@@ -3332,6 +3381,23 @@ public class GameStatus extends GridPanel {
                         setPlayerCertButton(index, pIdx, true, share);
                     else if (pIdx == -1 && compCanHoldOwnShares)
                         setTreasuryCertButton(index, true, share);
+                }
+            }
+
+            if (possibleActions.getList() != null) {
+                for (PossibleAction pa : possibleActions.getList()) {
+                    if (pa.getClass().getName().endsWith("CompanyBuyOpenMarketShare_1817")) {
+                        try {
+                            String compId = (String) pa.getClass().getMethod("getCompanyId").invoke(pa);
+                            PublicCompany comp = gameUIManager.getRoot().getCompanyManager().getPublicCompany(compId);
+                            if (comp != null) {
+                                log.info("Binding CompanyBuyOpenMarketShare_1817 to pool cert for: " + comp.getId());
+                                setPoolCertButton(comp.getPublicNumber(), true, pa);
+                            }
+                        } catch (Exception e) {
+                            log.error("Failed to bind CompanyBuyOpenMarketShare_1817", e);
+                        }
+                    }
                 }
             }
 

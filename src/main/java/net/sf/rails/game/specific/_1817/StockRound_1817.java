@@ -250,6 +250,22 @@ public class StockRound_1817 extends StockRound {
                 possibleActions.remove(action);
             }
         }
+// 1817 Rule 5.6: Allow companies to buy their own stock from the open market
+        // provided they are not in the red (liquidation) or gray (acquisition) areas.
+        if (currentPlayer != null) {
+            for (PublicCompany comp : gameManager.getAllPublicCompanies()) {
+                if (comp.getPresident() == currentPlayer && !comp.isClosed() && comp.isBuyable()) {
+                    int price = comp.getMarketPrice();
+                    // Check if company has enough cash and if a share exists in the pool
+                    if (comp.getCash() >= price) {
+                        net.sf.rails.game.financial.PublicCertificate poolCert = pool.findCertificate(comp, 1, false);
+                        if (poolCert != null) {
+                            possibleActions.add(new net.sf.rails.game.specific._1817.action.CompanyBuyOpenMarketShare_1817(gameManager.getRoot(), comp.getId(), price));
+                        }
+                    }
+                }
+            }
+        }
 
     }
 
@@ -416,6 +432,33 @@ return false;
                 return true;
             }
         }
+
+        if (action instanceof net.sf.rails.game.specific._1817.action.CompanyBuyOpenMarketShare_1817) {
+            net.sf.rails.game.specific._1817.action.CompanyBuyOpenMarketShare_1817 cbAction = (net.sf.rails.game.specific._1817.action.CompanyBuyOpenMarketShare_1817) action;
+            PublicCompany comp = companyManager.getPublicCompany(cbAction.getCompanyId());
+            
+            if (comp != null && comp.isBuyable()) {
+                int price = comp.getMarketPrice();
+                net.sf.rails.game.financial.PublicCertificate poolCert = pool.findCertificate(comp, 1, false);
+                
+                if (poolCert != null && comp.getCash() >= price) {
+                    // Move the certificate to the company treasury
+                    poolCert.moveTo(comp.getPortfolioModel());
+                    
+                    // 1817 Rule 5.6: The company pays the bank for the stock purchase[cite: 1783].
+                    // Use static Currency utility to move cash from the owner to the bank.
+                    net.sf.rails.game.state.Currency.toBank(comp, price);
+                    
+                    net.sf.rails.common.ReportBuffer.add(this, comp.getId() + " buys one share from the open market for " + net.sf.rails.game.financial.Bank.format(this, price));
+                    
+                    hasActed.set(true);
+                    companyBoughtThisTurnWrapper.set(comp);
+                    return true;
+                }
+            }
+        }
+
+
 
         return super.processGameSpecificAction(action);
     }
