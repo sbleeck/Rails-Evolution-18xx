@@ -1134,8 +1134,11 @@ public class OperatingRound_1817 extends OperatingRound {
                                 newBt.setForcedBuyIfHasRoute(false);
                                 newBt.setForcedBuyIfNoRoute(false);
                                 newBt.setPresidentMustAddCash(0);
-                                String label = "'" + t.getName() + "' from " + otherComp.getId() + " (1-"
-                                        + Math.max(1, cash) + ")";
+                                
+                                String cleanTrainName = t.getName().split("_")[0];
+                                String label = "Buy '" + cleanTrainName + "' from " + otherComp.getId();
+                                newBt.setButtonLabel(label);
+                                
                                 newBt.setButtonLabel(label);
                                 possibleActions.add(newBt);
                             }

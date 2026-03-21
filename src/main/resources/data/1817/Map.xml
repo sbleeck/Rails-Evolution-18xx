@@ -5,7 +5,7 @@
 
     <Tokens>
 		<BonusToken name="CoalMine" svg="1817/CoalMine.svg" value="10" />
-		<BonusToken name="Bridge" svg="1817/Bridge.svg" value="10" />
+		<BonusToken name="Bridge" svg="1817/Bridge.svg" value="0" />
     </Tokens>
 
 

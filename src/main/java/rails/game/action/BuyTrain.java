@@ -339,7 +339,24 @@ public class BuyTrain extends PossibleORAction {
     }
 
     public void setPricePaid(int pricePaid) {
-        this.pricePaid = pricePaid;
+        if (this.priceMode == PriceMode.FIXED) {
+            this.pricePaid = this.fixedCost; // Ignore external input if mode is fixed
+        } else {
+            // Clamp the value to the permitted minimum and maximum bounds
+            if (pricePaid < this.minPrice) {
+                this.pricePaid = this.minPrice;
+            } else if (pricePaid > this.maxPrice) {
+                this.pricePaid = this.maxPrice;
+            } else {
+                this.pricePaid = pricePaid;
+            }
+        }
+
+        // Absolute fallback to prevent negative money errors if bounds were improperly
+        // initialized
+        if (this.pricePaid < 0) {
+            this.pricePaid = 1;
+        }
     }
 
     public Train getExchangedTrain() {

@@ -105,11 +105,14 @@ private int calculateCoalMineBonus(List<RevenueTrainRun> runs) {
             
             // 3. Award $10 once per hex touched by this specific train run
             for (MapHex hex : visitedHexes) {
-                if (hasCoalMineToken(hex)) {
+               boolean hasMine = hasCoalMineToken(hex);
+                // log.info("Checking hex {} for Coal Mine. Found: {}", (hex != null ? hex.getId() : "null"), hasMine);
+                if (hasMine) {
                     totalBonus += 10;
                 }
             }
         }
+        // log.info("Total Coal Mine bonus for all runs: {}", totalBonus);
         return totalBonus;
     }
 

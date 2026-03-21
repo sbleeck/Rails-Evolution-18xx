@@ -179,6 +179,8 @@ public class GameStatus extends GridPanel {
     protected int playerCertCountXOffset, playerCertCountYOffset;
     protected JComponent[] compLoans;
     protected Field bankCash;
+    protected Field interestRateField;
+
     protected int newTrainsXOffset, newTrainsYOffset;
     protected int futureTrainsXOffset, futureTrainsYOffset, futureTrainsWidth;
     protected int rightCompCaptionXOffset;
@@ -2657,14 +2659,23 @@ public class GameStatus extends GridPanel {
             return;
 
         int totalLoans = 0;
+        int interestRate = 5;
+
         net.sf.rails.game.GameManager gm = gameUIManager.getGameManager();
         if (gm instanceof net.sf.rails.game.specific._1817.GameManager_1817) {
             BondsModel bm = ((net.sf.rails.game.specific._1817.GameManager_1817) gm).getBondsModel();
             if (bm != null) {
                 totalLoans = bm.getTotalLoansTaken();
+                if (bm instanceof net.sf.rails.game.specific._1817.BondsModel_1817) {
+                    interestRate = ((net.sf.rails.game.specific._1817.BondsModel_1817) bm).getInterestRate();
+                }
             }
         }
         bondsHeatbarPanel.setTotalLoansTaken(totalLoans);
+
+         if (interestRateField != null) {
+        interestRateField.setText("Interest: $" + interestRate);
+    }
 
     }
 
@@ -4906,15 +4917,24 @@ if (gameUIManager.getGameManager() instanceof net.sf.rails.game.specific._1817.G
         }
 
         if (is1817) {
-            bondsHeatbarPanel = new net.sf.rails.ui.swing.elements.BondsHeatbarPanel();
-            int span = rightCompCaptionXOffset - (bankX - 1);
-            if (span < 1)
-                span = 1;
 
-            gbc.weightx = 1.0;
-            gbc.fill = GridBagConstraints.BOTH;
-            addField(bondsHeatbarPanel, bankX - 1, bankY - 4, span, 1, 0, true);
-            gbc.weightx = 0.0;
+interestRateField = new Field("Interest: ?");
+interestRateField.setBorder(BORDER_BOX);
+interestRateField.setBackground(BG_BANK);
+interestRateField.setOpaque(true);
+interestRateField.setFont(new Font("SansSerif", Font.BOLD, 12));
+interestRateField.setHorizontalAlignment(SwingConstants.CENTER);
+addField(interestRateField, bankX - 1, bankY - 4, 1, 1, 0, true);
+
+        bondsHeatbarPanel = new net.sf.rails.ui.swing.elements.BondsHeatbarPanel();
+        int span = rightCompCaptionXOffset - bankX;
+        if (span < 1)
+            span = 1;
+
+        gbc.weightx = 1.0;
+        gbc.fill = GridBagConstraints.BOTH;
+        addField(bondsHeatbarPanel, bankX, bankY - 4, span, 1, 0, true);
+                    gbc.weightx = 0.0;
             gbc.fill = GridBagConstraints.HORIZONTAL;
         } else {
             f = new Caption("Bank Cash");

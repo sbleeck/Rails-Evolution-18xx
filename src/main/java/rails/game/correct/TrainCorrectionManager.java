@@ -165,6 +165,13 @@ public class TrainCorrectionManager extends CorrectionManager {
             // Fallback for destinations without a PortfolioModel (should be rare)
             tmgr.transferTrain(train, dest);
         }
+
+        // If the train was magically removed from the IPO, we must notify the TrainManager.
+        // This ensures that if the last train of a tier (e.g., the last '2') is moved, 
+        // the next tier (e.g., '3') is automatically released into the IPO.
+        if (source == getRoot().getBank().getIpo()) {
+            tmgr.checkTrainAvailability(train, source);
+        }
         
 
         String msg = LocalText.getText("CorrectTrainTransfer", 

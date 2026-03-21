@@ -58,7 +58,12 @@ public class BridgeModifier_1817 implements RevenueDynamicModifier {
 
         for (BonusToken t : hex.getBonusTokens()) {
             if (t != null) {
-                if ("Bridge".equals(t.getName()) || "Bridge".equals(t.getId())) {
+              
+                if ((t.getName() != null && t.getName().contains("Bridge")) || 
+                    (t.getId() != null && t.getId().contains("Bridge")) || 
+                    (t.getId() != null && t.getId().contains("UBC")) ||
+                    (t.getId() != null && t.getId().contains("OBC"))) {
+
                     return true;
                 }
             }
@@ -67,8 +72,9 @@ public class BridgeModifier_1817 implements RevenueDynamicModifier {
     }
 
     private int calculateBridgeBonus(List<RevenueTrainRun> runs) {
-        int totalBonus = 0;
-        if (runs == null) return 0;
+
+int totalBridgeVisits = 0;
+                if (runs == null) return 0;
         
         for (RevenueTrainRun run : runs) {
             Set<MapHex> visitedHexes = new HashSet<>();
@@ -96,14 +102,22 @@ public class BridgeModifier_1817 implements RevenueDynamicModifier {
                     }
                 }
             }
-            
+
             // 3. Award $10 once per bridge hex touched by this train run
             for (MapHex hex : visitedHexes) {
-                if (hasBridgeToken(hex)) {
-                    totalBonus += 10;
+
+                boolean hasBridge = hasBridgeToken(hex);
+                // log.info("Checking hex {} for Bridge. Found: {}", (hex != null ? hex.getId() : "null"), hasBridge);
+
+                if (hasBridge) {
+                    totalBridgeVisits++;
                 }
             }
         }
-        return totalBonus;
+
+        int dynamicBonus = totalBridgeVisits * 10;
+        // log.info("Bridge hexes visited {} times. Dynamic bonus added: {}", totalBridgeVisits, dynamicBonus);
+
+        return dynamicBonus;
     }
 }
