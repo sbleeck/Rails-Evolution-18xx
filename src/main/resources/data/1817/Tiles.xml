@@ -45,7 +45,7 @@
         <Tile colour="red" id="-905" name="Atlanta">
         <Station id="city1" position="0" slots="0" type="OffMapCity" value="-1"/>
         <Track from="city1" to="side5"/>
-        <Track from="city1" to="side1"/>
+        <Track from="city1" to="side0"/>
     </Tile>
             <Tile colour="red" id="-906" name="Raleigh-Durham">
         <Station id="city1" position="0" slots="0" type="OffMapCity" value="-1"/>

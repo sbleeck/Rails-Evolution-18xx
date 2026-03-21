@@ -493,8 +493,17 @@ boolean hasSpecialOR = false;
         return false; // Action not found
     }
 
-    
-    // --- MAIN INPUT PROCESSING ---
+
+    private boolean showMapMarkings = true; 
+
+    public boolean isShowMapMarkings() {
+        return showMapMarkings;
+    }
+
+    public void toggleMapMarkings() {
+        this.showMapMarkings = !this.showMapMarkings;
+        // The repaint is handled by your existing Spacebar hotkey logic
+    }
 
     public void processAction(String command, List<PossibleAction> actions, Component source) {
 

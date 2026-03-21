@@ -88,7 +88,6 @@ public class OperatingRound_1817 extends OperatingRound {
             }
         }
 
-       
     }
 
     @Override
@@ -154,20 +153,22 @@ public class OperatingRound_1817 extends OperatingRound {
     @Override
     public int getTileLayCost(PublicCompany company, MapHex hex, int standardCost) {
         int cost = super.getTileLayCost(company, hex, standardCost);
-        // Capture the raw terrain cost from the XML before any dynamic surcharges are
-        // applied
+        // Capture the raw terrain cost for internal tracking
         hexBaseCosts.put(hex.getId(), standardCost);
 
         // Rule 6.3: Second tile operation costs an additional $20.
         if (tilesLaidThisTurn.value() > 0) {
-            int extraCost = 20;
-            cost += extraCost;
+            cost += 20;
         }
-        if (standardCost == 15 && isLayingCoalMine.value()) {
+
+
+        // Rule 1.2.6: Waive $15 mountain fee upfront if Coal Mine is available.
+        if (canPotentiallyLayCoalMine(company, hex, standardCost)) {
             cost -= 15;
         }
 
-        // Rule 1.2.6: Bridge companies allow laying yellow on rivers ($10) for free
+        // Rule 1.2.6: Bridge companies allow laying yellow on rivers ($10) for
+        // free[cite: 238].
         if (standardCost == 10) {
             for (net.sf.rails.game.PrivateCompany priv : company.getPortfolioModel().getPrivateCompanies()) {
                 if ("OBC40".equals(priv.getId()) || "UBC80".equals(priv.getId())) {
@@ -178,7 +179,7 @@ public class OperatingRound_1817 extends OperatingRound {
         }
 
         return cost;
-    }// We are modifying OperatingRound_1817.java
+    }
 
     @Override
     public boolean layTile(LayTile action) {
@@ -279,6 +280,13 @@ public class OperatingRound_1817 extends OperatingRound {
     public boolean processGameSpecificAction(PossibleAction action) {
         if (action instanceof net.sf.rails.game.specific._1817.action.DeclineCoalToken_1817) {
             if (offeringCoalMineHex.value() != null) {
+                // Rule 1.2.6: If the token is declined, the deferred $15 fee must now be paid.
+                PublicCompany comp = operatingCompany.value();
+                if (comp != null) {
+                    net.sf.rails.game.state.Currency.toBank(comp, 15);
+                    net.sf.rails.common.ReportBuffer.add(this,
+                            comp.getId() + " declines Coal Mine placement and pays the deferred $15 mountain fee.");
+                }
                 resolvedCoalMineHexes.add(offeringCoalMineHex.value());
                 offeringCoalMineHex.set(null); // Release the interrupt lock
             }
@@ -290,11 +298,6 @@ public class OperatingRound_1817 extends OperatingRound {
             MapHex hex = gameManager.getRoot().getMapManager().getHex(coalAction.getHexId());
 
             if (comp != null && hex != null) {
-                // Refund the $15 paid during the standard LayTile action
-                if (comp instanceof net.sf.rails.game.specific._1817.PublicCompany_1817) {
-                    ((net.sf.rails.game.specific._1817.PublicCompany_1817) comp).addCashFromBank(15,
-                            gameManager.getRoot().getBank());
-                }
 
                 // Identify the specific coal mine private company to use as the token's parent
                 net.sf.rails.game.PrivateCompany coalPrivate = getAvailableCoalMine(comp);
@@ -477,15 +480,23 @@ public class OperatingRound_1817 extends OperatingRound {
         hexesLaidThisTurn.clear();
         offeringCoalMineHex.set(null);
 
-        
-
     }
 
+    /**
+     * Checks if the company is eligible for a mountain fee waiver based on owning
+     * a coal mine with remaining tokens[cite: 251, 253].
+     */
+    private boolean canPotentiallyLayCoalMine(PublicCompany company, MapHex hex, int standardCost) {
+        if (standardCost != 15)
+            return false;
+        if (getAvailableCoalMine(company) == null)
+            return false;
 
+        // NOTE: Future implementation should include geographic adjacency checks.
+        return true;
+    }
 
-
-
-@Override
+    @Override
     protected void privatesPayOut() {
         int count = 0;
         for (net.sf.rails.game.PrivateCompany priv : companyManager.getAllPrivateCompanies()) {
@@ -504,18 +515,18 @@ public class OperatingRound_1817 extends OperatingRound {
                             }
                         }
                         if (hasRealTrain) {
-                            if (count++ == 0) net.sf.rails.common.ReportBuffer.add(this, "");
+                            if (count++ == 0)
+                                net.sf.rails.common.ReportBuffer.add(this, "");
                             String revText = net.sf.rails.game.state.Currency.fromBank(revenue, comp);
-                            net.sf.rails.common.ReportBuffer.add(this, net.sf.rails.common.LocalText.getText("ReceivesFor",
-                                    comp.getId(), revText, priv.getId() + " (Mail Contract)"));
+                            net.sf.rails.common.ReportBuffer.add(this,
+                                    net.sf.rails.common.LocalText.getText("ReceivesFor",
+                                            comp.getId(), revText, priv.getId() + " (Mail Contract)"));
                         }
                     }
                 }
             }
         }
     }
-
-
 
     @Override
     public boolean process(PossibleAction action) {
@@ -753,7 +764,12 @@ public class OperatingRound_1817 extends OperatingRound {
             possibleActions.clear();
             possibleActions.add(new net.sf.rails.game.specific._1817.action.LayCoalToken_1817(getRoot(), comp.getId(),
                     offeringCoalMineHex.value()));
-            possibleActions.add(new net.sf.rails.game.specific._1817.action.DeclineCoalToken_1817(getRoot()));
+
+            // If the company has less than $15, they MUST place the coal token to waive the
+            // fee.
+            if (comp.getCash() >= 15) {
+                possibleActions.add(new net.sf.rails.game.specific._1817.action.DeclineCoalToken_1817(getRoot()));
+            }
             return true;
         }
 
@@ -1063,7 +1079,7 @@ public class OperatingRound_1817 extends OperatingRound {
 
                 // Enforce House Rule: Remove trains sold by companies not owned by the same
                 // president
-net.sf.rails.game.state.Owner seller = bt.getTrain().getOwner();
+                net.sf.rails.game.state.Owner seller = bt.getTrain().getOwner();
                 if (seller instanceof PublicCompany && seller != comp) {
                     PublicCompany sellingComp = (PublicCompany) seller;
                     if (sellingComp.getPresident() != currentPresident) {
@@ -1111,14 +1127,16 @@ net.sf.rails.game.state.Owner seller = bt.getTrain().getOwner();
                                 }
                             }
                             if (!exists && cash >= 1) {
-rails.game.action.BuyTrain newBt = new rails.game.action.BuyTrain(t, otherComp, 1);
+                                rails.game.action.BuyTrain newBt = new rails.game.action.BuyTrain(t, otherComp, 1);
                                 // Set up flexible pricing for inter-company purchases
                                 newBt.setFixedCostMode(rails.game.action.BuyTrain.Mode.MIN);
                                 newBt.setFixedCost(1);
                                 newBt.setForcedBuyIfHasRoute(false);
                                 newBt.setForcedBuyIfNoRoute(false);
                                 newBt.setPresidentMustAddCash(0);
-                                String label = "'" + t.getName() + "' from " + otherComp.getId() + " (1-" + Math.max(1, cash) + ")";
+                                String label = "'" + t.getName() + "' from " + otherComp.getId() + " (1-"
+                                        + Math.max(1, cash) + ")";
+                                newBt.setButtonLabel(label);
                                 possibleActions.add(newBt);
                             }
                         }

@@ -231,6 +231,15 @@ public class CashCorrectionManager extends CorrectionManager {
             if (getParent().getGameUIManager() != null) {
                 getParent().getGameUIManager().forceFullUIRefresh();
             }
+
+            // Force UI Refresh specifically for Status Window
+        if (getParent().getGameUIManager() != null) {
+            getParent().getGameUIManager().forceFullUIRefresh();
+            
+            if (getParent().getGameUIManager().getStatusWindow() != null) {
+                getParent().getGameUIManager().getStatusWindow().repaint();
+            }
+        }
         }
 
        return result;

@@ -524,6 +524,22 @@ private final ArrayListState<String> startedAboveAcquisition;
         ((PublicCompany_1817) initiator).setShareCount(10);
 
         // 5. Station Marker Conversion
+
+        // 5.1 Market Value Adjustment and UI Marker Move
+        StockSpace oldSpace = initiator.getCurrentSpace();
+        int newPriceValue = initiator.getMarketPrice() + target.getMarketPrice();
+        StockSpace newSpace = gameManagerRef.getRoot().getStockMarket().getStartSpace(newPriceValue);
+
+        if (newSpace != null) {
+            if (oldSpace != null) {
+                oldSpace.removeToken(initiator);
+            }
+            // addToken appends to the end of the list, satisfying the 1817 stacking rule
+            newSpace.addToken(initiator);
+            initiator.setCurrentSpace(newSpace);
+            log.info("MERGER MARKET: Moved " + initiator.getId() + " to space " + newSpace.getId());
+        }
+
         List<net.sf.rails.game.BaseToken> targetTokens = new java.util.ArrayList<>(target.getLaidBaseTokens());
         for (net.sf.rails.game.BaseToken targetToken : targetTokens) {
             if (targetToken.getOwner() instanceof net.sf.rails.game.Stop) {

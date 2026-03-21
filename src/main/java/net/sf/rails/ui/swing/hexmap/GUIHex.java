@@ -503,11 +503,14 @@ g.setColor(State.HIGHLIGHT_PURPLE.getColor());
         try {
             paintStationTokens(g);
             paintOffStationTokens(g);
+// 1. Check the toggle state
+            boolean displayMarkings = true;
+            if (hexMap.getOrUIManager() != null) {
+                displayMarkings = hexMap.getOrUIManager().isShowMapMarkings();
+            }
 
-            if (!isTilePainted())
-                return;
-
-            if (getHex().getTileCost() > 0) {
+            // 2. Draw costs even if the tile is "0", but only if the toggle is ON
+            if (displayMarkings && getHex().getTileCost() > 0) {
                 FontMetrics fontMetrics = g.getFontMetrics();
                 g.drawString(
                         Bank.format(getHex(), getHex().getTileCost()),
@@ -518,6 +521,9 @@ g.setColor(State.HIGHLIGHT_PURPLE.getColor());
                         dimensions.rectBound.y
                                 + ((fontMetrics.getHeight() + dimensions.rectBound.height) * 9 / 15));
             }
+
+            if (!isTilePainted())
+                return;
 
             // Force label drawing strictly for SVG/preprinted tiles to bypass the GUITile skip
             Tile visibleTile = getVisibleTile();

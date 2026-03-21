@@ -325,6 +325,11 @@ private void setupGlobalHotkeys() {
                 if (orPanel != null) {
                     orPanel.toggleTileBuildNumbers();
                     orUIManager.toggleCompanyHighlights();
+                    orUIManager.toggleMapMarkings();
+                    // Force a full map repaint to ensure the costs appear/disappear instantly
+                    if (orUIManager.getMap() != null) {
+                        orUIManager.getMap().repaintAll(new Rectangle(orUIManager.getMap().getSize()));
+                    }
                 }
             }
         });

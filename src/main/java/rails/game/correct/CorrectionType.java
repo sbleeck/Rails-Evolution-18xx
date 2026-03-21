@@ -17,6 +17,11 @@ public enum CorrectionType {
         {return MapCorrectionManager.create(gm);}
     },
 
+    CORRECT_LOANS {
+        public CorrectionManager newCorrectionManager(GameManager gm) 
+        {return LoanCorrectionManager.create(gm);}
+    },
+
     MOVE_PRIVATE {
 public CorrectionManager newCorrectionManager(GameManager gm)
 {return PrivateMoveCorrectionManager.create(gm);}
