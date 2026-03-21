@@ -87,38 +87,7 @@ if (bondsModel == null) {
         }
     }
 
-    @Override
-    public void startOperatingRound(boolean increment) {
-        super.startOperatingRound(increment);
-        payMailContracts();
-    }
-
-    /**
-     * Regel 6.0: Mail contracts werden zu Beginn der OR an Gesellschaften gezahlt,
-     * die einen Mail Contract und mindestens einen Zug besitzen.
-     */
-private void payMailContracts() {
-        for (net.sf.rails.game.PublicCompany comp : getRoot().getCompanyManager().getAllPublicCompanies()) {
-            if (comp instanceof PublicCompany_1817) {
-                PublicCompany_1817 comp1817 = (PublicCompany_1817) comp;
-
-                if (comp1817.getPortfolioModel().getNumberOfTrains() > 0) {
-                    for (net.sf.rails.game.PrivateCompany priv : comp1817.getPortfolioModel().getPrivateCompanies()) {
-                        int bonus = 0;
-                        if ("MNM60".equals(priv.getId())) bonus = 10;
-                        else if ("MLC90".equals(priv.getId())) bonus = 15;
-                        else if ("MJM12".equals(priv.getId())) bonus = 20;
-
-                        if (bonus > 0) {
-                            net.sf.rails.common.ReportBuffer.add(this, comp1817.getId() + " receives $" + bonus + " from " + priv.getLongName());
-                            comp1817.addCashFromBank(bonus, getRoot().getBank());
-                        }
-                    }
-                }
-            }
-        }
-    }
-
+  
     /**
      * Executes Rule 6.11: Exporting the next available train at the end of the OR.
      */

@@ -254,8 +254,13 @@ public class ORUIManager implements DialogOwner {
 
         // --- STANDARD OPERATING ROUND ---
         if (!(currentRound instanceof OperatingRound)) {
-            if (orPanel != null)
+            if (orPanel != null) {
                 orPanel.disableButtons();
+            // RIGOROUS CLEANUP: If the engine transitions to a non-Operating Round
+                // the ORUIManager aborts further updates. We must force the ORPanel to 
+                // wipe its display so special actions from the previous turn do not linger.
+                orPanel.finish();
+            }
             return;
         }
 

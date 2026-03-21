@@ -88,31 +88,7 @@ public class OperatingRound_1817 extends OperatingRound {
             }
         }
 
-        // The base engine automatically pays out private company revenues at the start
-        // of the OR.
-        // We unconditionally refund the automatic payout here so we can pay it
-        // conditionally
-        // at the start of each company's turn as requested.
-        for (PublicCompany comp : gameManager.getAllPublicCompanies()) {
-            if (comp.hasStarted() && !comp.isClosed()) {
-                for (net.sf.rails.game.PrivateCompany priv : comp.getPortfolioModel().getPrivateCompanies()) {
-                    String pid = priv.getId();
-                    int refund = 0;
-
-                    // Assuming XML IDs: MMC (Minor), MC (Regular), MaMC (Major)
-                    if (pid.startsWith("MMC"))
-                        refund = 10;
-                    else if (pid.startsWith("MC") && !pid.startsWith("MJM")) // Avoid MJM coal mine
-                        refund = 15;
-                    else if (pid.startsWith("MaMC"))
-                        refund = 20;
-
-                    if (refund > 0) {
-                        net.sf.rails.game.state.Currency.toBank(comp, refund);
-                    }
-                }
-            }
-        }
+       
     }
 
     @Override
@@ -501,50 +477,45 @@ public class OperatingRound_1817 extends OperatingRound {
         hexesLaidThisTurn.clear();
         offeringCoalMineHex.set(null);
 
-        // Mail Contracts pay out at the beginning of the company's turn if it has a
-        // real train.
-        // We explicitly iterate over the train portfolio to filter out "private papers"
-        // (e.g., Mail Contracts)
-        // that the base engine might be incorrectly classifying as trains.
-        PublicCompany comp = operatingCompany.value();
-        if (comp != null && !comp.isClosed()) {
-            boolean hasRealTrain = false;
-            if (comp.getPortfolioModel() != null && comp.getPortfolioModel().getTrainList() != null) {
-                for (net.sf.rails.game.Train t : comp.getPortfolioModel().getTrainList()) {
-                    // 1817 trains always contain a digit (2, 2+, 3, etc.). Private papers do not.
-                    if (t.getName() != null && t.getName().matches(".*\\d.*")) {
-                        hasRealTrain = true;
-                        break;
-                    }
-                }
-            }
-            if (hasRealTrain) {
-                for (net.sf.rails.game.PrivateCompany priv : comp.getPortfolioModel().getPrivateCompanies()) {
-                    String pid = priv.getId();
-                    int payout = 0;
+        
 
-                    if (pid.startsWith("MMC"))
-                        payout = 10;
-                    else if (pid.startsWith("MC") && !pid.startsWith("MJM"))
-                        payout = 15;
-                    else if (pid.startsWith("MaMC"))
-                        payout = 20;
+    }
 
-                    if (payout > 0) {
-                        if (comp instanceof net.sf.rails.game.specific._1817.PublicCompany_1817) {
-                            ((net.sf.rails.game.specific._1817.PublicCompany_1817) comp).addCashFromBank(payout,
-                                    gameManager.getRoot().getBank());
-                        } else {
-                            net.sf.rails.game.state.Currency.wire(gameManager.getRoot().getBank(), payout, comp);
+
+
+
+
+@Override
+    protected void privatesPayOut() {
+        int count = 0;
+        for (net.sf.rails.game.PrivateCompany priv : companyManager.getAllPrivateCompanies()) {
+            if (!priv.isClosed()) {
+                int revenue = priv.getRevenueByPhase(net.sf.rails.game.Phase.getCurrent(this));
+                if (revenue > 0 && priv.getOwner() instanceof PublicCompany) {
+                    PublicCompany comp = (PublicCompany) priv.getOwner();
+                    if (!comp.isClosed()) {
+                        boolean hasRealTrain = false;
+                        if (comp.getPortfolioModel() != null && comp.getPortfolioModel().getTrainList() != null) {
+                            for (net.sf.rails.game.Train t : comp.getPortfolioModel().getTrainList()) {
+                                if (t.getName() != null && t.getName().matches(".*\\d.*")) {
+                                    hasRealTrain = true;
+                                    break;
+                                }
+                            }
                         }
-                        net.sf.rails.common.ReportBuffer.add(this,
-                                comp.getId() + " receives $" + payout + " for " + pid + " (Mail Contract).");
+                        if (hasRealTrain) {
+                            if (count++ == 0) net.sf.rails.common.ReportBuffer.add(this, "");
+                            String revText = net.sf.rails.game.state.Currency.fromBank(revenue, comp);
+                            net.sf.rails.common.ReportBuffer.add(this, net.sf.rails.common.LocalText.getText("ReceivesFor",
+                                    comp.getId(), revText, priv.getId() + " (Mail Contract)"));
+                        }
                     }
                 }
             }
         }
-
     }
+
+
 
     @Override
     public boolean process(PossibleAction action) {

@@ -1790,16 +1790,16 @@ if (actions != null && !actions.isEmpty()) {
                             });
                             dynamicButtonPanel.add(auctionBidButton);
 
-                            if (auctionPassButton == null)
-                                auctionPassButton = new JButton("Pass");
+                            // if (auctionPassButton == null)
+                            //     auctionPassButton = new JButton("Pass");
 
-                            auctionPassButton.setPreferredSize(new Dimension(70, 28));
-                            auctionPassButton.setForeground(Color.RED);
-                            final NullAction finalPass = passAction;
-                            for (java.awt.event.ActionListener al : auctionPassButton.getActionListeners())
-                                auctionPassButton.removeActionListener(al);
-                            auctionPassButton.addActionListener(e -> process(finalPass));
-                            dynamicButtonPanel.add(auctionPassButton);
+                            // auctionPassButton.setPreferredSize(new Dimension(70, 28));
+                            // auctionPassButton.setForeground(Color.RED);
+                            // final NullAction finalPass = passAction;
+                            // for (java.awt.event.ActionListener al : auctionPassButton.getActionListeners())
+                            //     auctionPassButton.removeActionListener(al);
+                            // auctionPassButton.addActionListener(e -> process(finalPass));
+                            // dynamicButtonPanel.add(auctionPassButton);
                         } else {
                             dynamicButtonPanel
                                     .add(new JLabel("Waiting for " + actorName + " to bid for " + companyId + "..."));
@@ -1924,18 +1924,18 @@ if (actions != null && !actions.isEmpty()) {
                                 dynamicButtonPanel.add(noBidLabel);
                             }
 
-                            if (passAction != null) {
-                                if (auctionPassButton == null)
-                                    auctionPassButton = new JButton("Pass");
-                                auctionPassButton.setPreferredSize(new Dimension(70, 28));
-                                auctionPassButton.setForeground(Color.RED);
+                            // if (passAction != null) {
+                            //     if (auctionPassButton == null)
+                            //         auctionPassButton = new JButton("Pass");
+                            //     auctionPassButton.setPreferredSize(new Dimension(70, 28));
+                            //     auctionPassButton.setForeground(Color.RED);
 
-                                final NullAction finalPass = passAction;
-                                for (java.awt.event.ActionListener al : auctionPassButton.getActionListeners())
-                                    auctionPassButton.removeActionListener(al);
-                                auctionPassButton.addActionListener(e -> process(finalPass));
-                                dynamicButtonPanel.add(auctionPassButton);
-                            }
+                            //     final NullAction finalPass = passAction;
+                            //     for (java.awt.event.ActionListener al : auctionPassButton.getActionListeners())
+                            //         auctionPassButton.removeActionListener(al);
+                            //     auctionPassButton.addActionListener(e -> process(finalPass));
+                            //     dynamicButtonPanel.add(auctionPassButton);
+                            // }
 
                         } else {
                             dynamicButtonPanel
@@ -2010,23 +2010,23 @@ boolean hasSpecialActions = false;
                                 dynamicButtonPanel.add(shortBtn);
                             }
                         }
-                        if (myTurn) {
-                            List<NullAction> nullActions = possibleActions.getType(NullAction.class);
-                            if (nullActions != null) {
-                                for (NullAction na : nullActions) {
-                                    if (na.getMode() == NullAction.Mode.PASS || na.getMode() == NullAction.Mode.DONE) {
-                                        dynamicButtonPanel.add(new JSeparator(JSeparator.VERTICAL));
-                                        ActionButton declineBtn = new ActionButton(null);
-                                        declineBtn.setText(na.getMode() == NullAction.Mode.PASS ? "Decline / Pass" : "Done");
-                                        declineBtn.setForeground(Color.RED);
-                                        declineBtn.setPossibleAction(na);
-                                        declineBtn.addActionListener(this);
-                                        dynamicButtonPanel.add(declineBtn);
-                                        break;
-                                    }
-                                }
-                            }
-                        }
+                        // if (myTurn) {
+                        //     List<NullAction> nullActions = possibleActions.getType(NullAction.class);
+                        //     if (nullActions != null) {
+                        //         for (NullAction na : nullActions) {
+                        //             if (na.getMode() == NullAction.Mode.PASS || na.getMode() == NullAction.Mode.DONE) {
+                        //                 dynamicButtonPanel.add(new JSeparator(JSeparator.VERTICAL));
+                        //                 ActionButton declineBtn = new ActionButton(null);
+                        //                 declineBtn.setText(na.getMode() == NullAction.Mode.PASS ? "Decline / Pass" : "Done");
+                        //                 declineBtn.setForeground(Color.RED);
+                        //                 declineBtn.setPossibleAction(na);
+                        //                 declineBtn.addActionListener(this);
+                        //                 dynamicButtonPanel.add(declineBtn);
+                        //                 break;
+                        //             }
+                        //         }
+                        //     }
+                        // }
                     } else {
 
 
@@ -2042,15 +2042,12 @@ boolean hasSpecialActions = false;
             }
 
             boolean passFound = false;
-            boolean blockGlobalPass = (dynamicButtonPanel.getComponentCount() > 0);
+boolean blockGlobalPass = false; // NEVER block the global pass button
 
             List<NullAction> inactiveItems = possibleActions.getType(NullAction.class);
 
             if (inactiveItems != null && !blockGlobalPass) {
 
-                // boolean passFound = false;
-
-                // List<NullAction> inactiveItems = possibleActions.getType(NullAction.class);
 
                 // if (inactiveItems != null) {
                 for (NullAction na : inactiveItems) {

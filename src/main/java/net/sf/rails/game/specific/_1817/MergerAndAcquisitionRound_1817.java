@@ -48,6 +48,7 @@ public class MergerAndAcquisitionRound_1817 extends Round {
 
     private final ArrayListState<String> validMergerPairs;
     private final ArrayListState<String> mergedThisRound;
+private final ArrayListState<String> startedAboveAcquisition;
 
     private final GenericState<Integer> highestBid;
     private final GenericState<net.sf.rails.game.Player> highestBiddingPlayer;
@@ -100,17 +101,22 @@ public class MergerAndAcquisitionRound_1817 extends Round {
         activeBidders = new ArrayListState<>(this, "activeBidders");
         auctionPlayerIndex = new GenericState<>(this, "auctionPlayerIndex", 0);
         mandatoryTokenCost = new GenericState<>(this, "mandatoryTokenCost", 0);
-    }
+    startedAboveAcquisition = new ArrayListState<>(this, "startedAboveAcquisition");
+}
 
     public void start() {
         operatingCompanies.clear();
         log.info("M&A ROUND: start() invoked.");
+        startedAboveAcquisition.clear();
 
         List<PublicCompany> sortedComps = gameManagerRef.getCompaniesInRunningOrder();
         for (PublicCompany comp : sortedComps) {
             if (comp.hasFloated() && !comp.isClosed()) {
                 operatingCompanies.add(comp);
                 log.info("M&A ROUND: Added operating company: " + comp.getId());
+                if (comp.getCurrentSpace() != null && comp.getCurrentSpace().getPrice() > 30) {
+                    startedAboveAcquisition.add(comp.getId());
+                }
             }
         }
 
@@ -1081,11 +1087,21 @@ possibleActions.add(new net.sf.rails.game.specific._1817.action.TakeLoans_1817(g
 
         boolean isRed = false;
         boolean isGray = false;
+        boolean droppedToGrayThisRound = false;
 
         if (comp.hasStockPrice() && comp.getCurrentSpace() != null) {
             int currentPrice = comp.getCurrentSpace().getPrice();
             isRed = (currentPrice == 0);
             isGray = (currentPrice > 0 && currentPrice <= 30);
+            if (isGray && startedAboveAcquisition.contains(comp.getId())) {
+                droppedToGrayThisRound = true;
+            }
+        }
+        if (droppedToGrayThisRound) {
+            log.info("M&A ROUND: Skipping " + comp.getId() + " because it dropped into the acquisition zone during this round.");
+            companyIndex.set(companyIndex.value() + 1);
+            processNextSale();
+            return;
         }
 
         if (isRed) {

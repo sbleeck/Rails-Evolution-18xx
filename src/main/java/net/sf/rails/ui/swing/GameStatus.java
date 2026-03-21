@@ -3460,6 +3460,22 @@ if (gameUIManager.getGameManager() instanceof net.sf.rails.game.specific._1817.G
         } catch (Exception e) {
             e.printStackTrace();
         }
+
+         // The Kill Signal: ORUIManager silently aborts updates during Player-driven phases (like Auctions).
+        // We manually broadcast an empty action list to force the ORPanel to trigger its dormancy intercept.
+        if (possibleActions != null && possibleActions.getList() != null) {
+            boolean isPlayerExclusivePhase = false;
+            for (PossibleAction pa : possibleActions.getList()) {
+                String paName = pa.getClass().getSimpleName();
+                if (paName.contains("Bid") || paName.contains("OfferCompany") || paName.contains("SettleIPO")) {
+                    isPlayerExclusivePhase = true;
+                    break;
+                }
+            }
+            if (isPlayerExclusivePhase) {
+                net.sf.rails.ui.swing.ORPanel.forceUpdateForManager(gameUIManager, new java.util.ArrayList<>());
+            }
+        }
         repaint();
     }
 

@@ -1849,6 +1849,10 @@ public class ORPanel extends GridPanel
                 card.setCompactMode(true);
                 card.setOpaque(true);
                 card.setBackground(new Color(255, 235, 235)); // Pinkish for Privates
+                card.setPrivateCompanyTooltip(pc);
+                if (orUIManager != null) {
+                    net.sf.rails.ui.swing.hexmap.HexHighlightMouseListener.addMouseListener(card, orUIManager, pc, false);
+                }
                 stack.add(card);
             }
 
@@ -1861,6 +1865,8 @@ public class ORPanel extends GridPanel
         public void setTrains(String s, int i) {
         }
     }
+
+    
 
     private void addTrainBuyButton(BuyTrain action) {
         ActionButton btn = new ActionButton(RailsIcon.BUY_TRAIN);
@@ -2439,9 +2445,36 @@ public class ORPanel extends GridPanel
                 net.sf.rails.game.round.RoundFacade rf = orUIManager.getGameUIManager().getGameManager()
                         .getCurrentRound();
                 if (rf != null) {
-isMaARound = rf.getClass().getSimpleName().contains("Merger") || 
-                                 rf.getClass().getSimpleName().contains("Formation");
-                                                     if (rf instanceof net.sf.rails.game.OperatingRound) {
+                    String rfName = rf.getClass().getSimpleName();
+                   
+
+
+boolean hasOpComp = false;
+                    try {
+                        rf.getClass().getMethod("getOperatingCompany");
+                        hasOpComp = true;
+                    } catch (Exception e) {}
+
+                    boolean isOperatingPhase = rf instanceof net.sf.rails.game.OperatingRound ||
+                                               rfName.contains("Operating") ||
+                                               rfName.contains("Merger") ||
+                                               rfName.contains("Formation") ||
+                                               hasOpComp;
+
+                    if (!isOperatingPhase) {
+                        finish();
+                        if (lblCompanyInfo != null) {
+                            String cleanName = rfName.replace("Round", "").replaceAll("([a-z])([A-Z]+)", "$1 $2").trim();
+                            lblCompanyInfo.setText("<html><center><font face='SansSerif' size='5'><b>" + cleanName + " Phase</b></font></center></html>");
+                        }
+                        return; // Force dormancy: prevents lingering actions from being processed
+                    }
+                    isMaARound = rfName.contains("Merger") || rfName.contains("Formation");
+
+
+
+
+                    if (rf instanceof net.sf.rails.game.OperatingRound) {
                         engineActiveComp = ((net.sf.rails.game.OperatingRound) rf).getOperatingCompany();
                     } else {
                         try {
@@ -2461,18 +2494,31 @@ isMaARound = rf.getClass().getSimpleName().contains("Merger") ||
                 this.orComp = this.currentOperatingComp;
             }
 
-            // 3. FILTER & DETECT SPECIAL ACTIONS (Generic "Stupid Panel" Logic)
+            
+
+// 3. FILTER & DETECT SPECIAL ACTIONS
             List<PossibleAction> specialActions = new ArrayList<>();
             GuiTargetedAction contextProvider = null;
-
-            // Fix: Buffer the NullAction to process it AFTER checking for other special
-            // actions.
-            // This prevents the "Done" button from being swallowed if it appears
-            // before the Discard/Special action in the list.
             PossibleAction deferredNullAction = null;
+            
+            // Create a strictly filtered list for all downstream logic
+            List<PossibleAction> validOrActions = new ArrayList<>();
 
             for (PossibleAction pa : actions) {
-                boolean is1817Special = pa.getClass().getSimpleName().contains("1817");
+                String paName = pa.getClass().getSimpleName();
+                
+                // Exclude pure bidding/auction actions from ORPanel
+                boolean isStatusWindowExclusive = paName.contains("Bid") || 
+                                                  paName.contains("SettleIPO") || 
+                                                  paName.equals("Short1817");
+
+                if (isStatusWindowExclusive) {
+                    continue; 
+                }
+
+                validOrActions.add(pa);
+
+                boolean is1817Special = paName.contains("1817");
 
                 if (is1817Special) {
                     specialActions.add(pa);
@@ -2481,78 +2527,45 @@ isMaARound = rf.getClass().getSimpleName().contains("Merger") ||
                     specialActions.add(pa);
                     if (contextProvider == null)
                         contextProvider = (GuiTargetedAction) pa;
-                }
-
-                // Legacy Fallback for Home Token (if not yet upgraded to GuiTargetedAction)
-                else if (pa instanceof LayBaseToken && ((LayBaseToken) pa).getType() == LayBaseToken.HOME_CITY) {
+                } else if (pa instanceof LayBaseToken && ((LayBaseToken) pa).getType() == LayBaseToken.HOME_CITY) {
                     specialActions.add(pa);
-                }
-                // Buffer the NullAction; do not decide yet
-                else if (pa instanceof NullAction) {
+                } else if (pa instanceof NullAction) {
                     deferredNullAction = pa;
                 }
             }
 
-            // 4. GENERIC CONTEXT SWITCH
-            // If the special action dictates a specific actor (e.g. a Company discarding
-            // out of turn),
-            // we switch the panel's focus to that actor immediately.
-            if (contextProvider != null) {
-                Owner actor = contextProvider.getActor();
-                if (actor instanceof PublicCompany && actor != this.orComp) {
-                    this.orComp = (PublicCompany) actor;
-                    updateSidebarData();
-                }
-            }
-
-            int computedPhase = determineActivePhase(actions);
+            // Determine phase based ONLY on valid OR actions
+            int computedPhase = determineActivePhase(validOrActions);
             boolean hasStandardActions = computedPhase > 0;
 
-            // 5. RENDER SPECIAL MODE (Exclusive Interrupts Only)
-            if (isMaARound || (!specialActions.isEmpty() && !hasStandardActions)) {
-                this.specialModeActive = true;
-                this.activePhase = 0;
-                setStandardPanelsVisible(false);
+            // THE DORMANCY INTERCEPT (Hardened)
+            boolean onlyPassRemains = validOrActions.size() == 1 && deferredNullAction != null;
+        if (validOrActions.isEmpty() || (specialActions.isEmpty() && (!hasStandardActions || computedPhase == 6 || onlyPassRemains))) {
+// --- START FIX ---
+                // log.info("==================================================");
+                // log.info("ORPANEL DORMANCY INTERCEPT TRIGGERED!");
+                // log.info("Forcing physical UI cleanup...");
+                // log.info("==================================================");
 
-                if (contextProvider != null) {
-                    updateSpecialHeader(contextProvider);
-                } else if (isMaARound && this.orComp != null) {
-                    lblCompanyInfo.setText("<html><center><font face='SansSerif' size='6'><b>" + this.orComp.getId()
-                            + "</b></font></center></html>");
-                    lblCompanyInfo.setBackground(this.orComp.getBgColour());
-                    lblCompanyInfo.setForeground(this.orComp.getFgColour());
-                    lblCompanyInfo.setVisible(true);
-
-                    if (lblPlayerInfo != null) {
-                        String pName = (this.orComp.getPresident() != null) ? this.orComp.getPresident().getName() : "";
-                        lblPlayerInfo.setText(
-                                "<html><center><font face='SansSerif' size='5'>" + pName + "</font></center></html>");
-                        lblPlayerInfo.setBackground(this.orComp.getBgColour());
-                        lblPlayerInfo.setForeground(this.orComp.getFgColour());
-                        lblPlayerInfo.setBorder(BorderFactory.createMatteBorder(0, 1, 0, 1, Color.DARK_GRAY));
-                        lblPlayerInfo.setVisible(true);
-                    }
+                specialModeActive = false;
+                
+                // Leverage the native finish() method to rigorously wipe all panels,
+                // clear actions, and reset the header styling.
+                finish();
+                
+                // Hard physical refresh of the container hierarchy
+                if (sidebarPanel != null) {
+                    sidebarPanel.revalidate();
+                    sidebarPanel.repaint();
                 }
+                this.revalidate();
+                this.repaint();
+                
+                return; // Abort further ORPanel processing
 
-                if (specialPanel != null && specialContainer != null) {
-                    specialContainer.setVisible(true);
-                    specialPanel.removeAll();
-                    for (PossibleAction spa : specialActions) {
-                        addSpecialActionButton(spa);
-                    }
-                    if (deferredNullAction != null) {
-                        addSpecialActionButton(deferredNullAction);
-                    }
-                    specialPanel.revalidate();
-                    specialPanel.repaint();
-
-                    if (sidebarPanel != null) {
-                        sidebarPanel.revalidate();
-                        sidebarPanel.repaint();
-                    }
-                }
-                return;
             }
+
+          
 
             // --- 6. STANDARD MODE (OR MIXED) ---
             this.specialModeActive = false;
@@ -2577,7 +2590,7 @@ isMaARound = rf.getClass().getSimpleName().contains("Merger") ||
                 enableConfirm(hasSelection);
             }
 
-            distributeStandardActions(actions);
+distributeStandardActions(validOrActions);
             updateSidebarData();
             updatePhaseSpecifics();
 
