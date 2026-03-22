@@ -2547,13 +2547,9 @@ boolean hasOpComp = false;
 
             // THE DORMANCY INTERCEPT (Hardened)
             boolean onlyPassRemains = validOrActions.size() == 1 && deferredNullAction != null;
-        if (validOrActions.isEmpty() || (specialActions.isEmpty() && (!hasStandardActions || computedPhase == 6 || onlyPassRemains))) {
-// --- START FIX ---
-                // log.info("==================================================");
-                // log.info("ORPANEL DORMANCY INTERCEPT TRIGGERED!");
-                // log.info("Forcing physical UI cleanup...");
-                // log.info("==================================================");
-
+      
+            // Rule: The panel must remain active if the user needs to explicitly click 'Done'
+            if (validOrActions.isEmpty() || (specialActions.isEmpty() && !hasStandardActions)) {
                 specialModeActive = false;
                 
                 // Leverage the native finish() method to rigorously wipe all panels,
@@ -2571,7 +2567,6 @@ boolean hasOpComp = false;
                 return; // Abort further ORPanel processing
 
             }
-
           
 
             // --- 6. STANDARD MODE (OR MIXED) ---
