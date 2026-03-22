@@ -708,6 +708,25 @@ public class OperatingRound_1817 extends OperatingRound {
                     }
                 }
             }
+            net.sf.rails.game.PhaseManager pm = getRoot().getPhaseManager();
+                if (pm.hasReachedPhase("4")) {
+                    java.util.Set<net.sf.rails.game.Train> companyTrains = comp.getPortfolioModel().getTrainList();
+                    java.util.List<net.sf.rails.game.Train> toDiscard = new java.util.ArrayList<>();
+                    
+                    for (net.sf.rails.game.Train t : companyTrains) {
+                        if (t.getName() != null && t.getName().contains("2+")) {
+                            toDiscard.add(t);
+                        }
+                    }
+                    
+                    for (net.sf.rails.game.Train t : toDiscard) {
+                        getRoot().getTrainManager().trashTrain(t);
+                        log.info("1817_OR: 2+ train ({}) belonging to {} rusted and was removed from play.", 
+                            t.getId(), comp.getId());
+                        net.sf.rails.common.ReportBuffer.add(this, 
+                            comp.getId() + " discards rusted 2+ train after its final run.");
+                    }
+                }
             return result;
         }
 
