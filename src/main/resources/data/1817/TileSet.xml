@@ -37,10 +37,10 @@
     <!-- B (baltimore) green -->
     <Tile id="2053" quantity="4"><Upgrade id="148400"/></Tile>
 
-    <Tile id="80" quantity="-1"> <Upgrade id="7,8"/></Tile>
-    <Tile id="81" quantity="-1"> <Upgrade id="8"/></Tile>
-    <Tile id="82" quantity="-1"> <Upgrade id="7,8,9"/></Tile>
-    <Tile id="83" quantity="-1"> <Upgrade id="7,8,9"/></Tile>
+    <Tile id="80" quantity="-1"> <Upgrade id="545,546"/></Tile>
+    <Tile id="81" quantity="-1"> <Upgrade id="546"/></Tile>
+    <Tile id="82" quantity="-1"> <Upgrade id="544,545,546"/></Tile>
+    <Tile id="83" quantity="-1"> <Upgrade id="544,545,546"/></Tile>
 
 
 <!-- BROWN   -->

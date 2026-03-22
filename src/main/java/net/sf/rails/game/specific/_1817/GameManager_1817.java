@@ -38,8 +38,7 @@ if (bondsModel == null) {
 
   
     protected final net.sf.rails.game.state.BooleanState endgameTriggered = new net.sf.rails.game.state.BooleanState(this, "endgameTriggered", false);
-    protected final net.sf.rails.game.state.IntegerState remainingOperatingRounds = net.sf.rails.game.state.IntegerState.create(this, "remainingOperatingRounds", -1);
-    protected final net.sf.rails.game.state.BooleanState finalSetHasThreeORs = new net.sf.rails.game.state.BooleanState(this, "finalSetHasThreeORs", false);
+    protected final net.sf.rails.game.state.IntegerState remainingORs = net.sf.rails.game.state.IntegerState.create(this, "remainingORs", -1);
 
     @Override
     public void nextRound(Round round) {
@@ -59,78 +58,63 @@ if (bondsModel == null) {
             return;
         }
 
-        // 3. 1817 Static 5-Round Sequence
+        // 3. 1817 Static Sequence
         if (round instanceof StockRound) {
-            // Sequence: SR -> OR 1
             capturePlayerWorthSnapshot(round.getId());
             captureCompanyPayoutSnapshot(round.getId());
             relativeORNumber.set(0);
+
+            // Synchronize the core engine's round limits with the 1817 countdown
+            if (endgameTriggered.value()) {
+                numOfORs.set(remainingORs.value());
+                operatingRoundLimit.set(remainingORs.value());
+            } else {
+                numOfORs.set(2);
+                operatingRoundLimit.set(2);
+            }
             startOperatingRound(true);
 
         } else if (round instanceof OperatingRound) {
-            // Sequence: OR 1 -> M&A 1 OR OR 2 -> M&A 2
+            // Sequence: OR -> M&A
             capturePlayerWorthSnapshot(round.getId());
             captureCompanyPayoutSnapshot(round.getId());
             exportTrain();
 
-            boolean newlyTriggered = !endgameTriggered.value() && getRoot().getPhaseManager().hasReachedPhase("8");
-            if (newlyTriggered) {
+            // Trigger Check
+            boolean phase8Active = getRoot().getPhaseManager().hasReachedPhase("8");
+            if (!endgameTriggered.value() && phase8Active) {
                 endgameTriggered.set(true);
-                remainingOperatingRounds.set(3);
-                if (relativeORNumber.value() == 2) {
-                    finalSetHasThreeORs.set(true);
-                } else {
-                    finalSetHasThreeORs.set(false);
-                }
-                net.sf.rails.common.ReportBuffer.add(this, "The first 8-train has been purchased or exported! The game will end after exactly 3 more Operating Rounds.");
-            } else if (endgameTriggered.value()) {
-                remainingOperatingRounds.set(remainingOperatingRounds.value() - 1);
+                gameOverPending.set(true); 
+                remainingORs.set(3); // Game ends after exactly 3 more ORs
+                net.sf.rails.common.ReportBuffer.add(this, "The 8-train has been purchased or exported! The game will end after exactly 3 more Operating Rounds.");
+            } else if (endgameTriggered.value() && remainingORs.value() > 0) {
+                remainingORs.add(-1);
             }
 
             startMergerAndAcquisitionRound();
 
         } else if (round instanceof MergerAndAcquisitionRound_1817) {
-            // Sequence: M&A 1 -> OR 2 OR M&A 2 -> SR
+            // Sequence: M&A -> OR OR M&A -> SR
             capturePlayerWorthSnapshot(round.getId());
             captureCompanyPayoutSnapshot(round.getId());
 
-            if (endgameTriggered.value() && remainingOperatingRounds.value() == 0) {
+            if (endgameTriggered.value() && remainingORs.value() == 0) {
                 net.sf.rails.common.ReportBuffer.add(this, "The final Operating Round and M&A phase have concluded. Game Over.");
                 finishGame();
                 return;
             }
 
-            boolean goToSR = false;
-            
-            if (endgameTriggered.value()) {
-                if (finalSetHasThreeORs.value()) {
-                    if (remainingOperatingRounds.value() == 3) {
-                        goToSR = true;
-                    }
-                } else {
-                    if (remainingOperatingRounds.value() == 2) {
-                        goToSR = true;
-                    }
-                }
-            } else {
-                if (relativeORNumber.value() >= 2) {
-                    goToSR = true;
-                }
-            }
-
-            if (goToSR) {
-                if (gameOverPending.value() && gameEndWhen == GameEnd.AFTER_SET_OF_ORS) {
-                    finishGame();
-                } else {
-                    startStockRound();
-                }
-            } else {
+            // Route to next OR or SR based on relative number
+            if (relativeORNumber.value() < operatingRoundLimit.value()) {
                 startOperatingRound(true);
+            } else {
+                startStockRound();
             }
         } else {
             super.nextRound(round);
         }
     }
+    
 
     /**
      * Executes Rule 6.11: Exporting the next available train at the end of the OR.
