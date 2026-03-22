@@ -252,7 +252,7 @@
     </Tile>
 
 <!--standard brown city with 5 exits -->
-    <Tile colour="brown" id="611" name="611" rotation="1"> 
+    <Tile colour="brown" id="61100" name="61100" rotation="1"> 
         <Station id="city1" position="0" slots="2" type="City" value="40"/>
         <Track from="city1" to="side1"/>
         <Track from="city1" to="side3"/>
