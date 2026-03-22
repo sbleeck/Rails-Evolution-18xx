@@ -17,7 +17,7 @@
 	<Hex name="B7" tile="0"/>
 	<Hex name="B9" tile="0" cost="20"/>
 	<Hex name="B11" tile="0" />
-	<Hex name="B13" tile="-911" city="Toronto" value="20,30,40">
+	<Hex name="B13" tile="-911" city="Toronto" value="20,30,40,40">
 		<Access runThrough="yes"/>
 	</Hex>
 	<Hex name="B15" tile="0"/>

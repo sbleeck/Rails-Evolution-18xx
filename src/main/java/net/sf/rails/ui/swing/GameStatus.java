@@ -1347,10 +1347,11 @@ public class GameStatus extends GridPanel {
             } else if (actions.get(0) instanceof TrainCorrectionAction) {
                 chosenAction = actions.get(0);
             } else if (actions.get(0) instanceof BuyTrain) {
-                chosenAction = handleBuyTrain((BuyTrain) actions.get(0));
+                gameUIManager.getORUIManager().processBuyTrain((BuyTrain) actions.get(0));
+                return;
             } else if (actions.get(0).getClass().getName().endsWith("Initiate1817IPO")) {
                 chosenAction = handle1817IPO(actions.get(0));
-            
+
             } else if (actions.get(0).getClass().getSimpleName().equals("StartPrussian")) {
                 // Explicitly handle StartPrussian to ensure it triggers
                 chosenAction = actions.get(0);
@@ -1392,80 +1393,6 @@ public class GameStatus extends GridPanel {
         return null;
     }
 
-
-    /**
-     * Handles the logic for buying a train, including the UI for negotiating price
-     * between companies if applicable.
-     */
-    private PossibleAction handleBuyTrain(BuyTrain buyTrainAction) {
-        try {
-            net.sf.rails.game.state.Owner buyingOwner = null;
-            net.sf.rails.game.state.Owner sellingOwner = buyTrainAction.getFromOwner();
-
-            // 1. Determine BUYER
-            // In an OR, the Buyer is ALWAYS the Operating Company.
-            if (gameUIManager.getGameManager().getCurrentRound() instanceof net.sf.rails.game.OperatingRound) {
-                buyingOwner = ((net.sf.rails.game.OperatingRound) gameUIManager.getGameManager()
-                        .getCurrentRound()).getOperatingCompany();
-            }
-            // Fallback: Use action owner if not in OR
-            if (buyingOwner == null) {
-                buyingOwner = buyTrainAction.getOwner();
-            }
-
-            // 2. Identify if Seller is Bank (Fixed Price)
-            boolean isBankSale = (sellingOwner instanceof net.sf.rails.game.financial.Bank) ||
-                    (sellingOwner != null && sellingOwner.getParent() instanceof net.sf.rails.game.financial.Bank);
-
-            if (isBankSale) {
-                buyTrainAction.setPricePaid(buyTrainAction.getFixedCost());
-                return buyTrainAction;
-            }
-
-            // 3. Company-to-Company Negotiation
-            if (!(buyingOwner instanceof net.sf.rails.game.PublicCompany)) {
-                return null;
-            }
-
-            net.sf.rails.game.PublicCompany buyingCompany = (net.sf.rails.game.PublicCompany) buyingOwner;
-            String buyerName = buyingCompany.getId();
-            String trainName = (buyTrainAction.getTrain() != null) ? buyTrainAction.getTrain().getName() : "?";
-            String sellerName = (sellingOwner != null) ? sellingOwner.getId() : "Unknown";
-            int maxCash = buyingCompany.getPurseMoneyModel().value();
-
-            int defaultPrice = (maxCash > 0) ? maxCash : 1;
-
-            String message = String.format("%s buys a %s train from %s", buyerName, trainName, sellerName);
-            String detail = String.format("(%s Treasury: %s)", buyerName, gameUIManager.format(maxCash));
-            String fullMessage = "<html><h3>" + message + "</h3>" + detail + "<br>Enter Purchase Price:</html>";
-
-            String amountString = (String) JOptionPane.showInputDialog(
-                    this, fullMessage, "Negotiate Price", JOptionPane.QUESTION_MESSAGE,
-                    null, null, String.valueOf(defaultPrice));
-
-            if (amountString == null)
-                return null; // Cancelled
-
-            int price = 0;
-            try {
-                price = Integer.parseInt(amountString.replaceAll("[^0-9]", ""));
-            } catch (NumberFormatException e) {
-                price = 0;
-            }
-
-            if (price <= 0) {
-                JOptionPane.showMessageDialog(this, "Price must be > 0", "Error", JOptionPane.ERROR_MESSAGE);
-                return null;
-            }
-
-            buyTrainAction.setPricePaid(price);
-            return buyTrainAction;
-
-        } catch (Exception e) {
-            log.error("TRAIN_BUY_CRASH", e);
-            return buyTrainAction; // Fallback to raw action if UI fails
-        }
-    }
 
     protected void setCompanyTrainButton(int i, boolean clickable, PossibleAction action) {
         // 1. Safety Checks

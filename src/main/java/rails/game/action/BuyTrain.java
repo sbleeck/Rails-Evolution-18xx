@@ -338,9 +338,13 @@ public class BuyTrain extends PossibleORAction {
         return pricePaid;
     }
 
-    public void setPricePaid(int pricePaid) {
-        if (this.priceMode == PriceMode.FIXED) {
-            this.pricePaid = this.fixedCost; // Ignore external input if mode is fixed
+public void setPricePaid(int pricePaid) {
+        // Allow the UI to override the price during human negotiation,
+        // even if the legacy engine constructed this action as FIXED.
+        if (this.priceMode == PriceMode.FIXED && pricePaid > 0) {
+            this.pricePaid = pricePaid;
+        } else if (this.priceMode == PriceMode.FIXED) {
+            this.pricePaid = this.fixedCost; // Ignore external input if mode is fixed and no valid price passed
         } else {
             // Clamp the value to the permitted minimum and maximum bounds
             if (pricePaid < this.minPrice) {

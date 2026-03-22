@@ -148,29 +148,21 @@ public class AuctionRound_1817 extends Round {
 
             Player winner = highestBidder.value();
 
-            if (winner != null && auctionedCompany.value() != null) {
-                log.info("AUCTION_LOG: Generating Settlement Action for winner {} at ${}", winner.getName(),
-                        currentBid.value());
-                // Generate the settlement action for the UI to populate
-                possibleActions.add(new SettleIPO_1817(
-                        gameManager.getRoot(),
-                        auctionedCompany.value().getId(),
-                        new java.util.ArrayList<String>(),
-                        currentBid.value(),
-                        2));
-            }
             if (auctionType.value() == AuctionType.IPO) {
                 if (winner != null && auctionedCompany.value() != null) {
-                    log.info("AUCTION_LOG: Generating Settlement Action for winner {} at ${}", winner.getName(),
-                            currentBid.value());
-                    // Generate the settlement action for the UI to populate
-                    possibleActions.add(new SettleIPO_1817(
-                            gameManager.getRoot(),
-                            auctionedCompany.value().getId(),
-                            new java.util.ArrayList<String>(),
-                            currentBid.value(),
-                            2));
+                    // Rule 5.5: Winning player declares if this is for a 2, 5, or 10-share company 
+                    List<Integer> validSizes = getValidShareSizes();
+                    for (Integer size : validSizes) {
+                        possibleActions.add(new SettleIPO_1817(
+                                gameManager.getRoot(),
+                                auctionedCompany.value().getId(),
+                                new java.util.ArrayList<String>(),
+                                currentBid.value(),
+                                size));
+                    }
+                    log.info("AUCTION_LOG: Generated " + validSizes.size() + " size options for winner " + winner.getName());
                 }
+            
             } else {
                 // It's an M&A Auction.
                 // The winner must now select which of their companies makes the purchase.
@@ -542,5 +534,27 @@ public class AuctionRound_1817 extends Round {
         // 5. Close Company [cite: 852]
         target.setClosed();
     }
+
+
+    private List<Integer> getValidShareSizes() {
+        List<Integer> sizes = new ArrayList<>();
+        net.sf.rails.game.PhaseManager pm = gameManager.getRoot().getPhaseManager();
+
+        if (pm == null || !pm.hasReachedPhase("3")) {
+            sizes.add(2); // Phase 2: 2-share only
+        } else if (!pm.hasReachedPhase("4")) {
+            sizes.add(2);
+            sizes.add(5); // Phase 3: 2-share or 5-share
+        } else if (!pm.hasReachedPhase("5")) {
+            sizes.add(5); // Phase 4: 5-share only
+        } else if (!pm.hasReachedPhase("6")) {
+            sizes.add(5);
+            sizes.add(10); // Phase 5: 5-share or 10-share
+        } else {
+            sizes.add(10); // Phases 6+: 10-share only
+        }
+        return sizes;
+    }
+
 
 }

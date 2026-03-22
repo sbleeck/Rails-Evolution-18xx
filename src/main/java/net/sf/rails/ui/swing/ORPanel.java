@@ -407,7 +407,7 @@ public class ORPanel extends GridPanel
 
         if (activePhase == 1 || activePhase == 2) {
             setTileBuildNumbers(true);
-            updateCurrentRoutes(false);
+disableRoutesDisplay();
         } else if (activePhase == 3) {
             setTileBuildNumbers(false);
             if (orWindow != null && orWindow.getMapPanel() != null)
@@ -930,7 +930,9 @@ public class ORPanel extends GridPanel
         }
 
         updateSidebarData();
-        updateCurrentRoutes(false);
+        // updateCurrentRoutes(false);
+        disableRoutesDisplay();
+
     }
 
     public void resetSidebarState() {
@@ -1941,7 +1943,7 @@ public class ORPanel extends GridPanel
         if (activePhase == 3) { // Revenue phase
             updateCurrentRoutes(true);
         } else {
-            updateCurrentRoutes(false);
+            disableRoutesDisplay();
         }
     }
 
@@ -2185,63 +2187,19 @@ public class ORPanel extends GridPanel
             }
             List<PossibleAction> executedActions = ((ActionTaker) source).getPossibleActions();
             if (executedActions == null || executedActions.isEmpty()) {
-           
+
             } else if (executedActions.get(0) instanceof net.sf.rails.game.specific._1817.action.RepayLoans_1817) {
                 processRepayLoans_1817(
                         (net.sf.rails.game.specific._1817.action.RepayLoans_1817) executedActions.get(0));
                 return;
 
-                } else if (executedActions.get(0) instanceof BuyTrain) {
-                BuyTrain action = (BuyTrain) executedActions.get(0);
-                Owner seller = action.getFromOwner();
-                boolean isIpoOrBank = false;
-                
-                if (seller != null) {
-                    if ("IPO".equals(seller.getId()) || "Pool".equals(seller.getId()) || seller.getParent() instanceof net.sf.rails.game.financial.Bank) {
-                        isIpoOrBank = true;
-                    }
-                }
-
-                if (!isIpoOrBank) {
-                    String displayLabel = action.getButtonLabel();
-                    if (displayLabel != null) {
-                        // Strips out the train instance ID (e.g., "3_1" becomes "3")
-                        displayLabel = displayLabel.replaceAll("_[^\\s]+", "");
-                    }
-
-                    String inputValue = javax.swing.JOptionPane.showInputDialog(this,
-                            "Enter purchase price for:\n" + displayLabel,
-                            "Buy Train", javax.swing.JOptionPane.QUESTION_MESSAGE);
-
-                    if (inputValue == null) {
-                        if (source instanceof AbstractButton) {
-                            ((AbstractButton) source).setEnabled(true);
-                            source.repaint();
-                        }
-                        return;
-                    }
-
-                    try {
-                        int price = Integer.parseInt(inputValue.trim());
-                        action.setPricePaid(price);
-                    } catch (NumberFormatException ex) {
-                        javax.swing.JOptionPane.showMessageDialog(this, "Invalid price entered.", "Error", javax.swing.JOptionPane.ERROR_MESSAGE);
-                        if (source instanceof AbstractButton) {
-                            ((AbstractButton) source).setEnabled(true);
-                            source.repaint();
-                        }
-                        return;
-                    }
-                } else {
-                    if (action.getPricePaid() == 0 && action.getFixedCost() > 0) {
-                        action.setPricePaid(action.getFixedCost());
-                    }
-                }
-                orUIManager.processAction(command, executedActions, source);
-                
+            } else if (executedActions.get(0) instanceof BuyTrain) {
+                orUIManager.processBuyTrain((BuyTrain) executedActions.get(0));
+                return;
             } else {
                 orUIManager.processAction(command, executedActions, source);
             }
+
             // REVENUE SYNC: Minor companies often jump from Revenue to Done.
             // We manually force a state pull to ensure the "END TURN" button appears.
             if (PAYOUT_CMD.equals(command) || SPLIT_CMD.equals(command) || WITHHOLD_CMD.equals(command)) {

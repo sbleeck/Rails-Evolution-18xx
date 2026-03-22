@@ -28,7 +28,7 @@
 	</Component>
 
 	<Component name="Bank" class="net.sf.rails.game.financial.Bank">
-		<Bank amount="12000"/>
+		<Bank amount="9999999"/>
 		<Money format="$@"/>
 	</Component>
 
@@ -64,41 +64,41 @@
 		</TrainType>
 	</Component>
 
-	<Component name="PhaseManager" class="net.sf.rails.game.PhaseManager">
+<Component name="PhaseManager" class="net.sf.rails.game.PhaseManager">
 		<Phase name="2">
 			<Tiles colour="yellow"/>
 			<Trains limit="4"/>
-			<OffBoardRevenue level="0"/>
+			<OffBoardRevenue step="1"/>
 		</Phase>
 		<Phase name="3">
 			<Tiles colour="yellow,green"/>
 			<Trains limit="4"/>
-			<OffBoardRevenue level="2"/>
+			<OffBoardRevenue step="2"/>
 		</Phase>
 		<Phase name="4">
 			<Tiles colour="yellow,green"/>
 			<Trains rusted="2" limit="3"/>
-			<OffBoardRevenue level="2"/>
+			<OffBoardRevenue step="2"/>
 		</Phase>
 		<Phase name="5">
 			<Tiles colour="yellow,green,brown"/>
 			<Trains limit="3"/>
-			<OffBoardRevenue level="3"/>
+			<OffBoardRevenue step="3"/>
 		</Phase>
 		<Phase name="6">
 			<Tiles colour="yellow,green,brown"/>
 			<Trains rusted="3" limit="2"/>
-			<OffBoardRevenue level="3"/>
+			<OffBoardRevenue step="3"/>
 		</Phase>
 		<Phase name="7">
 			<Tiles colour="yellow,green,brown,gray"/>
 			<Trains limit="2"/>
-			<OffBoardRevenue level="4"/>
+			<OffBoardRevenue step="4"/>
 		</Phase>
 		<Phase name="8">
 			<Tiles colour="yellow,green,brown,gray"/>
 			<Trains rusted="4" limit="2"/>
-			<OffBoardRevenue level="4"/>
+			<OffBoardRevenue step="4"/>
 		</Phase>
 	</Component>
 

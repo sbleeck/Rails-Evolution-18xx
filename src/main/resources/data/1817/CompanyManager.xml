@@ -1,11 +1,8 @@
 <?xml version="1.0"?>
 <CompanyManager>
 	<CompanyType name="Private" class="net.sf.rails.game.PrivateCompany">
-		<ClosingConditions>
-            <Phase>5</Phase>
-		</ClosingConditions>
-		<Tradeable toCompany="yes" lowerPriceFactor="0.5" upperPriceFactor="2.0"/>
-		<Tradeable toPlayer="yes"/>	
+		<Tradeable toCompany="no"/>
+		<Tradeable toPlayer="no"/>	
 	</CompanyType>
 	
 <CompanyType name="Public" class="net.sf.rails.game.specific._1817.PublicCompany_1817">

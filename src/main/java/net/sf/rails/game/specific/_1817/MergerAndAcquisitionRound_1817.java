@@ -1370,9 +1370,22 @@ possibleActions.add(new net.sf.rails.game.specific._1817.action.TakeLoans_1817(g
         int finalBid = highestBid.value();
 
         if (winner == null) {
-            executeSale(target, null, finalBid);
+
+            // Rule 7.2.4.5: Only companies in liquidation (Red Zone) must be sold to the
+            // Bank.
+            // Acquisitions (Gray) and Friendly sales survive if there are no bids.
+            boolean isRed = (target.getCurrentSpace() != null && target.getCurrentSpace().getPrice() == 0);
+
+            if (isRed) {
+                executeSale(target, null, finalBid);
+            } else {
+                log.info("M&A ROUND: No bids for acquisition of " + target.getId() + ". Company survives.");
+                companyIndex.set(companyIndex.value() + 1);
+                processNextSale();
+            }
         } else {
-            log.info("M&A ROUND: Auction won by " + winner.getName() + " for $" + finalBid
+            log.info(
+                    "M&A ROUND: Auction won by " + winner.getName() + " for $" + finalBid
                     + ". Awaiting purchasing company selection.");
             currentStep.set(MaAStep.SALES_SELECT_BUYER);
             setPossibleActions();

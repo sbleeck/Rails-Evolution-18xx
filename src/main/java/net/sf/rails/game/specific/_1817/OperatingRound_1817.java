@@ -470,8 +470,6 @@ public class OperatingRound_1817 extends OperatingRound {
     @Override
     protected void initTurn() {
         super.initTurn();
-        log.info("1817_DEBUG: initTurn() started for company: {}",
-                (operatingCompany.value() != null ? operatingCompany.value().getId() : "null"));
         interestPaidThisTurn.set(false);
         repayPhaseDoneThisTurn.set(false);
         trainBuyingDone.set(false);
@@ -721,26 +719,8 @@ public class OperatingRound_1817 extends OperatingRound {
         boolean actionsAdded = false;
         PublicCompany comp = operatingCompany.value();
         net.sf.rails.game.GameDef.OrStep step = getStep();
-        log.info("1817_DEBUG: Entering setPossibleActions for {}, step: {}", (comp != null ? comp.getId() : "null"),
-                step);
-        if (comp != null) {
-            Collection<net.sf.rails.game.PrivateCompany> compPrivs = comp.getPortfolioModel().getPrivateCompanies();
-            log.info("1817_DEBUG: Company {} privates count: {}", comp.getId(), compPrivs.size());
-            for (net.sf.rails.game.PrivateCompany p : compPrivs) {
-                log.info("1817_DEBUG: -> Company has private: {}", p.getId());
-            }
+        
 
-            if (comp.getPresident() != null) {
-                Collection<net.sf.rails.game.PrivateCompany> presPrivs = comp.getPresident().getPortfolioModel()
-                        .getPrivateCompanies();
-
-                log.info("1817_DEBUG: President {} privates count: {}", comp.getPresident().getName(),
-                        presPrivs.size());
-                for (net.sf.rails.game.PrivateCompany p : presPrivs) {
-                    log.info("1817_DEBUG: -> President has private: {}", p.getId());
-                }
-            }
-        }
 
         // --- 2. COAL MINE INTERRUPT ---
         if ("Yellow".equalsIgnoreCase(lastLaidTileColour) && !hexesLaidThisTurn.isEmpty()) {

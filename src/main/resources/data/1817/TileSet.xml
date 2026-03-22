@@ -31,9 +31,11 @@
 <!-- GREEN -->
     <Tile id="14" quantity="-1"><Upgrade id="63,611"/></Tile>
     <Tile id="15" quantity="-1"><Upgrade id="63,611,448"/></Tile>
-    <Tile id="54" quantity="-1"><Upgrade id="62"/></Tile>
+    <Tile id="54" quantity="1"><Upgrade id="62"/></Tile>
     <Tile id="619" quantity="-1"><Upgrade id="63,611"/></Tile>
-    <Tile id="2053" quantity="-1"><Upgrade id="1484"/></Tile>
+
+    <!-- B (baltimore) green -->
+    <Tile id="2053" quantity="4"><Upgrade id="148400"/></Tile>
 
     <Tile id="80" quantity="-1"> <Upgrade id="7,8"/></Tile>
     <Tile id="81" quantity="-1"> <Upgrade id="8"/></Tile>
@@ -56,7 +58,7 @@
     <Tile id="611" quantity="-1"></Tile>
 
     <!-- previous: 523 -->
-    <Tile id="1484" quantity="-1"><Upgrade id="368"/></Tile>
+    <Tile id="148400" quantity="4"><Upgrade id="368"/></Tile>
 
 
 
