@@ -878,7 +878,6 @@ public class OperatingRound_1817 extends OperatingRound {
                 for (rails.game.action.BuyTrain pa : possibleActions.getType(rails.game.action.BuyTrain.class)) {
                     possibleActions.remove(pa);
                 }
-                
                 if (!possibleActions.contains(NullAction.class)) {
                     possibleActions.add(new NullAction(getRoot(), NullAction.Mode.DONE));
                 }
@@ -1037,13 +1036,26 @@ public class OperatingRound_1817 extends OperatingRound {
         return count;
     }
 
-    @Override
+
+@Override
     public void setBuyableTrains() {
+        // 1. MUST call super first to populate core step actions (e.g., 'Done')
         super.setBuyableTrains();
 
         PublicCompany comp = operatingCompany.value();
         if (comp == null)
             return;
+
+        net.sf.rails.game.PhaseManager pm = getRoot().getPhaseManager();
+        int trainLimit = 2; 
+        if (!pm.hasReachedPhase("4")) {
+            trainLimit = 4; 
+        } else if (!pm.hasReachedPhase("6")) {
+            trainLimit = 3; 
+        }
+
+        int currentTrains = comp.getPortfolioModel().getNumberOfTrains();
+        boolean isAtCapacity = (currentTrains >= trainLimit);
 
         int cash = comp.getCash();
         List<PossibleAction> toRemove = new ArrayList<>();
@@ -1053,13 +1065,16 @@ public class OperatingRound_1817 extends OperatingRound {
             if (pa instanceof rails.game.action.BuyTrain) {
                 rails.game.action.BuyTrain bt = (rails.game.action.BuyTrain) pa;
 
-                // Disable standard 1830-style emergency contributions
+                // 2. Filter out ALL BuyTrain actions if at limit, leaving 'Done' intact
+                if (isAtCapacity) {
+                    toRemove.add(bt);
+                    continue;
+                }
+
                 bt.setForcedBuyIfHasRoute(false);
                 bt.setForcedBuyIfNoRoute(false);
                 bt.setPresidentMustAddCash(0);
 
-                // Enforce House Rule: Remove trains sold by companies not owned by the same
-                // president
                 net.sf.rails.game.state.Owner seller = bt.getTrain().getOwner();
                 if (seller instanceof PublicCompany && seller != comp) {
                     PublicCompany sellingComp = (PublicCompany) seller;
@@ -1069,7 +1084,6 @@ public class OperatingRound_1817 extends OperatingRound {
                     }
                 }
 
-                // Remove trains that are strictly unaffordable by the company itself
                 int cost = bt.getFixedCost();
                 if (bt.getFixedCostMode() == rails.game.action.BuyTrain.Mode.FIXED ||
                         bt.getFixedCostMode() == rails.game.action.BuyTrain.Mode.MIN) {
@@ -1088,15 +1102,12 @@ public class OperatingRound_1817 extends OperatingRound {
             possibleActions.remove(pa);
         }
 
-        // Phase Exemption: Manually inject BuyTrain actions for valid cross-company
-        // purchases
-        // if the base engine suppressed them due to phase restrictions.
-        if (currentPresident != null) {
+        // 3. Inject cross-company actions ONLY if space permits
+        if (currentPresident != null && !isAtCapacity) {
             for (PublicCompany otherComp : gameManager.getAllPublicCompanies()) {
                 if (otherComp != comp && otherComp.hasStarted() && !otherComp.isClosed()
                         && otherComp.getPresident() == currentPresident) {
                     for (net.sf.rails.game.Train t : otherComp.getPortfolioModel().getTrainList()) {
-                        // Only add real trains, skip private papers/contracts
                         if (t.getName() != null && t.getName().matches(".*\\d.*")) {
                             boolean exists = false;
                             for (PossibleAction pa : possibleActions.getList()) {
@@ -1109,7 +1120,6 @@ public class OperatingRound_1817 extends OperatingRound {
                             }
                             if (!exists && cash >= 1) {
                                 rails.game.action.BuyTrain newBt = new rails.game.action.BuyTrain(t, otherComp, 1);
-                                // Set up flexible pricing for inter-company purchases
                                 newBt.setFixedCostMode(rails.game.action.BuyTrain.Mode.MIN);
                                 newBt.setFixedCost(1);
                                 newBt.setForcedBuyIfHasRoute(false);
@@ -1119,8 +1129,6 @@ public class OperatingRound_1817 extends OperatingRound {
                                 String cleanTrainName = t.getName().split("_")[0];
                                 String label = "Buy '" + cleanTrainName + "' from " + otherComp.getId();
                                 newBt.setButtonLabel(label);
-                                
-                                newBt.setButtonLabel(label);
                                 possibleActions.add(newBt);
                             }
                         }
@@ -1128,6 +1136,11 @@ public class OperatingRound_1817 extends OperatingRound {
                 }
             }
         }
-
     }
+
+
+
+
+
+
 }
