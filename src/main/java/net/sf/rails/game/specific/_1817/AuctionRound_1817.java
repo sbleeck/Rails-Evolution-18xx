@@ -274,9 +274,26 @@ public class AuctionRound_1817 extends Round {
             }
             comp.setPresident(winner);
 
-            // 5. Calculate Par Price (Bid / ShareSize) - Integer division naturally rounds
-            // down
-            int parPrice = currentBid.value() / settle.getShareSize();
+
+
+            // 5. Calculate Par Price (Winning Bid / 2)
+            int parPrice = currentBid.value() / 2;
+
+            StringBuilder report = new StringBuilder();
+            report.append(winner.getName()).append(" wins the auction for ").append(comp.getId())
+                  .append(" with a bid of ").append(net.sf.rails.game.financial.Bank.format(this, currentBid.value()))
+                  .append(" and establishes it as a ").append(settle.getShareSize()).append("-share company.");
+            
+            if (!settle.getPrivateCompanyIds().isEmpty()) {
+                report.append(" Trades in privates: ").append(String.join(", ", settle.getPrivateCompanyIds())).append(".");
+            }
+            if (settle.getCashAmount() > 0) {
+                report.append(" Pays ").append(net.sf.rails.game.financial.Bank.format(this, settle.getCashAmount())).append(" in cash.");
+            }
+            report.append(" Par price is set to ").append(net.sf.rails.game.financial.Bank.format(this, parPrice)).append(".");
+            net.sf.rails.common.ReportBuffer.add(this, report.toString());
+
+
             net.sf.rails.game.financial.StockMarket sm = gameManager.getRoot().getStockMarket();
             net.sf.rails.game.financial.StockSpace startSpace = sm.getStartSpace(parPrice);
 
@@ -300,7 +317,7 @@ public class AuctionRound_1817 extends Round {
                     log.info("AUCTION_LOG: Exact price ${} not found. Starting at {} (${})",
                             parPrice, startSpace.getId(), startSpace.getPrice());
                 }
-            }
+            }   
 
             if (startSpace != null) {
                 comp.start(startSpace);
@@ -308,8 +325,37 @@ public class AuctionRound_1817 extends Round {
                 log.error("AUCTION_LOG: No StockSpace found for price ${}", parPrice);
             }
 
+
             // 6. Float the company BEFORE laying the token so the engine accepts it
             comp.setFloated();
+
+            // 6.1 Buy Mandatory Station Markers
+            int tokenCost = 0;
+            int tokensBought = 0;
+            if (settle.getShareSize() == 5) {
+                tokenCost = 50;
+                tokensBought = 1;
+            } else if (settle.getShareSize() == 10) {
+                tokenCost = 150;
+                tokensBought = 3;
+            }
+
+            if (tokenCost > 0) {
+                net.sf.rails.game.state.Currency.toBank(comp, tokenCost);
+                net.sf.rails.common.ReportBuffer.add(this, comp.getId() + " purchases " + tokensBought + " additional station marker(s) for " + net.sf.rails.game.financial.Bank.format(this, tokenCost) + ".");
+
+                // Auto-loan if cash is negative
+                while (comp.getCash() < 0 && comp.getCurrentNumberOfLoans() < settle.getShareSize()) {
+                    comp.executeLoan();
+                    net.sf.rails.common.ReportBuffer.add(this, comp.getId() + " automatically takes a loan to cover station marker costs.");
+                }
+            }
+
+            // 6.2 Register IPO to prevent shorting in current round
+            net.sf.rails.game.round.RoundFacade parentRound = gameManager.getInterruptedRound();
+            if (parentRound instanceof StockRound_1817) {
+                ((StockRound_1817) parentRound).registerIpo(comp.getId());
+            }
 
             // 7. Lay the base token on the map using the specific station number passed
             // from the Stock Round
@@ -341,6 +387,7 @@ public class AuctionRound_1817 extends Round {
                 if (targetStop != null) {
                     comp.setHomeCityNumber(targetStop.getRelatedStationNumber());
                     homeHex.layBaseToken(comp, targetStop);
+                    net.sf.rails.common.ReportBuffer.add(this, comp.getId() + " lays its home token on " + homeHex.getId() + ".");
                 }
             }
 
@@ -353,6 +400,7 @@ public class AuctionRound_1817 extends Round {
         // --- Handle Bidding Actions ---
         if (action instanceof NullAction && ((NullAction) action).getMode() == NullAction.Mode.PASS) {
             log.info("AUCTION_LOG: Player {} passed.", actor.getName());
+            net.sf.rails.common.ReportBuffer.add(this, actor.getName() + " passes.");
             int index = activeBidders.indexOf(actor);
             activeBidders.remove(actor);
             if (!activeBidders.isEmpty()) {
@@ -382,6 +430,7 @@ public class AuctionRound_1817 extends Round {
         if (action instanceof Bid1817IPO) {
             int amount = ((Bid1817IPO) action).getBidAmount();
             log.info("AUCTION_LOG: Player {} BID ${}.", actor.getName(), amount);
+            net.sf.rails.common.ReportBuffer.add(this, actor.getName() + " bids " + net.sf.rails.game.financial.Bank.format(this, amount) + ".");
             this.currentBid.set(amount);
             this.highestBidder.set(actor);
 

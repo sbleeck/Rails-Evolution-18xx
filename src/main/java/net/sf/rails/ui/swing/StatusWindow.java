@@ -1661,7 +1661,10 @@ if (actions != null && !actions.isEmpty()) {
 
                     net.sf.rails.game.specific._1817.action.Bid1817IPO bidAction = null;
                     NullAction passAction = null;
-                    net.sf.rails.game.specific._1817.action.SettleIPO_1817 settleAction = null;
+
+
+
+java.util.List<net.sf.rails.game.specific._1817.action.SettleIPO_1817> settleActions = new java.util.ArrayList<>();
 
                     if (possibleActions != null && possibleActions.getList() != null) {
                         for (PossibleAction pa : possibleActions.getList()) {
@@ -1670,13 +1673,13 @@ if (actions != null && !actions.isEmpty()) {
                             else if (pa instanceof NullAction && ((NullAction) pa).getMode() == NullAction.Mode.PASS)
                                 passAction = (NullAction) pa;
                             else if (pa instanceof net.sf.rails.game.specific._1817.action.SettleIPO_1817)
-                                settleAction = (net.sf.rails.game.specific._1817.action.SettleIPO_1817) pa;
+                                settleActions.add((net.sf.rails.game.specific._1817.action.SettleIPO_1817) pa);
                         }
                     }
 
-                    if (settleAction != null) {
+                    if (!settleActions.isEmpty()) {
                         if (myTurn) {
-                            int totalBid = settleAction.getCashAmount(); // Initially holds the full bid
+                            int totalBid = settleActions.get(0).getCashAmount(); // Initially holds the full bid
 
                             JPanel settlePanel = new JPanel(new java.awt.BorderLayout(10, 5));
                             settlePanel.setOpaque(false);
@@ -1735,28 +1738,36 @@ if (actions != null && !actions.isEmpty()) {
                             centerPanel.add(summaryLabel, java.awt.BorderLayout.SOUTH);
                             settlePanel.add(centerPanel, java.awt.BorderLayout.CENTER);
 
-                            JButton settleButton = new JButton("Confirm Settlement");
-                            settleButton.setPreferredSize(new Dimension(80, 35));
+                           
+JPanel buttonBox = new JPanel(new FlowLayout(FlowLayout.RIGHT, 5, 0));
+                            buttonBox.setOpaque(false);
 
-                            final net.sf.rails.game.specific._1817.action.SettleIPO_1817 finalSettle = settleAction;
-                            settleButton.addActionListener(e -> {
-                                int selectedValue = 0;
-                                java.util.List<String> selectedIds = new java.util.ArrayList<>();
-                                for (JCheckBox box : privateBoxes) {
-                                    if (box.isSelected()) {
-                                        selectedValue += (Integer) box.getClientProperty("pc_value");
-                                        selectedIds.add((String) box.getClientProperty("pc_id"));
+                            for (final net.sf.rails.game.specific._1817.action.SettleIPO_1817 sa : settleActions) {
+                                JButton settleButton = new JButton("Settle as " + sa.getShareSize() + "-Share");
+                                settleButton.setPreferredSize(new Dimension(140, 35));
+
+                                settleButton.addActionListener(e -> {
+                                    int selectedValue = 0;
+                                    java.util.List<String> selectedIds = new java.util.ArrayList<>();
+                                    for (JCheckBox box : privateBoxes) {
+                                        if (box.isSelected()) {
+                                            selectedValue += (Integer) box.getClientProperty("pc_value");
+                                            selectedIds.add((String) box.getClientProperty("pc_id"));
+                                        }
                                     }
-                                }
-                                int cashDue = Math.max(0, totalBid - selectedValue);
+                                    int cashDue = Math.max(0, totalBid - selectedValue);
 
-                                finalSettle.setPrivateCompanyIds(selectedIds);
-                                finalSettle.setCashAmount(cashDue);
+                                    sa.setPrivateCompanyIds(selectedIds);
+                                    sa.setCashAmount(cashDue);
 
-                                process(finalSettle);
-                            });
+                                    process(sa);
+                                });
+                                buttonBox.add(settleButton);
+                            }
 
-                            settlePanel.add(settleButton, java.awt.BorderLayout.EAST);
+                            settlePanel.add(buttonBox, java.awt.BorderLayout.EAST);
+
+
                             dynamicButtonPanel.add(settlePanel);
                         } else {
                             dynamicButtonPanel.add(

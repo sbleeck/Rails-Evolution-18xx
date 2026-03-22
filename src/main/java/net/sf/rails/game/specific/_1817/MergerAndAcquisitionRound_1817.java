@@ -48,7 +48,7 @@ public class MergerAndAcquisitionRound_1817 extends Round {
 
     private final ArrayListState<String> validMergerPairs;
     private final ArrayListState<String> mergedThisRound;
-private final ArrayListState<String> startedAboveAcquisition;
+    private final ArrayListState<String> startedAboveAcquisition;
 
     private final GenericState<Integer> highestBid;
     private final GenericState<net.sf.rails.game.Player> highestBiddingPlayer;
@@ -101,8 +101,8 @@ private final ArrayListState<String> startedAboveAcquisition;
         activeBidders = new ArrayListState<>(this, "activeBidders");
         auctionPlayerIndex = new GenericState<>(this, "auctionPlayerIndex", 0);
         mandatoryTokenCost = new GenericState<>(this, "mandatoryTokenCost", 0);
-    startedAboveAcquisition = new ArrayListState<>(this, "startedAboveAcquisition");
-}
+        startedAboveAcquisition = new ArrayListState<>(this, "startedAboveAcquisition");
+    }
 
     public void start() {
         operatingCompanies.clear();
@@ -356,6 +356,9 @@ private final ArrayListState<String> startedAboveAcquisition;
                     cert.moveTo(player.getPortfolioModel());
                     log.info("M&A ROUND: " + player.getName() + " bought 1 share of " + comp.getId()
                             + " from Treasury.");
+                    net.sf.rails.common.ReportBuffer.add(this,
+                            player.getName() + " buys 1 treasury share of " + comp.getId() + " for "
+                                    + net.sf.rails.game.financial.Bank.format(this, comp.getMarketPrice()) + ".");
                     break;
                 }
             }
@@ -394,6 +397,12 @@ private final ArrayListState<String> startedAboveAcquisition;
             }
             log.info("M&A ROUND: " + player.getName() + " sold " + sold + " shares of " + comp.getId()
                     + " to Open Market.");
+            if (sold > 0) {
+                net.sf.rails.common.ReportBuffer.add(this,
+                        player.getName() + " sells " + sold + " share(s) of " + comp.getId()
+                                + " to the open market for "
+                                + net.sf.rails.game.financial.Bank.format(this, comp.getMarketPrice() * sold) + ".");
+            }
 
             if (currentStep.value() == MaAStep.POST_MERGER_PLAYERS)
                 advancePostMergerPlayer();
@@ -403,11 +412,11 @@ private final ArrayListState<String> startedAboveAcquisition;
             TakeLoans_1817 loanAction = (TakeLoans_1817) action;
             PublicCompany comp = operatingCompany.value();
 
-
             if (comp instanceof PublicCompany_1817) {
                 ((PublicCompany_1817) comp).executeLoan();
             }
             log.info("M&A ROUND: " + comp.getId() + " took 1 loan.");
+            net.sf.rails.common.ReportBuffer.add(this, comp.getId() + " takes a loan.");
 
             if (currentStep.value() == MaAStep.COMPANY_ACTIONS || currentStep.value() == MaAStep.LOAN_TAKING) {
                 setPossibleActions();
@@ -461,6 +470,7 @@ private final ArrayListState<String> startedAboveAcquisition;
         if (currentShares == 2) {
             comp1817.setShareCount(5);
             log.info("CONVERSION: Upgraded " + comp.getId() + " from 2-share to 5-share. ");
+            net.sf.rails.common.ReportBuffer.add(this, comp.getId() + " converts from a 2-share to a 5-share company.");
 
             // 1817 Rule 7.1.1: A 2-share starts with 1 marker and can acquire at most 1
             // more (Train Station).
@@ -479,6 +489,8 @@ private final ArrayListState<String> startedAboveAcquisition;
             } else if (currentMarkers == 7) {
                 mandatoryTokenCost.set(50);
             }
+            net.sf.rails.common.ReportBuffer.add(this,
+                    comp.getId() + " converts from a 5-share to a 10-share company.");
         }
         // Mark as merged/converted this round so it cannot merge again [cite: 708, 709]
         mergedThisRound.add(comp.getId());
@@ -488,8 +500,68 @@ private final ArrayListState<String> startedAboveAcquisition;
         startPostMergerPhase();
     }
 
+    private String buildAssetReport(PublicCompany target) {
+        StringBuilder assets = new StringBuilder();
+        assets.append(target.getId()).append(" brings ");
+        assets.append(net.sf.rails.game.financial.Bank.format(this, target.getCash())).append(" in cash");
+
+        int targetLoans = 0;
+        try {
+            targetLoans = target.getCurrentNumberOfLoans();
+        } catch (NullPointerException e) {
+            // Minor/Coal companies do not have an initialized loan state.
+            targetLoans = 0;
+        }
+
+        if (targetLoans > 0) {
+            assets.append(", ").append(targetLoans).append(" loan(s)");
+        }
+
+        if (!target.getTrains().isEmpty()) {
+            assets.append(", trains: ");
+            java.util.List<String> trainNames = new java.util.ArrayList<>();
+            for (net.sf.rails.game.Train t : target.getTrains())
+                trainNames.add(t.getName());
+            assets.append(String.join(", ", trainNames));
+        }
+
+        if (!target.getPrivates().isEmpty()) {
+            assets.append(", privates: ");
+            java.util.List<String> privNames = new java.util.ArrayList<>();
+            for (net.sf.rails.game.PrivateCompany p : target.getPrivates())
+                privNames.add(p.getId());
+            assets.append(String.join(", ", privNames));
+        }
+
+        java.util.List<String> tokenLocs = new java.util.ArrayList<>();
+        for (net.sf.rails.game.BaseToken t : target.getLaidBaseTokens()) {
+            if (t.getOwner() instanceof net.sf.rails.game.Stop) {
+                tokenLocs.add(((net.sf.rails.game.Stop) t.getOwner()).getHex().getId());
+            }
+        }
+        if (!tokenLocs.isEmpty()) {
+            assets.append(", tokens on: ").append(String.join(", ", tokenLocs));
+        }
+
+        int treasuryCount = 0;
+        for (net.sf.rails.game.financial.PublicCertificate cert : target.getCertificates()) {
+            if (cert.getOwner() == target && !cert.isPresidentShare()) {
+                treasuryCount += cert.getShare() / target.getShareUnit();
+            }
+        }
+        if (treasuryCount > 0) {
+            assets.append(", treasury: ").append(treasuryCount).append(" share(s)");
+        }
+        assets.append(".");
+        return assets.toString();
+    }
+
     private void execute2ShareMerger(PublicCompany initiator, PublicCompany target) {
         log.info(">>> Executing Merger: " + initiator.getId() + " absorbs " + target.getId());
+
+        net.sf.rails.common.ReportBuffer.add(this,
+                initiator.getId() + " merges with " + target.getId() + " to form a 5-share company.");
+        net.sf.rails.common.ReportBuffer.add(this, buildAssetReport(target));
 
         int initialCash = initiator.getCash();
         int targetCash = target.getCash();
@@ -595,7 +667,9 @@ private final ArrayListState<String> startedAboveAcquisition;
 
     private void execute5ShareMerger(PublicCompany initiator, PublicCompany target) {
         log.info(">>> Executing 5-Share Merger: " + initiator.getId() + " absorbs " + target.getId());
-
+        net.sf.rails.common.ReportBuffer.add(this,
+                initiator.getId() + " merges with " + target.getId() + " to form a 10-share company.");
+        net.sf.rails.common.ReportBuffer.add(this, buildAssetReport(target));
         // 1. Core Asset Consolidation
         initiator.transferAssetsFrom(target);
 
@@ -686,12 +760,13 @@ private final ArrayListState<String> startedAboveAcquisition;
         // Short Share Conversion (Rule 7.1.3)
         net.sf.rails.game.financial.BankPortfolio unavailableBank = gameManagerRef.getRoot().getBank().getUnavailable();
         List<net.sf.rails.game.financial.PublicCertificate> initiatorShorts = new java.util.ArrayList<>();
-        for (net.sf.rails.game.financial.PublicCertificate cert : unavailableBank.getPortfolioModel().getCertificates()) {
+        for (net.sf.rails.game.financial.PublicCertificate cert : unavailableBank.getPortfolioModel()
+                .getCertificates()) {
             if (cert instanceof net.sf.rails.game.specific._1817.ShortCertificate && cert.getCompany() == initiator) {
                 initiatorShorts.add(cert);
             }
         }
-        
+
         int shortIndex = 0;
         for (net.sf.rails.game.Player p : gameManagerRef.getRoot().getPlayerManager().getPlayers()) {
             List<net.sf.rails.game.financial.PublicCertificate> playerTargetShorts = new java.util.ArrayList<>();
@@ -700,7 +775,7 @@ private final ArrayListState<String> startedAboveAcquisition;
                     playerTargetShorts.add(c);
                 }
             }
-            
+
             for (net.sf.rails.game.financial.PublicCertificate oldShort : playerTargetShorts) {
                 if (shortIndex < initiatorShorts.size()) {
                     // Standard swap
@@ -708,10 +783,12 @@ private final ArrayListState<String> startedAboveAcquisition;
                     oldShort.moveTo(unavailableBank);
                     newShort.moveTo(p.getPortfolioModel());
                     shortIndex++;
-                    log.info("MERGER SHORTS: Swapped " + p.getName() + "'s " + target.getId() + " short for " + initiator.getId() + " short.");
+                    log.info("MERGER SHORTS: Swapped " + p.getName() + "'s " + target.getId() + " short for "
+                            + initiator.getId() + " short.");
                 } else {
                     // Excess shorts (Rule 7.1.3)
-                    log.warn("MERGER SHORTS: Excess short for " + p.getName() + ". Retaining " + target.getId() + " certificate as " + initiator.getId() + " liability.");
+                    log.warn("MERGER SHORTS: Excess short for " + p.getName() + ". Retaining " + target.getId()
+                            + " certificate as " + initiator.getId() + " liability.");
                 }
             }
         }
@@ -968,7 +1045,7 @@ private final ArrayListState<String> startedAboveAcquisition;
 
             if (current < limit) {
 
-possibleActions.add(new TakeLoans_1817(getRoot(), comp.getId()));
+                possibleActions.add(new TakeLoans_1817(getRoot(), comp.getId()));
                 // Add a DONE action so the player can choose NOT to take a loan
                 possibleActions.add(new NullAction(gameManagerRef.getRoot(), NullAction.Mode.DONE));
                 log.info("M&A ROUND: Offering loans to " + comp.getId() + " (Current: " + current + ", Max: " + limit
@@ -1003,12 +1080,16 @@ possibleActions.add(new TakeLoans_1817(getRoot(), comp.getId()));
                 if (market instanceof StockMarket_1817) {
                     ((StockMarket_1817) market).moveLeftOrDown(comp, 1);
                 }
+                net.sf.rails.common.ReportBuffer.add(this,
+                        comp.getId() + " automatically takes a loan to fund mandatory station markers.");
             }
 
             // Case 1: Cash >= cost -> Buy the token (Rule 7.1.1)
             if (comp.getCash() >= cost) {
                 net.sf.rails.game.state.Currency.wire(comp, cost, gameManagerRef.getRoot().getBank());
                 log.info("M&A ROUND: " + comp.getId() + " paid $" + cost + " for mandatory station markers.");
+                net.sf.rails.common.ReportBuffer.add(this, comp.getId() + " purchases mandatory station markers for "
+                        + net.sf.rails.game.financial.Bank.format(this, cost) + ".");
             } else {
                 // Rule 7.1.1 Fallback: Liquidation if Bank is empty
                 log.warn("M&A ROUND: " + comp.getId() + " still cannot afford markers. LIQUIDATING.");
@@ -1047,7 +1128,7 @@ possibleActions.add(new TakeLoans_1817(getRoot(), comp.getId()));
             PublicCompany_1817 comp1817 = (PublicCompany_1817) company;
             int maxLoans = comp1817.getShareCount();
             if (company.getNumberOfBonds() < maxLoans) {
-possibleActions.add(new net.sf.rails.game.specific._1817.action.TakeLoans_1817(getRoot(),
+                possibleActions.add(new net.sf.rails.game.specific._1817.action.TakeLoans_1817(getRoot(),
                         company.getId()));
                 log.info("M&A ROUND: Added TakeLoans_1817 action for " + company.getId() + " with max loans: "
                         + maxLoans);
@@ -1114,7 +1195,8 @@ possibleActions.add(new net.sf.rails.game.specific._1817.action.TakeLoans_1817(g
             }
         }
         if (droppedToGrayThisRound) {
-            log.info("M&A ROUND: Skipping " + comp.getId() + " because it dropped into the acquisition zone during this round.");
+            log.info("M&A ROUND: Skipping " + comp.getId()
+                    + " because it dropped into the acquisition zone during this round.");
             companyIndex.set(companyIndex.value() + 1);
             processNextSale();
             return;
@@ -1214,8 +1296,11 @@ possibleActions.add(new net.sf.rails.game.specific._1817.action.TakeLoans_1817(g
     }
 
     private void executeSale(PublicCompany target, PublicCompany predator, int finalBid) {
-        log.info(">>> Executing Sale: " + (predator != null ? predator.getId() : "Bank") + " buys " + target.getId()
-                + " for $" + finalBid);
+    
+    
+        net.sf.rails.common.ReportBuffer.add(this, (predator != null ? predator.getId() : "Bank") + " buys "
+                + target.getId() + " for " + net.sf.rails.game.financial.Bank.format(this, finalBid) + ".");
+        net.sf.rails.common.ReportBuffer.add(this, buildAssetReport(target));
 
         int currentPrice = target.getMarketPrice();
         boolean isRed = (target.getCurrentSpace().getPrice() == 0);
@@ -1386,7 +1471,7 @@ possibleActions.add(new net.sf.rails.game.specific._1817.action.TakeLoans_1817(g
         } else {
             log.info(
                     "M&A ROUND: Auction won by " + winner.getName() + " for $" + finalBid
-                    + ". Awaiting purchasing company selection.");
+                            + ". Awaiting purchasing company selection.");
             currentStep.set(MaAStep.SALES_SELECT_BUYER);
             setPossibleActions();
         }
@@ -1404,7 +1489,6 @@ possibleActions.add(new net.sf.rails.game.specific._1817.action.TakeLoans_1817(g
                 log.info("M&A ROUND: Paid {} ${} for shares of {}.", p.getName(), totalPayout, target.getId());
             }
 
-            
             // Short positions pay cash (Rule 7.2.4)
             java.util.List<net.sf.rails.game.financial.PublicCertificate> shortsToClose = new java.util.ArrayList<>();
             for (net.sf.rails.game.financial.PublicCertificate cert : p.getPortfolioModel().getCertificates()) {
@@ -1439,36 +1523,38 @@ possibleActions.add(new net.sf.rails.game.specific._1817.action.TakeLoans_1817(g
         }
     }
 
-
     private void reconcileShorts(net.sf.rails.game.Player player, net.sf.rails.game.PublicCompany comp) {
-        if (player == null || comp == null) return;
-        
+        if (player == null || comp == null)
+            return;
+
         boolean foundPair = true;
         while (foundPair) {
             net.sf.rails.game.financial.PublicCertificate shortCert = null;
             net.sf.rails.game.financial.PublicCertificate regularCert = null;
-            
+
             for (net.sf.rails.game.financial.PublicCertificate c : player.getPortfolioModel().getCertificates()) {
                 if (c.getCompany() == comp) {
                     if (c instanceof net.sf.rails.game.specific._1817.ShortCertificate) {
                         shortCert = c;
-                    } else if (!c.isPresidentShare()) { 
+                    } else if (!c.isPresidentShare()) {
                         regularCert = c;
                     }
                 }
             }
-            
+
             if (shortCert != null && regularCert != null) {
-                net.sf.rails.game.financial.BankPortfolio unavailableBank = gameManagerRef.getRoot().getBank().getUnavailable();
+                net.sf.rails.game.financial.BankPortfolio unavailableBank = gameManagerRef.getRoot().getBank()
+                        .getUnavailable();
                 shortCert.moveTo(unavailableBank);
                 regularCert.moveTo(unavailableBank);
-                log.info("Mandatory Reconciliation: " + player.getName() + " short position closed for " + comp.getId() + " post-merger.");
-                net.sf.rails.common.ReportBuffer.add(this, player.getName() + " automatically closes a short position in " + comp.getId());
+                log.info("Mandatory Reconciliation: " + player.getName() + " short position closed for " + comp.getId()
+                        + " post-merger.");
+                net.sf.rails.common.ReportBuffer.add(this,
+                        player.getName() + " automatically closes a short position in " + comp.getId());
             } else {
                 foundPair = false;
             }
         }
     }
-
 
 }
