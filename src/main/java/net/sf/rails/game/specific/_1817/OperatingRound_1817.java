@@ -878,6 +878,7 @@ public class OperatingRound_1817 extends OperatingRound {
                 for (rails.game.action.BuyTrain pa : possibleActions.getType(rails.game.action.BuyTrain.class)) {
                     possibleActions.remove(pa);
                 }
+                
                 if (!possibleActions.contains(NullAction.class)) {
                     possibleActions.add(new NullAction(getRoot(), NullAction.Mode.DONE));
                 }

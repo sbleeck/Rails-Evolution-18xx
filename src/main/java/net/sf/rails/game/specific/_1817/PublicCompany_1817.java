@@ -152,6 +152,30 @@ this.shareCount = IntegerState.create(this, "shareCount", 2);
     }
 
 
+    @Override
+    public int getCurrentTrainLimit() {
+        int xmlLimit = super.getCurrentTrainLimit();
+        String phaseId = getRoot().getPhaseManager().getCurrentPhase().getId();
+        
+        // log.info("1817_DEBUG: getCurrentTrainLimit() called for " + getId());
+        // log.info("1817_DEBUG: Current Phase ID: " + phaseId);
+        // log.info("1817_DEBUG: XML Engine parsed limit as: " + xmlLimit);
+
+        // Statutory 1817 Train Limits (Rule section 2)
+        int actualLimit = 4; // Default for Phases 2 and 3
+        if ("8".equals(phaseId) || "7".equals(phaseId) || "6".equals(phaseId)) {
+            actualLimit = 2;
+        } else if ("5".equals(phaseId) || "4".equals(phaseId)) {
+            actualLimit = 3;
+        }
+        
+        // if (xmlLimit != actualLimit) {
+        //     log.warn("1817_WARNING: XML limit (" + xmlLimit + ") mismatch. Enforcing statutory limit: " + actualLimit);
+        // }
+
+        return actualLimit;
+    }
+
 
     public void setShareCount(int count) {
         if (count == 2 || count == 5 || count == 10) {
