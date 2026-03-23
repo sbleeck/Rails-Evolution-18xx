@@ -91,11 +91,11 @@ public class StockRound_1817 extends StockRound {
                     // Search treasury for a non-president share to close the short
                     net.sf.rails.game.financial.PublicCertificate treasuryShare = comp.getPortfolioModel()
                             .findCertificate(comp, false);
-                    if (treasuryShare != null) {
+if (treasuryShare != null) {
+                        net.sf.rails.game.financial.BankPortfolio unavailableBank = getRoot().getBank().getUnavailable();
                         shortCert.moveTo(osiBank);
-                        treasuryShare.moveTo(osiBank);
-                        log.info(
-                                "Bank auto-closed orphaned short share for " + comp.getId() + " using treasury stock.");
+                        treasuryShare.moveTo(unavailableBank);
+                        log.info("Bank auto-closed orphaned short share for " + comp.getId() + " using treasury stock.");
                     } else {
                         keepClearing = false;
                     }
@@ -194,14 +194,7 @@ public class StockRound_1817 extends StockRound {
                         }
                     }
 
-                    // Check pool availability (Iteration approach for robustness)
-                    boolean hasPoolShare = false;
-                    for (net.sf.rails.game.financial.PublicCertificate c : pool.getCertificates()) {
-                        if (c.getCompany() == comp) {
-                            hasPoolShare = true;
-                            break;
-                        }
-                    }
+
 
                     boolean underShortLimit = (activeShorts < 5 && availableShorts > 0);
 
@@ -216,8 +209,11 @@ public class StockRound_1817 extends StockRound {
                     // 6. Prohibited if IPO'd this round
                     boolean notIpoedThisRound = !ipoedThisRound.contains(comp.getId());
 
-                    if (isLargeEnough && ownsZeroShares && underShortLimit && hasPoolShare && notInAcquisitionZone
-                            && notPhase8 && notIpoedThisRound) {
+                    // 7. Limit to one short per turn
+                    boolean notActed = !hasActed.value();
+
+                    if (isLargeEnough && ownsZeroShares && underShortLimit && notInAcquisitionZone
+                            && notPhase8 && notIpoedThisRound && notActed) {
 
                         possibleActions.add(new net.sf.rails.game.specific._1817.action.Short1817(gameManager.getRoot(),
                                 comp.getId()));
@@ -406,27 +402,6 @@ public class StockRound_1817 extends StockRound {
                 // 1. Calculate price (The market price is the per-share value in 1817)
                 int price = comp.getCurrentSpace().getPrice();
 
-                // 1. Rule 5.3: Check if this is the "First Short" for this company
-                // If no short certificates are in the Unavailable pile, they might already be
-                // in Open Short Interest
-                // We check if we need to sequester the 5 regular shares.
-                int regularSharesInOSI = 0;
-                for (net.sf.rails.game.financial.PublicCertificate c : getRoot().getBank().getOSI()
-                        .getPortfolioModel().getCertificates()) {
-                    if (!(c instanceof ShortCertificate) && c.getCompany() == comp) {
-                        regularSharesInOSI++;
-                    }
-                }
-
-                if (regularSharesInOSI == 0) {
-                    // Move 5 regular shares from the Pool to OSI
-                    for (int i = 0; i < 5; i++) {
-                        net.sf.rails.game.financial.PublicCertificate regCert = pool.findCertificate(comp, 1, false);
-                        if (regCert != null) {
-                            regCert.moveTo(getRoot().getBank().getOSI());
-                        }
-                    }
-                }
 
                 // 2. Find the ShortCertificate to give to the player
                 net.sf.rails.game.financial.PublicCertificate shortCert = null;
@@ -443,6 +418,12 @@ public class StockRound_1817 extends StockRound {
                     // 3. Complete the sale: Player gets the Liability (Short Cert) and the Cash
                     shortCert.moveTo(currentPlayer.getPortfolioModel());
                     net.sf.rails.game.state.Currency.fromBank(price, currentPlayer);
+
+      // 3b. Deposit one explicitly REGULAR share from the Unavailable portfolio directly to the Open Market (Pool) to simulate the sale
+                    net.sf.rails.game.financial.PublicCertificate regCertToSell = getRoot().getBank().getUnavailable().getPortfolioModel().findCertificate(comp, 1, false);
+                    if (regCertToSell != null) {
+                        regCertToSell.moveTo(pool);
+                    }
 
                     // Rule 5.3: Short selling is considered a sale and prevents the player
                     // from purchasing this stock for the remainder of the stock round.
@@ -592,11 +573,11 @@ public class StockRound_1817 extends StockRound {
             }
 
             if (shortCert != null && regularCert != null) {
-net.sf.rails.game.financial.BankPortfolio osiBank = getRoot().getBank().getOSI();
+                  net.sf.rails.game.financial.BankPortfolio osiBank = getRoot().getBank().getOSI();
+                net.sf.rails.game.financial.BankPortfolio unavailableBank = getRoot().getBank().getUnavailable();
                 shortCert.moveTo(osiBank);
-                regularCert.moveTo(osiBank);
-                log.info(
-                        "Mandatory Reconciliation: " + player.getName() + " short position closed for " + comp.getId());
+                regularCert.moveTo(unavailableBank);
+                log.info("Mandatory Reconciliation: " + player.getName() + " short position closed for " + comp.getId());
                 net.sf.rails.common.ReportBuffer.add(this,
                         player.getName() + " automatically closes a short position in " + comp.getId());
             } else {

@@ -1332,6 +1332,12 @@ int rawSum = initiator.getMarketPrice() + target.getMarketPrice();
 
     private void executeSale(PublicCompany target, PublicCompany predator, int finalBid) {
 
+        boolean isTargetRed = (target.getCurrentSpace().getPrice() == 0);
+        if (isTargetRed) {
+            executeLiquidationSale(target, predator, finalBid);
+            return;
+        }
+
         net.sf.rails.common.ReportBuffer.add(this, (predator != null ? predator.getId() : "Bank") + " buys "
                 + target.getId() + " for " + net.sf.rails.game.financial.Bank.format(this, finalBid) + ".");
         net.sf.rails.common.ReportBuffer.add(this, buildCompanyStateReport(target));
@@ -1679,5 +1685,114 @@ String presName = comp.getPresident() != null ? comp.getPresident().getName() : 
 
         return report.toString();
     }
+
+    private void executeLiquidationSale(PublicCompany target, PublicCompany predator, int finalBid) {
+        net.sf.rails.common.ReportBuffer.add(this, "--- LIQUIDATION EVENT: " + target.getId() + " ---");
+        net.sf.rails.common.ReportBuffer.add(this, "Pre-Liquidation State:\n" + buildCompanyStateReport(target));
+
+        Player president = target.getPresident();
+        int setAsideCash = target.getCash();
+        int targetLoans = (target instanceof PublicCompany_1817) ? ((PublicCompany_1817) target).getNumberOfBonds() : 0;
+        
+        log.info("LIQUIDATION: President " + (president != null ? president.getName() : "None") + " sets aside $" + setAsideCash + " and " + targetLoans + " loans.");
+
+        if (setAsideCash > 0) {
+            net.sf.rails.game.state.Currency.wire(target, setAsideCash, gameManagerRef.getRoot().getBank());
+        }
+        
+        // Rule 7.2.4 Step 6: Treasury shares to Open Market, zero compensation
+        for (PublicCertificate cert : new java.util.ArrayList<>(target.getCertificates())) {
+            if (cert.getOwner() == target && !cert.isPresidentShare()) {
+                cert.moveTo(gameManagerRef.getRoot().getBank().getPool());
+            }
+        }
+
+        // Rule 7.2.4 Steps 5 & 6: Asset Transfer
+        if (predator != null) {
+            net.sf.rails.common.ReportBuffer.add(this, predator.getId() + " buys assets of " + target.getId() + " for " + net.sf.rails.game.financial.Bank.format(this, finalBid) + ".");
+            
+            for (net.sf.rails.game.Train t : new java.util.ArrayList<>(target.getTrains())) {
+                t.moveTo(predator);
+            }
+            for (net.sf.rails.game.PrivateCompany p : new java.util.ArrayList<>(target.getPrivates())) {
+                p.moveTo(predator);
+            }
+            
+            List<net.sf.rails.game.BaseToken> targetTokens = new java.util.ArrayList<>(target.getLaidBaseTokens());
+            for (net.sf.rails.game.BaseToken targetToken : targetTokens) {
+                if (targetToken.getOwner() instanceof net.sf.rails.game.Stop) {
+                    net.sf.rails.game.Stop stop = (net.sf.rails.game.Stop) targetToken.getOwner();
+                    boolean hexHasPredatorToken = false;
+                    for (net.sf.rails.game.Stop s : stop.getHex().getStops()) {
+                        if (s.hasTokenOf(predator)) { hexHasPredatorToken = true; break; }
+                    }
+                    targetToken.moveTo(target);
+                    if (!hexHasPredatorToken) {
+                        net.sf.rails.game.BaseToken newToken = predator.getNextBaseToken();
+                        if (newToken != null) newToken.moveTo(stop);
+                    }
+                }
+            }
+            // Predator takes new loans if short on cash to pay final bid
+            if (predator instanceof PublicCompany_1817) {
+                PublicCompany_1817 p1817 = (PublicCompany_1817) predator;
+                int loansTaken = 0;
+                while (p1817.getCash() < finalBid && p1817.getNumberOfBonds() < p1817.getShareCount()) {
+                    p1817.setNumberOfBonds(p1817.getNumberOfBonds() + 1);
+                    p1817.addCashFromBank(100, gameManagerRef.getRoot().getBank());
+                    loansTaken++;
+                    if (gameManagerRef.getRoot().getStockMarket() instanceof StockMarket_1817) {
+                        ((StockMarket_1817) gameManagerRef.getRoot().getStockMarket()).moveLeftOrDown(p1817, 1);
+                    }
+                }
+            }
+            net.sf.rails.game.state.Currency.wire(predator, finalBid, gameManagerRef.getRoot().getBank());
+        } else {
+            net.sf.rails.common.ReportBuffer.add(this, "Bank buys assets of " + target.getId() + " for $0. Assets removed from game.");
+            for (net.sf.rails.game.BaseToken targetToken : new java.util.ArrayList<>(target.getLaidBaseTokens())) {
+                targetToken.moveTo(target);
+            }
+        }
+
+        // Rule 7.2.4 Step 8: Presidential Debt Settlement
+        int totalFunds = setAsideCash + finalBid;
+        int totalDebt = targetLoans * 100;
+        int surplus = 0;
+
+        if (totalFunds >= totalDebt) {
+            surplus = totalFunds - totalDebt;
+            log.info("LIQUIDATION: Debts cleared. Surplus: $" + surplus);
+            if (targetLoans > 0 && target instanceof PublicCompany_1817) {
+                ((PublicCompany_1817) target).setNumberOfBonds(0);
+            }
+        } else {
+            int deficit = totalDebt - totalFunds;
+            log.warn("LIQUIDATION: Deficit of $" + deficit + ". President must pay.");
+            if (president != null) {
+                if (president.getCash() >= deficit) {
+                    net.sf.rails.game.state.Currency.wire(president, deficit, gameManagerRef.getRoot().getBank());
+                    net.sf.rails.common.ReportBuffer.add(this, president.getName() + " pays deficit of " + net.sf.rails.game.financial.Bank.format(this, deficit) + " out of pocket.");
+                } else {
+                    log.error("CASH CRISIS: " + president.getName() + " cannot cover deficit of $" + deficit);
+                    // Cash Crisis delegation goes here
+                }
+            }
+            if (targetLoans > 0 && target instanceof PublicCompany_1817) {
+                 ((PublicCompany_1817) target).setNumberOfBonds(0);
+            }
+        }
+
+        // Rule 7.2.4 Step 9: Shareholder Settlement
+        int shareCount = ((PublicCompany_1817) target).getShareCount();
+        int payoutPerShare = surplus / shareCount;
+        net.sf.rails.common.ReportBuffer.add(this, "LIQUIDATION: Surplus per share payout is " + net.sf.rails.game.financial.Bank.format(this, payoutPerShare) + ".");
+        
+        settleWithShareholders(target, payoutPerShare);
+
+        target.setClosed();
+        companyIndex.set(companyIndex.value() + 1);
+        processNextSale();
+    }
+
 
 }

@@ -3426,20 +3426,20 @@ public class GameStatus extends GridPanel {
                 }
             }
 
-            // 1817 IPO Binding
+            // 1817 Short Binding: Map Sell Short actions to the OSI column
             if (possibleActions.getList() != null) {
                 for (PossibleAction pa : possibleActions.getList()) {
-                    if (pa.getClass().getName().endsWith("Initiate1817IPO")) {
+                    if (pa.getClass().getName().endsWith("Short1817")) {
                         try {
-                            PublicCompany comp = (PublicCompany) pa.getClass().getMethod("getCompany").invoke(pa);
+                            String compId = (String) pa.getClass().getMethod("getCompanyId").invoke(pa);
+                            PublicCompany comp = gameUIManager.getRoot().getCompanyManager().getPublicCompany(compId);
                             if (comp != null) {
-                                setIPOCertButton(comp.getPublicNumber(), true, pa);
+                                setOSICertButton(comp.getPublicNumber(), true, pa);
                             }
                         } catch (Exception e) {
-                            log.error("Failed to bind 1817 IPO action", e);
+                            log.error("Failed to bind Short1817 action", e);
                         }
                     }
-
                 }
             }
 
@@ -3530,7 +3530,31 @@ public class GameStatus extends GridPanel {
                 hasContent = true;
             }
         }
+        // Update the card text and visibility
+        osiShareCards[i].setCustomLabel(shareTxt);
+        osiShareCards[i].setVisible(hasContent);
+
+        if (clickable && o != null) {
+            // House Rule: Apply the "Big Green Border" to indicate the short is available to be taken
+            osiShareCards[i].setBackground(BG_CARD_PASSIVE);
+            osiShareCards[i].setBorder(BorderFactory.createLineBorder(BORDER_COL_BUY, BORDER_THICKNESS));
+
+            if (o instanceof PossibleAction) {
+                osiShareCards[i].addPossibleAction((PossibleAction) o);
+            }
+            osiShareCards[i].setEnabled(true);
+            osiShareCards[i].setVisible(true); // Ensure it is visible if actionable
+        } else {
+            // Standard passive state with dark red text for shorts
+            osiShareCards[i].setBackground(BG_CARD_PASSIVE);
+            osiShareCards[i].setBorder(BorderFactory.createCompoundBorder(
+                    BorderFactory.createLineBorder(Color.BLACK, 1),
+                    BorderFactory.createEmptyBorder(1, 1, 1, 1)));
+            osiShareCards[i].setEnabled(true);
+        }
     }
+
+    
 
     protected void setOSICertButton(int i, boolean clickable) {
         setOSICertButton(i, clickable, null);

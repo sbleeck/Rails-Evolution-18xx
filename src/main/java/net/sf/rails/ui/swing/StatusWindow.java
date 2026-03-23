@@ -2002,25 +2002,25 @@ boolean hasSpecialActions = false;
                         }
 
                         // Short Selling Logic
-                        if (!shortActions.isEmpty() && myTurn) {
-                            if (hasSpecialActions)
-                                dynamicButtonPanel.add(new JSeparator(JSeparator.VERTICAL));
+                        // if (!shortActions.isEmpty() && myTurn) {
+                        //     if (hasSpecialActions)
+                        //         dynamicButtonPanel.add(new JSeparator(JSeparator.VERTICAL));
 
-                            JLabel shortLabel = new JLabel("Sell Short:");
-                            shortLabel.setForeground(new Color(200, 0, 100));
-                            shortLabel.setFont(new Font("SansSerif", Font.BOLD, 12));
-                            dynamicButtonPanel.add(shortLabel);
+                        //     JLabel shortLabel = new JLabel("Sell Short:");
+                        //     shortLabel.setForeground(new Color(200, 0, 100));
+                        //     shortLabel.setFont(new Font("SansSerif", Font.BOLD, 12));
+                        //     dynamicButtonPanel.add(shortLabel);
 
-                            for (final PossibleAction pa : shortActions) {
-                                String compId = pa.toString().replace("Sell Short", "").trim();
-                                JButton shortBtn = new JButton(compId);
-                                shortBtn.setBackground(Color.PINK);
-                                shortBtn.setOpaque(true);
-                                shortBtn.setBorder(BorderFactory.createLineBorder(new Color(255, 105, 180), 2));
-                                shortBtn.addActionListener(e -> process(pa));
-                                dynamicButtonPanel.add(shortBtn);
-                            }
-                        }
+                        //     for (final PossibleAction pa : shortActions) {
+                        //         String compId = pa.toString().replace("Sell Short", "").trim();
+                        //         JButton shortBtn = new JButton(compId);
+                        //         shortBtn.setBackground(Color.PINK);
+                        //         shortBtn.setOpaque(true);
+                        //         shortBtn.setBorder(BorderFactory.createLineBorder(new Color(255, 105, 180), 2));
+                        //         shortBtn.addActionListener(e -> process(pa));
+                        //         dynamicButtonPanel.add(shortBtn);
+                        //     }
+                        // }
                         // if (myTurn) {
                         //     List<NullAction> nullActions = possibleActions.getType(NullAction.class);
                         //     if (nullActions != null) {
@@ -2876,6 +2876,12 @@ boolean blockGlobalPass = false; // NEVER block the global pass button
                     if (pa instanceof GameAction || pa instanceof CorrectionModeAction || pa.isCorrection()) {
                         continue;
                     }
+
+                    // HOUSE RULE: Hide "Sell Short" buttons from the sidebar. 
+                // They are now handled by the OSI grid with the Green Border.
+                if (pa.getClass().getName().endsWith("Short1817")) {
+                    continue;
+                }
 
                     // --- START FIX: SHOW ACTION OWNER ---
                     String owner = "-";
