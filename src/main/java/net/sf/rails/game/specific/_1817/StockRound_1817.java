@@ -69,7 +69,9 @@ public class StockRound_1817 extends StockRound {
         // At the start of every stock round, the bank closes any short positions
         // in the open market by purchasing stock from the company treasury.
         net.sf.rails.game.model.PortfolioModel openMarket = pool;
-        net.sf.rails.game.financial.BankPortfolio unavailableBank = getRoot().getBank().getUnavailable();
+        
+
+        net.sf.rails.game.financial.BankPortfolio osiBank = getRoot().getBank().getOSI();
 
         for (PublicCompany comp : gameManager.getAllPublicCompanies()) {
             if (!(comp instanceof PublicCompany_1817))
@@ -90,8 +92,8 @@ public class StockRound_1817 extends StockRound {
                     net.sf.rails.game.financial.PublicCertificate treasuryShare = comp.getPortfolioModel()
                             .findCertificate(comp, false);
                     if (treasuryShare != null) {
-                        shortCert.moveTo(unavailableBank);
-                        treasuryShare.moveTo(unavailableBank);
+                        shortCert.moveTo(osiBank);
+                        treasuryShare.moveTo(osiBank);
                         log.info(
                                 "Bank auto-closed orphaned short share for " + comp.getId() + " using treasury stock.");
                     } else {
@@ -102,6 +104,8 @@ public class StockRound_1817 extends StockRound {
                 }
             }
         }
+
+
     }
 
     @Override
@@ -158,6 +162,14 @@ public class StockRound_1817 extends StockRound {
                     // 3. Max 5 short shares in play (Rule 5.3)
                     int activeShorts = 0;
                     int availableShorts = 0;
+
+                    net.sf.rails.game.model.PortfolioModel osiPortfolio = getRoot().getBank().getOSI().getPortfolioModel();
+                    for (net.sf.rails.game.financial.PublicCertificate c : osiPortfolio.getCertificates()) {
+                        if (c instanceof net.sf.rails.game.specific._1817.ShortCertificate
+                                && c.getCompany() == comp1817) {
+                            availableShorts++;
+                        }
+                    }
 
                     // Count Available Shorts (Iterate through the Bank's Unavailable Portfolio)
                     // This is exactly where you moved them in
@@ -399,7 +411,7 @@ public class StockRound_1817 extends StockRound {
                 // in Open Short Interest
                 // We check if we need to sequester the 5 regular shares.
                 int regularSharesInOSI = 0;
-                for (net.sf.rails.game.financial.PublicCertificate c : getRoot().getBank().getUnavailable()
+                for (net.sf.rails.game.financial.PublicCertificate c : getRoot().getBank().getOSI()
                         .getPortfolioModel().getCertificates()) {
                     if (!(c instanceof ShortCertificate) && c.getCompany() == comp) {
                         regularSharesInOSI++;
@@ -407,24 +419,25 @@ public class StockRound_1817 extends StockRound {
                 }
 
                 if (regularSharesInOSI == 0) {
-                    // Move 5 regular shares from the Pool to Unavailable (OSI)
+                    // Move 5 regular shares from the Pool to OSI
                     for (int i = 0; i < 5; i++) {
                         net.sf.rails.game.financial.PublicCertificate regCert = pool.findCertificate(comp, 1, false);
                         if (regCert != null) {
-                            regCert.moveTo(getRoot().getBank().getUnavailable());
+                            regCert.moveTo(getRoot().getBank().getOSI());
                         }
                     }
                 }
 
                 // 2. Find the ShortCertificate to give to the player
                 net.sf.rails.game.financial.PublicCertificate shortCert = null;
-                for (net.sf.rails.game.financial.PublicCertificate c : getRoot().getBank().getUnavailable()
+                for (net.sf.rails.game.financial.PublicCertificate c : getRoot().getBank().getOSI()
                         .getPortfolioModel().getCertificates()) {
                     if (c instanceof net.sf.rails.game.specific._1817.ShortCertificate && c.getCompany() == comp) {
                         shortCert = c;
                         break;
                     }
                 }
+
 
                 if (shortCert != null) {
                     // 3. Complete the sale: Player gets the Liability (Short Cert) and the Cash
@@ -579,9 +592,9 @@ public class StockRound_1817 extends StockRound {
             }
 
             if (shortCert != null && regularCert != null) {
-                net.sf.rails.game.financial.BankPortfolio unavailableBank = getRoot().getBank().getUnavailable();
-                shortCert.moveTo(unavailableBank);
-                regularCert.moveTo(unavailableBank);
+net.sf.rails.game.financial.BankPortfolio osiBank = getRoot().getBank().getOSI();
+                shortCert.moveTo(osiBank);
+                regularCert.moveTo(osiBank);
                 log.info(
                         "Mandatory Reconciliation: " + player.getName() + " short position closed for " + comp.getId());
                 net.sf.rails.common.ReportBuffer.add(this,

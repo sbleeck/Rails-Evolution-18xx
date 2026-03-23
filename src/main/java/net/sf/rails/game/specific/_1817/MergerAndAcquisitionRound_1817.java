@@ -485,17 +485,20 @@ public class MergerAndAcquisitionRound_1817 extends Round {
             mandatoryTokenCost.set(50);
 
         } else if (currentShares == 5) {
+           
+            net.sf.rails.common.ReportBuffer.add(this, "--- CONVERSION EVENT: " + comp.getId() + " converts from a 5-share to a 10-share company ---");
+            net.sf.rails.common.ReportBuffer.add(this, "Pre-Conversion State:\n" + preReport);
+
             comp1817.setShareCount(10);
             log.info("CONVERSION: Upgraded " + comp.getId() + " from 5-share to 10-share. ");
 
             // 1817 Rule 7.1.1: Must buy 2 markers for $100 unless company has 7 or 8
-            // markers
+            // markers 
             if (currentMarkers <= 6) {
                 mandatoryTokenCost.set(100);
             } else if (currentMarkers == 7) {
                 mandatoryTokenCost.set(50);
             }
-
         }
         
         // Mark as merged/converted this round so it cannot merge again [cite: 708, 709]
@@ -1645,12 +1648,19 @@ String presName = comp.getPresident() != null ? comp.getPresident().getName() : 
         int playerShorts = 0;
         
         if (shareCount > 2) {
-            for (net.sf.rails.game.financial.PublicCertificate cert : gameManagerRef.getRoot().getBank().getUnavailable().getPortfolioModel().getCertificates()) {
+// House Rule: Look in OSI portfolio instead of Unavailable
+            net.sf.rails.game.financial.BankPortfolio osiBank = gameManagerRef.getRoot().getBank().getOSI();
+            for (net.sf.rails.game.financial.PublicCertificate cert : osiBank.getPortfolioModel().getCertificates()) {
                 if (cert.getCompany() == comp) {
-                    if (cert instanceof net.sf.rails.game.specific._1817.ShortCertificate) osiShorts++;
-                    else osiRegular += cert.getShare() / comp.getShareUnit();
+                    if (cert instanceof net.sf.rails.game.specific._1817.ShortCertificate) {
+                        osiShorts++;
+                    } else {
+                        osiRegular += cert.getShare() / comp.getShareUnit();
+                    }
                 }
             }
+
+
             
             for (net.sf.rails.game.Player p : gameManagerRef.getRoot().getPlayerManager().getPlayers()) {
                 for (net.sf.rails.game.financial.PublicCertificate cert : p.getPortfolioModel().getCertificates()) {

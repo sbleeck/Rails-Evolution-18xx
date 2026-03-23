@@ -441,6 +441,13 @@ public class GameStatus extends GridPanel {
     protected JPanel[] treasuryPanels;
     protected RailCard[] treasuryShareCards;
 
+    protected boolean hasOSI = false;
+    protected PortfolioModel osi;
+    protected JPanel[] osiPanels;
+    protected RailCard[] osiShareCards;
+    protected javax.swing.JLabel[] osiLabels;
+    protected int certInOSIXOffset;
+
     protected JPanel[] poolPanels;
     protected RailCard[] poolShareCards;
     protected javax.swing.JLabel[] poolPriceLabels;
@@ -512,6 +519,42 @@ public class GameStatus extends GridPanel {
         hasBonds = gameUIManager.getGameParameterAsBoolean(GuiDef.Parm.HAS_BONDS);
         hasDirectCompanyIncomeInOr = gameUIManager.getGameParameterAsBoolean(GuiDef.Parm.HAS_SPECIAL_COMPANY_INCOME);
         needsNumberOfSharesColumn = gameUIManager.getGameParameterAsBoolean(GuiDef.Parm.HAS_GROWING_NUMBER_OF_SHARES);
+
+        hasOSI = is1817;
+        if (hasOSI) {
+            try {
+                Object osiPort = null;
+
+                // Attempt 1: Standard Rails portfolio lookup
+                try {
+                    java.lang.reflect.Method getPort = bank.getClass().getMethod("getPortfolio", String.class);
+                    osiPort = getPort.invoke(bank, "OSI");
+                    if (osiPort == null)
+                        osiPort = getPort.invoke(bank, "Open Short Interest");
+                } catch (Exception e1) {
+                    // Ignore and try fallback
+                }
+
+                // Attempt 2: Explicit getOSI() getter
+                if (osiPort == null) {
+                    try {
+                        java.lang.reflect.Method m = bank.getClass().getMethod("getOSI");
+                        osiPort = m.invoke(bank);
+                    } catch (Exception e2) {
+                        // Ignore
+                    }
+                }
+
+                if (osiPort != null) {
+                    java.lang.reflect.Method m2 = osiPort.getClass().getMethod("getPortfolioModel");
+                    osi = (PortfolioModel) m2.invoke(osiPort);
+                } else {
+                    log.warn("OSI Portfolio not found. Rendering empty column for layout testing.");
+                }
+            } catch (Exception e) {
+                log.warn("Error initializing OSI portfolio: " + e.getMessage());
+            }
+        }
 
         // TODO: Can this be done using ipo and pool directly?
         ipo = bank.getIpo().getPortfolioModel();
@@ -1101,16 +1144,6 @@ public class GameStatus extends GridPanel {
 
             SoundManager.notifyOfClickFieldSelection(actions.isEmpty() ? null : actions.get(0));
 
-            log.info("=== UI CLICK DETECTED ===");
-            if (actions != null) {
-                log.info("Number of actions bound to this UI element: " + actions.size());
-                for (PossibleAction pa : actions) {
-                    log.info(" -> Bound Action: " + pa.toString() + " (Class: " + pa.getClass().getSimpleName() + ")");
-                }
-            } else {
-                log.warn("Actions list is null for clicked component.");
-            }
-
             if (actions.size() == 0) {
                 log.warn("No ClickField action found");
             } else if (actions.size() > 1 && !allSameBaseAction(actions)) {
@@ -1392,7 +1425,6 @@ public class GameStatus extends GridPanel {
     protected PossibleAction handle1817IPO(PossibleAction action) {
         return null;
     }
-
 
     protected void setCompanyTrainButton(int i, boolean clickable, PossibleAction action) {
         // 1. Safety Checks
@@ -2600,9 +2632,9 @@ public class GameStatus extends GridPanel {
         }
         bondsHeatbarPanel.setTotalLoansTaken(totalLoans);
 
-         if (interestRateField != null) {
-        interestRateField.setText("Interest: $" + interestRate);
-    }
+        if (interestRateField != null) {
+            interestRateField.setText("Interest: $" + interestRate);
+        }
 
     }
 
@@ -2713,6 +2745,10 @@ public class GameStatus extends GridPanel {
 
             setIPOCertButton(i, false);
             setPoolCertButton(i, false);
+
+            if (hasOSI) {
+                setOSICertButton(i, false);
+            }
 
             // Update Company Name background (ALWAYS STANDARD, never yellow)
             if (compNameCaption[i] != null) {
@@ -2842,6 +2878,29 @@ public class GameStatus extends GridPanel {
 
             }
 
+            if (hasOSI && osiPanels[i] != null) {
+                osiPanels[i].setBackground(bgIpo);
+
+                if (osiShareCards[i] != null && osi != null) {
+                    if (stickyFont != null)
+                        osiShareCards[i].setFont(stickyFont);
+
+                    osiShareCards[i].getCertificates().clear();
+                    osiShareCards[i].getCertificates().addAll(osi.getCertificates(c));
+
+                    String shareTxt = osi.getShareModel(c).toText();
+                    if (shareTxt == null)
+                        shareTxt = "";
+
+                    String trimmed = shareTxt.trim();
+                    boolean hasContent = !trimmed.isEmpty() && !trimmed.equals("0") && !trimmed.equals("0%");
+
+                    osiShareCards[i].setCustomLabel(shareTxt);
+                    osiShareCards[i].setVisible(hasContent);
+                    osiShareCards[i].setForeground(new Color(139, 0, 0)); // Dark Red for Shorts
+                }
+            }
+
             if (hasParPrices && parPrice[i] != null) {
                 parPrice[i].setBackground(bgIpo);
                 parPrice[i].setOpaque(true);
@@ -2854,8 +2913,12 @@ public class GameStatus extends GridPanel {
             if (compCanHoldOwnShares) {
                 setTreasuryCertButton(i, false);
                 if (certInTreasury[i] != null) {
-                    certInTreasury[i].setBackground(bgPool);
+                    certInTreasury[i].setBackground(bgIpo);
                     certInTreasury[i].setOpaque(true);
+                    if (treasuryPanels[i] != null) {
+                        treasuryPanels[i].setBackground(bgIpo);
+                    }
+
                 }
             }
 
@@ -2941,8 +3004,9 @@ public class GameStatus extends GridPanel {
 
                     // Calculate Interest Cost using the BondsModel_1817 rate
                     int interestRate = 0;
-if (gameUIManager.getGameManager() instanceof net.sf.rails.game.specific._1817.GameManager_1817) {
-                        net.sf.rails.game.model.BondsModel bm = ((net.sf.rails.game.specific._1817.GameManager_1817) gameUIManager.getGameManager()).getBondsModel();
+                    if (gameUIManager.getGameManager() instanceof net.sf.rails.game.specific._1817.GameManager_1817) {
+                        net.sf.rails.game.model.BondsModel bm = ((net.sf.rails.game.specific._1817.GameManager_1817) gameUIManager
+                                .getGameManager()).getBondsModel();
                         if (bm instanceof net.sf.rails.game.specific._1817.BondsModel_1817) {
                             interestRate = ((net.sf.rails.game.specific._1817.BondsModel_1817) bm).getInterestRate();
                         }
@@ -2970,9 +3034,6 @@ if (gameUIManager.getGameManager() instanceof net.sf.rails.game.specific._1817.G
                     } else if (compLoans[i] instanceof JLabel) {
                         ((JLabel) compLoans[i]).setText(loanDisplay);
                     }
-
-
-                    
 
                     if (possibleActions != null && possibleActions.getList() != null) {
                         for (PossibleAction pa : possibleActions.getList()) {
@@ -3328,6 +3389,8 @@ if (gameUIManager.getGameManager() instanceof net.sf.rails.game.specific._1817.G
                         setIPOCertButton(index, true, bCert);
                     else if (portfolio == pool)
                         setPoolCertButton(index, true, bCert);
+                    else if (hasOSI && osi != null && portfolio == osi)
+                        setOSICertButton(index, true, bCert);
                     else if ((portfolio.getParent()) instanceof Player)
                         setPlayerCertButton(index, ((Player) portfolio.getParent()).getIndex(), true, bCert);
                     else if (portfolio.getParent() instanceof PublicCompany && compCanHoldOwnShares)
@@ -3399,8 +3462,10 @@ if (gameUIManager.getGameManager() instanceof net.sf.rails.game.specific._1817.G
             e.printStackTrace();
         }
 
-         // The Kill Signal: ORUIManager silently aborts updates during Player-driven phases (like Auctions).
-        // We manually broadcast an empty action list to force the ORPanel to trigger its dormancy intercept.
+        // The Kill Signal: ORUIManager silently aborts updates during Player-driven
+        // phases (like Auctions).
+        // We manually broadcast an empty action list to force the ORPanel to trigger
+        // its dormancy intercept.
         if (possibleActions != null && possibleActions.getList() != null) {
             boolean isPlayerExclusivePhase = false;
             for (PossibleAction pa : possibleActions.getList()) {
@@ -3415,6 +3480,60 @@ if (gameUIManager.getGameManager() instanceof net.sf.rails.game.specific._1817.G
             }
         }
         repaint();
+    }
+
+    protected void setOSICertButton(int i, boolean clickable, Object o) {
+        RowVisibility observer = null;
+        if (shareRowVisibilityObservers != null && i >= 0 && i < shareRowVisibilityObservers.length) {
+            observer = shareRowVisibilityObservers[i];
+        }
+
+        if (observer == null || osiShareCards == null || osiShareCards[i] == null || osi == null) {
+            return;
+        }
+
+        if (companies == null || i < 0 || i >= companies.length || companies[i] == null) {
+            return;
+        }
+
+        if (stickyFont != null) {
+            osiShareCards[i].setFont(stickyFont);
+        }
+
+        osiShareCards[i].setShareStackTooltip(osi.getCertificates(companies[i]));
+
+        boolean visible = observer.lastValue();
+        if (!visible) {
+            osiShareCards[i].setVisible(false);
+            return;
+        }
+
+        net.sf.rails.game.model.ShareModel sm = osi.getShareModel(companies[i]);
+        String shareTxt = (sm != null) ? sm.toText() : "";
+        boolean hasContent = (shareTxt != null && !shareTxt.trim().isEmpty() && !shareTxt.trim().equals("0")
+                && !shareTxt.trim().equals("0%"));
+
+        osiShareCards[i].setVisible(hasContent);
+        osiShareCards[i].clearPossibleActions();
+// House Rule Display: If percentage is 0 but ShortCertificates exist, show the count (e.g., "5")
+
+        
+        if ((shareTxt == null || shareTxt.trim().isEmpty() || shareTxt.equals("0%")) && osi != null) {
+            int shortCertCount = 0;
+            for (net.sf.rails.game.financial.PublicCertificate cert : osi.getCertificates(companies[i])) {
+                if (cert instanceof net.sf.rails.game.specific._1817.ShortCertificate) {
+                    shortCertCount++;
+                }
+            }
+            if (shortCertCount > 0) {
+                shareTxt = String.valueOf(shortCertCount);
+                hasContent = true;
+            }
+        }
+    }
+
+    protected void setOSICertButton(int i, boolean clickable) {
+        setOSICertButton(i, clickable, null);
     }
 
     /**
@@ -3966,6 +4085,14 @@ if (gameUIManager.getGameManager() instanceof net.sf.rails.game.specific._1817.G
             ipoShareCards = new RailCard[nc];
         if (ipoParLabels == null || ipoParLabels.length != nc)
             ipoParLabels = new javax.swing.JLabel[nc];
+        if (hasOSI) {
+            if (osiPanels == null || osiPanels.length != nc)
+                osiPanels = new JPanel[nc];
+            if (osiShareCards == null || osiShareCards.length != nc)
+                osiShareCards = new RailCard[nc];
+            if (osiLabels == null || osiLabels.length != nc)
+                osiLabels = new javax.swing.JLabel[nc];
+        }
         if (treasuryPanels == null || treasuryPanels.length != nc)
             treasuryPanels = new JPanel[nc];
         if (treasuryShareCards == null || treasuryShareCards.length != nc)
@@ -4015,6 +4142,10 @@ if (gameUIManager.getGameManager() instanceof net.sf.rails.game.specific._1817.G
 
         if (compCanHoldOwnShares)
             certInTreasuryXOffset = col++;
+
+        if (hasOSI) {
+            certInOSIXOffset = col++;
+        }
 
         compCashXOffset = col++;
         compTrainsXOffset = col++;
@@ -4142,7 +4273,7 @@ if (gameUIManager.getGameManager() instanceof net.sf.rails.game.specific._1817.G
         addField(f, certInPoolXOffset, 1, 1, 1, 0, true);
 
         f = new Caption(LocalText.getText("IPO"));
-        f.setBorder(BorderFactory.createMatteBorder(0, 0, 1, 4, Color.BLACK));
+        f.setBorder(BorderFactory.createMatteBorder(0, 0, 1, hasOSI ? 1 : 4, hasOSI ? Color.GRAY : Color.BLACK));
         f.setPreferredSize(dimMarket); // Use dynamic width
         f.setBackground(BG_HEADER);
         f.setOpaque(true);
@@ -4152,7 +4283,18 @@ if (gameUIManager.getGameManager() instanceof net.sf.rails.game.specific._1817.G
             f = new Caption(LocalText.getText("TREASURY"));
             f.setBorder(BorderFactory.createMatteBorder(0, 0, 1, 1, Color.GRAY));
             f.setPreferredSize(DIM_STD);
+            f.setBackground(BG_HEADER);
+            f.setOpaque(true);
             addField(f, certInTreasuryXOffset, 1, 1, 1, 0, true);
+        }
+
+        if (hasOSI) {
+            f = new Caption("OSI");
+            f.setBorder(BorderFactory.createMatteBorder(0, 0, 1, 4, Color.BLACK));
+            f.setPreferredSize(DIM_STD);
+            f.setBackground(BG_HEADER);
+            f.setOpaque(true);
+            addField(f, certInOSIXOffset, 1, 1, 1, 0, true);
         }
 
         f = new Caption(compCanHoldOwnShares ? LocalText.getText("CASH") : LocalText.getText("TREASURY"));
@@ -4429,7 +4571,8 @@ if (gameUIManager.getGameManager() instanceof net.sf.rails.game.specific._1817.G
             ipoParLabels[i].setHorizontalAlignment(SwingConstants.RIGHT);
             ipoParLabels[i].setOpaque(false);
             ipoPanels[i] = createShareCell(
-                    ipoShareCards[i], ipoParLabels[i], dimCard, dimPrice, getBorder.apply(false, true));
+                    ipoShareCards[i], ipoParLabels[i], dimCard, dimPrice, getBorder.apply(false, !hasOSI));
+
             ipoPanels[i].setOpaque(true);
             addField(ipoPanels[i], certInIPOXOffset, y, 1, 1, 0, visible);
 
@@ -4448,11 +4591,35 @@ if (gameUIManager.getGameManager() instanceof net.sf.rails.game.specific._1817.G
                 treasuryPanels[i] = createShareCell(
                         treasuryShareCards[i], null, dimCard, null, getBorder.apply(true, false));
                 treasuryPanels[i]
-                        .setBackground(isOperating ? BG_OPERATING : (isMinor || !isActive ? BG_INACTIVE : BG_POOL));
+                        .setBackground(isOperating ? BG_OPERATING
+                                : (isMinor || !isActive ? BG_INACTIVE : BG_SPOTLIGHT_INACTIVE));
                 treasuryPanels[i].setOpaque(true);
 
                 addField(treasuryPanels[i], certInTreasuryXOffset, y, 1, 1, 0, visible);
 
+            }
+
+            if (hasOSI) {
+                osiShareCards[i] = new RailCard((net.sf.rails.game.Train) null, buySellGroup);
+                osiShareCards[i].addActionListener(this);
+                osiShareCards[i].setCompany(c);
+                HexHighlightMouseListener.addMouseListener(osiShareCards[i], gameUIManager.getORUIManager(), c, false);
+                if (stickyFont != null)
+                    osiShareCards[i].setFont(stickyFont);
+
+                osiLabels[i] = new Caption("");
+                osiLabels[i].setFont(baseFont.deriveFont(Font.BOLD));
+                osiLabels[i].setForeground(Color.RED);
+                osiLabels[i].setHorizontalAlignment(SwingConstants.RIGHT);
+                osiLabels[i].setOpaque(false);
+
+                osiPanels[i] = createShareCell(
+                        osiShareCards[i], null, dimCard, null, getBorder.apply(false, true));
+                osiPanels[i].setBackground(
+                        isOperating ? BG_OPERATING : (isMinor || !isActive ? BG_INACTIVE : BG_SPOTLIGHT_INACTIVE));
+                osiPanels[i].setOpaque(true);
+
+                addField(osiPanels[i], certInOSIXOffset, y, 1, 1, 0, visible);
             }
 
             // DETAILS (Cash, Rev, Trains, Tokens)
@@ -4845,23 +5012,23 @@ if (gameUIManager.getGameManager() instanceof net.sf.rails.game.specific._1817.G
 
         if (is1817) {
 
-interestRateField = new Field("Interest: ?");
-interestRateField.setBorder(BORDER_BOX);
-interestRateField.setBackground(BG_BANK);
-interestRateField.setOpaque(true);
-interestRateField.setFont(new Font("SansSerif", Font.BOLD, 12));
-interestRateField.setHorizontalAlignment(SwingConstants.CENTER);
-addField(interestRateField, bankX - 1, bankY - 4, 1, 1, 0, true);
+            interestRateField = new Field("Interest: ?");
+            interestRateField.setBorder(BORDER_BOX);
+            interestRateField.setBackground(BG_BANK);
+            interestRateField.setOpaque(true);
+            interestRateField.setFont(new Font("SansSerif", Font.BOLD, 12));
+            interestRateField.setHorizontalAlignment(SwingConstants.CENTER);
+            addField(interestRateField, bankX - 1, bankY - 4, 1, 1, 0, true);
 
-        bondsHeatbarPanel = new net.sf.rails.ui.swing.elements.BondsHeatbarPanel();
-        int span = rightCompCaptionXOffset - bankX;
-        if (span < 1)
-            span = 1;
+            bondsHeatbarPanel = new net.sf.rails.ui.swing.elements.BondsHeatbarPanel();
+            int span = rightCompCaptionXOffset - bankX;
+            if (span < 1)
+                span = 1;
 
-        gbc.weightx = 1.0;
-        gbc.fill = GridBagConstraints.BOTH;
-        addField(bondsHeatbarPanel, bankX, bankY - 4, span, 1, 0, true);
-                    gbc.weightx = 0.0;
+            gbc.weightx = 1.0;
+            gbc.fill = GridBagConstraints.BOTH;
+            addField(bondsHeatbarPanel, bankX, bankY - 4, span, 1, 0, true);
+            gbc.weightx = 0.0;
             gbc.fill = GridBagConstraints.HORIZONTAL;
         } else {
             f = new Caption("Bank Cash");
@@ -5274,7 +5441,5 @@ addField(interestRateField, bankX - 1, bankY - 4, 1, 1, 0, true);
 
         return null;
     }
-
-    
 
 }

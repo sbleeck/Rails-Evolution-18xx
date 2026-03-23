@@ -15,20 +15,20 @@ import java.util.List;
 /**
  * 1817 specific Public Company logic.
  * Handles dynamic share units (50, 20, 10) and loan limits (2, 5, 10).
- * Manages certificate sequestering for 2-share starts via the Bank's Unavailable portfolio.
+ * Manages certificate sequestering for 2-share starts via the Bank's
+ * Unavailable portfolio.
  */
 public class PublicCompany_1817 extends PublicCompany {
 
     private static final Logger log = LoggerFactory.getLogger(PublicCompany_1817.class);
 
-
     protected final IntegerState tokenCapacity;
     protected final IntegerState shareCount;
-protected final IntegerState bondsState;
+    protected final IntegerState bondsState;
 
     public PublicCompany_1817(RailsItem parent, String id) {
         super(parent, id);
-this.shareCount = IntegerState.create(this, "shareCount", 2);
+        this.shareCount = IntegerState.create(this, "shareCount", 2);
         this.bondsState = IntegerState.create(this, "bondsState", 0);
         this.tokenCapacity = IntegerState.create(this, "tokenCapacity", 8);
     }
@@ -36,19 +36,19 @@ this.shareCount = IntegerState.create(this, "shareCount", 2);
     @Override
     public void finishConfiguration(RailsRoot root) throws ConfigurationException {
         super.finishConfiguration(root);
-       // Rule 1.2.7: Initialize the 5 required short certificates with unique indices
+        // Rule 1.2.7: Initialize the 5 required short certificates with unique indices
         for (int i = 1; i <= 5; i++) {
             ShortCertificate sc = new ShortCertificate(this, i);
-            
+
             // We must use the internal CertificatesModel to find the mutable portfolio
             getPortfolioModel().getCertificatesModel().getPortfolio().add(sc);
-            
+
             // Now that it's registered with the company, sequester it
             sc.moveTo(root.getBank().getUnavailable());
         }
         // Initial certificate setup for all companies
         adjustCertificates();
-            }
+    }
 
     @Override
     public int getNumberOfBonds() {
@@ -59,7 +59,7 @@ this.shareCount = IntegerState.create(this, "shareCount", 2);
         bondsState.set(bonds);
     }
 
-/**
+    /**
      * Executes a single loan transaction for the company.
      * Increments the bond count, transfers $100 from the Bank,
      * and moves the stock price one space to the left/down.
@@ -81,14 +81,15 @@ this.shareCount = IntegerState.create(this, "shareCount", 2);
         if (market instanceof net.sf.rails.game.specific._1817.StockMarket_1817) {
             ((net.sf.rails.game.specific._1817.StockMarket_1817) market).moveLeftOrDown(this, 1);
         }
-        
-        // Note: The global 70-loan limit decrement should be handled by the Bank's 
+
+        // Note: The global 70-loan limit decrement should be handled by the Bank's
         // BondsModel listening to changes in this company's bondsState.
     }
 
     /**
      * Transfers cash from the Bank to the Company treasury.
-     * Uses Currency state movement to ensure the Undo/Redo stack functions correctly.
+     * Uses Currency state movement to ensure the Undo/Redo stack functions
+     * correctly.
      */
     public void addCashFromBank(int amount, net.sf.rails.game.financial.Bank bank) {
         net.sf.rails.game.state.Currency.fromBank(amount, this);
@@ -100,17 +101,18 @@ this.shareCount = IntegerState.create(this, "shareCount", 2);
      */
     public void adjustCertificates() {
         int count = shareCount.value();
-        // President cert is always 2 units (shares). 
+        // President cert is always 2 units (shares).
         // 2-share company = 2 units total (0 normal certs).
         // 5-share company = 5 units total (3 normal certs).
         // 10-share company = 10 units total (8 normal certs).
-        int targetNormalCerts = count - 2; 
+        int targetNormalCerts = count - 2;
 
         List<PublicCertificate> allNormal = new ArrayList<>();
-        
-        // Collect all certificates that aren't the President's share
+
+        // Collect all certificates that aren't the President's share and aren't Short
+        // Certificates
         for (PublicCertificate cert : getCertificates()) {
-            if (!cert.isPresidentShare()) {
+            if (!cert.isPresidentShare() && !(cert instanceof ShortCertificate)) {
                 allNormal.add(cert);
             }
         }
@@ -138,7 +140,8 @@ this.shareCount = IntegerState.create(this, "shareCount", 2);
     @Override
     public int getShareUnit() {
         int count = shareCount.value();
-        if (count == 0) return super.getShareUnit();
+        if (count == 0)
+            return super.getShareUnit();
         return 100 / count;
     }
 
@@ -151,12 +154,11 @@ this.shareCount = IntegerState.create(this, "shareCount", 2);
         return shareCount.value();
     }
 
-
     @Override
     public int getCurrentTrainLimit() {
         int xmlLimit = super.getCurrentTrainLimit();
         String phaseId = getRoot().getPhaseManager().getCurrentPhase().getId();
-        
+
         // log.info("1817_DEBUG: getCurrentTrainLimit() called for " + getId());
         // log.info("1817_DEBUG: Current Phase ID: " + phaseId);
         // log.info("1817_DEBUG: XML Engine parsed limit as: " + xmlLimit);
@@ -168,14 +170,14 @@ this.shareCount = IntegerState.create(this, "shareCount", 2);
         } else if ("5".equals(phaseId) || "4".equals(phaseId)) {
             actualLimit = 3;
         }
-        
+
         // if (xmlLimit != actualLimit) {
-        //     log.warn("1817_WARNING: XML limit (" + xmlLimit + ") mismatch. Enforcing statutory limit: " + actualLimit);
+        // log.warn("1817_WARNING: XML limit (" + xmlLimit + ") mismatch. Enforcing
+        // statutory limit: " + actualLimit);
         // }
 
         return actualLimit;
     }
-
 
     public void setShareCount(int count) {
         if (count == 2 || count == 5 || count == 10) {
@@ -183,10 +185,38 @@ this.shareCount = IntegerState.create(this, "shareCount", 2);
             log.info("Company " + getId() + " set to " + count + "-share size.");
             adjustCertificates();
 
-// Set station marker capacity according to 1817 rules.
+            // HOUSE RULE: Immediately populate OSI with Short Certificates when reaching 5
+            // or 10 shares
+            if (count > 2) {
+                net.sf.rails.game.financial.BankPortfolio osi = net.sf.rails.game.financial.Bank.getOSI(this);
+                net.sf.rails.game.financial.BankPortfolio unavailable = getRoot().getBank().getUnavailable();
+
+                // Collect safely to avoid ConcurrentModificationException during moveTo
+                List<PublicCertificate> shortsToMove = new ArrayList<>();
+                for (PublicCertificate cert : unavailable.getPortfolioModel().getCertificates(this)) {
+                    if (cert instanceof ShortCertificate) {
+                        shortsToMove.add(cert);
+                    }
+                }
+
+                for (PublicCertificate cert : shortsToMove) {
+                    cert.moveTo(osi);
+                }
+                if (!shortsToMove.isEmpty()) {
+                    log.info("1817 House Rule: " + shortsToMove.size() + " Short Certificates for " + getId()
+                            + " moved to OSI.");
+                    net.sf.rails.common.ReportBuffer.add(this,
+                            "1817 House Rule: " + shortsToMove.size() + " Short Certificates for " + getId()
+                                    + " have been issued to the Open Short Interest (OSI).");
+                }
+            }
+
+            // Set station marker capacity according to 1817 rules.
+
+            // Set station marker capacity according to 1817 rules.
             // 2-share: 1 token, 5-share: 2 tokens, 10-share: 4 tokens.
             int capacity = (count == 2) ? 1 : (count == 5) ? 2 : 4;
-            
+
             // Rule 1.2.6: Train Station provides an additional station marker.
             for (net.sf.rails.game.PrivateCompany priv : getPortfolioModel().getPrivateCompanies()) {
                 if ("STA80".equals(priv.getId())) {
@@ -194,31 +224,29 @@ this.shareCount = IntegerState.create(this, "shareCount", 2);
                     log.info("1817: Train Station (STA80) bonus applied to " + getId());
                 }
             }
-            
+
             this.tokenCapacity.set(capacity);
-            
+
         }
     }
-    
+
     public void addTokenCapacity(int amount) {
         this.tokenCapacity.add(amount);
     }
 
-
     @Override
     public int getShareUnitsForSharePrice() {
-        return 1; 
+        return 1;
     }
 
-
-@Override
+    @Override
     public java.util.Set<net.sf.rails.game.BaseToken> getAllBaseTokens() {
         java.util.Set<net.sf.rails.game.BaseToken> all = super.getAllBaseTokens();
         int limit = tokenCapacity.value();
         if (all.size() <= limit) {
             return all;
         }
-        
+
         java.util.Set<net.sf.rails.game.BaseToken> restricted = new java.util.TreeSet<>();
         int count = 0;
         for (net.sf.rails.game.BaseToken t : all) {
@@ -247,7 +275,7 @@ this.shareCount = IntegerState.create(this, "shareCount", 2);
         }
         for (net.sf.rails.game.BaseToken t : getAllBaseTokens()) {
             if (!t.isPlaced()) {
-                    return t;
+                return t;
             }
         }
         return null;
@@ -261,6 +289,5 @@ this.shareCount = IntegerState.create(this, "shareCount", 2);
     public void close() {
         getIsClosedModel().set(true);
     }
-
 
 }
