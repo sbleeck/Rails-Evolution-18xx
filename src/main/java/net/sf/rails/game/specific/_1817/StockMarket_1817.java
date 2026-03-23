@@ -49,6 +49,22 @@ int row = oldsquare.getRow();
         prepareMove(company, oldsquare, newsquare);
     }
 
+    public StockSpace getFloorSpace(int targetPrice) {
+        StockSpace bestSpace = null;
+        int bestPrice = -1;
+        
+        // Linear markets populate spaces sequentially along column 0
+        for (int r = 0; r < numRows; r++) {
+            StockSpace s = getStockSpace(r, 0);
+            if (s != null && s.getPrice() <= targetPrice && s.getPrice() > bestPrice) {
+                bestPrice = s.getPrice();
+                bestSpace = s;
+            }
+        }
+        
+        return bestSpace;
+    }
+
     @Override
     public void moveLeftOrDown(PublicCompany company, int numberOfMoves) {
         StockSpace oldsquare = company.getCurrentSpace();
