@@ -89,14 +89,18 @@ public class AuctionRound_1817 extends Round {
 
         // In Liquidation, the Bank makes the initial $0 bid, so there might not be an
         // initiating player yet.
+net.sf.rails.common.ReportBuffer.add(this, "--- " + type + " AUCTION: " + company.getId() + " ---");
+
         if (type == AuctionType.LIQUIDATION && startingBid == 0) {
             this.currentBid.set(0);
             this.highestBidder.set(null); // Bank is highest bidder initially
             this.initiator.set(startingPlayer); // The player who was supposed to act next starts the bidding
+            net.sf.rails.common.ReportBuffer.add(this, "Bank opens bidding at $0.");
         } else {
             this.currentBid.set(startingBid);
             this.initiator.set(startingPlayer);
             this.highestBidder.set(startingPlayer);
+            net.sf.rails.common.ReportBuffer.add(this, startingPlayer.getName() + " opens bidding at $" + startingBid + ".");
         }
 
         this.activeBidders.clear();
@@ -430,7 +434,7 @@ public class AuctionRound_1817 extends Round {
         if (action instanceof Bid1817IPO) {
             int amount = ((Bid1817IPO) action).getBidAmount();
             log.info("AUCTION_LOG: Player {} BID ${}.", actor.getName(), amount);
-            net.sf.rails.common.ReportBuffer.add(this, actor.getName() + " bids " + net.sf.rails.game.financial.Bank.format(this, amount) + ".");
+net.sf.rails.common.ReportBuffer.add(this, actor.getName() + " bids $" + amount + ".");
             this.currentBid.set(amount);
             this.highestBidder.set(actor);
 
@@ -445,6 +449,12 @@ public class AuctionRound_1817 extends Round {
 
     private void resolveAuction() {
         Player winner = highestBidder.value();
+
+        if (winner != null) {
+            net.sf.rails.common.ReportBuffer.add(this, winner.getName() + " wins the auction with a bid of $" + currentBid.value() + ".");
+        } else {
+            net.sf.rails.common.ReportBuffer.add(this, "Auction ends with no player bids.");
+        }
 
         log.info("AUCTION_LOG: Auction finished. Waiting for settlement from {}",
                 (winner != null ? winner.getName() : "None"));

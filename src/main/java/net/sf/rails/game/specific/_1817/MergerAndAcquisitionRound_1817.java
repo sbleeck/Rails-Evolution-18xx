@@ -265,6 +265,8 @@ public class MergerAndAcquisitionRound_1817 extends Round {
             } else if (currentStep.value() == MaAStep.SALES_AUCTION) {
                 net.sf.rails.game.Player passingPlayer = activeBidders.get(auctionPlayerIndex.value());
                 log.info("M&A ROUND: Player " + passingPlayer.getName() + " passed on bidding.");
+
+                net.sf.rails.common.ReportBuffer.add(this, passingPlayer.getName() + " passes.");
                 activeBidders.remove(auctionPlayerIndex.value());
 
                 if (activeBidders.isEmpty()
@@ -330,6 +332,9 @@ public class MergerAndAcquisitionRound_1817 extends Round {
             log.info("M&A ROUND: President offered " + operatingCompany.value().getId() + " for Friendly Sale.");
             int minBid = operatingCompany.value().getMarketPrice()
                     * ((PublicCompany_1817) operatingCompany.value()).getShareCount();
+            net.sf.rails.common.ReportBuffer.add(this, "--- FRIENDLY SALE OFFERING: " + operatingCompany.value().getId() + " ---");
+            net.sf.rails.common.ReportBuffer.add(this, "Pre-Event State:\n" + buildCompanyStateReport(operatingCompany.value()));
+            startAuction(operatingCompany.value(), minBid);
             startAuction(operatingCompany.value(), minBid);
             return true;
 
@@ -432,6 +437,9 @@ public class MergerAndAcquisitionRound_1817 extends Round {
 
             log.info("M&A ROUND: " + bidder.getName() + " bid $" + bidAmount + " on "
                     + operatingCompany.value().getId());
+
+                    net.sf.rails.common.ReportBuffer.add(this, bidder.getName() + " bids $" + bidAmount + ".");
+            
             highestBid.set(bidAmount);
             highestBiddingPlayer.set(bidder);
 
@@ -1243,6 +1251,8 @@ int rawSum = initiator.getMarketPrice() + target.getMarketPrice();
             startAuction(comp, 0);
         } else if (isGray) {
             log.info("M&A ROUND: Forced Acquisition Offering for " + comp.getId());
+net.sf.rails.common.ReportBuffer.add(this, "--- ACQUISITION OFFERING: " + comp.getId() + " ---");
+            net.sf.rails.common.ReportBuffer.add(this, "Pre-Event State:\n" + buildCompanyStateReport(comp));
             startAuction(comp, 10);
 
         } else {
@@ -1339,10 +1349,14 @@ int rawSum = initiator.getMarketPrice() + target.getMarketPrice();
         }
 
         net.sf.rails.common.ReportBuffer.add(this, (predator != null ? predator.getId() : "Bank") + " buys "
+                + target.getId() + " for $" + finalBid + ".");
+
+        int currentPrice = target.getMarketPrice();
+
+        net.sf.rails.common.ReportBuffer.add(this, (predator != null ? predator.getId() : "Bank") + " buys "
                 + target.getId() + " for " + net.sf.rails.game.financial.Bank.format(this, finalBid) + ".");
         net.sf.rails.common.ReportBuffer.add(this, buildCompanyStateReport(target));
 
-        int currentPrice = target.getMarketPrice();
         boolean isRed = (target.getCurrentSpace().getPrice() == 0);
         boolean isGray = (target.getCurrentSpace().getPrice() > 0 && target.getCurrentSpace().getPrice() <= 30);
 
@@ -1359,6 +1373,7 @@ int rawSum = initiator.getMarketPrice() + target.getMarketPrice();
             int cashInfusion = treasurySharesSold * target.getMarketPrice();
             net.sf.rails.game.state.Currency.wire(gameManagerRef.getRoot().getBank(), cashInfusion, target);
             log.info("M&A ROUND: Treasury shares sold. Infused $" + cashInfusion + " into " + target.getId());
+       net.sf.rails.common.ReportBuffer.add(this, "TREASURY SELL-OFF: " + treasurySharesSold + " shares sold to the open market for $" + cashInfusion + ".");
         }
 
         // 2. Payout Calculation (Rule 7.2.4 [cite: 845])
@@ -1436,7 +1451,10 @@ int rawSum = initiator.getMarketPrice() + target.getMarketPrice();
         settleWithShareholders(target, payoutPerShare);
 
         log.info("M&A ROUND: Sale complete.");
-        target.setClosed();
+target.setClosed();
+        if (predator != null) {
+            net.sf.rails.common.ReportBuffer.add(this, "Final Post-Event State (Predator):\n" + buildCompanyStateReport(predator));
+        }
         companyIndex.set(companyIndex.value() + 1);
         processNextSale();
     }

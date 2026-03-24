@@ -79,7 +79,7 @@
 
 
 
-<Company name="AA" type="Public" tokens="8" fgColour="FFFFFF" bgColour="F8DE21" longname="Ann Arbor" />
+<Company name="AA" type="Public" tokens="8" fgColour="000000" bgColour="F8DE21" longname="Ann Arbor" />
 <Company name="ALT" type="Public" tokens="8" fgColour="FFFFFF" bgColour="D81A21" longname="Alton" />
 <Company name="BA" type="Public" tokens="8" fgColour="FFFFFF" bgColour="D81A21" longname="Bangor &amp; Aroostook" />
 <Company name="BELT" type="Public" tokens="8" fgColour="000000" bgColour="F8EA31" longname="Belt Railway of Chicago" />
