@@ -253,20 +253,24 @@ net.sf.rails.common.ReportBuffer.add(this, "--- " + type + " AUCTION: " + compan
             log.info("AUCTION_LOG: Settling IPO for {}. Size: {}-share. Cash: ${}. Privates: {}",
                     comp.getId(), settle.getShareSize(), settle.getCashAmount(), settle.getPrivateCompanyIds());
 
-            // 1. Set Company Size (updates internal loan limits and certificates)
-            comp.setShareCount(settle.getShareSize());
-            int cashToTransfer = currentBid.value();
+int cashToTransfer = currentBid.value();
 
-            // 3. Transfer Private Companies from Winner to Company
+            // 1. Transfer Private Companies from Winner to Company FIRST so capacity checks succeed
             for (String pId : settle.getPrivateCompanyIds()) {
                 net.sf.rails.game.PrivateCompany pc = gameManager.getRoot().getCompanyManager().getPrivateCompany(pId);
                 if (pc != null) {
                     pc.moveTo(comp.getPortfolioModel());
                     cashToTransfer -= pc.getBasePrice();
+                    if ("STA80".equals(pId)) {
+                        net.sf.rails.common.ReportBuffer.add(this, comp.getId() + " receives an extra station marker from the Train Station.");
+                    }
                 }
             }
 
-            // 2. Transfer Cash from Winner to Company Treasury
+            // 2. Set Company Size (updates internal loan limits and certificates)
+            comp.setShareCount(settle.getShareSize());
+
+            // 3. Transfer Cash from Winner to Company Treasury
             if (cashToTransfer > 0) {
                 net.sf.rails.game.state.Currency.wire(winner, cashToTransfer, comp);
             }

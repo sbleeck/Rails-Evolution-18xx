@@ -350,42 +350,31 @@ public /*abstract*/ class Round extends RailsAbstractItem implements RoundFacade
         return possibleActions.getList();
     }// File: Round.java
 
-/**
- * Centralized logic to generate deduplicated discard actions.
- * @param company The company needing to discard.
- * @param possibleActions The action container (PossibleActions), not the list.
- */
 
+
+    /**
+     * Generates individual discard actions for every physical train.
+     * This resolves the bug where "2" and "2+" were conflated and 
+     * fulfills the requirement for unique buttons per train.
+     */
 public void generateGroupedDiscardActions(PublicCompany company, PossibleActions possibleActions) {
-    // --- START FIX ---
-    // 1. Clear existing actions to prevent duplicate buttons in the UI
-    possibleActions.clear();
+        possibleActions.clear();
+List<net.sf.rails.game.Train> trains = new java.util.ArrayList<>(company.getPortfolioModel().getTrainList());
+        java.util.Map<String, java.util.Set<net.sf.rails.game.Train>> typeGroups = new java.util.HashMap<>();
 
-    Collection<Train> trains = company.getPortfolioModel().getTrainList();
-    Set<String> addedTypes = new HashSet<>();
+        for (net.sf.rails.game.Train train : trains) {
+            if (train == null) continue;
+            // Extract the type (e.g., "2" from "2_0", "2+" from "2+_2")
+            String type = train.getName().replaceAll("(.*)_\\d+", "$1");
+            typeGroups.computeIfAbsent(type, k -> new java.util.HashSet<>()).add(train);
+        }
 
-    for (Train train : trains) {
-        if (train == null) continue;
-
-        // 2. Extract base name (e.g., "1G_5" -> "1G") for the grouping check
-        String baseName = train.getName().replaceAll("(.*)_\\d+", "$1");
-        
-        // 3. Use the baseName for the 'addedTypes' check to ensure deduplication
-        if (!addedTypes.contains(baseName)) {
-            Set<Train> trainOption = new HashSet<>();
-            trainOption.add(train);
-            
-            DiscardTrain action = new DiscardTrain(company, trainOption);
-            action.setButtonLabel(baseName);
-            
+        for (java.util.Map.Entry<String, java.util.Set<net.sf.rails.game.Train>> entry : typeGroups.entrySet()) {
+            rails.game.action.DiscardTrain action = new rails.game.action.DiscardTrain(company, entry.getValue());
+            action.setButtonLabel(entry.getKey()); 
             possibleActions.add(action);
-            addedTypes.add(baseName);
         }
     }
-    // --- END FIX ---
-}
-
-
     /**
      * CENTRALIZED HELPER: Executes the physical move of a train to the Bank Pool.
      * Uses 'this.pool' which is the correct PortfolioModel required by the UI.
@@ -444,42 +433,26 @@ public void generateGroupedDiscardActions(PublicCompany company, PossibleActions
         return false; // Not blocking
     }
 
-    /**
-     * Helper: Generates the actual buttons.
-     * REMOVED possibleActions.clear() so it can be used for Voluntary discards too.
+/**
+     * Internal helper to generate buttons. Modified to provide individual actions 
+     * for each physical train, bypassing the buggy startsWith() grouping logic.
      */
-    protected void generateGroupedDiscardActions(PublicCompany company) {
-        // --- DELETE ---
-        // possibleActions.clear(); // DO NOT CLEAR HERE! 
-        // --- END DELETE ---
+protected void generateGroupedDiscardActions(PublicCompany company) {
+List<net.sf.rails.game.Train> trains = new java.util.ArrayList<>(company.getPortfolioModel().getTrainList());
+        java.util.Map<String, java.util.Set<net.sf.rails.game.Train>> typeGroups = new java.util.HashMap<>();
 
-        Collection<Train> trains = company.getPortfolioModel().getTrainList();
-        Set<String> addedTypes = new HashSet<>();
-
-        for (Train train : trains) {
+        for (net.sf.rails.game.Train train : trains) {
             if (train == null) continue;
+            String type = train.getName().replaceAll("(.*)_\\d+", "$1");
+            typeGroups.computeIfAbsent(type, k -> new java.util.HashSet<>()).add(train);
+        }
 
-            // Regex to group "2_1" and "2_2" into just "2"
-            String baseName = train.getName().replaceAll("(.*)_\\d+", "$1");
-            
-            if (!addedTypes.contains(baseName)) {
-                Set<Train> trainOption = new HashSet<>();
-                // Find all trains that match this base name
-                for (Train t : trains) {
-                     if (t.getName().startsWith(baseName)) {
-                         trainOption.add(t);
-                     }
-                }
-
-                DiscardTrain action = new DiscardTrain(company, trainOption);
-                action.setButtonLabel(baseName); 
-                
-                possibleActions.add(action);
-                addedTypes.add(baseName);
-            }
+        for (java.util.Map.Entry<String, java.util.Set<net.sf.rails.game.Train>> entry : typeGroups.entrySet()) {
+            rails.game.action.DiscardTrain action = new rails.game.action.DiscardTrain(company, entry.getValue());
+            action.setButtonLabel(entry.getKey()); 
+            possibleActions.add(action);
         }
     }
-
 
     /**
      * Checks if a "Pass" action should terminate an interrupted round (e.g., Formation Round).

@@ -1836,10 +1836,21 @@ JPanel buttonBox = new JPanel(new FlowLayout(FlowLayout.RIGHT, 5, 0));
                     dynamicButtonPanel.setBorder(BorderFactory.createLineBorder(Color.BLUE, 1));
                     dynamicButtonPanel.setLayout(new FlowLayout(FlowLayout.LEFT, 8, 2));
 
-                    String highBidderName = (maRound.getHighestBiddingPlayer() != null)
+
+
+                  String highBidderName = (maRound.getHighestBiddingPlayer() != null)
                             ? maRound.getHighestBiddingPlayer().getName()
                             : "None";
-                    JLabel highBidLabel = new JLabel("High: " + highBidderName + " ($" + maRound.getHighestBid() + ")");
+                            
+                    String companyId = (maRound.getOperatingCompany() != null) ? maRound.getOperatingCompany().getId() : "Company";
+                    String saleType = "friendly sale";
+                    if (maRound.getOperatingCompany() != null && maRound.getOperatingCompany().hasStockPrice()) {
+                        int price = maRound.getOperatingCompany().getMarketPrice();
+                        if (price == 0) saleType = "liquidation";
+                        else if (price <= 30) saleType = "acquisition";
+                    }
+
+                    JLabel highBidLabel = new JLabel(companyId + " (" + saleType + ") | High: " + highBidderName + " ($" + maRound.getHighestBid() + ")");
                     highBidLabel.setFont(new Font("SansSerif", Font.BOLD, 13));
                     highBidLabel.setForeground(new Color(0, 102, 204));
                     dynamicButtonPanel.add(highBidLabel);
@@ -1848,13 +1859,20 @@ JPanel buttonBox = new JPanel(new FlowLayout(FlowLayout.RIGHT, 5, 0));
                     sep.setPreferredSize(new Dimension(2, 25));
                     dynamicButtonPanel.add(sep);
 
-                    String actorName = (maRound.getActingPlayer() != null) ? maRound.getActingPlayer().getName()
-                            : "Someone";
+                    String actorName = (maRound.getActingPlayer() != null) ? maRound.getActingPlayer().getName() : "Someone";
                     if (step == net.sf.rails.game.specific._1817.MergerAndAcquisitionRound_1817.MaAStep.SALES_SELECT_BUYER) {
                         actorName = highBidderName;
                     }
-                    String companyId = (maRound.getOperatingCompany() != null) ? maRound.getOperatingCompany().getId()
-                            : "Company";
+
+
+
+
+
+
+                            
+
+
+
 
                     net.sf.rails.game.specific._1817.action.BidOnCompany_1817 bidAction = null;
                     NullAction passAction = null;
@@ -1960,95 +1978,54 @@ JPanel buttonBox = new JPanel(new FlowLayout(FlowLayout.RIGHT, 5, 0));
                 } else {
 
 
-
 boolean hasSpecialActions = false;
-                    java.util.List<PossibleAction> specialActions = new java.util.ArrayList<>();
-                    java.util.List<PossibleAction> shortActions = new java.util.ArrayList<>();
-                    GuiTargetedAction contextProvider = null;
+                        java.util.List<PossibleAction> specialActions = new java.util.ArrayList<>();
+                        GuiTargetedAction contextProvider = null;
 
-                    if (possibleActions != null && possibleActions.getList() != null) {
-                        for (PossibleAction pa : possibleActions.getList()) {
-                            if (pa instanceof GuiTargetedAction) {
-                                specialActions.add(pa);
-                                hasSpecialActions = true;
-                                if (contextProvider == null)
-                                    contextProvider = (GuiTargetedAction) pa;
-                            } else if (pa.getClass().getSimpleName().equals("Short1817")) {
-                                shortActions.add(pa);
-                            }
-                        }
-                    }
-
-                    if (hasSpecialActions || !shortActions.isEmpty()) {
-                        dynamicButtonPanel.setBackground(null);
-                        dynamicButtonPanel.setOpaque(false);
-                        dynamicButtonPanel.setBorder(BorderFactory.createEmptyBorder(0, 10, 0, 0));
-                        dynamicButtonPanel.setLayout(new FlowLayout(FlowLayout.LEFT, 8, 2));
-
-                        if (hasSpecialActions && contextProvider != null) {
-                            String actorName = (effectivePlayer != null) ? effectivePlayer.getName() : "Player";
-                            JLabel promptLabel = new JLabel("<html><b>" + actorName + "</b>: " + contextProvider.getGroupLabel() + "</html>");
-                            promptLabel.setForeground(new Color(0, 102, 204));
-                            dynamicButtonPanel.add(promptLabel);
-
-                            for (PossibleAction spa : specialActions) {
-                                GuiTargetedAction gta = (GuiTargetedAction) spa;
-                                ActionButton btn = new ActionButton(null);
-                                btn.setText(gta.getButtonLabel());
-                                btn.setPossibleAction(spa);
-                                btn.addActionListener(this);
-                                dynamicButtonPanel.add(btn);
+                        if (possibleActions != null && possibleActions.getList() != null) {
+                            for (PossibleAction pa : possibleActions.getList()) {
+                                // Skip Short1817 as it is handled visually on the OSI grid
+                                if (pa.getClass().getSimpleName().equals("Short1817")) {
+                                    continue;
+                                }
+                                
+                                if (pa instanceof GuiTargetedAction) {
+                                    specialActions.add(pa);
+                                    hasSpecialActions = true;
+                                    if (contextProvider == null)
+                                        contextProvider = (GuiTargetedAction) pa;
+                                }
                             }
                         }
 
-                        // Short Selling Logic
-                        // if (!shortActions.isEmpty() && myTurn) {
-                        //     if (hasSpecialActions)
-                        //         dynamicButtonPanel.add(new JSeparator(JSeparator.VERTICAL));
+                        if (hasSpecialActions) {
+                            dynamicButtonPanel.setBackground(null);
+                            dynamicButtonPanel.setOpaque(false);
+                            dynamicButtonPanel.setBorder(BorderFactory.createEmptyBorder(0, 10, 0, 0));
+                            dynamicButtonPanel.setLayout(new FlowLayout(FlowLayout.LEFT, 8, 2));
 
-                        //     JLabel shortLabel = new JLabel("Sell Short:");
-                        //     shortLabel.setForeground(new Color(200, 0, 100));
-                        //     shortLabel.setFont(new Font("SansSerif", Font.BOLD, 12));
-                        //     dynamicButtonPanel.add(shortLabel);
+                            if (contextProvider != null) {
+                                String actorName = (effectivePlayer != null) ? effectivePlayer.getName() : "Player";
+                                JLabel promptLabel = new JLabel("<html><b>" + actorName + "</b>: " + contextProvider.getGroupLabel() + "</html>");
+                                promptLabel.setForeground(new Color(0, 102, 204));
+                                dynamicButtonPanel.add(promptLabel);
 
-                        //     for (final PossibleAction pa : shortActions) {
-                        //         String compId = pa.toString().replace("Sell Short", "").trim();
-                        //         JButton shortBtn = new JButton(compId);
-                        //         shortBtn.setBackground(Color.PINK);
-                        //         shortBtn.setOpaque(true);
-                        //         shortBtn.setBorder(BorderFactory.createLineBorder(new Color(255, 105, 180), 2));
-                        //         shortBtn.addActionListener(e -> process(pa));
-                        //         dynamicButtonPanel.add(shortBtn);
-                        //     }
-                        // }
-                        // if (myTurn) {
-                        //     List<NullAction> nullActions = possibleActions.getType(NullAction.class);
-                        //     if (nullActions != null) {
-                        //         for (NullAction na : nullActions) {
-                        //             if (na.getMode() == NullAction.Mode.PASS || na.getMode() == NullAction.Mode.DONE) {
-                        //                 dynamicButtonPanel.add(new JSeparator(JSeparator.VERTICAL));
-                        //                 ActionButton declineBtn = new ActionButton(null);
-                        //                 declineBtn.setText(na.getMode() == NullAction.Mode.PASS ? "Decline / Pass" : "Done");
-                        //                 declineBtn.setForeground(Color.RED);
-                        //                 declineBtn.setPossibleAction(na);
-                        //                 declineBtn.addActionListener(this);
-                        //                 dynamicButtonPanel.add(declineBtn);
-                        //                 break;
-                        //             }
-                        //         }
-                        //     }
-                        // }
-                    } else {
+                                for (PossibleAction spa : specialActions) {
+                                    GuiTargetedAction gta = (GuiTargetedAction) spa;
+                                    ActionButton btn = new ActionButton(null);
+                                    btn.setText(gta.getButtonLabel());
+                                    btn.setPossibleAction(spa);
+                                    btn.addActionListener(this);
+                                    dynamicButtonPanel.add(btn);
+                                }
+                            }
+                        } else {
+                            dynamicButtonPanel.setBackground(null);
+                            dynamicButtonPanel.setOpaque(false);
+                            dynamicButtonPanel.setBorder(BorderFactory.createEmptyBorder(0, 10, 0, 0));
+                        }
 
 
-
-
-
-
-                        dynamicButtonPanel.setBackground(null);
-                        dynamicButtonPanel.setOpaque(false);
-                        dynamicButtonPanel.setBorder(BorderFactory.createEmptyBorder(0, 10, 0, 0));
-                    }
                 }
             }
 

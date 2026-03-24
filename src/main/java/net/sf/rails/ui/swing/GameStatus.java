@@ -5281,23 +5281,30 @@ public class GameStatus extends GridPanel {
         }
 
         for (PossibleAction pa : possibleActions.getList()) {
-            if (pa instanceof GuiTargetedAction && !(pa instanceof BuyTrain) && !(pa instanceof DiscardTrain)) {
+            // Remove the exclusion for DiscardTrain so we can style it red
+            if (pa instanceof GuiTargetedAction && !(pa instanceof BuyTrain)) {
                 GuiTargetedAction gta = (GuiTargetedAction) pa;
                 Object target = gta.getTarget();
 
                 if (target != null) {
+                    // This utility scans the 'compSubTrainButtons' (the owned train railcards)
                     net.sf.rails.ui.swing.elements.RailCard card = findRailCardFor(target);
 
                     if (card != null) {
                         card.addPossibleAction(pa);
 
-                        Color bg = gta.getHighlightBackgroundColor();
-                        Color border = gta.getHighlightBorderColor();
-
-                        if (bg != null)
-                            card.setBackground(bg);
-                        if (border != null)
-                            card.setBorder(BorderFactory.createLineBorder(border, 3));
+                        // If it's a Discard action or specifically targeting a Train for removal/selection, 
+                        // apply the BORDER_COL_SELL (Crimson Red) highlight.
+                        if (pa instanceof DiscardTrain || target instanceof net.sf.rails.game.Train) {
+                            card.setBackground(BG_CARD_PASSIVE);
+                            card.setBorder(BorderFactory.createLineBorder(BORDER_COL_SELL, BORDER_THICKNESS));
+                        } else {
+                            // Standard highlight for other targeted actions
+                            Color bg = gta.getHighlightBackgroundColor();
+                            Color border = gta.getHighlightBorderColor();
+                            if (bg != null) card.setBackground(bg);
+                            if (border != null) card.setBorder(BorderFactory.createLineBorder(border, 3));
+                        }
 
                         card.setEnabled(true);
                         card.setVisible(true);

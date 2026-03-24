@@ -2493,6 +2493,22 @@ boolean hasOpComp = false;
                 }
             }
 
+            // THE CONTEXT OVERRIDE: 
+            // If the engine demands a discard, the actor might not match the nominal "Operating Company"
+            // We scan for DiscardTrain actions and forcibly redirect the UI focus to the discarding company.
+            if (actions != null) {
+                for (PossibleAction pa : actions) {
+                    if (pa instanceof DiscardTrain) {
+                        net.sf.rails.game.Company targetComp = ((DiscardTrain) pa).getCompany();
+                        if (targetComp instanceof PublicCompany) {
+                            engineActiveComp = (PublicCompany) targetComp;
+                            // Once we find a discard context, we lock it in and stop searching
+                            break; 
+                        }
+                    }
+                }
+            }
+
             // Sync Context
             if (engineActiveComp != null && !engineActiveComp.isClosed()) {
                 this.orComp = engineActiveComp;

@@ -1597,7 +1597,10 @@ public Integer getRoundStart(int currentIndex) {
                         if (getCurrentRound() != null) {
                             getCurrentRound().setPossibleActions();
                         }
-
+                        if (!isGameOver()) {
+                            setCorrectionActions();
+                        }
+                        
                         ChangeStack changeStack = getRoot().getStateManager().getChangeStack();
                         if (changeStack.isUndoPossible()) {
                             possibleActions.add(new GameAction(getRoot(), GameAction.Mode.FORCED_UNDO));
