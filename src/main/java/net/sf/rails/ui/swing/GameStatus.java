@@ -1554,6 +1554,11 @@ public class GameStatus extends GridPanel {
             PublicCompany pc = ((net.sf.rails.game.OperatingRound) currentRound).getOperatingCompany();
             if (pc != null)
                 opCompId = pc.getId();
+        } else if (currentRound instanceof net.sf.rails.game.specific._1817.MergerAndAcquisitionRound_1817) {
+            PublicCompany pc = ((net.sf.rails.game.specific._1817.MergerAndAcquisitionRound_1817) currentRound)
+                    .getOperatingCompany();
+            if (pc != null)
+                opCompId = pc.getId();
         }
 
         else if (gameUIManager.getGameManager().getPossibleActions() != null) {
@@ -1577,9 +1582,14 @@ public class GameStatus extends GridPanel {
         int orderIndex = 0;
         java.util.List<PublicCompany> displayList = new java.util.ArrayList<>();
 
+        net.sf.rails.game.round.RoundFacade currentRoundForDisplay = gameUIManager.getGameManager().getCurrentRound();
+        boolean isStockRound = currentRoundForDisplay instanceof net.sf.rails.game.financial.StockRound;
+
         for (PublicCompany c : allCompanies) {
             originalOrder.put(c, orderIndex++);
             if (c.isClosed())
+                continue;
+            if (!isStockRound && !c.hasFloated() && c.getClass().getName().contains("1817"))
                 continue;
             displayList.add(c);
         }
@@ -2672,6 +2682,14 @@ public class GameStatus extends GridPanel {
                 opCompId = pc.getId();
         }
 
+        else if (gameUIManager.getGameManager()
+                .getCurrentRound() instanceof net.sf.rails.game.specific._1817.MergerAndAcquisitionRound_1817) {
+            PublicCompany pc = ((net.sf.rails.game.specific._1817.MergerAndAcquisitionRound_1817) gameUIManager
+                    .getGameManager().getCurrentRound()).getOperatingCompany();
+            if (pc != null)
+                opCompId = pc.getId();
+        }
+
         // GENERIC HIGHLIGHT LOGIC:
         // If we are not in a standard Operating Round, check the available actions.
         // If any action targets a specific Company (e.g. Formation, Discard, Merger),
@@ -2687,6 +2705,18 @@ public class GameStatus extends GridPanel {
                 }
             }
         }
+// Override actorIndex with the company president to remove lingering past-phase players
+        if (opCompId != null && companies != null) {
+            for (PublicCompany c : companies) {
+                if (c != null && c.getId().equals(opCompId) && c.getPresident() != null) {
+                    actorIndex = c.getPresident().getIndex();
+                    break;
+                }
+            }
+        }
+
+        net.sf.rails.game.round.RoundFacade currentRound = gameUIManager.getGameManager().getCurrentRound();
+        boolean isStockRound = currentRound instanceof net.sf.rails.game.financial.StockRound;
 
         // 1. ITERATE COMPANIES (Rows)
         for (cIdx = 0; cIdx < nc; cIdx++) {
@@ -2697,6 +2727,10 @@ public class GameStatus extends GridPanel {
             // initCompanyRows),
             // so accessing arrays like compNameCaption[i] will throw NullPointerException.
             if (c.isClosed())
+                continue;
+
+            // Skip unfloated companies outside the Stock Round in 1817 to save UI space
+            if (!isStockRound && !c.hasFloated() && c.getClass().getName().contains("1817"))
                 continue;
 
             // FORCE RESET TRAINS: Ensure we are in "Display Mode" (HTML) at the start of
@@ -3081,7 +3115,7 @@ public class GameStatus extends GridPanel {
                 // PRIORITY 3: Inactive (Grey)
 
                 Color cellBg;
-                if (isOperating) {
+if (isOperating) {
                     cellBg = Color.WHITE; // Force continuous white line
                 } else if (pIdx == actorIndex) {
                     cellBg = BG_SPOTLIGHT_ACTIVE; // White Spotlight
@@ -3168,7 +3202,7 @@ public class GameStatus extends GridPanel {
 
         // 2. PLAYER FOOTERS
         for (int i = 0; i < np; i++) {
-            // 1. Spotlight Logic
+// 1. Spotlight Logic
             boolean isSpotlight = (i == actorIndex);
             Color pBg = isSpotlight ? BG_SPOTLIGHT_ACTIVE : BG_SPOTLIGHT_INACTIVE;
 
@@ -3443,6 +3477,28 @@ public class GameStatus extends GridPanel {
                 }
             }
 
+            // 1817 IPO Binding: Map Initiate1817IPO actions to the IPO column
+            if (possibleActions.getList() != null) {
+                for (PossibleAction pa : possibleActions.getList()) {
+                    if (pa.getClass().getName().endsWith("Initiate1817IPO")) {
+                        try {
+                            PublicCompany comp = null;
+                            try {
+                                comp = (PublicCompany) pa.getClass().getMethod("getCompany").invoke(pa);
+                            } catch (Exception e1) {
+                                String compId = (String) pa.getClass().getMethod("getCompanyId").invoke(pa);
+                                comp = gameUIManager.getRoot().getCompanyManager().getPublicCompany(compId);
+                            }
+                            if (comp != null) {
+                                setIPOCertButton(comp.getPublicNumber(), true, pa);
+                            }
+                        } catch (Exception e) {
+                            log.error("Failed to bind Initiate1817IPO action", e);
+                        }
+                    }
+                }
+            }
+
             setTrainBuyingActions(possibleActions.getList());
         }
 
@@ -3515,9 +3571,9 @@ public class GameStatus extends GridPanel {
 
         osiShareCards[i].setVisible(hasContent);
         osiShareCards[i].clearPossibleActions();
-// House Rule Display: If percentage is 0 but ShortCertificates exist, show the count (e.g., "5")
+        // House Rule Display: If percentage is 0 but ShortCertificates exist, show the
+        // count (e.g., "5")
 
-        
         if ((shareTxt == null || shareTxt.trim().isEmpty() || shareTxt.equals("0%")) && osi != null) {
             int shortCertCount = 0;
             for (net.sf.rails.game.financial.PublicCertificate cert : osi.getCertificates(companies[i])) {
@@ -3535,7 +3591,8 @@ public class GameStatus extends GridPanel {
         osiShareCards[i].setVisible(hasContent);
 
         if (clickable && o != null) {
-            // House Rule: Apply the "Big Green Border" to indicate the short is available to be taken
+            // House Rule: Apply the "Big Green Border" to indicate the short is available
+            // to be taken
             osiShareCards[i].setBackground(BG_CARD_PASSIVE);
             osiShareCards[i].setBorder(BorderFactory.createLineBorder(BORDER_COL_BUY, BORDER_THICKNESS));
 
@@ -3553,8 +3610,6 @@ public class GameStatus extends GridPanel {
             osiShareCards[i].setEnabled(true);
         }
     }
-
-    
 
     protected void setOSICertButton(int i, boolean clickable) {
         setOSICertButton(i, clickable, null);
@@ -4064,6 +4119,9 @@ public class GameStatus extends GridPanel {
 
         if (currentRound instanceof net.sf.rails.game.OperatingRound) {
             operatingComp = ((net.sf.rails.game.OperatingRound) currentRound).getOperatingCompany();
+        } else if (currentRound instanceof net.sf.rails.game.specific._1817.MergerAndAcquisitionRound_1817) {
+            operatingComp = ((net.sf.rails.game.specific._1817.MergerAndAcquisitionRound_1817) currentRound)
+                    .getOperatingCompany();
         }
         // 1835 PFR Fix: Safe Lookup
         else if (currentRound != null
@@ -4189,9 +4247,14 @@ public class GameStatus extends GridPanel {
         // 4. Setup Rows
         int actual_nc = 0;
         int actual_nb = 0;
+        net.sf.rails.game.round.RoundFacade currentRoundForFields = gameUIManager.getGameManager().getCurrentRound();
+        boolean isStockRoundFields = currentRoundForFields instanceof net.sf.rails.game.financial.StockRound;
+
         if (companies != null) {
             for (PublicCompany c : companies) {
                 if (c.isClosed())
+                    continue;
+                if (!isStockRoundFields && !c.hasFloated() && c.getClass().getName().contains("1817"))
                     continue;
                 actual_nc++;
                 if (c.hasBonds())
@@ -4380,7 +4443,18 @@ public class GameStatus extends GridPanel {
 
     protected void initCompanyRows(int startY, PublicCompany operatingComp) {
         int y = startY;
-        java.util.List<PublicCompany> displayList = new java.util.ArrayList<>(gameUIManager.getAllPublicCompanies());
+        java.util.List<PublicCompany> displayList = new java.util.ArrayList<>();
+        net.sf.rails.game.round.RoundFacade currentRound = gameUIManager.getGameManager().getCurrentRound();
+        boolean isStockRound = currentRound instanceof net.sf.rails.game.financial.StockRound;
+
+        for (PublicCompany c : gameUIManager.getAllPublicCompanies()) {
+            if (c.isClosed())
+                continue;
+            if (!isStockRound && !c.hasFloated() && c.getClass().getName().contains("1817"))
+                continue;
+            displayList.add(c);
+        }
+
         compNameCaption = new Caption[nc];
         // compArrowCaption = new Caption[nc]; // Initialize storage
 
@@ -5293,7 +5367,8 @@ public class GameStatus extends GridPanel {
                     if (card != null) {
                         card.addPossibleAction(pa);
 
-                        // If it's a Discard action or specifically targeting a Train for removal/selection, 
+                        // If it's a Discard action or specifically targeting a Train for
+                        // removal/selection,
                         // apply the BORDER_COL_SELL (Crimson Red) highlight.
                         if (pa instanceof DiscardTrain || target instanceof net.sf.rails.game.Train) {
                             card.setBackground(BG_CARD_PASSIVE);
@@ -5302,8 +5377,10 @@ public class GameStatus extends GridPanel {
                             // Standard highlight for other targeted actions
                             Color bg = gta.getHighlightBackgroundColor();
                             Color border = gta.getHighlightBorderColor();
-                            if (bg != null) card.setBackground(bg);
-                            if (border != null) card.setBorder(BorderFactory.createLineBorder(border, 3));
+                            if (bg != null)
+                                card.setBackground(bg);
+                            if (border != null)
+                                card.setBorder(BorderFactory.createLineBorder(border, 3));
                         }
 
                         card.setEnabled(true);
