@@ -427,39 +427,43 @@ public class OperatingRound_1817 extends OperatingRound {
                         net.sf.rails.game.financial.StockSpace space = comp.getCurrentSpace();
 
 
-                        
-int row = space.getRow();
-int col = space.getColumn();
+if (market instanceof net.sf.rails.game.specific._1817.StockMarket_1817) {
+                            net.sf.rails.game.specific._1817.StockMarket_1817 m1817 = (net.sf.rails.game.specific._1817.StockMarket_1817) market;
+                            int row = space.getRow();
+                            int col = space.getColumn();
 
-
-   for (int i = 0; i < count; i++) {
-log.info("1817_OR: RepayLoans tracking movement. Current space: row={}, col={}", row, col);
-int nextCol = col + 1;
-boolean spaceFound = false;
-
-                        while (nextCol < market.getNumberOfColumns() && !spaceFound) {
-                            // Scan all rows in the target column because the base space is likely at row 0
-                            for (int r = 0; r < market.getNumberOfRows(); r++) {
-                                if (market.getStockSpace(r, nextCol) != null) {
-                                    col = nextCol;
-                                    row = r; 
-                                    spaceFound = true;
-                                    log.info("1817_OR: Found valid rightward space at row={}, col={}", r, nextCol);
+                            for (int i = 0; i < count; i++) {
+                                log.info("1817_OR: RepayLoans tracking movement. Current space: row={}, col={}", row, col);
+                                int nextRow = row + 1;
+                                while (nextRow < m1817.getNumberOfRows() && m1817.getStockSpace(nextRow, col) == null) {
+                                    nextRow++;
+                                }
+                                if (nextRow < m1817.getNumberOfRows() && m1817.getStockSpace(nextRow, col) != null) {
+                                    row = nextRow;
+                                    log.info("1817_OR: Found valid rightward space at row={}, col={}", row, col);
+                                } else {
+                                    log.warn("1817_OR: No valid rightward (upward) space found from row {}", row);
                                     break;
                                 }
                             }
-                            if (!spaceFound) nextCol++;
-                        }
-                        if (!spaceFound) log.warn("1817_OR: No valid rightward space found from col {}", col);
-                    }
-                    
-                    net.sf.rails.game.financial.StockSpace target = market.getStockSpace(row, col);
-                    if (target != null && target != space) {
-                        market.correctStockPrice(comp, target);
-                        net.sf.rails.common.ReportBuffer.add(this, 
-                            comp.getId() + " stock price moves from $" + space.getPrice() + " to $" + target.getPrice() + " due to loan repayment.");
-                    }
 
+                            net.sf.rails.game.financial.StockSpace target = m1817.getStockSpace(row, col);
+                            if (target != null && target != space) {
+                                m1817.correctStockPrice(comp, target);
+                                net.sf.rails.common.ReportBuffer.add(this, 
+                                    comp.getId() + " stock price moves from $" + space.getPrice() + " to $" + target.getPrice() + " due to loan repayment.");
+                            }
+                        }
+
+
+
+
+
+
+
+
+
+                        
                     }
                     net.sf.rails.common.ReportBuffer.add(this,
                             comp.getId() + " repays " + count + " loan(s) for $" + cost + ".");
