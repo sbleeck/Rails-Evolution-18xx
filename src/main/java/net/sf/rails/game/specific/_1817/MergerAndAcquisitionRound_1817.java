@@ -1880,14 +1880,16 @@ public class MergerAndAcquisitionRound_1817 extends Round {
             net.sf.rails.common.ReportBuffer.add(this,
                     predator.getId() + " buys assets of " + target.getId() + " for $" + finalBid + ".");
 
+            // 1. Identify special privates before they are moved
             boolean targetHasTrainStation = false;
-
-            for (net.sf.rails.game.PrivateCompany p : new java.util.ArrayList<>(target.getPrivates())) {
+            for (net.sf.rails.game.PrivateCompany p : target.getPrivates()) {
                 if ("STA80".equals(p.getId())) {
                     targetHasTrainStation = true;
+                    break;
                 }
-                p.moveTo(predator);
             }
+            // 2. Use framework-validated bulk transfer for trains and privates
+            predator.transferAssetsFrom(target);
 
             if (targetHasTrainStation && predator instanceof PublicCompany_1817) {
                 ((PublicCompany_1817) predator).addTokenCapacity(1);
