@@ -18,10 +18,11 @@ public class BondsModel_1817 extends BondsModel {
         currentInterestRate = net.sf.rails.game.state.IntegerState.create(this, "currentInterestRate", 5);
     }
     
+   
     /**
-     * Calculates and locks in the interest rate based on the total number of loans in play.
+     * Calculates the projected interest rate based on the current number of loans in play.
      */
-    public void updateInterestRate() {
+    public int calculateProjectedInterestRate() {
         int totalLoans = 0;
         CompanyManager cm = root.getCompanyManager();
         if (cm != null) {
@@ -32,24 +33,18 @@ public class BondsModel_1817 extends BondsModel {
             }
         }
         
-        // Tiered logic
-        int newRate = 5;
-        if (totalLoans >= 65) newRate = 70;
-        else if (totalLoans >= 60) newRate = 65;
-        else if (totalLoans >= 55) newRate = 60;
-        else if (totalLoans >= 50) newRate = 55;
-        else if (totalLoans >= 45) newRate = 50;
-        else if (totalLoans >= 40) newRate = 45;
-        else if (totalLoans >= 35) newRate = 40;
-        else if (totalLoans >= 30) newRate = 35;
-        else if (totalLoans >= 25) newRate = 30;
-        else if (totalLoans >= 20) newRate = 25;
-        else if (totalLoans >= 15) newRate = 20;
-        else if (totalLoans >= 10) newRate = 15;
-        else if (totalLoans >= 5) newRate = 10;
-        
-        currentInterestRate.set(newRate);
+        if (totalLoans == 0) return 5;
+        // Rate increases by $5 for every 5 loans, starting at loan 1.
+        return 5 + (((totalLoans - 1) / 5) + 1) * 5;
     }
+
+    /**
+     * Locks in the interest rate at the start of the operating round.
+     */
+    public void updateInterestRate() {
+        currentInterestRate.set(calculateProjectedInterestRate());
+    }
+    
 
     public int getInterestRate() {
         return currentInterestRate.value();

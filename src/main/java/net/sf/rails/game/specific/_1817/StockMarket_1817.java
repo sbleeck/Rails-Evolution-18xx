@@ -49,20 +49,20 @@ int row = oldsquare.getRow();
         prepareMove(company, oldsquare, newsquare);
     }
 
-    public StockSpace getFloorSpace(int targetPrice) {
-        StockSpace bestSpace = null;
-        int bestPrice = -1;
-        
-        // Linear markets populate spaces sequentially along column 0
-        for (int r = 0; r < numRows; r++) {
-            StockSpace s = getStockSpace(r, 0);
-            if (s != null && s.getPrice() <= targetPrice && s.getPrice() > bestPrice) {
-                bestPrice = s.getPrice();
-                bestSpace = s;
-            }
+/**
+     * Rule 6.2: Markers must be placed lowest in the column to operate last.
+     */
+    @Override
+    public void prepareMove(PublicCompany company, StockSpace oldSpace, StockSpace newSpace) {
+        if (oldSpace != null) {
+            oldSpace.removeToken(company);
         }
-        
-        return bestSpace;
+        if (newSpace != null) {
+            // Standard Rails addToken puts the marker at the end of the list (bottom)
+            newSpace.addToken(company);
+            company.setCurrentSpace(newSpace);
+            log.info("Rule 6.2: Moved {} to bottom of stack at ${}", company.getId(), newSpace.getPrice());
+        }
     }
 
     @Override
@@ -92,5 +92,36 @@ int row = oldsquare.getRow();
         prepareMove(company, oldsquare, newsquare);
     }
 
+
+
+    /**
+     * Rule 7.1.2 & 7.1.3: Round down to the nearest legal market value.
+     * Scans the full grid to find the highest price <= targetPrice.
+     */
+   public StockSpace getFloorSpace(int targetPrice) {
+        StockSpace bestSpace = null;
+        int bestPrice = -1;
+        
+        for (int r = 0; r < numRows; r++) {
+            for (int c = 0; c < numCols; c++) { 
+                StockSpace s = getStockSpace(r, c);
+                if (s != null) {
+                    int price = s.getPrice();
+                    if (price <= targetPrice && price > bestPrice) {
+                        bestPrice = price;
+                        bestSpace = s;
+                    }
+                }
+            }
+        }
+        return bestSpace;
+    }
+
+    /**
+     * Public wrapper to allow StockRound to move multiple spaces left.
+     */
+    public void moveLeftMultiple(PublicCompany company, int numberOfMoves) {
+        moveLeftOrDown(company, numberOfMoves);
+    }
     
 }

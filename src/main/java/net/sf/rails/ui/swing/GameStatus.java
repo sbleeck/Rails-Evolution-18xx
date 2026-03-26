@@ -1513,12 +1513,15 @@ public class GameStatus extends GridPanel {
                     cf.setToolTipText(null);
                     cf.setEnabled(true);
                 }
+                cf.setOpaque(true);
                 cf.setVisible(true);
 
             } else if (t < limit) {
                 // EMPTY SLOT (Passive)
                 cf.setCustomLabel("");
-                cf.setBackground(BG_PLACEHOLDER);
+
+cf.setOpaque(false);
+                cf.setBackground(new Color(0, 0, 0, 0));
                 cf.setBorder(BORDER_DASHED);
                 cf.setVisible(true);
             } else {
@@ -1620,8 +1623,19 @@ public class GameStatus extends GridPanel {
                 return Integer.compare(p2, p1);
             }
 
+  boolean is1817 = "1817".equals(gameUIManager.getGameManager().getGameName());
+            if (is1817 && c1.getCurrentSpace() != null && c1.getCurrentSpace() == c2.getCurrentSpace()) {
+                java.util.List<net.sf.rails.game.PublicCompany> tokens = c1.getCurrentSpace().getTokens();
+                if (tokens != null) {
+                    int idx1 = tokens.indexOf(c1);
+                    int idx2 = tokens.indexOf(c2);
+                    if (idx1 >= 0 && idx2 >= 0) {
+                        return Integer.compare(idx1, idx2);
+                    }
+                }
+            }
             return Integer.compare(c1.getPublicNumber(), c2.getPublicNumber());
-        });
+                });
 
         // 3. Build Signature
         java.util.List<String> currentSignature = new java.util.ArrayList<>();
@@ -2628,23 +2642,31 @@ public class GameStatus extends GridPanel {
             return;
 
         int totalLoans = 0;
-        int interestRate = 5;
 
         net.sf.rails.game.GameManager gm = gameUIManager.getGameManager();
+        boolean isOR = gm.getCurrentRound() instanceof net.sf.rails.game.OperatingRound;
+        String displayText = "Interest: $5";
+
         if (gm instanceof net.sf.rails.game.specific._1817.GameManager_1817) {
             BondsModel bm = ((net.sf.rails.game.specific._1817.GameManager_1817) gm).getBondsModel();
             if (bm != null) {
                 totalLoans = bm.getTotalLoansTaken();
                 if (bm instanceof net.sf.rails.game.specific._1817.BondsModel_1817) {
-                    interestRate = ((net.sf.rails.game.specific._1817.BondsModel_1817) bm).getInterestRate();
+                    net.sf.rails.game.specific._1817.BondsModel_1817 bm1817 = (net.sf.rails.game.specific._1817.BondsModel_1817) bm;
+                    if (isOR) {
+                        displayText = "Interest: $" + bm1817.getInterestRate();
+                    } else {
+                        displayText = "Next Interst: $" + bm1817.calculateProjectedInterestRate();
+                    }
                 }
             }
         }
         bondsHeatbarPanel.setTotalLoansTaken(totalLoans);
 
         if (interestRateField != null) {
-            interestRateField.setText("Interest: $" + interestRate);
+            interestRateField.setText(displayText);
         }
+
 
     }
 
@@ -2705,13 +2727,22 @@ public class GameStatus extends GridPanel {
                 }
             }
         }
-// Override actorIndex with the company president to remove lingering past-phase players
-        if (opCompId != null && companies != null) {
-            for (PublicCompany c : companies) {
-                if (c != null && c.getId().equals(opCompId) && c.getPresident() != null) {
-                    actorIndex = c.getPresident().getIndex();
-                    break;
-                }
+        // Preserve the correct actorIndex passed from StatusWindow during Sales and
+        // Auctions.
+        // Only override with the company president in standard operating rounds to
+        // clear lingering players.
+        boolean preserveActor = false;
+        net.sf.rails.game.round.RoundFacade currentRoundForHighlight = gameUIManager.getGameManager().getCurrentRound();
+        if (currentRoundForHighlight instanceof net.sf.rails.game.specific._1817.AuctionRound_1817) {
+            preserveActor = true;
+        } else if (currentRoundForHighlight instanceof net.sf.rails.game.specific._1817.MergerAndAcquisitionRound_1817) {
+            net.sf.rails.game.specific._1817.MergerAndAcquisitionRound_1817 mar = (net.sf.rails.game.specific._1817.MergerAndAcquisitionRound_1817) currentRoundForHighlight;
+            net.sf.rails.game.specific._1817.MergerAndAcquisitionRound_1817.MaAStep step = mar.getCurrentStep();
+            if (step == net.sf.rails.game.specific._1817.MergerAndAcquisitionRound_1817.MaAStep.SALES_AUCTION ||
+                    step == net.sf.rails.game.specific._1817.MergerAndAcquisitionRound_1817.MaAStep.SALES_SELECT_BUYER
+                    ||
+                    step == net.sf.rails.game.specific._1817.MergerAndAcquisitionRound_1817.MaAStep.SALES_FRIENDLY) {
+                preserveActor = true;
             }
         }
 
@@ -3021,7 +3052,7 @@ public class GameStatus extends GridPanel {
 
                 if (compLoans[i] instanceof ClickField) {
                     ClickField cf = (ClickField) compLoans[i];
-                    cf.setEnabled(false);
+                    cf.setEnabled(true);
                     cf.setPossibleAction(null);
                     cf.setBorder(BORDER_BOX);
                 }
@@ -3047,20 +3078,17 @@ public class GameStatus extends GridPanel {
                     }
                     int totalInterestCost = currentBonds * interestRate;
 
-                    // Build the Visual Dot String
+                   // Build the Visual Dot String
                     StringBuilder sb = new StringBuilder("<html><center>");
                     // Red dots for loans taken
                     for (int b = 0; b < currentBonds; b++) {
                         sb.append("<font color='red'>●</font>");
                     }
-                    // Grey circles for available slots
+                    // Red circles for available slots
                     for (int b = 0; b < (maxBonds - currentBonds); b++) {
-                        sb.append("<font color='#888888'>○</font>");
+                        sb.append("<font color='black'>○</font>");
                     }
-                    // Append interest cost
-                    sb.append("&nbsp;<font color='black' size='2'>($").append(totalInterestCost).append(")</font>");
                     sb.append("</center></html>");
-
                     String loanDisplay = sb.toString();
 
                     if (compLoans[i] instanceof ClickField) {
@@ -3115,7 +3143,7 @@ public class GameStatus extends GridPanel {
                 // PRIORITY 3: Inactive (Grey)
 
                 Color cellBg;
-if (isOperating) {
+                if (isOperating) {
                     cellBg = Color.WHITE; // Force continuous white line
                 } else if (pIdx == actorIndex) {
                     cellBg = BG_SPOTLIGHT_ACTIVE; // White Spotlight
@@ -3202,7 +3230,7 @@ if (isOperating) {
 
         // 2. PLAYER FOOTERS
         for (int i = 0; i < np; i++) {
-// 1. Spotlight Logic
+            // 1. Spotlight Logic
             boolean isSpotlight = (i == actorIndex);
             Color pBg = isSpotlight ? BG_SPOTLIGHT_ACTIVE : BG_SPOTLIGHT_INACTIVE;
 
@@ -3218,7 +3246,7 @@ if (isOperating) {
 
             // CHANGED: Do NOT change background color for passing. Use standard spotlight
             // color.
-            Color headerBg = pBg;
+            Color headerBg = isSpotlight ? new Color(100, 255,100) : pBg;
 
             if (upperPlayerCaption[i] != null) {
                 upperPlayerCaption[i].setBackground(headerBg);
@@ -4384,13 +4412,16 @@ if (isOperating) {
             addField(f, certInOSIXOffset, 1, 1, 1, 0, true);
         }
 
-        f = new Caption(compCanHoldOwnShares ? LocalText.getText("CASH") : LocalText.getText("TREASURY"));
-        f.setBorder(BORDER_THIN);
+String cashHeaderTxt = compCanHoldOwnShares ? LocalText.getText("CASH") : LocalText.getText("TREASURY");
+ 
+f = new Caption(cashHeaderTxt);
+        f.setBorder(BorderFactory.createCompoundBorder(BORDER_THIN, BorderFactory.createEmptyBorder(0, 0, 0, 5)));
+        ((JLabel) f).setHorizontalAlignment(SwingConstants.RIGHT);
         f.setBackground(BG_HEADER);
         f.setOpaque(true);
         f.setPreferredSize(DIM_STD);
         addField(f, compCashXOffset, 1, 1, 1, 0, true);
-
+        
         // 1. Trains Header
         f = new Caption(LocalText.getText("TRAINS"));
         f.setBorder(BORDER_THIN);
@@ -4401,7 +4432,8 @@ if (isOperating) {
 
         // 2. Dividend Header
         f = new Caption("Dividend");
-        f.setBorder(BORDER_THIN);
+        f.setBorder(BorderFactory.createCompoundBorder(BORDER_THIN, BorderFactory.createEmptyBorder(0, 0, 0, 5)));
+        ((JLabel) f).setHorizontalAlignment(SwingConstants.RIGHT);
         f.setBackground(BG_HEADER);
         f.setOpaque(true);
         f.setPreferredSize(DIM_STD);
@@ -4409,7 +4441,8 @@ if (isOperating) {
 
         // 3. Retained Header
         f = new Caption("Retained");
-        f.setBorder(BORDER_THIN);
+        f.setBorder(BorderFactory.createCompoundBorder(BORDER_THIN, BorderFactory.createEmptyBorder(0, 0, 0, 5)));
+        ((JLabel) f).setHorizontalAlignment(SwingConstants.RIGHT);
         f.setBackground(BG_HEADER);
         f.setOpaque(true);
         f.setPreferredSize(DIM_STD);
@@ -4721,24 +4754,33 @@ if (isOperating) {
             }
 
             // DETAILS (Cash, Rev, Trains, Tokens)
+            
             f = compCash[i] = new Field(c.getPurseMoneyModel()) {
-                @Override
-                public void setText(String t) {
-                    boolean isMajor = c.hasStockPrice();
-                    boolean hasStarted = c.hasFloated();
-                    if (isMajor && !hasStarted) {
-                        super.setText("");
-                    } else {
-                        super.setText(t);
-                    }
+            @Override
+            public void setText(String t) {
+                boolean isMajor = c.hasStockPrice();
+                boolean hasStarted = c.hasFloated();
+                if (isMajor && !hasStarted) {
+                    super.setText("");
+                } else {
+                    super.setText(t);
                 }
-            };
-            f.setBackground(isOperating ? BG_OPERATING : (!isActive ? BG_INACTIVE : BG_MAUVE));
-            f.setOpaque(true);
-            f.setBorder(bDet);
+            }
+        };
+        f.setBackground(isOperating ? BG_OPERATING : (!isActive ? BG_INACTIVE : BG_MAUVE));
+        f.setOpaque(true);
+        f.setBorder(BorderFactory.createCompoundBorder(bDet, BorderFactory.createEmptyBorder(0, 0, 0, 5)));
+        ((JLabel) f).setHorizontalAlignment(SwingConstants.RIGHT);
+
+
+
             f.setPreferredSize(new Dimension(60, 25));
             addField(f, compCashXOffset, y, 1, 1, 0, visible);
+
             f = compCashButton[i] = new ClickField(compCash[i].getText(), CASH_CORRECT_CMD, "", this, buySellGroup);
+            ((ClickField) f).setHorizontalAlignment(SwingConstants.RIGHT);
+            ((ClickField) f)
+                    .setBorder(BorderFactory.createCompoundBorder(bDet, BorderFactory.createEmptyBorder(0, 0, 0, 5)));
             addField(f, compCashXOffset, y, 1, 1, 0, false);
 
             // 1. TRAINS PANEL (Now 2nd column)
@@ -4768,13 +4810,15 @@ if (isOperating) {
                         super.setText("");
                         return;
                     }
-                    super.setText("<html><div align='right'><b>" + gameUIManager.format(c.getDividendRevenue())
-                            + "</b></div></html>");
+                    super.setText(gameUIManager.format(c.getDividendRevenue()));
                 }
             };
             f.setBackground(isOperating ? BG_OPERATING : (!isActive ? BG_INACTIVE : BG_MAUVE));
             f.setOpaque(true);
-            f.setBorder(bDet);
+            f.setBorder(BorderFactory.createCompoundBorder(bDet, BorderFactory.createEmptyBorder(0, 0, 0, 5)));
+            ((JLabel) f).setHorizontalAlignment(SwingConstants.RIGHT);
+            if (f.getFont() != null)
+                f.setFont(f.getFont().deriveFont(Font.BOLD));
             f.setPreferredSize(new Dimension(60, 25));
             addField(f, compRevenueXOffset, y, 1, 1, 0, visible);
 
@@ -4786,13 +4830,15 @@ if (isOperating) {
                         super.setText("");
                         return;
                     }
-                    super.setText("<html><div align='right'><b>" + gameUIManager.format(c.getRetainedRevenue())
-                            + "</b></div></html>");
+                    super.setText(gameUIManager.format(c.getRetainedRevenue()));
                 }
             };
             f.setBackground(isOperating ? BG_OPERATING : (!isActive ? BG_INACTIVE : BG_MAUVE));
             f.setOpaque(true);
-            f.setBorder(bDet);
+            f.setBorder(BorderFactory.createCompoundBorder(bDet, BorderFactory.createEmptyBorder(0, 0, 0, 5)));
+            ((JLabel) f).setHorizontalAlignment(SwingConstants.RIGHT);
+            if (f.getFont() != null)
+                f.setFont(f.getFont().deriveFont(Font.BOLD));
             f.setPreferredSize(new Dimension(60, 25));
 
             // Restore Coal Mine tooltip logic for Retained column
@@ -4859,7 +4905,7 @@ if (isOperating) {
         // Cash
         f = new Caption(LocalText.getText("CASH"));
         f.setBorder(BORDER_THIN);
-        f.setBackground(Color.WHITE);
+        f.setBackground(BG_HEADER);
         f.setOpaque(true);
         addField(f, compNameCol, playerCashYOffset, 1, 1, 0, true);
         for (int i = 0; i < np; i++) {
@@ -4914,7 +4960,7 @@ if (isOperating) {
         // Certs
         f = new Caption("Certs");
         f.setBorder(BORDER_THIN);
-        f.setBackground(Color.WHITE);
+        f.setBackground(BG_HEADER);
         f.setOpaque(true);
         addField(f, compNameCol, playerCertCountYOffset, 1, 1, 0, true);
 
@@ -4934,7 +4980,7 @@ if (isOperating) {
         // Privates
         f = new Caption(LocalText.getText("PRIVATES"));
         f.setBorder(BORDER_THIN);
-        f.setBackground(Color.WHITE);
+        f.setBackground(BG_HEADER);
         f.setOpaque(true);
         addField(f, compNameCol, playerPrivatesYOffset, 1, 2, 0, true);
         playerPrivatesPanel = new JPanel[np];
@@ -5094,7 +5140,7 @@ if (isOperating) {
         boolean is1817 = "1817".equals(gameUIManager.getGameManager().getGameName());
         f = new Caption(is1817 ? "Pur. Power" : "Fixed Inc");
         f.setBorder(BORDER_THIN);
-        f.setBackground(Color.WHITE);
+        f.setBackground(BG_HEADER);
         f.setOpaque(true);
         gbc.anchor = GridBagConstraints.CENTER;
         gbc.fill = GridBagConstraints.HORIZONTAL;
@@ -5146,7 +5192,7 @@ if (isOperating) {
         }
 
         f = new Caption("Time");
-        f.setBackground(Color.WHITE);
+        f.setBackground(BG_HEADER);
         f.setOpaque(true);
         f.setBorder(BORDER_THIN);
         addField(f, compNameCol, playerTimerYOffset, 1, 1, 0, true);

@@ -595,10 +595,15 @@ public class OperatingRound_1817 extends OperatingRound {
                     trueTreasuryAmount = 0;
                     truePerShare = revenue / shareCount;
                 } else if (alloc == rails.game.action.SetDividend.SPLIT) {
-                    if (shareCount == 10) {
-                        truePerShare = (((revenue / 2) + 9) / 10);
-                        trueTreasuryAmount = revenue - (truePerShare * 10);
+if (shareCount == 10) {
+                        // Rule 6.6: Round half-pay UP to nearest $10 for shareholders
+                        // and DOWN to nearest $10 for treasury.
+                        int half = revenue / 2;
+                        int paidToShareholdersTotal = ((half + 9) / 10) * 10; 
+                        truePerShare = paidToShareholdersTotal / 10;
+                        trueTreasuryAmount = revenue - paidToShareholdersTotal;
                     } else {
+                        // 2-share and 5-share use standard integer division 
                         trueTreasuryAmount = revenue / 2;
                         int totalToShares = revenue - trueTreasuryAmount;
                         truePerShare = totalToShares / shareCount;
@@ -1094,15 +1099,15 @@ public class OperatingRound_1817 extends OperatingRound {
                 bt.setForcedBuyIfNoRoute(false);
                 bt.setPresidentMustAddCash(0);
 
-                net.sf.rails.game.state.Owner seller = bt.getTrain().getOwner();
-                if (seller instanceof PublicCompany && seller != comp) {
-                    PublicCompany sellingComp = (PublicCompany) seller;
-                    if (sellingComp.getPresident() != currentPresident) {
-                        toRemove.add(bt);
-                        continue;
-                    }
+                // Rule 6.7: President may not contribute cash.
+                // This is already set above, but we must ensure the engine doesn't 
+                // prompt for it if cash < price.
+                if (bt.getFixedCost() > cash) {
+                    toRemove.add(bt);
+                    continue;
                 }
 
+                
                 int cost = bt.getFixedCost();
                 if (bt.getFixedCostMode() == rails.game.action.BuyTrain.Mode.FIXED ||
                         bt.getFixedCostMode() == rails.game.action.BuyTrain.Mode.MIN) {

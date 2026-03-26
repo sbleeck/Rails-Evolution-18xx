@@ -586,13 +586,16 @@ if (treasuryShare != null) {
         }
     }
 
+
+    // ... (lines of unchanged context code) ...
     @Override
     protected void finishRound() {
         // Sort companies by operating order to satisfy Rule 5.7 requirements
         List<PublicCompany> operatingOrder = gameManager.getAllPublicCompanies();
-        // Assuming Rails framework has a sorting utility for current market prices
-        // Collections.sort(operatingOrder, new CompanyOperatingOrderComparator()); 
-
+        // --- START FIX ---
+        // Rule 5.7: Examine price in operating order.
+        // Note: The framework should handle the sorting of 'operatingOrder' before this loop.
+        
         for (PublicCompany comp : operatingOrder) {
             if (!(comp instanceof PublicCompany_1817) || comp.isClosed()) {
                 continue;
@@ -600,33 +603,38 @@ if (treasuryShare != null) {
 
             PublicCompany_1817 comp1817 = (PublicCompany_1817) comp;
 
-            // 1. Upward Movement: 5-share and 10-share companies
+            // 1. Upward Movement: 5-share and 10-share companies 
             if (comp1817.getShareCount() > 2) {
                 int totalPlayerOwnedShares = 0;
                 for (net.sf.rails.game.Player p : getRoot().getPlayerManager().getPlayers()) {
-                    for (net.sf.rails.game.financial.PublicCertificate cert : p.getPortfolioModel().getCertificates(comp)) {
-                        if (!(cert instanceof net.sf.rails.game.specific._1817.ShortCertificate)) {
-                            totalPlayerOwnedShares += cert.getShares();
-                        }
+                    // We sum the actual share count, not certificate count 
+                    totalPlayerOwnedShares += p.getPortfolioModel().getShares(comp);
+                }
+
+                // If players own 100% or more, move right (up) 
+                if (totalPlayerOwnedShares >= comp1817.getShareCount()) {
+                    // Use the specific moveRight logic for 1817's 2D market
+                    stockMarket.moveRight(comp, 1);
+                }
+            }
+
+            // 2. Downward Movement: Move left for EACH share in the open market 
+            // This applies to all company sizes (2, 5, and 10).
+            int openMarketShares = pool.getShares(comp);
+            if (openMarketShares > 0) {
+               if (stockMarket instanceof StockMarket_1817) {
+                    ((StockMarket_1817) stockMarket).moveLeftOrDown(comp, openMarketShares); 
+                } else {
+                    for (int i = 0; i < openMarketShares; i++) {
+                        stockMarket.withhold(comp);
                     }
                 }
-
-                // If players own 100% or more, move right (up)
-                if (totalPlayerOwnedShares >= comp1817.getShareCount()) {
-                    // stockMarket.payOut acts as a "move right" for 1D tracks in Rails
-                    stockMarket.payOut(comp, 1);
-                }
-            }
-
-            // 2. Downward Movement: Move left for EACH share in the open market
-            int openMarketShares = pool.getShares(comp);
-            for (int i = 0; i < openMarketShares; i++) {
-                // stockMarket.withhold acts as a "move left" for 1D tracks in Rails
-                stockMarket.withhold(comp); 
             }
         }
+        // --- END FIX ---
 
         super.finishRound();
     }
+// ... (rest of the method) ...
 
 }

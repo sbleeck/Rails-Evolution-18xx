@@ -1447,6 +1447,24 @@ if (actions != null && !actions.isEmpty()) {
                     }
                 }
             }
+
+            if (currentRound instanceof net.sf.rails.game.specific._1817.AuctionRound_1817) {
+                net.sf.rails.game.specific._1817.AuctionRound_1817 ar = (net.sf.rails.game.specific._1817.AuctionRound_1817) currentRound;
+                if (ar.getActingPlayer() != null) {
+                    effectivePlayer = ar.getActingPlayer();
+                }
+            } else if (currentRound instanceof net.sf.rails.game.specific._1817.MergerAndAcquisitionRound_1817) {
+                net.sf.rails.game.specific._1817.MergerAndAcquisitionRound_1817 mar = (net.sf.rails.game.specific._1817.MergerAndAcquisitionRound_1817) currentRound;
+                net.sf.rails.game.specific._1817.MergerAndAcquisitionRound_1817.MaAStep step = mar.getCurrentStep();
+                if (step == net.sf.rails.game.specific._1817.MergerAndAcquisitionRound_1817.MaAStep.SALES_AUCTION ||
+                    step == net.sf.rails.game.specific._1817.MergerAndAcquisitionRound_1817.MaAStep.SALES_SELECT_BUYER ||
+                    step == net.sf.rails.game.specific._1817.MergerAndAcquisitionRound_1817.MaAStep.SALES_FRIENDLY) {
+                    if (mar.getActingPlayer() != null) {
+                        effectivePlayer = mar.getActingPlayer();
+                    }
+                }
+            }
+
             // Use this safe index for ALL initTurn calls below
             final int effectivePlayerIndex = (effectivePlayer != null) ? effectivePlayer.getIndex() : -1;
 
@@ -1456,6 +1474,23 @@ if (actions != null && !actions.isEmpty()) {
             } else {
                 // Unconditionally call initTurn for the active player.
                 gameStatus.initTurn(effectivePlayerIndex, true);
+            }
+
+            if (currentRound instanceof net.sf.rails.game.specific._1817.AuctionRound_1817) {
+                net.sf.rails.game.specific._1817.AuctionRound_1817 ar = (net.sf.rails.game.specific._1817.AuctionRound_1817) currentRound;
+                if (ar.getAuctionedCompany() != null) {
+                    highlightRailCard(ar.getAuctionedCompany(), null, "Auction");
+                }
+            } else if (currentRound instanceof net.sf.rails.game.specific._1817.MergerAndAcquisitionRound_1817) {
+                net.sf.rails.game.specific._1817.MergerAndAcquisitionRound_1817 mar = (net.sf.rails.game.specific._1817.MergerAndAcquisitionRound_1817) currentRound;
+                net.sf.rails.game.specific._1817.MergerAndAcquisitionRound_1817.MaAStep step = mar.getCurrentStep();
+                if (step == net.sf.rails.game.specific._1817.MergerAndAcquisitionRound_1817.MaAStep.SALES_AUCTION ||
+                    step == net.sf.rails.game.specific._1817.MergerAndAcquisitionRound_1817.MaAStep.SALES_SELECT_BUYER ||
+                    step == net.sf.rails.game.specific._1817.MergerAndAcquisitionRound_1817.MaAStep.SALES_FRIENDLY) {
+                    if (mar.getOperatingCompany() != null) {
+                        highlightRailCard(mar.getOperatingCompany(), null, "Sale");
+                    }
+                }
             }
 
             // Register the Global Hotkey Manager
@@ -1778,8 +1813,7 @@ JPanel buttonBox = new JPanel(new FlowLayout(FlowLayout.RIGHT, 5, 0));
                         if (myTurn) {
                             int minBid = (bidAction != null) ? bidAction.getBidAmount() : 5;
                             ((SpinnerNumberModel) bidSpinner.getModel()).setMinimum(minBid);
-                            if ((Integer) bidSpinner.getValue() < minBid)
-                                bidSpinner.setValue(minBid);
+                            bidSpinner.setValue(minBid);
 
                             JLabel bidPrompt = new JLabel(actorName + " bids: $");
                             bidPrompt.setFont(new Font("SansSerif", Font.PLAIN, 13));
@@ -1924,10 +1958,8 @@ JPanel buttonBox = new JPanel(new FlowLayout(FlowLayout.RIGHT, 5, 0));
                                 ((SpinnerNumberModel) bidSpinner.getModel()).setMinimum(minNextBid);
                                 ((SpinnerNumberModel) bidSpinner.getModel()).setMaximum(maxNextBid);
 
-                                if ((Integer) bidSpinner.getValue() < minNextBid)
-                                    bidSpinner.setValue(minNextBid);
-                                if ((Integer) bidSpinner.getValue() > maxNextBid)
-                                    bidSpinner.setValue(maxNextBid);
+                                // Always snap to the minimum valid bid when it becomes this player's turn to act
+                                bidSpinner.setValue(minNextBid);
 
                                 JLabel bidPrompt = new JLabel(actorName + " bids: $");
                                 bidPrompt.setFont(new Font("SansSerif", Font.PLAIN, 13));
