@@ -1583,18 +1583,22 @@ public class GameStatus extends GridPanel {
         // 1. Capture Order
         final java.util.Map<PublicCompany, Integer> originalOrder = new java.util.HashMap<>();
         int orderIndex = 0;
-        java.util.List<PublicCompany> displayList = new java.util.ArrayList<>();
+
+java.util.List<PublicCompany> displayList = new java.util.ArrayList<>();
+        java.util.List<PublicCompany> inactiveList = new java.util.ArrayList<>();
 
         net.sf.rails.game.round.RoundFacade currentRoundForDisplay = gameUIManager.getGameManager().getCurrentRound();
         boolean isStockRound = currentRoundForDisplay instanceof net.sf.rails.game.financial.StockRound;
 
         for (PublicCompany c : allCompanies) {
             originalOrder.put(c, orderIndex++);
-            if (c.isClosed())
-                continue;
-            if (!isStockRound && !c.hasFloated() && c.getClass().getName().contains("1817"))
-                continue;
-            displayList.add(c);
+            if (c.isClosed()) continue;
+            boolean isActive = c.hasFloated() || (c.getPresidentsShare() != null && c.getPresidentsShare().getOwner() instanceof net.sf.rails.game.Player);
+            if (isStockRound || isActive) {
+                displayList.add(c);
+            } else {
+                inactiveList.add(c);
+            }
         }
 
         // 2. Sort
@@ -1641,6 +1645,19 @@ public class GameStatus extends GridPanel {
         displayList.clear();
         displayList.addAll(minorsList);
         displayList.addAll(majorsList);
+
+// Append Padding (Inactive) Companies to the BOTTOM
+        if (!isStockRound && displayList.size() < 10) {
+            java.util.List<PublicCompany> inactivePool = new java.util.ArrayList<>();
+            for (PublicCompany c : allCompanies) {
+                if (c.isClosed() || displayList.contains(c)) continue;
+                inactivePool.add(c);
+            }
+            int needed = 10 - displayList.size();
+            for (int i = 0; i < Math.min(needed, inactivePool.size()); i++) {
+                displayList.add(inactivePool.get(i));
+            }
+        }
 
         // 3. Build Signature
         java.util.List<String> currentSignature = new java.util.ArrayList<>();
@@ -2764,9 +2781,10 @@ public class GameStatus extends GridPanel {
             if (c.isClosed())
                 continue;
 
-            // Skip unfloated companies outside the Stock Round in 1817 to save UI space
-            if (!isStockRound && !c.hasFloated() && c.getClass().getName().contains("1817"))
-                continue;
+// Padding Mask: Determine if this row is just empty padding for the grid
+            boolean isEffectivelyActive = c.hasFloated() || (c.getPresidentsShare() != null && c.getPresidentsShare().getOwner() instanceof Player);
+            boolean isPadding = !isStockRound && !isEffectivelyActive;
+
 
             // FORCE RESET TRAINS: Ensure we are in "Display Mode" (HTML) at the start of
             // every update.
@@ -2847,6 +2865,7 @@ public class GameStatus extends GridPanel {
                 // STRICT VISIBILITY: Hide if empty, whitespace, 0, or 0%
                 String trimmed = shareTxt.trim();
                 boolean hasContent = !trimmed.isEmpty() && !trimmed.equals("0") && !trimmed.equals("0%");
+if (isPadding) hasContent = false;
 
                 poolShareCards[i].setCustomLabel(shareTxt);
                 // Force visibility off if no content
@@ -2863,8 +2882,8 @@ public class GameStatus extends GridPanel {
 
             // Update Pool Price Label
             if (poolPriceLabels[i] != null) {
-                if (c.hasStockPrice() && c.getCurrentSpace() != null) {
-                    poolPriceLabels[i].setText(gameUIManager.format(c.getCurrentSpace().getPrice()));
+if (c.hasStockPrice() && c.getCurrentSpace() != null && !isPadding) {
+                        poolPriceLabels[i].setText(gameUIManager.format(c.getCurrentSpace().getPrice()));
                     poolPriceLabels[i].setForeground(new Color(0, 0, 128)); // Navy Blue
 
                     // Use stickyFont if available (Zoom preserved), otherwise current font
@@ -2929,8 +2948,8 @@ public class GameStatus extends GridPanel {
                 // We intentionally ignore the global 'hasParPrices' flag here because 1837 sets
                 // it to false,
                 // effectively hiding these valid fixed prices otherwise.
-                if (price > 0 && hasSharesInIPO) {
-                    ipoParLabels[i].setText(gameUIManager.format(price));
+if (price > 0 && hasSharesInIPO && !isPadding) {
+                        ipoParLabels[i].setText(gameUIManager.format(price));
                     ipoParLabels[i].setForeground(new Color(0, 0, 128)); // Navy Blue
 
                     // FORMATTING: Right Align + Bigger Font
@@ -4276,23 +4295,38 @@ public class GameStatus extends GridPanel {
             rightsXOffset = col++;
         rightCompCaptionXOffset = col++;
 
-        // 4. Setup Rows
-        int actual_nc = 0;
+int actual_nc = 0;
         int actual_nb = 0;
+        java.util.List<PublicCompany> gridList = new java.util.ArrayList<>();
+        java.util.List<PublicCompany> inactiveGridList = new java.util.ArrayList<>();
         net.sf.rails.game.round.RoundFacade currentRoundForFields = gameUIManager.getGameManager().getCurrentRound();
         boolean isStockRoundFields = currentRoundForFields instanceof net.sf.rails.game.financial.StockRound;
 
         if (companies != null) {
             for (PublicCompany c : companies) {
-                if (c.isClosed())
-                    continue;
-                if (!isStockRoundFields && !c.hasFloated() && c.getClass().getName().contains("1817"))
-                    continue;
-                actual_nc++;
-                if (c.hasBonds())
-                    actual_nb++;
+                if (c.isClosed()) continue;
+                boolean isActive = c.hasFloated() || (c.getPresidentsShare() != null && c.getPresidentsShare().getOwner() instanceof Player);
+                if (isStockRoundFields || isActive) {
+                    gridList.add(c);
+                } else {
+                    inactiveGridList.add(c);
+                }
             }
         }
+        
+        if (!isStockRoundFields && gridList.size() < 10) {
+            int needed = 10 - gridList.size();
+            for (int i = 0; i < Math.min(needed, inactiveGridList.size()); i++) {
+                gridList.add(inactiveGridList.get(i));
+            }
+        }
+
+        actual_nc = gridList.size();
+        for (PublicCompany c : gridList) {
+            if (c.hasBonds()) actual_nb++;
+        }
+
+
 
         int startY = 2;
         certPerPlayerYOffset = startY;
@@ -4480,17 +4514,25 @@ public class GameStatus extends GridPanel {
 
     protected void initCompanyRows(int startY, PublicCompany operatingComp) {
         int y = startY;
-        java.util.List<PublicCompany> displayList = new java.util.ArrayList<>();
+       
+       
+     java.util.List<PublicCompany> displayList = new java.util.ArrayList<>();
+        java.util.List<PublicCompany> inactiveList = new java.util.ArrayList<>();
         net.sf.rails.game.round.RoundFacade currentRound = gameUIManager.getGameManager().getCurrentRound();
         boolean isStockRound = currentRound instanceof net.sf.rails.game.financial.StockRound;
 
         for (PublicCompany c : gameUIManager.getAllPublicCompanies()) {
-            if (c.isClosed())
-                continue;
-            if (!isStockRound && !c.hasFloated() && c.getClass().getName().contains("1817"))
-                continue;
-            displayList.add(c);
+            if (c.isClosed()) continue;
+            boolean isActive = c.hasFloated() || (c.getPresidentsShare() != null && c.getPresidentsShare().getOwner() instanceof net.sf.rails.game.Player);
+            if (isStockRound || isActive) {
+                displayList.add(c);
+            } else {
+                inactiveList.add(c);
+            }
         }
+
+
+
 
         compNameCaption = new Caption[nc];
         // compArrowCaption = new Caption[nc]; // Initialize storage
@@ -4536,6 +4578,20 @@ public class GameStatus extends GridPanel {
         displayList.clear();
         displayList.addAll(minorsList);
         displayList.addAll(majorsList);
+
+// Append Padding (Inactive) Companies to the BOTTOM
+        if (!isStockRound && displayList.size() < 10) {
+            java.util.List<PublicCompany> inactivePool = new java.util.ArrayList<>();
+            for (PublicCompany c : gameUIManager.getAllPublicCompanies()) {
+                if (c.isClosed() || displayList.contains(c)) continue;
+                inactivePool.add(c);
+            }
+            int needed = 10 - displayList.size();
+            for (int k = 0; k < Math.min(needed, inactivePool.size()); k++) {
+                displayList.add(inactivePool.get(k));
+            }
+        }
+
 
         // Determine Chunk Boundary
         PublicCompany lastMinor = null;
@@ -4777,9 +4833,16 @@ public class GameStatus extends GridPanel {
 
             // DETAILS (Cash, Rev, Trains, Tokens)
 
+
             f = compCash[i] = new Field(c.getPurseMoneyModel()) {
                 @Override
                 public void setText(String t) {
+                    boolean isSR = gameUIManager.getGameManager().getCurrentRound() instanceof net.sf.rails.game.financial.StockRound;
+                    boolean isEffectivelyActive = c.hasFloated() || (c.getPresidentsShare() != null && c.getPresidentsShare().getOwner() instanceof Player);
+                    if (!isSR && !isEffectivelyActive) {
+                        super.setText("");
+                        return;
+                    }
                     boolean isMajor = c.hasStockPrice();
                     boolean hasStarted = c.hasFloated();
                     if (isMajor && !hasStarted) {
@@ -4789,6 +4852,11 @@ public class GameStatus extends GridPanel {
                     }
                 }
             };
+
+
+
+
+
             f.setBackground(isOperating ? BG_OPERATING : (!isActive ? BG_INACTIVE : BG_MAUVE));
             f.setOpaque(true);
             f.setBorder(BorderFactory.createCompoundBorder(bDet, BorderFactory.createEmptyBorder(0, 0, 0, 5)));
@@ -4823,9 +4891,15 @@ public class GameStatus extends GridPanel {
             addField(compTrainsButtonPanel[i], compTrainsXOffset, y, 1, 1, 0, visible);
 
             // 2. DIVIDEND FIELD
-            f = compRevenue[i] = new Field(c.getLastRevenueModel()) {
+           f = compRevenue[i] = new Field(c.getLastRevenueModel()) {
                 @Override
                 public void setText(String t) {
+                    boolean isSR = gameUIManager.getGameManager().getCurrentRound() instanceof net.sf.rails.game.financial.StockRound;
+                    boolean isEffectivelyActive = c.hasFloated() || (c.getPresidentsShare() != null && c.getPresidentsShare().getOwner() instanceof Player);
+                    if (!isSR && !isEffectivelyActive) {
+                        super.setText("");
+                        return;
+                    }
                     if (c.getLastRevenue() == 0 && c.getLastDirectIncome() == 0) {
                         super.setText("");
                         return;
@@ -4833,6 +4907,9 @@ public class GameStatus extends GridPanel {
                     super.setText(gameUIManager.format(c.getDividendRevenue()));
                 }
             };
+
+
+
             f.setBackground(isOperating ? BG_OPERATING : (!isActive ? BG_INACTIVE : BG_MAUVE));
             f.setOpaque(true);
             f.setBorder(BorderFactory.createCompoundBorder(bDet, BorderFactory.createEmptyBorder(0, 0, 0, 5)));
@@ -4843,9 +4920,15 @@ public class GameStatus extends GridPanel {
             addField(f, compRevenueXOffset, y, 1, 1, 0, visible);
 
             // 3. RETAINED FIELD
-            f = compRetained[i] = new Field(c.getLastRevenueModel()) {
+           f = compRetained[i] = new Field(c.getLastRevenueModel()) {
                 @Override
                 public void setText(String t) {
+                    boolean isSR = gameUIManager.getGameManager().getCurrentRound() instanceof net.sf.rails.game.financial.StockRound;
+                    boolean isEffectivelyActive = c.hasFloated() || (c.getPresidentsShare() != null && c.getPresidentsShare().getOwner() instanceof Player);
+                    if (!isSR && !isEffectivelyActive) {
+                        super.setText("");
+                        return;
+                    }
                     if (c.getLastRevenue() == 0 && c.getLastDirectIncome() == 0) {
                         super.setText("");
                         return;
@@ -4853,6 +4936,8 @@ public class GameStatus extends GridPanel {
                     super.setText(gameUIManager.format(c.getRetainedRevenue()));
                 }
             };
+
+            
             f.setBackground(isOperating ? BG_OPERATING : (!isActive ? BG_INACTIVE : BG_MAUVE));
             f.setOpaque(true);
             f.setBorder(BorderFactory.createCompoundBorder(bDet, BorderFactory.createEmptyBorder(0, 0, 0, 5)));
