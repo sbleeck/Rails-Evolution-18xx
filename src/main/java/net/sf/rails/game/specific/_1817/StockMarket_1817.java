@@ -58,10 +58,21 @@ int row = oldsquare.getRow();
             oldSpace.removeToken(company);
         }
         if (newSpace != null) {
-            // Standard Rails addToken puts the marker at the end of the list (bottom)
+java.util.List<net.sf.rails.game.PublicCompany> existingTokens = newSpace.getTokens() != null ? 
+                new java.util.ArrayList<>(newSpace.getTokens()) : new java.util.ArrayList<>();
+                
+            for (net.sf.rails.game.PublicCompany c : existingTokens) {
+                newSpace.removeToken(c);
+            }
+            
             newSpace.addToken(company);
+            
+            for (net.sf.rails.game.PublicCompany c : existingTokens) {
+                newSpace.addToken(c);
+            }
+            
             company.setCurrentSpace(newSpace);
-            log.info("Rule 6.2: Moved {} to bottom of stack at ${}", company.getId(), newSpace.getPrice());
+            log.info("Rule 6.2: Moved {} to physical bottom of stack (Index 0) at ${}", company.getId(), newSpace.getPrice());
         }
     }
 

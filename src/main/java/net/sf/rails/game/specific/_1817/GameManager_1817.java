@@ -180,28 +180,8 @@ if (bondsModel == null) {
         guiParameters.put(net.sf.rails.common.GuiDef.Parm.CAN_ANY_COMPANY_HOLD_OWN_SHARES, true);
     }
 
-    @Override
-    public java.util.List<net.sf.rails.game.PublicCompany> getCompaniesInRunningOrder() {
-        java.util.List<net.sf.rails.game.PublicCompany> runningOrder = new java.util.ArrayList<>(super.getCompaniesInRunningOrder());
-        
-        // 1817 Rule 6.2: "If the stock values of two or more companies are equal, 
-        // then the one whose stock marker was placed in that space first operates first."
-        runningOrder.sort((c1, c2) -> {
-            net.sf.rails.game.financial.StockSpace s1 = c1.getCurrentSpace();
-            net.sf.rails.game.financial.StockSpace s2 = c2.getCurrentSpace();
-            
-            if (s1 != null && s2 != null && s1.equals(s2)) {
-                java.util.List<?> stack = s1.getTokens();
-                int idx1 = stack.indexOf(c1);
-                int idx2 = stack.indexOf(c2);
-                return Integer.compare(idx1, idx2);
-            }
-            return 0; // Maintain superclass order (price descending) for all other comparisons
-        });
-        
-        return runningOrder;
-    }
 
+    
 
     /**
      * Calculates the true net worth for 1817: Cash + Long Stock - Short Stock.
@@ -297,5 +277,84 @@ if (bondsModel == null) {
         assetHistory.put(roundId, roundAssets);
         playerAssetHistory.set(assetHistory);
     }
+
+@Override
+    public java.util.List<net.sf.rails.game.PublicCompany> getCompaniesInRunningOrder() {
+        java.util.List<net.sf.rails.game.PublicCompany> operatingCompanies = new java.util.ArrayList<>(getRoot().getCompanyManager().getAllPublicCompanies());
+
+
+        java.util.Collections.sort(operatingCompanies, (c1, c2) -> {
+            boolean c1Started = c1.hasStockPrice() && c1.hasStarted();
+            boolean c2Started = c2.hasStockPrice() && c2.hasStarted();
+
+            if (!c1Started && c2Started) return -1;
+            if (c1Started && !c2Started) return 1;
+            if (!c1Started && !c2Started) return Integer.compare(c1.getPublicNumber(), c2.getPublicNumber());
+
+            int p1 = c1.getCurrentSpace() != null ? c1.getCurrentSpace().getPrice() : 0;
+            int p2 = c2.getCurrentSpace() != null ? c2.getCurrentSpace().getPrice() : 0;
+
+            if (p1 != p2) return Integer.compare(p2, p1);
+
+            int idx1 = -1;
+            if (c1.getCurrentSpace() != null && c1.getCurrentSpace().getTokens() != null) {
+                java.util.List<?> tokens = c1.getCurrentSpace().getTokens();
+                idx1 = tokens.indexOf(c1);
+                if (idx1 == -1) {
+                    for (int i = 0; i < tokens.size(); i++) {
+                        Object t = tokens.get(i);
+                        try {
+                            java.lang.reflect.Method m = t.getClass().getMethod("getCompany");
+                            Object comp = m.invoke(t);
+                            if (c1 == comp || c1.equals(comp)) { idx1 = i; break; }
+                        } catch (Exception e) {}
+                        if (idx1 == -1) {
+                            try {
+                                java.lang.reflect.Method m = t.getClass().getMethod("getCompanyId");
+                                Object compId = m.invoke(t);
+                                if (c1.getId().equals(compId)) { idx1 = i; break; }
+                            } catch (Exception e) {}
+                        }
+                    }
+                }
+            }
+
+            int idx2 = -1;
+            if (c2.getCurrentSpace() != null && c2.getCurrentSpace().getTokens() != null) {
+                java.util.List<?> tokens = c2.getCurrentSpace().getTokens();
+                idx2 = tokens.indexOf(c2);
+                if (idx2 == -1) {
+                    for (int i = 0; i < tokens.size(); i++) {
+                        Object t = tokens.get(i);
+                        try {
+                            java.lang.reflect.Method m = t.getClass().getMethod("getCompany");
+                            Object comp = m.invoke(t);
+                            if (c2 == comp || c2.equals(comp)) { idx2 = i; break; }
+                        } catch (Exception e) {}
+                        if (idx2 == -1) {
+                            try {
+                                java.lang.reflect.Method m = t.getClass().getMethod("getCompanyId");
+                                Object compId = m.invoke(t);
+                                if (c2.getId().equals(compId)) { idx2 = i; break; }
+                            } catch (Exception e) {}
+                        }
+                    }
+                }
+            }
+
+            // Descending Sort: Higher index (Top of stack) operates first[cite: 573, 574]. 
+            // -1 (Unknown or Mid-transition) moves to the very end.
+            int sort1 = (idx1 == -1) ? Integer.MIN_VALUE : idx1;
+            int sort2 = (idx2 == -1) ? Integer.MIN_VALUE : idx2;
+
+
+            if (sort1 != sort2) return Integer.compare(sort2, sort1);
+
+            return Integer.compare(c1.getPublicNumber(), c2.getPublicNumber());
+        });
+
+        return operatingCompanies;
+    }
+    
     
 }

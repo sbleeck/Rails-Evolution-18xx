@@ -161,7 +161,6 @@ public class OperatingRound_1817 extends OperatingRound {
             cost += 20;
         }
 
-
         // Rule 1.2.6: Waive $15 mountain fee upfront if Coal Mine is available.
         if (canPotentiallyLayCoalMine(company, hex, standardCost)) {
             cost -= 15;
@@ -426,17 +425,40 @@ public class OperatingRound_1817 extends OperatingRound {
                         // off.
                         net.sf.rails.game.financial.StockMarket market = getRoot().getStockMarket();
                         net.sf.rails.game.financial.StockSpace space = comp.getCurrentSpace();
-                        int row = space.getRow();
-                        int col = space.getColumn();
-                        for (int i = 0; i < count; i++) {
-                            if (market.getStockSpace(row, col + 1) != null) {
-                                col++;
+
+
+                        
+int row = space.getRow();
+int col = space.getColumn();
+
+
+   for (int i = 0; i < count; i++) {
+log.info("1817_OR: RepayLoans tracking movement. Current space: row={}, col={}", row, col);
+int nextCol = col + 1;
+boolean spaceFound = false;
+
+                        while (nextCol < market.getNumberOfColumns() && !spaceFound) {
+                            // Scan all rows in the target column because the base space is likely at row 0
+                            for (int r = 0; r < market.getNumberOfRows(); r++) {
+                                if (market.getStockSpace(r, nextCol) != null) {
+                                    col = nextCol;
+                                    row = r; 
+                                    spaceFound = true;
+                                    log.info("1817_OR: Found valid rightward space at row={}, col={}", r, nextCol);
+                                    break;
+                                }
                             }
+                            if (!spaceFound) nextCol++;
                         }
-                        net.sf.rails.game.financial.StockSpace target = market.getStockSpace(row, col);
-                        if (target != null && target != space) {
-                            market.correctStockPrice(comp, target);
-                        }
+                        if (!spaceFound) log.warn("1817_OR: No valid rightward space found from col {}", col);
+                    }
+                    
+                    net.sf.rails.game.financial.StockSpace target = market.getStockSpace(row, col);
+                    if (target != null && target != space) {
+                        market.correctStockPrice(comp, target);
+                        net.sf.rails.common.ReportBuffer.add(this, 
+                            comp.getId() + " stock price moves from $" + space.getPrice() + " to $" + target.getPrice() + " due to loan repayment.");
+                    }
 
                     }
                     net.sf.rails.common.ReportBuffer.add(this,
@@ -595,15 +617,15 @@ public class OperatingRound_1817 extends OperatingRound {
                     trueTreasuryAmount = 0;
                     truePerShare = revenue / shareCount;
                 } else if (alloc == rails.game.action.SetDividend.SPLIT) {
-if (shareCount == 10) {
+                    if (shareCount == 10) {
                         // Rule 6.6: Round half-pay UP to nearest $10 for shareholders
                         // and DOWN to nearest $10 for treasury.
                         int half = revenue / 2;
-                        int paidToShareholdersTotal = ((half + 9) / 10) * 10; 
+                        int paidToShareholdersTotal = ((half + 9) / 10) * 10;
                         truePerShare = paidToShareholdersTotal / 10;
                         trueTreasuryAmount = revenue - paidToShareholdersTotal;
                     } else {
-                        // 2-share and 5-share use standard integer division 
+                        // 2-share and 5-share use standard integer division
                         trueTreasuryAmount = revenue / 2;
                         int totalToShares = revenue - trueTreasuryAmount;
                         truePerShare = totalToShares / shareCount;
@@ -687,51 +709,64 @@ if (shareCount == 10) {
                     int col = oldSpace.getColumn();
 
                     if (moves > 0) {
+                        // Rule 6.6: Move RIGHT (increase col)[cite: 193, 636, 637].
                         for (int i = 0; i < moves; i++) {
-                            int nextRow = row + 1;
-                            while (nextRow < m1817.getNumberOfRows() && m1817.getStockSpace(nextRow, col) == null) {
-                                nextRow++;
+                            int nextCol = col + 1;
+                            while (nextCol < m1817.getNumberOfColumns() && m1817.getStockSpace(row, nextCol) == null) {
+                                nextCol++;
                             }
-                            if (m1817.getStockSpace(nextRow, col) != null)
-                                row = nextRow;
+                            if (nextCol < m1817.getNumberOfColumns() && m1817.getStockSpace(row, nextCol) != null) {
+                                col = nextCol;
+                            }
                         }
                     } else if (moves < 0) {
+                        // Rule 6.6: Move LEFT (decrease col)[cite: 193, 641].
                         for (int i = 0; i < -moves; i++) {
-                            int nextRow = row - 1;
-                            while (nextRow > 0 && m1817.getStockSpace(nextRow, col) == null) {
-                                nextRow--;
+                            int prevCol = col - 1;
+                            while (prevCol >= 0 && m1817.getStockSpace(row, prevCol) == null) {
+                                prevCol--;
                             }
-                            net.sf.rails.game.financial.StockSpace pot = m1817.getStockSpace(nextRow, col);
-                            if (pot != null && !pot.getId().equalsIgnoreCase("A1"))
-                                row = nextRow;
+                            if (prevCol >= 0) {
+                                net.sf.rails.game.financial.StockSpace pot = m1817.getStockSpace(row, prevCol);
+                                // Prevent moving into A1 unless specifically required by liquidation
+                                if (pot != null && !pot.getId().equalsIgnoreCase("A1")) {
+                                    col = prevCol;
+                                }
+                            }
                         }
                     }
 
                     net.sf.rails.game.financial.StockSpace target = m1817.getStockSpace(row, col);
-                    if (target != null && comp.getCurrentSpace() != target) {
+                    if (target != null && oldSpace != target) {
                         m1817.correctStockPrice(comp, target);
+                        // --- DELETE --- net.sf.rails.game.financial.Bank.format(this, ...)
+                        net.sf.rails.common.ReportBuffer.add(this,
+                                comp.getId() + " stock price moves from $" + oldSpace.getPrice() + " to $"
+                                        + target.getPrice() + ".");
                     }
+
                 }
+
             }
             net.sf.rails.game.PhaseManager pm = getRoot().getPhaseManager();
-                if (pm.hasReachedPhase("4")) {
-                    java.util.Set<net.sf.rails.game.Train> companyTrains = comp.getPortfolioModel().getTrainList();
-                    java.util.List<net.sf.rails.game.Train> toDiscard = new java.util.ArrayList<>();
-                    
-                    for (net.sf.rails.game.Train t : companyTrains) {
-                        if (t.getName() != null && t.getName().contains("2+")) {
-                            toDiscard.add(t);
-                        }
-                    }
-                    
-                    for (net.sf.rails.game.Train t : toDiscard) {
-                        getRoot().getTrainManager().trashTrain(t);
-                        log.info("1817_OR: 2+ train ({}) belonging to {} rusted and was removed from play.", 
-                            t.getId(), comp.getId());
-                        net.sf.rails.common.ReportBuffer.add(this, 
-                            comp.getId() + " discards rusted 2+ train after its final run.");
+            if (pm.hasReachedPhase("4")) {
+                java.util.Set<net.sf.rails.game.Train> companyTrains = comp.getPortfolioModel().getTrainList();
+                java.util.List<net.sf.rails.game.Train> toDiscard = new java.util.ArrayList<>();
+
+                for (net.sf.rails.game.Train t : companyTrains) {
+                    if (t.getName() != null && t.getName().contains("2+")) {
+                        toDiscard.add(t);
                     }
                 }
+
+                for (net.sf.rails.game.Train t : toDiscard) {
+                    getRoot().getTrainManager().trashTrain(t);
+                    log.info("1817_OR: 2+ train ({}) belonging to {} rusted and was removed from play.",
+                            t.getId(), comp.getId());
+                    net.sf.rails.common.ReportBuffer.add(this,
+                            comp.getId() + " discards rusted 2+ train after its final run.");
+                }
+            }
             return result;
         }
 
@@ -743,8 +778,6 @@ if (shareCount == 10) {
         boolean actionsAdded = false;
         PublicCompany comp = operatingCompany.value();
         net.sf.rails.game.GameDef.OrStep step = getStep();
-        
-
 
         // --- 2. COAL MINE INTERRUPT ---
         if ("Yellow".equalsIgnoreCase(lastLaidTileColour) && !hexesLaidThisTurn.isEmpty()) {
@@ -1060,8 +1093,7 @@ if (shareCount == 10) {
         return count;
     }
 
-
-@Override
+    @Override
     public void setBuyableTrains() {
         // 1. MUST call super first to populate core step actions (e.g., 'Done')
         super.setBuyableTrains();
@@ -1071,11 +1103,11 @@ if (shareCount == 10) {
             return;
 
         net.sf.rails.game.PhaseManager pm = getRoot().getPhaseManager();
-        int trainLimit = 2; 
+        int trainLimit = 2;
         if (!pm.hasReachedPhase("4")) {
-            trainLimit = 4; 
+            trainLimit = 4;
         } else if (!pm.hasReachedPhase("6")) {
-            trainLimit = 3; 
+            trainLimit = 3;
         }
 
         int currentTrains = comp.getPortfolioModel().getNumberOfTrains();
@@ -1100,14 +1132,13 @@ if (shareCount == 10) {
                 bt.setPresidentMustAddCash(0);
 
                 // Rule 6.7: President may not contribute cash.
-                // This is already set above, but we must ensure the engine doesn't 
+                // This is already set above, but we must ensure the engine doesn't
                 // prompt for it if cash < price.
                 if (bt.getFixedCost() > cash) {
                     toRemove.add(bt);
                     continue;
                 }
 
-                
                 int cost = bt.getFixedCost();
                 if (bt.getFixedCostMode() == rails.game.action.BuyTrain.Mode.FIXED ||
                         bt.getFixedCostMode() == rails.game.action.BuyTrain.Mode.MIN) {
@@ -1149,7 +1180,7 @@ if (shareCount == 10) {
                                 newBt.setForcedBuyIfHasRoute(false);
                                 newBt.setForcedBuyIfNoRoute(false);
                                 newBt.setPresidentMustAddCash(0);
-                                
+
                                 String cleanTrainName = t.getName().split("_")[0];
                                 String label = "Buy '" + cleanTrainName + "' from " + otherComp.getId();
                                 newBt.setButtonLabel(label);
@@ -1162,9 +1193,22 @@ if (shareCount == 10) {
         }
     }
 
+    @Override
+    public List<PublicCompany> setOperatingCompanies(List<PublicCompany> oldOperatingCompanies,
+            PublicCompany lastOperatingCompany) {
+        // 1817 strictly locks the operating order at the beginning of the round based
+        // on
+        // the GameManager's mathematically correct token-stacking algorithm.
+        // It must not dynamically resort companies mid-round.
+        List<PublicCompany> authoritativeOrder = gameManager.getCompaniesInRunningOrder();
+        List<PublicCompany> activeCompanies = new ArrayList<>();
 
-
-
-
+        for (PublicCompany comp : authoritativeOrder) {
+            if (canCompanyOperateThisRound(comp)) {
+                activeCompanies.add(comp);
+            }
+        }
+        return activeCompanies;
+    }
 
 }

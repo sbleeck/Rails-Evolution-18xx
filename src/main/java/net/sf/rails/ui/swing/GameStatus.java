@@ -1520,7 +1520,7 @@ public class GameStatus extends GridPanel {
                 // EMPTY SLOT (Passive)
                 cf.setCustomLabel("");
 
-cf.setOpaque(false);
+                cf.setOpaque(false);
                 cf.setBackground(new Color(0, 0, 0, 0));
                 cf.setBorder(BORDER_DASHED);
                 cf.setVisible(true);
@@ -1599,43 +1599,48 @@ cf.setOpaque(false);
 
         // 2. Sort
         compNameCaption = new Caption[nc];
-        // Synchronized sorting logic with refreshDashboard to ensure UI matches the
-        // detected state
-        java.util.Collections.sort(displayList, (c1, c2) -> {
-            boolean c1Minor = !c1.hasStockPrice();
-            boolean c2Minor = !c2.hasStockPrice();
-            if (c1Minor && !c2Minor)
+        // Delegate sorting directly to the Engine's authoritative running order to
+        // prevent MVC desync.
+        final java.util.List<PublicCompany> engineOrder = gameUIManager.getGameManager().getCompaniesInRunningOrder();
+
+        StringBuilder orderLog = new StringBuilder();
+        if (engineOrder != null) {
+            for (PublicCompany comp : engineOrder) {
+                orderLog.append(comp.getId()).append(", ");
+            }
+        }
+
+        java.util.List<PublicCompany> minorsList = new java.util.ArrayList<>();
+        java.util.List<PublicCompany> majorsList = new java.util.ArrayList<>();
+
+        for (PublicCompany c : displayList) {
+            if (!c.hasStockPrice()) {
+                minorsList.add(c);
+            } else {
+                majorsList.add(c);
+            }
+        }
+
+        // Minors maintain static creation order
+        java.util.Collections.sort(minorsList, (c1, c2) -> Integer.compare(c1.getPublicNumber(), c2.getPublicNumber()));
+
+        // Majors strictly follow the engine's authoritative order
+        java.util.Collections.sort(majorsList, (c1, c2) -> {
+            int idx1 = engineOrder != null ? engineOrder.indexOf(c1) : -1;
+            int idx2 = engineOrder != null ? engineOrder.indexOf(c2) : -1;
+
+            if (idx1 >= 0 && idx2 >= 0)
+                return Integer.compare(idx1, idx2);
+            if (idx1 >= 0)
                 return -1;
-            if (!c1Minor && c2Minor)
+            if (idx2 >= 0)
                 return 1;
-
-            if (c1Minor) {
-                return Integer.compare(c1.getPublicNumber(), c2.getPublicNumber());
-            }
-
-            // Majors: Sort by Price Descending (High to Low)
-            int p1 = c1.getCurrentSpace() != null ? c1.getCurrentSpace().getPrice()
-                    : (c1.getStartSpace() != null ? c1.getStartSpace().getPrice() : 0);
-            int p2 = c2.getCurrentSpace() != null ? c2.getCurrentSpace().getPrice()
-                    : (c2.getStartSpace() != null ? c2.getStartSpace().getPrice() : 0);
-
-            if (p1 != p2) {
-                return Integer.compare(p2, p1);
-            }
-
-  boolean is1817 = "1817".equals(gameUIManager.getGameManager().getGameName());
-            if (is1817 && c1.getCurrentSpace() != null && c1.getCurrentSpace() == c2.getCurrentSpace()) {
-                java.util.List<net.sf.rails.game.PublicCompany> tokens = c1.getCurrentSpace().getTokens();
-                if (tokens != null) {
-                    int idx1 = tokens.indexOf(c1);
-                    int idx2 = tokens.indexOf(c2);
-                    if (idx1 >= 0 && idx2 >= 0) {
-                        return Integer.compare(idx1, idx2);
-                    }
-                }
-            }
             return Integer.compare(c1.getPublicNumber(), c2.getPublicNumber());
-                });
+        });
+
+        displayList.clear();
+        displayList.addAll(minorsList);
+        displayList.addAll(majorsList);
 
         // 3. Build Signature
         java.util.List<String> currentSignature = new java.util.ArrayList<>();
@@ -2667,7 +2672,6 @@ cf.setOpaque(false);
             interestRateField.setText(displayText);
         }
 
-
     }
 
     public void initTurn(int actorIndex, boolean myTurn) {
@@ -3078,7 +3082,7 @@ cf.setOpaque(false);
                     }
                     int totalInterestCost = currentBonds * interestRate;
 
-                   // Build the Visual Dot String
+                    // Build the Visual Dot String
                     StringBuilder sb = new StringBuilder("<html><center>");
                     // Red dots for loans taken
                     for (int b = 0; b < currentBonds; b++) {
@@ -3246,7 +3250,7 @@ cf.setOpaque(false);
 
             // CHANGED: Do NOT change background color for passing. Use standard spotlight
             // color.
-            Color headerBg = isSpotlight ? new Color(100, 255,100) : pBg;
+            Color headerBg = isSpotlight ? new Color(100, 255, 100) : pBg;
 
             if (upperPlayerCaption[i] != null) {
                 upperPlayerCaption[i].setBackground(headerBg);
@@ -4412,16 +4416,16 @@ cf.setOpaque(false);
             addField(f, certInOSIXOffset, 1, 1, 1, 0, true);
         }
 
-String cashHeaderTxt = compCanHoldOwnShares ? LocalText.getText("CASH") : LocalText.getText("TREASURY");
- 
-f = new Caption(cashHeaderTxt);
+        String cashHeaderTxt = compCanHoldOwnShares ? LocalText.getText("CASH") : LocalText.getText("TREASURY");
+
+        f = new Caption(cashHeaderTxt);
         f.setBorder(BorderFactory.createCompoundBorder(BORDER_THIN, BorderFactory.createEmptyBorder(0, 0, 0, 5)));
         ((JLabel) f).setHorizontalAlignment(SwingConstants.RIGHT);
         f.setBackground(BG_HEADER);
         f.setOpaque(true);
         f.setPreferredSize(DIM_STD);
         addField(f, compCashXOffset, 1, 1, 1, 0, true);
-        
+
         // 1. Trains Header
         f = new Caption(LocalText.getText("TRAINS"));
         f.setBorder(BORDER_THIN);
@@ -4491,29 +4495,47 @@ f = new Caption(cashHeaderTxt);
         compNameCaption = new Caption[nc];
         // compArrowCaption = new Caption[nc]; // Initialize storage
 
-        // 1. Sort the list
-        java.util.Collections.sort(displayList, (c1, c2) -> {
-            boolean c1IsPR = "PR".equals(c1.getId());
-            boolean c2IsPR = "PR".equals(c2.getId());
+        // Delegate sorting directly to the Engine's authoritative running order to
+        // prevent MVC desync.
+        final java.util.List<PublicCompany> engineOrder = gameUIManager.getGameManager().getCompaniesInRunningOrder();
 
-            int p1 = c1.getCurrentSpace() != null ? c1.getCurrentSpace().getPrice()
-                    : (c1.getStartSpace() != null ? c1.getStartSpace().getPrice() : 0);
-            int p2 = c2.getCurrentSpace() != null ? c2.getCurrentSpace().getPrice()
-                    : (c2.getStartSpace() != null ? c2.getStartSpace().getPrice() : 0);
+        StringBuilder initOrderLog = new StringBuilder();
+        if (engineOrder != null) {
+            for (PublicCompany comp : engineOrder) {
+                initOrderLog.append(comp.getId()).append(", ");
+            }
+        }
+        java.util.List<PublicCompany> minorsList = new java.util.ArrayList<>();
+        java.util.List<PublicCompany> majorsList = new java.util.ArrayList<>();
 
-            boolean c1Minor = c1IsPR ? (p1 == 0) : !c1.hasStockPrice();
-            boolean c2Minor = c2IsPR ? (p2 == 0) : !c2.hasStockPrice();
+        for (PublicCompany c : displayList) {
+            if (!c.hasStockPrice()) {
+                minorsList.add(c);
+            } else {
+                majorsList.add(c);
+            }
+        }
 
-            if (c1Minor && !c2Minor)
+        // Minors maintain static creation order
+        java.util.Collections.sort(minorsList, (c1, c2) -> Integer.compare(c1.getPublicNumber(), c2.getPublicNumber()));
+
+        // Majors strictly follow the engine's authoritative order
+        java.util.Collections.sort(majorsList, (c1, c2) -> {
+            int idx1 = engineOrder != null ? engineOrder.indexOf(c1) : -1;
+            int idx2 = engineOrder != null ? engineOrder.indexOf(c2) : -1;
+
+            if (idx1 >= 0 && idx2 >= 0)
+                return Integer.compare(idx1, idx2);
+            if (idx1 >= 0)
                 return -1;
-            if (!c1Minor && c2Minor)
+            if (idx2 >= 0)
                 return 1;
-            if (c1Minor)
-                return Integer.compare(c1.getPublicNumber(), c2.getPublicNumber());
-            if (p1 != p2)
-                return Integer.compare(p2, p1);
             return Integer.compare(c1.getPublicNumber(), c2.getPublicNumber());
         });
+
+        displayList.clear();
+        displayList.addAll(minorsList);
+        displayList.addAll(majorsList);
 
         // Determine Chunk Boundary
         PublicCompany lastMinor = null;
@@ -4754,25 +4776,23 @@ f = new Caption(cashHeaderTxt);
             }
 
             // DETAILS (Cash, Rev, Trains, Tokens)
-            
+
             f = compCash[i] = new Field(c.getPurseMoneyModel()) {
-            @Override
-            public void setText(String t) {
-                boolean isMajor = c.hasStockPrice();
-                boolean hasStarted = c.hasFloated();
-                if (isMajor && !hasStarted) {
-                    super.setText("");
-                } else {
-                    super.setText(t);
+                @Override
+                public void setText(String t) {
+                    boolean isMajor = c.hasStockPrice();
+                    boolean hasStarted = c.hasFloated();
+                    if (isMajor && !hasStarted) {
+                        super.setText("");
+                    } else {
+                        super.setText(t);
+                    }
                 }
-            }
-        };
-        f.setBackground(isOperating ? BG_OPERATING : (!isActive ? BG_INACTIVE : BG_MAUVE));
-        f.setOpaque(true);
-        f.setBorder(BorderFactory.createCompoundBorder(bDet, BorderFactory.createEmptyBorder(0, 0, 0, 5)));
-        ((JLabel) f).setHorizontalAlignment(SwingConstants.RIGHT);
-
-
+            };
+            f.setBackground(isOperating ? BG_OPERATING : (!isActive ? BG_INACTIVE : BG_MAUVE));
+            f.setOpaque(true);
+            f.setBorder(BorderFactory.createCompoundBorder(bDet, BorderFactory.createEmptyBorder(0, 0, 0, 5)));
+            ((JLabel) f).setHorizontalAlignment(SwingConstants.RIGHT);
 
             f.setPreferredSize(new Dimension(60, 25));
             addField(f, compCashXOffset, y, 1, 1, 0, visible);

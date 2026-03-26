@@ -634,8 +634,7 @@ public class OperatingRound extends Round implements Observer {
      * =======================================
      */
 
-    // [REPLACE this existing method]
-    protected boolean setNextOperatingCompany(boolean initial) {
+protected boolean setNextOperatingCompany(boolean initial) {
 
         while (true) {
             if (initial || operatingCompany == null || operatingCompany.value() == null) {
@@ -659,6 +658,7 @@ public class OperatingRound extends Round implements Observer {
         }
     }
 
+    
     /**
      * Insert a newly formed company that is allowed to operate
      * into the current list of operating companies at the proper spot:
