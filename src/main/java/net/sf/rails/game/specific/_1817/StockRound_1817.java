@@ -519,11 +519,7 @@ if (currentPlayer != null && !hasActed.value()) {
         return super.checkAgainstHoldLimit(player, company, number);
     }
 
-    // ... (lines of unchanged context code) ...
-    private void setupCompanyActions(PublicCompany company) {
-        log.info("M&A ROUND: setupCompanyActions() invoked for " + company.getId());
 
-    }
 
     @Override
     public boolean process(rails.game.action.PossibleAction action) {
