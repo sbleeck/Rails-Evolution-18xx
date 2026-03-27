@@ -239,8 +239,8 @@ if (treasuryShare != null) {
         // 1817: IPOs are based on Purchasing Power (Cash + Private Base Prices), not
         // just Cash.
         // Minimum bid for a 2-share at $50 is $100.
-        if (currentPlayer != null) {
-            int purchasingPower = currentPlayer.getCashValue();
+if (currentPlayer != null && !hasActed.value()) {
+                int purchasingPower = currentPlayer.getCashValue();
             for (net.sf.rails.game.PrivateCompany pc : currentPlayer.getPortfolioModel().getPrivateCompanies()) {
                 purchasingPower += pc.getBasePrice();
             }
@@ -461,9 +461,7 @@ if (treasuryShare != null) {
                 // shares
                 companyBoughtThisTurnWrapper.set(comp);
 
-                // 3. Mark that the player has acted
-                hasActed.set(true);
-                return true;
+
 
             }
         }
@@ -487,7 +485,6 @@ if (treasuryShare != null) {
                             comp.getId() + " buys one share from the open market for "
                                     + net.sf.rails.game.financial.Bank.format(this, price));
 
-                    hasActed.set(true);
                     companyBoughtThisTurnWrapper.set(comp);
                     return true;
                 }

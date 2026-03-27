@@ -60,11 +60,22 @@ public class LinearRoundTracker extends JComponent {
             Object roundObj = gameUIManager.getGameManager().getCurrentRound();
             String roundName = roundObj.getClass().getSimpleName();
 
+            org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(LinearRoundTracker.class);
+            log.info("LRT_DEBUG: Current Round = " + roundName + ", cachedTimeline size = " + cachedTimeline.size()
+                    + ", persistentTimeline size = " + persistentTimeline.size());
+
             // --- STEP 1: DETECT SPECIAL ROUNDS (FREEZE) ---
-            if (roundName.contains("Prussian") || roundName.contains("Formation")) {
+            if (roundName.contains("Prussian") || roundName.contains("Formation") || roundName.contains("Auction")
+                    || roundName.contains("ShareSelling")) {
+                log.info("LRT_DEBUG: Special round detected. Attempting to freeze timeline.");
                 if (!cachedTimeline.isEmpty()) {
+                    log.info("LRT_DEBUG: Freeze SUCCESSFUL. Retaining static timeline state.");
                     return; // FREEZE SUCCESSFUL: We kept the restored static data
+                } else {
+                    log.info("LRT_DEBUG: Freeze FAILED. cachedTimeline is empty.");
                 }
+            } else {
+                log.info("LRT_DEBUG: Not a freeze round. Proceeding to standard rebuild.");
             }
 
             // --- STEP 2: STANDARD REBUILD ---
@@ -72,14 +83,14 @@ public class LinearRoundTracker extends JComponent {
             cachedActiveIndex = -1;
             PublicCompany activeComp = null;
 
-
             boolean isOperatingType = false;
 
             if (roundObj instanceof OperatingRound) {
                 // Operating Round: Use Engine Order
                 OperatingRound or = (OperatingRound) roundObj;
                 List<PublicCompany> sorted = or.getOperatingCompanies();
-                if (sorted != null) cachedTimeline.addAll(sorted);
+                if (sorted != null)
+                    cachedTimeline.addAll(sorted);
                 activeComp = or.getOperatingCompany();
                 isOperatingType = true;
             } else {
@@ -102,21 +113,33 @@ public class LinearRoundTracker extends JComponent {
 
             if (!isOperatingType) {
                 // Stock Round: Predict Order
+                List<PublicCompany> minorsList = new ArrayList<>();
+                List<PublicCompany> majorsList = new ArrayList<>();
+                List<PublicCompany> unfloatedList = new ArrayList<>();
+
                 for (PublicCompany c : companies) {
-                    if (!c.isClosed() && c.hasFloated()) {
-                        cachedTimeline.add(c);
+                    if (c.isClosed())
+                        continue;
+
+                    boolean isEffectivelyActive = c.hasFloated() || (c.getPresidentsShare() != null
+                            && c.getPresidentsShare().getOwner() instanceof net.sf.rails.game.Player);
+
+                    if (isEffectivelyActive) {
+                        if (!c.hasFloated()) {
+                            unfloatedList.add(c);
+                        } else if (!c.hasStockPrice()) {
+                            minorsList.add(c);
+                        } else {
+                            majorsList.add(c);
+                        }
                     }
                 }
-                Collections.sort(cachedTimeline, (c1, c2) -> {
-                    boolean c1Minor = !c1.hasStockPrice();
-                    boolean c2Minor = !c2.hasStockPrice();
-                    if (c1Minor && !c2Minor)
-                        return -1;
-                    if (!c1Minor && c2Minor)
-                        return 1;
-                    if (c1Minor)
-                        return Integer.compare(c1.getPublicNumber(), c2.getPublicNumber());
 
+                Collections.sort(minorsList, (c1, c2) -> Integer.compare(c1.getPublicNumber(), c2.getPublicNumber()));
+                Collections.sort(unfloatedList,
+                        (c1, c2) -> Integer.compare(c1.getPublicNumber(), c2.getPublicNumber()));
+
+                Collections.sort(majorsList, (c1, c2) -> {
                     int p1 = c1.getCurrentSpace() != null ? c1.getCurrentSpace().getPrice()
                             : (c1.getStartSpace() != null ? c1.getStartSpace().getPrice() : 0);
                     int p2 = c2.getCurrentSpace() != null ? c2.getCurrentSpace().getPrice()
@@ -126,11 +149,18 @@ public class LinearRoundTracker extends JComponent {
                         return Integer.compare(p2, p1);
                     return Integer.compare(c1.getPublicNumber(), c2.getPublicNumber());
                 });
+
+                cachedTimeline.addAll(minorsList);
+                cachedTimeline.addAll(majorsList);
+                cachedTimeline.addAll(unfloatedList);
             }
 
             // Generic fallback for activeComp if reflection failed but GUI actions exist
-            if (activeComp == null && gameUIManager.getGameManager().getPossibleActions() != null) {
-                for (rails.game.action.PossibleAction pa : gameUIManager.getGameManager().getPossibleActions().getList()) {
+            // CRITICAL FIX: Only run this during actual operating rounds to prevent the
+            // train from spuriously jumping to companies during Stock Round IPOs.
+            if (isOperatingType && activeComp == null && gameUIManager.getGameManager().getPossibleActions() != null) {
+                for (rails.game.action.PossibleAction pa : gameUIManager.getGameManager().getPossibleActions()
+                        .getList()) {
                     if (pa instanceof rails.game.action.GuiTargetedAction) {
                         net.sf.rails.game.state.Owner actor = ((rails.game.action.GuiTargetedAction) pa).getActor();
                         if (actor instanceof PublicCompany) {
@@ -140,7 +170,7 @@ public class LinearRoundTracker extends JComponent {
                     }
                 }
             }
-            
+
             // Find Index
             if (activeComp != null) {
                 for (int i = 0; i < cachedTimeline.size(); i++) {

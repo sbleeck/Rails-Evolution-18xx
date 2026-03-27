@@ -144,6 +144,11 @@ net.sf.rails.common.ReportBuffer.add(this, "--- " + type + " AUCTION: " + compan
         return activeBidders.get(index);
     }
 
+@Override
+    public Player getCurrentPlayer() {
+        return getActingPlayer();
+    }
+
     @Override
     public boolean setPossibleActions() {
         possibleActions.clear();

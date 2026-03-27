@@ -83,6 +83,36 @@ public class StartRound_1817 extends StartRound {
     }
 
     @Override
+    protected void finishRound() {
+        // 1817 Rule: All unsold private companies are removed from the game.
+        for (StartItem item : itemsToSell.view()) {
+            if (!item.isSold()) {
+                item.setStatus(StartItem.SOLD);
+            }
+        }
+
+        // 1817 Rule: Any remaining seed money is returned to the bank.
+        if (seedMoney.value() > 0) {
+            seedMoney.set(0);
+        }
+
+        super.finishRound();
+
+        // 1817 Rule: Priority deal goes to the player to the left of the last
+        // initiator.
+        if (lastInitiator.value() != null) {
+            Player pdPlayer = null;
+            for (Player p : playerManager.getNextPlayersAfter(lastInitiator.value(), false, false)) {
+                pdPlayer = p;
+                break;
+            }
+            if (pdPlayer != null) {
+                playerManager.setPriorityPlayer(pdPlayer);
+            }
+        }
+    }
+
+    @Override
     protected void assignItem(Player player, StartItem item, int price, int bPrice) {
 
         for (Player p : playerManager.getPlayers()) {

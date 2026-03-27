@@ -2615,7 +2615,7 @@ public Integer getRoundStart(int currentIndex) {
         // the dialog box. We must also populate correction/undo actions
         // to prevent the UI from getting stuck if the dialog is closed.
         possibleActions.clear();
-        endRound.setPossibleActions();
+        // endRound.setPossibleActions();
         setCorrectionActions(); // Add corrections (e.g., Undo/Redo)
 
         ChangeStack changeStack = getRoot().getStateManager().getChangeStack();
@@ -3132,8 +3132,13 @@ public Integer getRoundStart(int currentIndex) {
         return getRoot().getPlayerManager().getPlayerCertificateLimit(player);
     }
 
+
     // shortcut to PlayerManager
     public Player getCurrentPlayer() {
+        RoundFacade round = getCurrentRound();
+        if (round != null && round.getCurrentPlayer() != null) {
+            return round.getCurrentPlayer();
+        }
         return getRoot().getPlayerManager().getCurrentPlayer();
     }
 

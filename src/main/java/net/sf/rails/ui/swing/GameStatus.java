@@ -858,8 +858,8 @@ public class GameStatus extends GridPanel {
 
         int currentActor = -1;
 
-        if (players != null && players.getCurrentPlayer() != null) {
-            currentActor = players.getCurrentPlayer().getIndex();
+ if (gameUIManager != null && gameUIManager.getGameManager() != null && gameUIManager.getGameManager().getCurrentPlayer() != null) {
+            currentActor = gameUIManager.getGameManager().getCurrentPlayer().getIndex();
         } else {
             currentActor = this.actorIndex;
         }
@@ -1533,6 +1533,12 @@ public class GameStatus extends GridPanel {
 
     private java.util.List<String> previousDashboardSignature = new java.util.ArrayList<>();
 
+    private boolean isMarketOrAuctionRound(net.sf.rails.game.round.RoundFacade round) {
+if (round == null) return false;
+        return round instanceof net.sf.rails.game.financial.StockRound
+            || round instanceof net.sf.rails.game.specific._1817.AuctionRound_1817;
+    }
+
     public void refreshDashboard() {
         if (!javax.swing.SwingUtilities.isEventDispatchThread()) {
             javax.swing.SwingUtilities.invokeLater(this::refreshDashboard);
@@ -1587,8 +1593,8 @@ public class GameStatus extends GridPanel {
 java.util.List<PublicCompany> displayList = new java.util.ArrayList<>();
         java.util.List<PublicCompany> inactiveList = new java.util.ArrayList<>();
 
-        net.sf.rails.game.round.RoundFacade currentRoundForDisplay = gameUIManager.getGameManager().getCurrentRound();
-        boolean isStockRound = currentRoundForDisplay instanceof net.sf.rails.game.financial.StockRound;
+net.sf.rails.game.round.RoundFacade currentRoundForDisplay = gameUIManager.getGameManager().getCurrentRound();
+        boolean isStockRound = isMarketOrAuctionRound(currentRoundForDisplay);
 
         for (PublicCompany c : allCompanies) {
             originalOrder.put(c, orderIndex++);
@@ -1689,9 +1695,9 @@ java.util.List<PublicCompany> displayList = new java.util.ArrayList<>();
         }
 
         int currentActor = -1;
-        if (players != null && players.getCurrentPlayer() != null) {
-            currentActor = players.getCurrentPlayer().getIndex();
-        } else {
+ if (gameUIManager != null && gameUIManager.getGameManager() != null && gameUIManager.getGameManager().getCurrentPlayer() != null) {
+            currentActor = gameUIManager.getGameManager().getCurrentPlayer().getIndex();
+                } else {
             currentActor = this.actorIndex;
         }
 
@@ -2767,8 +2773,8 @@ java.util.List<PublicCompany> displayList = new java.util.ArrayList<>();
             }
         }
 
-        net.sf.rails.game.round.RoundFacade currentRound = gameUIManager.getGameManager().getCurrentRound();
-        boolean isStockRound = currentRound instanceof net.sf.rails.game.financial.StockRound;
+net.sf.rails.game.round.RoundFacade currentRound = gameUIManager.getGameManager().getCurrentRound();
+        boolean isStockRound = isMarketOrAuctionRound(currentRound);
 
         // 1. ITERATE COMPANIES (Rows)
         for (cIdx = 0; cIdx < nc; cIdx++) {
@@ -4299,8 +4305,9 @@ int actual_nc = 0;
         int actual_nb = 0;
         java.util.List<PublicCompany> gridList = new java.util.ArrayList<>();
         java.util.List<PublicCompany> inactiveGridList = new java.util.ArrayList<>();
+
         net.sf.rails.game.round.RoundFacade currentRoundForFields = gameUIManager.getGameManager().getCurrentRound();
-        boolean isStockRoundFields = currentRoundForFields instanceof net.sf.rails.game.financial.StockRound;
+        boolean isStockRoundFields = isMarketOrAuctionRound(currentRoundForFields);
 
         if (companies != null) {
             for (PublicCompany c : companies) {
@@ -4518,8 +4525,10 @@ int actual_nc = 0;
        
      java.util.List<PublicCompany> displayList = new java.util.ArrayList<>();
         java.util.List<PublicCompany> inactiveList = new java.util.ArrayList<>();
-        net.sf.rails.game.round.RoundFacade currentRound = gameUIManager.getGameManager().getCurrentRound();
-        boolean isStockRound = currentRound instanceof net.sf.rails.game.financial.StockRound;
+
+
+net.sf.rails.game.round.RoundFacade currentRound = gameUIManager.getGameManager().getCurrentRound();
+        boolean isStockRound = isMarketOrAuctionRound(currentRound);
 
         for (PublicCompany c : gameUIManager.getAllPublicCompanies()) {
             if (c.isClosed()) continue;
@@ -4547,11 +4556,17 @@ int actual_nc = 0;
                 initOrderLog.append(comp.getId()).append(", ");
             }
         }
-        java.util.List<PublicCompany> minorsList = new java.util.ArrayList<>();
+
+
+java.util.List<PublicCompany> minorsList = new java.util.ArrayList<>();
         java.util.List<PublicCompany> majorsList = new java.util.ArrayList<>();
+        java.util.List<PublicCompany> unfloatedList = new java.util.ArrayList<>();
 
         for (PublicCompany c : displayList) {
-            if (!c.hasStockPrice()) {
+            boolean isEffectivelyActive = c.hasFloated() || (c.getPresidentsShare() != null && c.getPresidentsShare().getOwner() instanceof Player);
+            if (!isEffectivelyActive) {
+                unfloatedList.add(c);
+            } else if (!c.hasStockPrice()) {
                 minorsList.add(c);
             } else {
                 majorsList.add(c);
@@ -4560,6 +4575,7 @@ int actual_nc = 0;
 
         // Minors maintain static creation order
         java.util.Collections.sort(minorsList, (c1, c2) -> Integer.compare(c1.getPublicNumber(), c2.getPublicNumber()));
+        java.util.Collections.sort(unfloatedList, (c1, c2) -> Integer.compare(c1.getPublicNumber(), c2.getPublicNumber()));
 
         // Majors strictly follow the engine's authoritative order
         java.util.Collections.sort(majorsList, (c1, c2) -> {
@@ -4578,6 +4594,13 @@ int actual_nc = 0;
         displayList.clear();
         displayList.addAll(minorsList);
         displayList.addAll(majorsList);
+        displayList.addAll(unfloatedList);
+
+
+
+
+
+
 
 // Append Padding (Inactive) Companies to the BOTTOM
         if (!isStockRound && displayList.size() < 10) {
@@ -4617,9 +4640,8 @@ int actual_nc = 0;
 
             boolean isMinor = !c.hasStockPrice();
             boolean isOperating = (c == operatingComp);
-            boolean isSR = gameUIManager.getGameManager()
-                    .getCurrentRound() instanceof net.sf.rails.game.financial.StockRound;
-            boolean hasOwner = c.getPresidentsShare() != null && c.getPresidentsShare().getOwner() instanceof Player;
+   boolean isSR = isMarketOrAuctionRound(gameUIManager.getGameManager().getCurrentRound());
+             boolean hasOwner = c.getPresidentsShare() != null && c.getPresidentsShare().getOwner() instanceof Player;
 
             boolean isActive;
             if (isSR) {
@@ -4894,7 +4916,7 @@ int actual_nc = 0;
            f = compRevenue[i] = new Field(c.getLastRevenueModel()) {
                 @Override
                 public void setText(String t) {
-                    boolean isSR = gameUIManager.getGameManager().getCurrentRound() instanceof net.sf.rails.game.financial.StockRound;
+boolean isSR = isMarketOrAuctionRound(gameUIManager.getGameManager().getCurrentRound());
                     boolean isEffectivelyActive = c.hasFloated() || (c.getPresidentsShare() != null && c.getPresidentsShare().getOwner() instanceof Player);
                     if (!isSR && !isEffectivelyActive) {
                         super.setText("");
@@ -4923,7 +4945,7 @@ int actual_nc = 0;
            f = compRetained[i] = new Field(c.getLastRevenueModel()) {
                 @Override
                 public void setText(String t) {
-                    boolean isSR = gameUIManager.getGameManager().getCurrentRound() instanceof net.sf.rails.game.financial.StockRound;
+boolean isSR = isMarketOrAuctionRound(gameUIManager.getGameManager().getCurrentRound());
                     boolean isEffectivelyActive = c.hasFloated() || (c.getPresidentsShare() != null && c.getPresidentsShare().getOwner() instanceof Player);
                     if (!isSR && !isEffectivelyActive) {
                         super.setText("");
@@ -4937,7 +4959,7 @@ int actual_nc = 0;
                 }
             };
 
-            
+
             f.setBackground(isOperating ? BG_OPERATING : (!isActive ? BG_INACTIVE : BG_MAUVE));
             f.setOpaque(true);
             f.setBorder(BorderFactory.createCompoundBorder(bDet, BorderFactory.createEmptyBorder(0, 0, 0, 5)));

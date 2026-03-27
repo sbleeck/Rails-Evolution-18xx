@@ -1727,10 +1727,10 @@ currentRoundName = "Game Start";
                         } else {
                             return; // No tick between OR turns
                         }
-                    } else if (currentRound instanceof StockRound || currentRound instanceof StartRound) {
-                        // In SR or IR, time ticks for the player whose turn it currently is
+ } else if (currentRound instanceof StockRound || currentRound instanceof StartRound || (currentRound != null && currentRound.getCurrentPlayer() != null)) {
+                        // In SR or IR, or any round reporting a current player, time ticks for that player
                         playerWhoseTimeTicks = railsRoot.getGameManager().getCurrentPlayer();
-                    } else {
+                                        } else {
                         return; // No tick for other round types for now
                     }
 

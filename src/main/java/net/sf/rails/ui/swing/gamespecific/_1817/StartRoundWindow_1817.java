@@ -22,6 +22,30 @@ public class StartRoundWindow_1817 extends StartRoundWindow {
     }
 
     @Override
+public void setSRPlayerTurn() {
+// Allow superclass to clear old highlights and set new ones
+super.setSRPlayerTurn();
+
+    int playerIndex = players.getCurrentPlayer().getIndex();
+    
+    for (int i = 0; i < players.getNumberOfPlayers(); i++) {
+        if (i == playerIndex) {
+            // Apply green background to the active player's upper and lower captions
+            for (int j = 0; j < numberOfColumns; j++) {
+                if (upperPlayerCaption != null && upperPlayerCaption[j][i] != null) {
+                    upperPlayerCaption[j][i].setBackground(java.awt.Color.GREEN);
+                    upperPlayerCaption[j][i].setOpaque(true);
+                }
+            }
+            if (lowerPlayerCaption != null && lowerPlayerCaption[i] != null) {
+                lowerPlayerCaption[i].setBackground(java.awt.Color.GREEN);
+                lowerPlayerCaption[i].setOpaque(true);
+            }
+        }
+    }
+}
+
+    @Override
     protected void initCells() {
         super.initCells();
 
@@ -64,6 +88,7 @@ public class StartRoundWindow_1817 extends StartRoundWindow {
     public void updateStatus(boolean myTurn) {
         super.updateStatus(myTurn);
         forceMinimumBids();
+        
     }
 
     private void forceMinimumBids() {

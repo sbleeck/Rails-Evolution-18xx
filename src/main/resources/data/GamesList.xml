@@ -6,7 +6,7 @@
 
 
 <Game name="1817">
-		<Note>in development</Note>
+		<Note>fully playable</Note>
 		<Description>1817 - 
 		the ultimate stock market game
 		</Description>
@@ -262,7 +262,7 @@ Game variants:
 	</Game>
 
 	<Game name="18Chesapeake">
-		<Note>not yet playable - Tests needed</Note>
+		<Note>fully playable </Note>
 		<Description> 18Chesapeake - North East USA
 			(c) 2019 Scott Pedersen    </Description>
 		<Players minimum = "2" maximum = "6" />

@@ -361,6 +361,12 @@ public /* abstract */ class Round extends RailsAbstractItem implements RoundFaca
         return possibleActions.getList();
     }// File: Round.java
 
+
+    @Override
+    public Player getCurrentPlayer() {
+        return null;
+    }
+    
     /**
      * Generates individual discard actions for every physical train.
      * This resolves the bug where "2" and "2+" were conflated and

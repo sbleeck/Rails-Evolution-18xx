@@ -78,6 +78,13 @@ public class WorthChartWindow extends JDialog {
         relativePanel = new WorthChartPanel(data, true, revealController);
         relativePanel.setPreferredSize(new Dimension(1100, 500));
         
+        relativePanel.addMouseListener(new java.awt.event.MouseAdapter() {
+            @Override
+            public void mousePressed(java.awt.event.MouseEvent e) {
+                stepReveal(1); // Advance on any mouse click
+            }
+        });
+
         // Bottom: Table
         tableScroll = createSummaryTableSetup();
         tableScroll.setVisible(false); // HIDDEN INITIALLY
@@ -287,17 +294,28 @@ public class WorthChartWindow extends JDialog {
         nextButton.setEnabled(tableVisible && revealController.canReveal());
     }
 
-    private void setupHotkeys() {
+private void setupHotkeys() {
         JRootPane rootPane = this.getRootPane();
         InputMap inputMap = rootPane.getInputMap(JComponent.WHEN_IN_FOCUSED_WINDOW);
         ActionMap actionMap = rootPane.getActionMap();
 
-        inputMap.put(KeyStroke.getKeyStroke(java.awt.event.KeyEvent.VK_SPACE, 0), "next");
+        // Keep specific navigation for Arrows
         inputMap.put(KeyStroke.getKeyStroke(java.awt.event.KeyEvent.VK_RIGHT, 0), "next");
         inputMap.put(KeyStroke.getKeyStroke(java.awt.event.KeyEvent.VK_LEFT, 0), "prev");
         
         actionMap.put("next", new AbstractAction() { @Override public void actionPerformed(java.awt.event.ActionEvent e) { stepReveal(1); } });
         actionMap.put("prev", new AbstractAction() { @Override public void actionPerformed(java.awt.event.ActionEvent e) { stepReveal(-1); } });
+
+        // Add "Any Key" support using a KeyListener
+        this.addKeyListener(new java.awt.event.KeyAdapter() {
+            @Override
+            public void keyPressed(java.awt.event.KeyEvent e) {
+                // If it's not the left arrow (which we want for "back"), any key advances
+                if (e.getKeyCode() != java.awt.event.KeyEvent.VK_LEFT) {
+                    stepReveal(1);
+                }
+            }
+        });
     }
 
     public void revealNextRound() { stepReveal(1); }
