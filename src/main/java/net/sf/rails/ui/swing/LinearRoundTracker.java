@@ -61,21 +61,15 @@ public class LinearRoundTracker extends JComponent {
             String roundName = roundObj.getClass().getSimpleName();
 
             org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(LinearRoundTracker.class);
-            log.info("LRT_DEBUG: Current Round = " + roundName + ", cachedTimeline size = " + cachedTimeline.size()
-                    + ", persistentTimeline size = " + persistentTimeline.size());
 
             // --- STEP 1: DETECT SPECIAL ROUNDS (FREEZE) ---
             if (roundName.contains("Prussian") || roundName.contains("Formation") || roundName.contains("Auction")
                     || roundName.contains("ShareSelling")) {
-                log.info("LRT_DEBUG: Special round detected. Attempting to freeze timeline.");
                 if (!cachedTimeline.isEmpty()) {
-                    log.info("LRT_DEBUG: Freeze SUCCESSFUL. Retaining static timeline state.");
                     return; // FREEZE SUCCESSFUL: We kept the restored static data
                 } else {
-                    log.info("LRT_DEBUG: Freeze FAILED. cachedTimeline is empty.");
                 }
             } else {
-                log.info("LRT_DEBUG: Not a freeze round. Proceeding to standard rebuild.");
             }
 
             // --- STEP 2: STANDARD REBUILD ---
