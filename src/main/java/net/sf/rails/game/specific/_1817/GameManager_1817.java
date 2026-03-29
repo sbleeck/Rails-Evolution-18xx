@@ -185,7 +185,7 @@ if (bondsModel == null) {
 
     /**
      * Calculates the true net worth for 1817: Cash + Long Stock - Short Stock.
-     * Company assets and private companies count for nothing[cite: 898].
+     * Company assets and private companies count for nothing
      */
     public int get1817PlayerWorth(net.sf.rails.game.Player p) {
         int worth = p.getCash();

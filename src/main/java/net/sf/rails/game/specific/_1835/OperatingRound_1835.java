@@ -1351,7 +1351,7 @@ GameDef.OrStep step = getStep();
         forceCleanupGhosts();
         PublicCompany company = action.getCompany();
 
-        // Snapshots for PfB state restoration [cite: 10, 26]
+        // Snapshots for PfB state restoration 
         boolean wasNormalLaid = normalTileLaidThisTurn.value();
         GameDef.OrStep stepBefore = getStep();
         Map<String, Integer> laysSnapshot = new HashMap<>();
@@ -1461,24 +1461,22 @@ GameDef.OrStep step = getStep();
     }
 
     /**
-     * Diagnostic helper class to snapshot the absolute "Baden Situation". [cite: 1,
-     * 2]
-     */
+     * Diagnostic helper class to snapshot the absolute "Baden Situation".     */
     private class BadenContext {
         // Absolute Map & Company State (Permanent)
-        boolean baFloated; // True if BA has started/floated [cite: 17]
-        boolean isL6Preprinted; // True if NO tile has been laid yet (Map default) [cite: 4]
-        boolean hasL6Tile; // True if a physical tile has been laid (by anyone) [cite: 18, 30]
+        boolean baFloated; // True if BA has started/floated 
+        boolean isL6Preprinted; // True if NO tile has been laid yet (Map default)
+        boolean hasL6Tile; // True if a physical tile has been laid (by anyone)
         boolean baHasL6Token; // True strictly if BA owns a token on L6
 
         // Turn/Actor Context (Who is causing the check)
         String activeCompanyId; // The company currently operating
         boolean isBadenOperating; // True if BA is the active company
 
-        // PfB Status [cite: 10]
-        boolean pfbClosed; // True if PfB is definitively closed [cite: 52]
+        // PfB Statu
+        boolean pfbClosed; // True if PfB is definitively closed
         boolean pfbOwnedByActive; // True if active company president owns PfB
-        boolean pfbOwnedByBaden; // True if BA's president owns PfB [cite: 22]
+        boolean pfbOwnedByBaden; // True if BA's president owns PfB
 
         @Override
         public String toString() {
@@ -1494,7 +1492,7 @@ GameDef.OrStep step = getStep();
      * Scans the absolute map and permanent company state to determine the exact
      * scenario for Baden.
      * This is decoupled from transient Operating Round flags to prevent
-     * round-restart bugs[cite: 57].
+     * round-restart bugs
      */
     private BadenContext getBadenStatus() {
         BadenContext ctx = new BadenContext();

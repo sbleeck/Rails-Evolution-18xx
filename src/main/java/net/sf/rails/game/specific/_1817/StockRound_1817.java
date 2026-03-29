@@ -42,6 +42,16 @@ public class StockRound_1817 extends StockRound {
 
     protected final net.sf.rails.game.state.ArrayListState<String> ipoedThisRound;
 
+    // State variables to enforce strict 1817 stock round sequence
+    protected final net.sf.rails.game.state.BooleanState playerHasSold;
+    protected final net.sf.rails.game.state.BooleanState playerHasShorted;
+    protected final net.sf.rails.game.state.BooleanState playerHasBoughtOrIPOed;
+
+    // State variables to enforce mutual exclusivity and company action sequence
+    protected final net.sf.rails.game.state.StringState activeCompanyId;
+    protected final net.sf.rails.game.state.BooleanState companyHasTakenLoan;
+    protected final net.sf.rails.game.state.BooleanState companyHasBoughtShare;
+
     public StockRound_1817(GameManager parent, String id) {
         super(parent, id);
         waitingForE22Start = new BooleanState(this, "waitingForE22Start_" + id, false);
@@ -49,12 +59,25 @@ public class StockRound_1817 extends StockRound {
         pendingE22Bid = IntegerState.create(this, "pendingE22Bid_" + id, 0);
         shortedThisRound = net.sf.rails.game.state.HashMapState.create(this, "shortedThisRound_" + id);
         ipoedThisRound = new net.sf.rails.game.state.ArrayListState<>(this, "ipoedThisRound_" + id);
+
+        playerHasSold = new net.sf.rails.game.state.BooleanState(this, "playerHasSold_" + id, false);
+        playerHasShorted = new net.sf.rails.game.state.BooleanState(this, "playerHasShorted_" + id, false);
+        playerHasBoughtOrIPOed = new net.sf.rails.game.state.BooleanState(this, "playerHasBoughtOrIPOed_" + id, false);
+
+        activeCompanyId = net.sf.rails.game.state.StringState.create(this, "activeCompanyId_" + id, "");
+        companyHasTakenLoan = new net.sf.rails.game.state.BooleanState(this, "companyHasTakenLoan_" + id, false);
+        companyHasBoughtShare = new net.sf.rails.game.state.BooleanState(this, "companyHasBoughtShare_" + id, false);
+
     }
 
     @Override
     public void start() {
         super.start();
         shortedThisRound.clear();
+        resetPlayerTurnStates();
+        // Disable base class sold-out logic to prevent double upward movement in 1817
+        raiseIfSoldOut = false;
+
         ipoedThisRound.clear();
         // Initial certificate setup for all companies
         if (gameManager.getSRNumber() == 1) {
@@ -65,11 +88,10 @@ public class StockRound_1817 extends StockRound {
             }
         }
 
-        // 1817 Rule 7.4: Bank Market Clearing [cite: 886, 887, 888]
+        // 1817 Rule 7.4: Bank Market Clearing
         // At the start of every stock round, the bank closes any short positions
         // in the open market by purchasing stock from the company treasury.
         net.sf.rails.game.model.PortfolioModel openMarket = pool;
-        
 
         net.sf.rails.game.financial.BankPortfolio osiBank = getRoot().getBank().getOSI();
 
@@ -91,11 +113,13 @@ public class StockRound_1817 extends StockRound {
                     // Search treasury for a non-president share to close the short
                     net.sf.rails.game.financial.PublicCertificate treasuryShare = comp.getPortfolioModel()
                             .findCertificate(comp, false);
-if (treasuryShare != null) {
-                        net.sf.rails.game.financial.BankPortfolio unavailableBank = getRoot().getBank().getUnavailable();
+                    if (treasuryShare != null) {
+                        net.sf.rails.game.financial.BankPortfolio unavailableBank = getRoot().getBank()
+                                .getUnavailable();
                         shortCert.moveTo(osiBank);
                         treasuryShare.moveTo(unavailableBank);
-                        log.info("Bank auto-closed orphaned short share for " + comp.getId() + " using treasury stock.");
+                        log.info(
+                                "Bank auto-closed orphaned short share for " + comp.getId() + " using treasury stock.");
                     } else {
                         keepClearing = false;
                     }
@@ -105,8 +129,8 @@ if (treasuryShare != null) {
             }
         }
 
-
     }
+
 
     @Override
     public void setBuyableCerts() {
@@ -121,186 +145,191 @@ if (treasuryShare != null) {
             }
             return;
         }
+        
         super.setBuyableCerts();
 
         if (possibleActions == null)
             return;
 
-        // 1817: Players can take loans for companies they lead during their Stock Round
-        // turn
         net.sf.rails.game.Player currentPlayer = gameManager.getCurrentPlayer();
-        if (currentPlayer != null) {
-            for (PublicCompany comp : gameManager.getAllPublicCompanies()) {
-                // If player is president and company has loan capacity
-                if (comp.getPresident() == currentPlayer && !comp.isClosed()) {
-                    // Capped by share count (2, 5, or 10)
-                    int maxLoans = (comp instanceof PublicCompany_1817) ? ((PublicCompany_1817) comp).getShareCount()
-                            : 0;
-                    if (comp.getNumberOfBonds() < maxLoans) {
-                        possibleActions.add(new TakeLoans_1817(getRoot(), comp.getId()));
-                    }
-                }
+        if (currentPlayer == null) return;
 
-                // 1817: Players can short sell companies under strict conditions
-                if (comp instanceof PublicCompany_1817 && !comp.isClosed()) {
-                    PublicCompany_1817 comp1817 = (PublicCompany_1817) comp;
+// --- START FIX ---
+        String activeComp = activeCompanyId.value();
+        boolean actingForSelf = (activeComp == null || activeComp.isEmpty());
+        boolean actingForCompany = !actingForSelf;
+        boolean noPersonalActions = !playerHasSold.value() && !playerHasShorted.value() && !playerHasBoughtOrIPOed.value();
 
-                    // 1. Must be a 5-share or 10-share company
-                    boolean isLargeEnough = comp1817.getShareCount() > 2;
-
-                    // 2. Player must own zero REGULAR shares (Short shares don't block shorting)
-                    int regularSharesOwned = 0;
-                    for (net.sf.rails.game.financial.PublicCertificate c : currentPlayer.getPortfolioModel()
-                            .getCertificates()) {
-                        if (!(c instanceof net.sf.rails.game.specific._1817.ShortCertificate)
-                                && c.getCompany() == comp) {
-                            regularSharesOwned++;
-                        }
-                    }
-                    boolean ownsZeroShares = (regularSharesOwned == 0);
-
-                    // 3. Max 5 short shares in play (Rule 5.3)
-                    int activeShorts = 0;
-                    int availableShorts = 0;
-
-                    net.sf.rails.game.model.PortfolioModel osiPortfolio = getRoot().getBank().getOSI().getPortfolioModel();
-                    for (net.sf.rails.game.financial.PublicCertificate c : osiPortfolio.getCertificates()) {
-                        if (c instanceof net.sf.rails.game.specific._1817.ShortCertificate
-                                && c.getCompany() == comp1817) {
-                            availableShorts++;
-                        }
-                    }
-
-                    // Count Available Shorts (Iterate through the Bank's Unavailable Portfolio)
-                    // This is exactly where you moved them in
-                    // PublicCompany_1817.finishConfiguration()
-                    net.sf.rails.game.model.PortfolioModel unavailablePortfolio = getRoot().getBank().getUnavailable()
-                            .getPortfolioModel();
-                    for (net.sf.rails.game.financial.PublicCertificate c : unavailablePortfolio.getCertificates()) {
-                        if (c instanceof net.sf.rails.game.specific._1817.ShortCertificate
-                                && c.getCompany() == comp1817) {
-                            availableShorts++;
-                        }
-                    }
-
-                    // Count Active Shorts (Iterate through all players to find issued short certs)
-                    for (net.sf.rails.game.Player p : getRoot().getPlayerManager().getPlayers()) {
-                        for (net.sf.rails.game.financial.PublicCertificate c : p.getPortfolioModel()
-                                .getCertificates()) {
-                            if (c instanceof net.sf.rails.game.specific._1817.ShortCertificate
-                                    && c.getCompany() == comp1817) {
-                                activeShorts++;
-                            }
-                        }
-                    }
-
-
-
-                    boolean underShortLimit = (activeShorts < 5 && availableShorts > 0);
-
-                    // 4. Prohibited in acquisition/liquidation zones
-                    boolean notInAcquisitionZone = comp.isBuyable();
-
-                    // 5. Prohibited in Phase 8 (Safely handle null phase IDs)
-                    String phaseId = (gameManager.getCurrentPhase() != null) ? gameManager.getCurrentPhase().getId()
-                            : "";
-                    boolean notPhase8 = (phaseId == null || !phaseId.startsWith("8"));
-
-                    // 6. Prohibited if IPO'd this round
-                    boolean notIpoedThisRound = !ipoedThisRound.contains(comp.getId());
-
-                    // 7. Limit to one short per turn
-                    boolean notActed = !hasActed.value();
-
-                    if (isLargeEnough && ownsZeroShares && underShortLimit && notInAcquisitionZone
-                            && notPhase8 && notIpoedThisRound && notActed) {
-
-                        possibleActions.add(new net.sf.rails.game.specific._1817.action.Short1817(gameManager.getRoot(),
-                                comp.getId()));
-                    }
-
-                }
-
-            }
-        }
-
-        // Remove default StartCompany actions generated by parent class (which rely
-        // strictly on raw cash)
+        // 1. Filter default Rails actions based on 1817 state
         List<PossibleAction> actionsToRemove = new ArrayList<>();
         for (PossibleAction action : possibleActions.getList()) {
             if (action instanceof StartCompany) {
+                // We completely replace standard StartCompany with Initiate1817IPO
                 actionsToRemove.add(action);
+            } else if (action instanceof rails.game.action.BuyCertificate) {
+                // Remove buys if player acted for a company, OR if already bought/IPOed
+                if (actingForCompany || playerHasBoughtOrIPOed.value()) {
+                    actionsToRemove.add(action);
+                } else {
+                    // Rule 5.3: Filter out BuyCertificate actions for companies shorted this round
+                    rails.game.action.BuyCertificate buyAction = (rails.game.action.BuyCertificate) action;
+                    String key = currentPlayer.getId() + "_" + buyAction.getCompany().getId();
+                    if (shortedThisRound.containsKey(key)) {
+                        actionsToRemove.add(action);
+                    }
+                }
             }
         }
         for (PossibleAction action : actionsToRemove) {
             possibleActions.remove(action);
         }
 
-        // 1817: IPOs are based on Purchasing Power (Cash + Private Base Prices), not
-        // just Cash.
-        // Minimum bid for a 2-share at $50 is $100.
-if (currentPlayer != null && !hasActed.value()) {
-                int purchasingPower = currentPlayer.getCashValue();
-            for (net.sf.rails.game.PrivateCompany pc : currentPlayer.getPortfolioModel().getPrivateCompanies()) {
-                purchasingPower += pc.getBasePrice();
-            }
+        // 2. COMPANY ACTIONS
+        if (noPersonalActions) {
+            for (PublicCompany comp : gameManager.getAllPublicCompanies()) {
+                if (actingForCompany && !comp.getId().equals(activeComp)) continue;
 
-            if (purchasingPower >= 100) {
-                for (PublicCompany comp : gameManager.getAllPublicCompanies()) {
-                    if (!comp.hasFloated() && !comp.isClosed()) {
-                        boolean alreadyAdded = false;
-                        for (PossibleAction action : possibleActions.getList()) {
-                            if (action instanceof Initiate1817IPO
-                                    && ((Initiate1817IPO) action).getCompanyName().equals(comp.getId())) {
-                                alreadyAdded = true;
-                                break;
+                if (comp.getPresident() == currentPlayer && !comp.isClosed()) {
+                    // Action 1: Take Loans (must precede buying open market stock)
+                    if (!companyHasBoughtShare.value()) {
+                        int maxLoans = (comp instanceof PublicCompany_1817) ? ((PublicCompany_1817) comp).getShareCount() : 0;
+                        if (comp.getNumberOfBonds() < maxLoans) {
+                            possibleActions.add(new TakeLoans_1817(getRoot(), comp.getId()));
+                        }
+                    }
+
+                    // Action 2: Company Buys Open Market Share
+                    if (comp.isBuyable()) {
+                        int price = comp.getMarketPrice();
+                        if (comp.getCash() >= price) {
+                            net.sf.rails.game.financial.PublicCertificate poolCert = pool.findCertificate(comp, 1, false);
+                            if (poolCert != null) {
+                                possibleActions.add(new net.sf.rails.game.specific._1817.action.CompanyBuyOpenMarketShare_1817(
+                                        gameManager.getRoot(), comp.getId(), price));
                             }
                         }
-                        if (!alreadyAdded) {
-                            possibleActions.add(new Initiate1817IPO(gameManager.getRoot(), comp.getId()));
-                        }
                     }
                 }
             }
         }
 
-        // Rule 5.3: Filter out BuyCertificate actions for companies shorted this round
-        // by the current player
-        if (currentPlayer != null) {
-            List<PossibleAction> buyActionsToRemove = new ArrayList<>();
-            for (PossibleAction action : possibleActions.getList()) {
-                if (action instanceof rails.game.action.BuyCertificate) {
-                    rails.game.action.BuyCertificate buyAction = (rails.game.action.BuyCertificate) action;
-                    String key = currentPlayer.getId() + "_" + buyAction.getCompany().getId();
-                    if (shortedThisRound.containsKey(key)) {
-                        buyActionsToRemove.add(action);
+        // 3. PLAYER ACTIONS (Short & IPO)
+        if (actingForSelf) {
+            // Short Action (Must not have Bought/IPOed, max 1 per turn)
+            if (!playerHasBoughtOrIPOed.value() && !playerHasShorted.value()) {
+                for (PublicCompany comp : gameManager.getAllPublicCompanies()) {
+                    if (comp instanceof PublicCompany_1817 && !comp.isClosed()) {
+                        PublicCompany_1817 comp1817 = (PublicCompany_1817) comp;
+                        boolean isLargeEnough = comp1817.getShareCount() > 2;
+
+                        int regularSharesOwned = 0;
+                        for (net.sf.rails.game.financial.PublicCertificate c : currentPlayer.getPortfolioModel().getCertificates()) {
+                            if (!(c instanceof net.sf.rails.game.specific._1817.ShortCertificate) && c.getCompany() == comp) {
+                                regularSharesOwned++;
+                            }
+                        }
+                        boolean ownsZeroShares = (regularSharesOwned == 0);
+
+                        int activeShorts = 0;
+                        int availableShorts = 0;
+                        net.sf.rails.game.model.PortfolioModel osiPortfolio = getRoot().getBank().getOSI().getPortfolioModel();
+                        for (net.sf.rails.game.financial.PublicCertificate c : osiPortfolio.getCertificates()) {
+                            if (c instanceof net.sf.rails.game.specific._1817.ShortCertificate && c.getCompany() == comp1817) availableShorts++;
+                        }
+                        net.sf.rails.game.model.PortfolioModel unavailablePortfolio = getRoot().getBank().getUnavailable().getPortfolioModel();
+                        for (net.sf.rails.game.financial.PublicCertificate c : unavailablePortfolio.getCertificates()) {
+                            if (c instanceof net.sf.rails.game.specific._1817.ShortCertificate && c.getCompany() == comp1817) availableShorts++;
+                        }
+                        for (net.sf.rails.game.Player p : getRoot().getPlayerManager().getPlayers()) {
+                            for (net.sf.rails.game.financial.PublicCertificate c : p.getPortfolioModel().getCertificates()) {
+                                if (c instanceof net.sf.rails.game.specific._1817.ShortCertificate && c.getCompany() == comp1817) activeShorts++;
+                            }
+                        }
+
+                        boolean underShortLimit = (activeShorts < 5 && availableShorts > 0);
+                        boolean notInAcquisitionZone = comp.isBuyable();
+                        String phaseId = (gameManager.getCurrentPhase() != null) ? gameManager.getCurrentPhase().getId() : "";
+                        boolean notPhase8 = (phaseId == null || !phaseId.startsWith("8"));
+                        boolean notIpoedThisRound = !ipoedThisRound.contains(comp.getId());
+
+                        if (isLargeEnough && ownsZeroShares && underShortLimit && notInAcquisitionZone && notPhase8 && notIpoedThisRound) {
+                            possibleActions.add(new net.sf.rails.game.specific._1817.action.Short1817(gameManager.getRoot(), comp.getId()));
+                        }
                     }
                 }
             }
-            for (PossibleAction action : buyActionsToRemove) {
-                possibleActions.remove(action);
-            }
-        }
-        // 1817 Rule 5.6: Allow companies to buy their own stock from the open market
-        // provided they are not in the red (liquidation) or gray (acquisition) areas.
-        if (currentPlayer != null) {
-            for (PublicCompany comp : gameManager.getAllPublicCompanies()) {
-                if (comp.getPresident() == currentPlayer && !comp.isClosed() && comp.isBuyable()) {
-                    int price = comp.getMarketPrice();
-                    // Check if company has enough cash and if a share exists in the pool
-                    if (comp.getCash() >= price) {
-                        net.sf.rails.game.financial.PublicCertificate poolCert = pool.findCertificate(comp, 1, false);
-                        if (poolCert != null) {
-                            possibleActions
-                                    .add(new net.sf.rails.game.specific._1817.action.CompanyBuyOpenMarketShare_1817(
-                                            gameManager.getRoot(), comp.getId(), price));
+
+            // IPO Action (Replaces standard Buy, cannot happen if already bought/IPOed)
+            if (!playerHasBoughtOrIPOed.value()) {
+
+                // Rule 5.5: Purchasing power = cash + face value of privates [cite: 516, 518]
+                int purchasingPower = currentPlayer.getCash();
+                for (net.sf.rails.game.PrivateCompany pc : currentPlayer.getPortfolioModel().getPrivateCompanies()) {
+                    purchasingPower += pc.getBasePrice(); // face value [cite: 517]
+                }
+
+                // Minimum starting bid for an IPO is $100 
+                if (purchasingPower >= 100) {
+                    
+                    for (PublicCompany comp : gameManager.getAllPublicCompanies()) {
+                        if (!comp.hasFloated() && !comp.isClosed()) {
+                            boolean alreadyAdded = false;
+                            for (PossibleAction action : possibleActions.getList()) {
+                                if (action instanceof Initiate1817IPO && ((Initiate1817IPO) action).getCompanyName().equals(comp.getId())) {
+                                    alreadyAdded = true;
+                                    break;
+                                }
+                            }
+                            if (!alreadyAdded) {
+                                possibleActions.add(new Initiate1817IPO(gameManager.getRoot(), comp.getId()));
+                            }
                         }
                     }
                 }
             }
         }
-
     }
+
+    @Override
+    public boolean mayCurrentPlayerSellAnything() {
+        if (!super.mayCurrentPlayerSellAnything()) {
+            return false;
+        }
+
+        // Rule: Cannot sell personal shares if acting for a company
+        String activeComp = activeCompanyId.value();
+        if (activeComp != null && !activeComp.isEmpty()) {
+            return false;
+        }
+
+        // Rule: Sequence is strictly Sell -> Short -> Buy/IPO. 
+        // Cannot sell if already shorted or bought/IPOed.
+        if (playerHasShorted.value() || playerHasBoughtOrIPOed.value()) {
+            return false;
+        }
+
+        return true;
+    }
+
+    @Override
+    public boolean sellShares(rails.game.action.SellShares action) {
+        boolean result = super.sellShares(action);
+        if (result) {
+            playerHasSold.set(true);
+        }
+        return result;
+    }
+
+    @Override
+    public boolean buyShares(String playerName, rails.game.action.BuyCertificate action) {
+        boolean result = super.buyShares(playerName, action);
+        if (result) {
+            playerHasBoughtOrIPOed.set(true);
+        }
+        return result;
+    }
+
+
 
     public void registerIpo(String compId) {
         ipoedThisRound.add(compId);
@@ -333,6 +362,11 @@ if (currentPlayer != null && !hasActed.value()) {
             }
         }
 
+        // Rule 5.2: Shares in a company may not be sold during the stock round it formed via IPO.
+        if (ipoedThisRound.contains(company.getId())) {
+            return false;
+        }
+
         // Rule 5.3: Short certificates are liabilities, not sellable assets.
         // Due to Mandatory Reconciliation, if a player holds a short, they hold NO
         // regular shares.
@@ -349,7 +383,7 @@ if (currentPlayer != null && !hasActed.value()) {
         return true;
     }
 
-    // ... (lines of unchanged context code) ...
+
     @Override
     protected boolean processGameSpecificAction(PossibleAction action) {
         if (action instanceof Initiate1817IPO) {
@@ -368,6 +402,7 @@ if (currentPlayer != null && !hasActed.value()) {
                     return true;
                 } else {
                     startAuctionRound(comp, hexId, 0, bid);
+                    playerHasBoughtOrIPOed.set(true);
                     hasActed.set(true);
                     companyBoughtThisTurnWrapper.set(comp);
                     return true;
@@ -388,6 +423,7 @@ if (currentPlayer != null && !hasActed.value()) {
 
             waitingForE22Start.set(false);
             startAuctionRound(comp, "E22", stationNumber, bid);
+            playerHasBoughtOrIPOed.set(true);
             hasActed.set(true);
             companyBoughtThisTurnWrapper.set(comp);
             return true;
@@ -402,7 +438,6 @@ if (currentPlayer != null && !hasActed.value()) {
                 // 1. Calculate price (The market price is the per-share value in 1817)
                 int price = comp.getCurrentSpace().getPrice();
 
-
                 // 2. Find the ShortCertificate to give to the player
                 net.sf.rails.game.financial.PublicCertificate shortCert = null;
                 for (net.sf.rails.game.financial.PublicCertificate c : getRoot().getBank().getOSI()
@@ -413,14 +448,15 @@ if (currentPlayer != null && !hasActed.value()) {
                     }
                 }
 
-
                 if (shortCert != null) {
                     // 3. Complete the sale: Player gets the Liability (Short Cert) and the Cash
                     shortCert.moveTo(currentPlayer.getPortfolioModel());
                     net.sf.rails.game.state.Currency.fromBank(price, currentPlayer);
 
-      // 3b. Deposit one explicitly REGULAR share from the Unavailable portfolio directly to the Open Market (Pool) to simulate the sale
-                    net.sf.rails.game.financial.PublicCertificate regCertToSell = getRoot().getBank().getUnavailable().getPortfolioModel().findCertificate(comp, 1, false);
+                    // 3b. Deposit one explicitly REGULAR share from the Unavailable portfolio
+                    // directly to the Open Market (Pool) to simulate the sale
+                    net.sf.rails.game.financial.PublicCertificate regCertToSell = getRoot().getBank().getUnavailable()
+                            .getPortfolioModel().findCertificate(comp, 1, false);
                     if (regCertToSell != null) {
                         regCertToSell.moveTo(pool);
                     }
@@ -429,8 +465,11 @@ if (currentPlayer != null && !hasActed.value()) {
                     // from purchasing this stock for the remainder of the stock round.
                     shortedThisRound.put(currentPlayer.getId() + "_" + comp.getId(), "shorted");
 
-                    // Update Engine Wrapper to register the active company for the UI/Game Loop
-                    companyBoughtThisTurnWrapper.set(comp);
+playerHasShorted.set(true);
+                    
+                    // We DO NOT set companyBoughtThisTurnWrapper here. 
+                    // That wrapper is used by the base engine to lock out cross-company buying,
+                    // which we now handle explicitly with our state machine.
 
                     // 5. Record the action and report
                     String logMsg = net.sf.rails.common.LocalText.getText("SHORT_SELL_LOG",
@@ -456,11 +495,10 @@ if (currentPlayer != null && !hasActed.value()) {
                 // 1. Execute the centralized loan logic (adds bond, adds cash, moves stock
                 // left)
                 comp1817.executeLoan();
-
-                // 2. Register the active company so the player can subsequently buy treasury
-                // shares
-                companyBoughtThisTurnWrapper.set(comp);
-
+                activeCompanyId.set(comp.getId());
+                companyHasTakenLoan.set(true);
+                hasActed.set(true);
+                return true;
 
 
             }
@@ -477,13 +515,17 @@ if (currentPlayer != null && !hasActed.value()) {
                     // Move the certificate to the company treasury
                     poolCert.moveTo(comp.getPortfolioModel());
 
-                    // 1817 Rule 5.6: The company pays the bank for the stock purchase[cite: 1783].
+                    // 1817 Rule 5.6: The company pays the bank for the stock purchase
                     // Use static Currency utility to move cash from the owner to the bank.
                     net.sf.rails.game.state.Currency.toBank(comp, price);
 
                     net.sf.rails.common.ReportBuffer.add(this,
                             comp.getId() + " buys one share from the open market for "
                                     + net.sf.rails.game.financial.Bank.format(this, price));
+                    
+                    
+                    activeCompanyId.set(comp.getId());
+                    companyHasBoughtShare.set(true);
 
                     companyBoughtThisTurnWrapper.set(comp);
                     return true;
@@ -492,6 +534,15 @@ if (currentPlayer != null && !hasActed.value()) {
         }
 
         return super.processGameSpecificAction(action);
+    }
+
+    protected void resetPlayerTurnStates() {
+        playerHasSold.set(false);
+        playerHasShorted.set(false);
+        playerHasBoughtOrIPOed.set(false);
+        activeCompanyId.set(null); 
+        companyHasTakenLoan.set(false);
+        companyHasBoughtShare.set(false);
     }
 
     /**
@@ -519,27 +570,35 @@ if (currentPlayer != null && !hasActed.value()) {
         return super.checkAgainstHoldLimit(player, company, number);
     }
 
-
-
     @Override
     public boolean process(rails.game.action.PossibleAction action) {
+        
+boolean isEndingTurn = (action instanceof rails.game.action.NullAction);
+
         boolean result = super.process(action);
 
         // Rule 5.1 Mandatory Reconciliation: Check after any successful action that
-        // could create a conflicting long/short state[cite: 451, 452].
-        if (result && gameManager.getCurrentPlayer() != null) {
-            net.sf.rails.game.PublicCompany comp = null;
-            if (action instanceof rails.game.action.BuyCertificate) {
-                comp = ((rails.game.action.BuyCertificate) action).getCompany();
-            } else if (action instanceof net.sf.rails.game.specific._1817.action.Short1817) {
-                comp = companyManager
-                        .getPublicCompany(((net.sf.rails.game.specific._1817.action.Short1817) action).getCompanyId());
+        // could create a conflicting long/short state
+        if (result) {
+            if (isEndingTurn) {
+                resetPlayerTurnStates();
             }
 
-            if (comp != null) {
-                reconcileShorts(gameManager.getCurrentPlayer(), comp);
+            if (gameManager.getCurrentPlayer() != null) {
+                net.sf.rails.game.PublicCompany comp = null;
+                if (action instanceof rails.game.action.BuyCertificate) {
+                    comp = ((rails.game.action.BuyCertificate) action).getCompany();
+                } else if (action instanceof net.sf.rails.game.specific._1817.action.Short1817) {
+                    comp = companyManager
+                            .getPublicCompany(((net.sf.rails.game.specific._1817.action.Short1817) action).getCompanyId());
+                }
+
+                if (comp != null) {
+                    reconcileShorts(gameManager.getCurrentPlayer(), comp);
+                }
             }
         }
+
         return result;
     }
 
@@ -548,7 +607,7 @@ if (currentPlayer != null && !hasActed.value()) {
             return;
 
         // Use a loop because a player could theoretically acquire multiple pairs (e.g.,
-        // via merger)[cite: 452, 454].
+        // via merger)
         boolean foundPair = true;
         while (foundPair) {
             net.sf.rails.game.financial.PublicCertificate shortCert = null;
@@ -566,11 +625,12 @@ if (currentPlayer != null && !hasActed.value()) {
             }
 
             if (shortCert != null && regularCert != null) {
-                  net.sf.rails.game.financial.BankPortfolio osiBank = getRoot().getBank().getOSI();
+                net.sf.rails.game.financial.BankPortfolio osiBank = getRoot().getBank().getOSI();
                 net.sf.rails.game.financial.BankPortfolio unavailableBank = getRoot().getBank().getUnavailable();
                 shortCert.moveTo(osiBank);
                 regularCert.moveTo(unavailableBank);
-                log.info("Mandatory Reconciliation: " + player.getName() + " short position closed for " + comp.getId());
+                log.info(
+                        "Mandatory Reconciliation: " + player.getName() + " short position closed for " + comp.getId());
                 net.sf.rails.common.ReportBuffer.add(this,
                         player.getName() + " automatically closes a short position in " + comp.getId());
             } else {
@@ -579,16 +639,15 @@ if (currentPlayer != null && !hasActed.value()) {
         }
     }
 
-
-    // ... (lines of unchanged context code) ...
     @Override
     protected void finishRound() {
-        // Sort companies by operating order to satisfy Rule 5.7 requirements
-        List<PublicCompany> operatingOrder = gameManager.getAllPublicCompanies();
-        // --- START FIX ---
+
         // Rule 5.7: Examine price in operating order.
-        // Note: The framework should handle the sorting of 'operatingOrder' before this loop.
-        
+        // gameManager.getAllPublicCompanies() returns definition order. We must
+        // explicitly sort it.
+        List<PublicCompany> operatingOrder = new java.util.ArrayList<>(gameManager.getAllPublicCompanies());
+        java.util.Collections.sort(operatingOrder);
+
         for (PublicCompany comp : operatingOrder) {
             if (!(comp instanceof PublicCompany_1817) || comp.isClosed()) {
                 continue;
@@ -596,27 +655,27 @@ if (currentPlayer != null && !hasActed.value()) {
 
             PublicCompany_1817 comp1817 = (PublicCompany_1817) comp;
 
-            // 1. Upward Movement: 5-share and 10-share companies 
+            // 1. Upward Movement: 5-share and 10-share companies
             if (comp1817.getShareCount() > 2) {
                 int totalPlayerOwnedShares = 0;
                 for (net.sf.rails.game.Player p : getRoot().getPlayerManager().getPlayers()) {
-                    // We sum the actual share count, not certificate count 
+                    // We sum the actual share count, not certificate count
                     totalPlayerOwnedShares += p.getPortfolioModel().getShares(comp);
                 }
 
-                // If players own 100% or more, move right (up) 
+                // If players own 100% or more, move right (up)
                 if (totalPlayerOwnedShares >= comp1817.getShareCount()) {
                     // Use the specific moveRight logic for 1817's 2D market
                     stockMarket.moveRight(comp, 1);
                 }
             }
 
-            // 2. Downward Movement: Move left for EACH share in the open market 
+            // 2. Downward Movement: Move left for EACH share in the open market
             // This applies to all company sizes (2, 5, and 10).
             int openMarketShares = pool.getShares(comp);
             if (openMarketShares > 0) {
-               if (stockMarket instanceof StockMarket_1817) {
-                    ((StockMarket_1817) stockMarket).moveLeftOrDown(comp, openMarketShares); 
+                if (stockMarket instanceof StockMarket_1817) {
+                    ((StockMarket_1817) stockMarket).moveLeftOrDown(comp, openMarketShares);
                 } else {
                     for (int i = 0; i < openMarketShares; i++) {
                         stockMarket.withhold(comp);
@@ -624,10 +683,10 @@ if (currentPlayer != null && !hasActed.value()) {
                 }
             }
         }
-        // --- END FIX ---
+
 
         super.finishRound();
     }
-// ... (rest of the method) ...
+
 
 }

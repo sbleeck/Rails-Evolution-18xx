@@ -3,7 +3,7 @@ package net.sf.rails.game.ai.playground.stub;
 import java.util.HashMap;
 import java.util.Map;
 
-/** Stub data class for a parsed BuyTrain action [cite: 813, 853] */
+/** Stub data class for a parsed BuyTrain action*/
 public class ParsedBuyTrainAction {
     private String train;
     private int cost;

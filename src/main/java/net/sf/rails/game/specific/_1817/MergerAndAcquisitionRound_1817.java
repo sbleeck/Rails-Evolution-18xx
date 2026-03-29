@@ -523,10 +523,10 @@ public net.sf.rails.game.Player getActingPlayer() {
             }
         }
 
-        // Mark as merged/converted this round so it cannot merge again [cite: 708, 709]
+        // Mark as merged/converted this round so it cannot merge again
         mergedThisRound.add(comp.getId());
 
-        // Initiate Post-Merger Phase (same as mergers) [cite: 715]
+        // Initiate Post-Merger Phase (same as mergers) 
         calculateValidMergerPairs();
         startPostMergerPhase();
     }
@@ -739,8 +739,7 @@ public net.sf.rails.game.Player getActingPlayer() {
         // 6. Market Value Adjustment and UI Marker Move
         StockSpace oldSpace = initiator.getCurrentSpace();
 
-        // Rule 7.1.3: New stock value is the average of the two 5-share values [cite:
-        // 741]
+        // Rule 7.1.3: New stock value is the average of the two 5-share values
         int rawAvg = (initiator.getMarketPrice() + target.getMarketPrice()) / 2;
         StockMarket_1817 sm = (StockMarket_1817) gameManagerRef.getRoot().getStockMarket();
         StockSpace newSpace = sm.getFloorSpace(rawAvg);
@@ -1298,19 +1297,6 @@ private void updateCurrentPlayer() {
         }
         auctionPlayerIndex.set(0);
 
-        // Calculate maximum legal bid for the current player to prevent illegal UI
-        // input
-        int maxBid = calculateMaxPurchasingPower(activeBidders.get(0), target);
-
-        // Ensure maxBid is at least the minBid for valid auction initiation
-        if (maxBid < minBid) {
-            maxBid = minBid;
-        }
-
-        // Generate the specific bid action for the engine
-        possibleActions.add(new net.sf.rails.game.specific._1817.action.BidOnCompany_1817(
-                gameManagerRef.getRoot(), target.getId(), minBid, maxBid));
-
         setPossibleActions();
     }
 
@@ -1529,20 +1515,16 @@ private void updateCurrentPlayer() {
         possibleActions.add(new NullAction(gameManagerRef.getRoot(), NullAction.Mode.PASS));
 
         boolean isPresident = activePlayer.equals(president);
-        int minNextBid = (currentHighestBid == 0 && highestBiddingPlayer.value() == null) ? currentHighestBid
-                : currentHighestBid + 10;
 
-        if (currentHighestBid > 0 && highestBiddingPlayer.value() == null) {
-            minNextBid = currentHighestBid;
-        }
 
-        if (isPresident && minNextBid > currentHighestBid + 10 && highestBiddingPlayer.value() != null) {
-            return;
-        }
+boolean isLiquidation = (target.getCurrentSpace() != null && target.getCurrentSpace().getPrice() == 0);
+        boolean hasPreviousBid = highestBiddingPlayer.value() != null || isLiquidation;
+
+        int minNextBid = hasPreviousBid ? currentHighestBid + 10 : currentHighestBid;
 
         boolean canAfford = false;
-
         int maxPurchasingPower = calculateMaxPurchasingPower(activePlayer, target);
+        
         for (PublicCompany comp : gameManagerRef.getRoot().getCompanyManager().getAllPublicCompanies()) {
             if (comp.getPresident() != null && comp.getPresident().equals(activePlayer) && !comp.equals(target)) {
                 if (comp.getCurrentSpace() != null && comp.getCurrentSpace().getPrice() > 30) {
@@ -1555,9 +1537,14 @@ private void updateCurrentPlayer() {
         }
 
         if (canAfford) {
-            int actualMaxBid = isPresident ? currentHighestBid + 10 : maxPurchasingPower;
-            possibleActions.add(new net.sf.rails.game.specific._1817.action.BidOnCompany_1817(
-                    gameManagerRef.getRoot(), target.getId(), minNextBid, actualMaxBid));
+            int actualMaxBid = maxPurchasingPower;
+            if (isPresident) {
+                actualMaxBid = Math.min(actualMaxBid, currentHighestBid + 10);
+            }
+            if (minNextBid <= actualMaxBid) {
+                possibleActions.add(new net.sf.rails.game.specific._1817.action.BidOnCompany_1817(
+                        gameManagerRef.getRoot(), target.getId(), minNextBid, actualMaxBid));
+            }
         }
 
     }

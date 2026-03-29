@@ -23,7 +23,7 @@ public class StockMarket_1817 extends StockMarket {
 
     @Override
     protected void moveLeft(PublicCompany company, Owner seller, int numberOfSpaces) {
-        moveLeftOrDown(company, numberOfSpaces);
+        // moveLeftOrDown(company, numberOfSpaces);
     }
 
     @Override

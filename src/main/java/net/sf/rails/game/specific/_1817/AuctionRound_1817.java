@@ -220,16 +220,25 @@ net.sf.rails.common.ReportBuffer.add(this, "--- " + type + " AUCTION: " + compan
             }
         } else {
             // IPO bidding is based on purchase power (cash + private companies)
+            // Rule 5.5: Players cannot bid more than they can pay
             canAfford = currentPlayer != null && getPurchasePower(currentPlayer) >= minNextBid;
         }
         if (currentPlayer != null && canAfford) {
             int actualMaxBid = 9990;
-            // The president of the company being sold in M&A can only bid +10
-            if (auctionType.value() != AuctionType.IPO && currentPlayer.equals(auctionedCompany.value().getPresident())
-                    && highestBidder.value() != null) {
+
+            if (auctionType.value() == AuctionType.IPO) {
+                // IPO bids are limited by the $400 rule AND personal purchasing power
+                actualMaxBid = Math.min(400, getPurchasePower(currentPlayer));
+            } else if (currentPlayer.equals(auctionedCompany.value().getPresident()) && highestBidder.value() != null) {
+                // The president of the company being sold in M&A can only bid +10
                 actualMaxBid = currentBid.value() + 10;
             }
-            possibleActions.add(new Bid1817IPO(gameManager.getRoot(), minNextBid, actualMaxBid));
+
+            // Only generate the bid action if the player can legally place a higher bid
+            if (minNextBid <= actualMaxBid) {
+                possibleActions.add(new Bid1817IPO(gameManager.getRoot(), minNextBid, actualMaxBid));
+            }
+
         }
 
         return true;
@@ -248,6 +257,19 @@ net.sf.rails.common.ReportBuffer.add(this, "--- " + type + " AUCTION: " + compan
     @Override
     public boolean process(PossibleAction action) {
         Player actor = getActingPlayer();
+
+        // During reload, the state tracking the active player can desync.
+        // Force sync the internal state to the recorded action's player.
+        if (action != null && action.getPlayerName() != null && actor != null && !action.getPlayerName().equals(actor.getName())) {
+            for (int i = 0; i < activeBidders.size(); i++) {
+                if (activeBidders.get(i).getName().equals(action.getPlayerName())) {
+                    actor = activeBidders.get(i);
+                    this.currentPlayerIndex.set(i);
+                    log.warn("AUCTION_LOG: Actor desync detected. Synced active player to " + actor.getName());
+                    break;
+                }
+            }
+        }
 
         // --- Handle Settlement Action ---
         if (action instanceof SettleIPO_1817) {
@@ -354,13 +376,33 @@ int cashToTransfer = currentBid.value();
             }
 
             if (tokenCost > 0) {
-                net.sf.rails.game.state.Currency.toBank(comp, tokenCost);
-                net.sf.rails.common.ReportBuffer.add(this, comp.getId() + " purchases " + tokensBought + " additional station marker(s) for " + net.sf.rails.game.financial.Bank.format(this, tokenCost) + ".");
-
-                // Auto-loan if cash is negative
-                while (comp.getCash() < 0 && comp.getCurrentNumberOfLoans() < settle.getShareSize()) {
+                // Auto-loan BEFORE paying if cash is insufficient
+                int loansTaken = 0;
+                while (comp.getCash() < tokenCost && comp.getCurrentNumberOfLoans() < settle.getShareSize()) {
                     comp.executeLoan();
-                    net.sf.rails.common.ReportBuffer.add(this, comp.getId() + " automatically takes a loan to cover station marker costs.");
+                    loansTaken++;
+                }
+
+                if (loansTaken > 0) {
+                    net.sf.rails.common.ReportBuffer.add(this, "AUTOMATIC ACTION: " + comp.getId() + 
+                        " takes " + loansTaken + " loan(s) to cover mandatory IPO station markers.");
+                }
+
+                // Pay the fee or liquidate if impossible
+                if (comp.getCash() >= tokenCost) {
+                    net.sf.rails.game.state.Currency.toBank(comp, tokenCost);
+                    net.sf.rails.common.ReportBuffer.add(this, comp.getId() + 
+                        " purchases " + tokensBought + " additional station marker(s) for " + 
+                        net.sf.rails.game.financial.Bank.format(this, tokenCost) + ".");
+                } else {
+                    net.sf.rails.common.ReportBuffer.add(this, "LIQUIDATION PENALTY: " + comp.getId() + 
+                        " failed to secure funds for mandatory IPO station markers.");
+                    net.sf.rails.game.financial.StockSpace liquidationSpace = gameManager.getRoot().getStockMarket().getStartSpace(0);
+                    if (liquidationSpace != null) {
+                        if (comp.getCurrentSpace() != null) comp.getCurrentSpace().removeToken(comp);
+                        liquidationSpace.addToken(comp);
+                        comp.setCurrentSpace(liquidationSpace);
+                    }
                 }
             }
 
@@ -469,14 +511,23 @@ net.sf.rails.common.ReportBuffer.add(this, actor.getName() + " bids $" + amount 
                 (winner != null ? winner.getName() : "None"));
     }
 
-    private void advanceToNextValidBidder() {
-        int minNextBid = currentBid.value() + 5;
+private void advanceToNextValidBidder() {
+        // IPO bid increments are $5 [cite: 415, 507]
+        int minNextBid = currentBid.value() + minNextBidIncrement.value();
 
         while (activeBidders.size() > 1) {
             int index = currentPlayerIndex.value() % activeBidders.size();
             Player candidate = activeBidders.get(index);
 
-            if (getPurchasePower(candidate) >= minNextBid) {
+            // A player is valid if they can afford the next minimum increment 
+            boolean canBid = getPurchasePower(candidate) >= minNextBid;
+            
+            // Auto-resolve IPO auctions if the next minimum bid exceeds the $400 limit
+            if (auctionType.value() == AuctionType.IPO && minNextBid > 400) {
+                canBid = false;
+            }
+
+            if (canBid) {
                 return;
             }
 
@@ -492,7 +543,7 @@ net.sf.rails.common.ReportBuffer.add(this, actor.getName() + " bids $" + amount 
         log.info(">>> Executing M&A Sale: {} bought by {} for ${}", target.getId(),
                 (predator != null ? predator.getId() : "BANK"), finalBid);
 
-        // 1. Treasury Processing (Shares to Open Market) [cite: 827, 829]
+        // 1. Treasury Processing (Shares to Open Market)
         int treasuryShares = 0;
         for (net.sf.rails.game.financial.PublicCertificate cert : new java.util.ArrayList<>(target.getCertificates())) {
             if (cert.getOwner() == target && !cert.isPresidentShare()) {
@@ -501,7 +552,7 @@ net.sf.rails.common.ReportBuffer.add(this, actor.getName() + " bids $" + amount 
             }
         }
 
-        // Friendly Sale Treasury Compensation [cite: 830]
+        // Friendly Sale Treasury Compensation 
         if (type == AuctionType.FRIENDLY_SALE && treasuryShares > 0) {
             int infusion = treasuryShares * target.getMarketPrice();
             target.setCash_AI(target.getCash() + infusion);
@@ -521,7 +572,7 @@ net.sf.rails.common.ReportBuffer.add(this, actor.getName() + " bids $" + amount 
                 predator.addLoans(targetLoans);
                 target.addLoans(-targetLoans); // Clear from target
 
-                // Move predator stock left 1 space per loan [cite: 838, 839]
+                // Move predator stock left 1 space per loan 
                 for (int i = 0; i < targetLoans; i++) {
                     // Note: Ensure your 1817 StockMarket implementation handles this move.
                     // gameManager.getRoot().getStockMarket().moveLeft(predator);

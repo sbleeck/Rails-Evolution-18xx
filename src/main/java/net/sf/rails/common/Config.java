@@ -3,8 +3,6 @@ package net.sf.rails.common;
 import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import net.sf.rails.game.RailsRoot;
 import net.sf.rails.util.Util;
 
 /**

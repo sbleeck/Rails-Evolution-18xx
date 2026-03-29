@@ -6,7 +6,6 @@ import org.slf4j.LoggerFactory;
 /**
  * Implements A* search on the map graph to find cheapest/best paths.
  * Used by ExpertStrategyService to score tile lays.
- * [cite: report6 ai plan.docx, II. Core Architecture Summary]
  */
 public class AIPathfinderService {
 
@@ -43,7 +42,6 @@ public class AIPathfinderService {
         // 2. Use A* algorithm to find the cheapest path from that "reach"
         //    to the targetHexId.
         // 3. The "cost" function for A* will use context.getMapHex(id).getTileCost()
-        //    [cite: MapHex.java L702]
         // 4. The "heuristic" can be Euclidean distance (using hex coordinates).
         
         aiLog.debug("[Stub] AIPathfinderService.findBestPathToHex called for {}.", targetHexId);

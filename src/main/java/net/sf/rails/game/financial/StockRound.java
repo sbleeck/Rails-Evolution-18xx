@@ -131,7 +131,7 @@ public class StockRound extends Round implements I_MapRenderableRound {
      * turn state is reset (e.g., hasActed = false) *after*
      * they satisfy the limit, giving them a fresh "normal" turn.
      */
-    protected boolean playerWasInForcedSell = false;
+protected final BooleanState playerWasInForcedSell = new BooleanState(this, "playerWasInForcedSell");
 
     /**
      * Autopasses
@@ -270,8 +270,7 @@ recordedBuyShareChoices = new ArrayListState<>(parent, "recordedBuyShareChoices_
 
         if (certificateCount > certificateLimit) {
 
-            playerWasInForcedSell = true; // SET THE FLAG
-
+playerWasInForcedSell.set(true); // SET THE FLAG
             if (sellShareActions != null && !sellShareActions.isEmpty()) {
                 possibleActions.addAll(sellShareActions);
             }
@@ -282,8 +281,7 @@ recordedBuyShareChoices = new ArrayListState<>(parent, "recordedBuyShareChoices_
         // 3. CHECK FOR FORCED COMPANY HOLDING LIMIT (e.g., >60%)
         if (isOverLimits) {
 
-            playerWasInForcedSell = true; // SET THE FLAG
-
+playerWasInForcedSell.set(true); // SET THE FLAG
             if (sellShareActions != null && !sellShareActions.isEmpty()) {
                 possibleActions.addAll(sellShareActions);
             }
@@ -294,10 +292,9 @@ recordedBuyShareChoices = new ArrayListState<>(parent, "recordedBuyShareChoices_
         // 4. CHECK IF FORCED SELL JUST COMPLETED
         // If we *were* in a forced sell, but (from the checks above)
         // are not anymore, this is the start of the player's *real* turn.
-        if (playerWasInForcedSell) {
+if (playerWasInForcedSell.value()) {
 
-            playerWasInForcedSell = false; // Clear the flag
-
+playerWasInForcedSell.set(false); // Reset flag on turn end
             // Reset the turn state to give them a "new go"
             companyBoughtThisTurnWrapper.set(null);
             hasSoldThisTurnBeforeBuying.set(false);
@@ -2175,8 +2172,8 @@ recordedBuyShareChoices = new ArrayListState<>(parent, "recordedBuyShareChoices_
         // [] All "Global Check" logic is removed.
         setNextPlayer(); // This is the original call
 
-        playerWasInForcedSell = false; // Reset flag on turn end
-        sellPrices.clear();
+playerWasInForcedSell.set(false); // Reset flag on turn end
+//         sellPrices.clear();
     }
 
     // not overridden

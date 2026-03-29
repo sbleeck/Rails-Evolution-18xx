@@ -35,7 +35,7 @@ public class BondsModel_1817 extends BondsModel {
         
         if (totalLoans == 0) return 5;
         // Rate increases by $5 for every 5 loans, starting at loan 1.
-        return 5 + (((totalLoans - 1) / 5) + 1) * 5;
+return (((totalLoans - 1) / 5) + 1) * 5;
     }
 
     /**

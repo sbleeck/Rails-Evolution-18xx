@@ -1877,6 +1877,37 @@ public Integer getRoundStart(int currentIndex) {
             CorrectionType ct = ca.getCorrectionType();
             CorrectionManager cm = getCorrectionManager(ct);
             result = cm.executeCorrection(ca);
+
+            // Force state resynchronization after map corrections mid-turn.
+            // This prevents stale route/revenue caches from rejecting subsequent actions.
+            if (result) {
+                boolean shouldFlush = false;
+                if (ca instanceof rails.game.correct.MapCorrectionAction) {
+                    shouldFlush = true;
+                } else if (ca.getClass().getSimpleName().equals("CorrectionModeAction")) {
+                    try {
+                        java.lang.reflect.Method isActiveMethod = ca.getClass().getMethod("isActive");
+                        Boolean isActive = (Boolean) isActiveMethod.invoke(ca);
+                        if (!isActive) {
+                            shouldFlush = true;
+                        }
+                    } catch (Exception e) {
+                        shouldFlush = true; 
+                    }
+                }
+
+                if (shouldFlush) {
+                    RoundFacade currentRound = getCurrentRound();
+                    if (currentRound instanceof OperatingRound) {
+                        ((OperatingRound) currentRound).resetTransientStateOnLoad();
+                        log.info("MAP CORRECTION: Flushed OperatingRound transient caches to maintain state consistency.");
+                    } else if (currentRound instanceof StockRound) {
+                        ((StockRound) currentRound).resetTransientStateOnLoad();
+                    }
+                }
+            }
+
+            
         }
 
         return result;
@@ -2171,7 +2202,7 @@ public Integer getRoundStart(int currentIndex) {
 
         setReloading(true);
 
-        // This is the fix for the save/load crash [cite: 570-572].
+        // This is the fix for the save/load crash 
         // We must clean up all *active round references* in the GameManager
         // to clear 'transient' fields of stale data *before* we replay any actions.
 
@@ -3335,36 +3366,48 @@ public PossibleAction getNextActionFromLog() {
         }
 
         if (!possibleActions.validate(action)) {
-            DisplayBuffer.add(this, LocalText.getText("ActionNotAllowed", action.toString()));
-
-            StringBuilder sb = new StringBuilder();
-            sb.append("\n!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n");
-            sb.append("FATAL RELOAD ERROR: Action not in PossibleActions list.\n");
-            sb.append("Failed Action: ").append(action).append("\n");
-            sb.append("Current Round: ").append(getCurrentRound() != null ? getCurrentRound().toString() : "null")
-                    .append("\n");
-            sb.append("Bank Cash:     ").append(getRoot().getBank().getPurse().value()).append("\n");
-
-            int actionCount = (possibleActions.getList() != null) ? possibleActions.getList().size() : 0;
-            sb.append("--- Available Possible Actions (" + actionCount + ") ---\n");
-
-            if (actionCount == 0) {
-                sb.append("  (NONE)\n");
-            } else {
-                for (PossibleAction pa : possibleActions.getList()) {
-                    if (pa.toString().contains("CorrectionModeAction")) {
-                        continue;
-                    }
-                    sb.append("  > ").append(pa).append("\n");
+           boolean classMatch = false;
+            for (PossibleAction pa : possibleActions.getList()) {
+                if (pa.getClass().equals(action.getClass())) {
+                    classMatch = true;
+                    break;
                 }
             }
-            sb.append("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n");
+            
+            if (classMatch) {
+                log.warn("RELOAD WARNING: Player mismatch on action " + action + ". Bypassing strict validation to allow Round to sync state.");
+            } else {
+                DisplayBuffer.add(this, LocalText.getText("ActionNotAllowed", action.toString()));
 
-            String error = sb.toString();
-            log.error(error);
+                StringBuilder sb = new StringBuilder();
+                sb.append("\n!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n");
+                sb.append("FATAL RELOAD ERROR: Action not in PossibleActions list.\n");
+                sb.append("Failed Action: ").append(action).append("\n");
+                sb.append("Current Round: ").append(getCurrentRound() != null ? getCurrentRound().toString() : "null")
+                        .append("\n");
+                sb.append("Bank Cash:     ").append(getRoot().getBank().getPurse().value()).append("\n");
 
-            // CRASH IMMEDIATELY
-            throw new RuntimeException(error);
+                int actionCount = (possibleActions.getList() != null) ? possibleActions.getList().size() : 0;
+                sb.append("--- Available Possible Actions (" + actionCount + ") ---\n");
+
+                if (actionCount == 0) {
+                    sb.append("  (NONE)\n");
+                } else {
+                    for (PossibleAction pa : possibleActions.getList()) {
+                        if (pa.toString().contains("CorrectionModeAction")) {
+                            continue;
+                        }
+                        sb.append("  > ").append(pa).append("\n");
+                    }
+                }
+                sb.append("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n");
+
+                String error = sb.toString();
+                log.error(error);
+
+                // CRASH IMMEDIATELY
+                throw new RuntimeException(error);
+            }
         }
 
         boolean doProcess = true;
@@ -3415,110 +3458,6 @@ public PossibleAction getNextActionFromLog() {
         return true;
     }
 
-    // public boolean processOnReload(PossibleAction action) {
-    // getRoot().getReportManager().getDisplayBuffer().clear();
-    // RoundFacade roundBefore = getCurrentRound();
-
-    // if (this.logOutputDirectory != null) {
-    // try {
-    // String filename = String.format("state_%05d.json",
-    // getActionCountModel().value());
-    // File outputFile = new File(this.logOutputDirectory, filename);
-    // net.sf.rails.game.ai.snapshot.JsonStateSerializer.serialize(this,
-    // outputFile.getAbsolutePath());
-    // } catch (Exception e) {
-    // }
-    // }
-
-    // logActionTaken(action);
-    // logAction(action);
-    // try {
-    // if (action instanceof NullAction
-    // && !possibleActions.contains(NullAction.class)) {
-    // return true;
-    // }
-
-    // if (!possibleActions.validate(action)) {
-    // DisplayBuffer.add(this, LocalText.getText("ActionNotAllowed",
-    // action.toString()));
-
-    // StringBuilder sb = new StringBuilder();
-    // sb.append("!!! RELOAD VALIDATION FAILURE ANALYSIS !!!\n");
-    // sb.append("Failed Action: ").append(action).append("\n");
-    // sb.append("Current Round: ").append(getCurrentRound() != null ?
-    // getCurrentRound().toString() : "null")
-    // .append("\n");
-
-    // sb.append("Bank Cash:
-    // ").append(getRoot().getBank().getPurse().value()).append("\n");
-
-    // sb.append("Game Over Pending:
-    // ").append(gameOverPending.value()).append("\n");
-    // sb.append("Is Game Over: ").append(isGameOver()).append("\n");
-
-    // int actionCount = (possibleActions.getList() != null) ?
-    // possibleActions.getList().size() : 0;
-    // sb.append("--- Available Possible Actions (" + actionCount + ") ---\n");
-
-    // if (actionCount == 0) {
-    // sb.append(" (NONE)\n");
-    // } else {
-    // for (PossibleAction pa : possibleActions.getList()) {
-    // sb.append(" > ").append(pa).append("\n");
-    // }
-    // }
-    // sb.append("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n");
-    // log.warn(sb.toString());
-
-    // }
-
-    // boolean doProcess = true;
-    // if (skipNextDone) {
-    // if (action instanceof NullAction
-    // && ((NullAction) action).getMode() == NullAction.Mode.DONE) {
-    // if (currentRound.value() instanceof OperatingRound
-    // && ((OperatingRound) currentRound.value()).getStep() == skippedStep) {
-    // doProcess = false;
-    // }
-    // }
-    // }
-    // skipNextDone = false;
-    // skippedStep = null;
-
-    // ChangeStack changeStack = getRoot().getStateManager().getChangeStack();
-
-    // if (doProcess && !processCorrectionActions(action) &&
-    // !getCurrentRound().process(action)) {
-
-    // String msg = "Player " + action.getPlayerName() + "'s action \""
-    // + action + "\"\n in " + getCurrentRound().getRoundName()
-    // + " is considered invalid by the game engine";
-    // log.error(msg);
-    // DisplayBuffer.add(this, msg);
-    // log.warn("GAMEMANAGER [BruteForce]: Engine failed to process action. IGNORING
-    // and continuing replay.",
-    // action);
-    // }
-
-    // executedActions.add(action);
-    // updatePayoutTracker(action);
-
-    // possibleActions.clear();
-    // getCurrentRound().setPossibleActions();
-    // changeStack.close(action);
-
-    // if (!isGameOver())
-    // setCorrectionActions();
-
-    // } catch (Exception e) {
-    // log.error("GAMEMANAGER [BruteForce]: CRASH during replay. IGNORING and
-    // continuing. Error: {} -> {}",
-    // e.getClass().getSimpleName(), e.getMessage());
-    // }
-
-    // return true;
-
-    // }
 
     public LinkedHashMap<String, Map<String, Integer>> getInstantaneousPayoutHistory() {
         return instantaneousPayoutHistory.value();

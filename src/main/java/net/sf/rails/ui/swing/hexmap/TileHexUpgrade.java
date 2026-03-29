@@ -226,7 +226,7 @@ public class TileHexUpgrade extends HexUpgrade implements Iterable<HexSide> {
 // File: TileHexUpgrade.java
 // [Insert these methods]
 
-    public boolean hexIsBlocked() {
+public boolean hexIsBlocked() {
         // 1. Get the authoritative Game Engine
         net.sf.rails.game.round.RoundFacade round = hex.getHex().getRoot().getGameManager().getCurrentRound();
         String hexId = hex.getHex().getId();
@@ -237,6 +237,7 @@ public class TileHexUpgrade extends HexUpgrade implements Iterable<HexSide> {
             // Ask the Engine
             boolean allowed = or.isTileLayAllowed(action.getCompany(), hex.getHex(), -1);            
             if (allowed) return false; // If allowed, it's NOT blocked
+            return true;
         }
 
         // Fallback
@@ -257,6 +258,7 @@ public class TileHexUpgrade extends HexUpgrade implements Iterable<HexSide> {
             boolean allowed = or.isTileLayAllowed(action.getCompany(), hex.getHex(), -1);
             
             if (allowed) return false;
+            return true;
         }
 
         // 3. Fallback / Detail Check

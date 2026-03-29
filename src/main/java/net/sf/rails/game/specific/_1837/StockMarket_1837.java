@@ -48,17 +48,17 @@ public class StockMarket_1837 extends StockMarket {
 
     public void payOut(PublicCompany company, boolean split) {
         if (!split) {
-            // Rule 10.7.4: 100% payout moves Right or Up-Right [cite: 726, 727]
+            // Rule 10.7.4: 100% payout moves Right or Up-Right 
             moveRightOrUp(company);
         } else {
-            // Rule 10.7.4: 50% payout moves Down-Right [cite: 730]
+            // Rule 10.7.4: 50% payout moves Down-Right 
             moveDownRight(company);
         }
     }
 
     @Override
     public int spacesDownOnSale(int sharesSold, Owner seller) {
-        // Rule 9.1: Every sale moves the price marker diagonally down and left [cite: 426]
+        // Rule 9.1: Every sale moves the price marker diagonally down and left 
         return 1;
     }
 
@@ -119,13 +119,13 @@ public class StockMarket_1837 extends StockMarket {
     }
 
     public void moveDown(PublicCompany company) {
-        // Rule 9.1: Sales move diagonally down and to the left [cite: 426]
+        // Rule 9.1: Sales move diagonally down and to the left 
         moveDownLeft(company);
     }
 
     @Override
     public void moveUp(PublicCompany company) {
-        // Standard Up redirection to Up-Right for 1837 grid [cite: 727]
+        // Standard Up redirection to Up-Right for 1837 grid 
         moveUpRight(company);
     }
 

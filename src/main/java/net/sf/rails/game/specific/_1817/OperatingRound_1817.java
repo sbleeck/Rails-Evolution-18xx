@@ -166,8 +166,8 @@ public class OperatingRound_1817 extends OperatingRound {
             cost -= 15;
         }
 
-        // Rule 1.2.6: Bridge companies allow laying yellow on rivers ($10) for
-        // free[cite: 238].
+        // Rule 1.2.6: Bridge companies allow laying yellow on rivers ($10) for free
+        
         if (standardCost == 10) {
             for (net.sf.rails.game.PrivateCompany priv : company.getPortfolioModel().getPrivateCompanies()) {
                 if ("OBC40".equals(priv.getId()) || "UBC80".equals(priv.getId())) {
@@ -508,7 +508,7 @@ if (market instanceof net.sf.rails.game.specific._1817.StockMarket_1817) {
 
     /**
      * Checks if the company is eligible for a mountain fee waiver based on owning
-     * a coal mine with remaining tokens[cite: 251, 253].
+     * a coal mine with remaining token
      */
     private boolean canPotentiallyLayCoalMine(PublicCompany company, MapHex hex, int standardCost) {
         if (standardCost != 15)
@@ -724,7 +724,7 @@ if (market instanceof net.sf.rails.game.specific._1817.StockMarket_1817) {
                             }
                         }
                     } else if (moves < 0) {
-                        // Rule 6.6: Move LEFT (decrease col)[cite: 193, 641].
+                        // Rule 6.6: Move LEFT (decrease col)
                         for (int i = 0; i < -moves; i++) {
                             int prevCol = col - 1;
                             while (prevCol >= 0 && m1817.getStockSpace(row, prevCol) == null) {
