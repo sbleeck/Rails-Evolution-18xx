@@ -70,10 +70,10 @@ public class MergerAndAcquisitionRound_1817 extends Round {
         return operatingCompany.value();
     }
 
-public net.sf.rails.game.Player getActingPlayer() {
+    public net.sf.rails.game.Player getActingPlayer() {
         MaAStep step = currentStep.value();
-        if (step == MaAStep.COMPANY_ACTIONS || step == MaAStep.POST_MERGER_PRESIDENT || 
-            step == MaAStep.LOAN_TAKING || step == MaAStep.SALES_FRIENDLY || step == MaAStep.DISCARD_TRAINS) {
+        if (step == MaAStep.COMPANY_ACTIONS || step == MaAStep.POST_MERGER_PRESIDENT ||
+                step == MaAStep.LOAN_TAKING || step == MaAStep.SALES_FRIENDLY || step == MaAStep.DISCARD_TRAINS) {
             return operatingCompany.value() != null ? operatingCompany.value().getPresident() : null;
         } else if (step == MaAStep.POST_MERGER_PLAYERS) {
             List<net.sf.rails.game.Player> players = gameManagerRef.getRoot().getPlayerManager().getPlayers();
@@ -84,9 +84,11 @@ public net.sf.rails.game.Player getActingPlayer() {
         } else if (step == MaAStep.SALES_SELECT_BUYER) {
             return highestBiddingPlayer.value();
         } else if (step == MaAStep.SALES_AUCTION) {
-            if (activeBidders.isEmpty()) return null;
+            if (activeBidders.isEmpty())
+                return null;
             int idx = auctionPlayerIndex.value();
-            if (idx >= activeBidders.size()) idx = 0;
+            if (idx >= activeBidders.size())
+                idx = 0;
             return activeBidders.get(idx);
         }
         return null;
@@ -179,7 +181,7 @@ public net.sf.rails.game.Player getActingPlayer() {
         int index = companyIndex.value();
         while (index < operatingCompanies.size()) {
             PublicCompany comp = operatingCompanies.get(index);
- 
+
             boolean canMerge = false;
             for (String pair : validMergerPairs.view()) {
                 if (pair.startsWith(comp.getId() + ",")) {
@@ -202,8 +204,6 @@ public net.sf.rails.game.Player getActingPlayer() {
                     && comp.getNumberOfBonds() < ((PublicCompany_1817) comp).getShareCount()) {
                 canLoan = true;
             }
-
-
 
             if (mergedThisRound.contains(comp.getId()) || (!canMerge && !canConvert && !canLoan)) {
 
@@ -292,7 +292,6 @@ public net.sf.rails.game.Player getActingPlayer() {
                 int shareCount = ((PublicCompany_1817) operatingCompany.value()).getShareCount();
                 int minBid = sharePrice * shareCount;
 
-
                 startAuction(operatingCompany.value(), minBid);
 
                 return true;
@@ -342,7 +341,6 @@ public net.sf.rails.game.Player getActingPlayer() {
                     net.sf.rails.game.state.Currency.wire(player, comp.getMarketPrice(), comp);
 
                     cert.moveTo(player.getPortfolioModel());
-
 
                     net.sf.rails.common.ReportBuffer.add(this,
                             player.getName() + " buys 1 treasury share of " + comp.getId() + " for $"
@@ -413,7 +411,6 @@ public net.sf.rails.game.Player getActingPlayer() {
             int bidAmount = bidAction.getBidAmount();
             net.sf.rails.game.Player bidder = activeBidders.get(auctionPlayerIndex.value());
 
-
             String saleType = "";
             int price = operatingCompany.value().getMarketPrice();
             if (price == 0)
@@ -443,7 +440,6 @@ public net.sf.rails.game.Player getActingPlayer() {
             PublicCompany predator = gameManagerRef.getRoot().getCompanyManager()
                     .getPublicCompany(selectAction.getCompanyId());
             int finalBid = highestBid.value();
-
 
             executeSale(target, predator, finalBid);
             return true;
@@ -526,7 +522,7 @@ public net.sf.rails.game.Player getActingPlayer() {
         // Mark as merged/converted this round so it cannot merge again
         mergedThisRound.add(comp.getId());
 
-        // Initiate Post-Merger Phase (same as mergers) 
+        // Initiate Post-Merger Phase (same as mergers)
         calculateValidMergerPairs();
         startPostMergerPhase();
     }
@@ -666,7 +662,7 @@ public net.sf.rails.game.Player getActingPlayer() {
                 "Post-Merger State (Combined):\n" + buildCompanyStateReport(initiator));
 
         // 7. Remove Disappearing Company
-        target.setClosed();
+        ((PublicCompany_1817) target).resetForReuse();
 
         // 8. Update State tracking
         mergedThisRound.add(initiator.getId());
@@ -859,8 +855,7 @@ public net.sf.rails.game.Player getActingPlayer() {
                 "Post-Merger State (Combined):\n" + buildCompanyStateReport(initiator));
 
         // 7. Remove Disappearing Company
-        target.setClosed();
-
+        ((PublicCompany_1817) target).resetForReuse();
         // 8. Update State tracking
         mergedThisRound.add(initiator.getId());
         mergedThisRound.add(target.getId());
@@ -983,7 +978,7 @@ public net.sf.rails.game.Player getActingPlayer() {
         return false;
     }
 
-private void updateCurrentPlayer() {
+    private void updateCurrentPlayer() {
         net.sf.rails.game.Player p = getActingPlayer();
         if (p != null && !p.equals(gameManagerRef.getRoot().getPlayerManager().getCurrentPlayer())) {
         }
@@ -1396,7 +1391,8 @@ private void updateCurrentPlayer() {
                 }
             }
 
-            // Predator absorbs target assets first (including cash and treasury sales infusion)
+            // Predator absorbs target assets first (including cash and treasury sales
+            // infusion)
             predator.transferAssetsFrom(target);
 
             // Apply Train Station capacity increase
@@ -1448,12 +1444,12 @@ private void updateCurrentPlayer() {
                     net.sf.rails.common.ReportBuffer.add(this,
                             predator.getId() + " inherits " + loanStr + " from " + target.getId() + ".");
 
-                    // Rule 7.2.4 Step 7: Penalty for inherited loans not paid off 
+                    // Rule 7.2.4 Step 7: Penalty for inherited loans not paid off
                     if (gameManagerRef.getRoot().getStockMarket() instanceof StockMarket_1817) {
                         ((StockMarket_1817) gameManagerRef.getRoot().getStockMarket()).moveLeftOrDown(predator,
                                 acquiredBonds);
-                        net.sf.rails.common.ReportBuffer.add(this, 
-                            predator.getId() + " price drops " + acquiredBonds + " space(s) for inherited debt.");
+                        net.sf.rails.common.ReportBuffer.add(this,
+                                predator.getId() + " price drops " + acquiredBonds + " space(s) for inherited debt.");
                     }
                 }
             }
@@ -1484,8 +1480,7 @@ private void updateCurrentPlayer() {
         // 4. Shareholder Settlement (Rule 7.2.4)
         settleWithShareholders(target, payoutPerShare);
 
-        target.setClosed();
-
+        ((PublicCompany_1817) target).resetForReuse();
         if (predator != null) {
             net.sf.rails.common.ReportBuffer.add(this,
                     "Final Post-Event State (Predator):\n" + buildCompanyStateReport(predator));
@@ -1516,15 +1511,14 @@ private void updateCurrentPlayer() {
 
         boolean isPresident = activePlayer.equals(president);
 
-
-boolean isLiquidation = (target.getCurrentSpace() != null && target.getCurrentSpace().getPrice() == 0);
+        boolean isLiquidation = (target.getCurrentSpace() != null && target.getCurrentSpace().getPrice() == 0);
         boolean hasPreviousBid = highestBiddingPlayer.value() != null || isLiquidation;
 
         int minNextBid = hasPreviousBid ? currentHighestBid + 10 : currentHighestBid;
 
         boolean canAfford = false;
         int maxPurchasingPower = calculateMaxPurchasingPower(activePlayer, target);
-        
+
         for (PublicCompany comp : gameManagerRef.getRoot().getCompanyManager().getAllPublicCompanies()) {
             if (comp.getPresident() != null && comp.getPresident().equals(activePlayer) && !comp.equals(target)) {
                 if (comp.getCurrentSpace() != null && comp.getCurrentSpace().getPrice() > 30) {
@@ -1609,11 +1603,9 @@ boolean isLiquidation = (target.getCurrentSpace() != null && target.getCurrentSp
                 if (totalDebt > 0) {
                     net.sf.rails.game.state.Currency.wire(p, totalDebt, gameManagerRef.getRoot().getBank());
 
-
                     String shortStr = (shortCount == 1) ? "1 short share" : shortCount + " short shares";
                     net.sf.rails.common.ReportBuffer.add(this, p.getName() + " pays $" + totalDebt + " to the Bank for "
                             + shortStr + " of " + target.getId() + ".");
-
 
                 }
             }
@@ -1910,8 +1902,7 @@ boolean isLiquidation = (target.getCurrentSpace() != null && target.getCurrentSp
 
         settleWithShareholders(target, payoutPerShare);
 
-        target.setClosed();
-
+        ((PublicCompany_1817) target).resetForReuse();
         if (predator != null) {
             net.sf.rails.common.ReportBuffer.add(this, "Final Post-Event State:\n" + buildCompanyStateReport(predator));
 

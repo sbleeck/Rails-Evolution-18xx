@@ -82,7 +82,7 @@ public class StockRound_1817 extends StockRound {
         // Initial certificate setup for all companies
         if (gameManager.getSRNumber() == 1) {
             for (PublicCompany comp : gameManager.getAllPublicCompanies()) {
-                if (comp instanceof PublicCompany_1817) {
+                if (comp.getPresident() == null && !comp.isClosed()) {
                     ((PublicCompany_1817) comp).adjustCertificates();
                 }
             }
@@ -270,7 +270,7 @@ public class StockRound_1817 extends StockRound {
 
                 // Minimum starting bid for an IPO is $100 
                 if (purchasingPower >= 100) {
-                    
+
                     for (PublicCompany comp : gameManager.getAllPublicCompanies()) {
                         if (!comp.hasFloated() && !comp.isClosed()) {
                             boolean alreadyAdded = false;
@@ -281,7 +281,7 @@ public class StockRound_1817 extends StockRound {
                                 }
                             }
                             if (!alreadyAdded) {
-                                possibleActions.add(new Initiate1817IPO(gameManager.getRoot(), comp.getId()));
+possibleActions.add(new Initiate1817IPO(gameManager.getRoot(), comp.getId()));
                             }
                         }
                     }
@@ -392,6 +392,25 @@ public class StockRound_1817 extends StockRound {
                 PublicCompany_1817 comp = (PublicCompany_1817) ipoAction.getCompany();
 
                 int bid = ipoAction.getBid();
+
+
+                // Server-side validation: calculate total purchasing power
+                int purchasingPower = currentPlayer.getCash();
+                for (net.sf.rails.game.PrivateCompany pc : currentPlayer.getPortfolioModel().getPrivateCompanies()) {
+                    purchasingPower += pc.getBasePrice();
+                }
+
+                // Rule 5.5: Reject if bid exceeds equity or violates strict limits
+                if (bid > purchasingPower) {
+                    net.sf.rails.common.ReportBuffer.add(this, currentPlayer.getName() + " attempted an illegal IPO bid of $" + bid + ". Max allowed by purchasing power is $" + purchasingPower + ".");
+                    return false;
+                }
+                if (bid < 100 || bid > 400 || bid % 5 != 0) {
+                    net.sf.rails.common.ReportBuffer.add(this, currentPlayer.getName() + " attempted an illegal IPO bid. Bid must be a multiple of $5 between $100 and $400.");
+                    return false;
+                }
+
+                
                 String hexId = ipoAction.getHexId();
 
                 if ("E22".equals(hexId)) {

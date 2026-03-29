@@ -290,4 +290,25 @@ public class PublicCompany_1817 extends PublicCompany {
         getIsClosedModel().set(true);
     }
 
+
+    public void resetForReuse() {
+        getIsClosedModel().set(false);
+        setPresident(null);
+        setNumberOfBonds(0);
+        if (getCurrentSpace() != null) {
+            getCurrentSpace().removeToken(this);
+            setCurrentSpace(null);
+        }
+        net.sf.rails.game.financial.BankPortfolio ipo = getRoot().getBank().getIPO();
+        for (net.sf.rails.game.financial.PublicCertificate cert : getCertificates()) {
+            if (!(cert instanceof ShortCertificate)) cert.moveTo(ipo);
+        }
+        for (net.sf.rails.game.BaseToken t : new java.util.ArrayList<>(getLaidBaseTokens())) {
+            t.moveTo(this);
+        }
+        shareCount.set(2);
+        adjustCertificates();
+        if (getCash() > 0) net.sf.rails.game.state.Currency.wire(this, getCash(), getRoot().getBank());
+    }
+    
 }
