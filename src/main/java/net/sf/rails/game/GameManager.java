@@ -3084,6 +3084,10 @@ public Integer getRoundStart(int currentIndex) {
         int minorNo = 0;
         for (PublicCompany company : getRoot().getCompanyManager().getAllPublicCompanies()) {
 
+            if (company.isClosed()) {
+                continue;
+            }
+            
             // Key must put companies in reverse operating order, because sort
             // is ascending.
             if (company.hasStockPrice() && company.hasStarted()) {

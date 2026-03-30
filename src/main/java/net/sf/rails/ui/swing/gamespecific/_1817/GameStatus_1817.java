@@ -113,7 +113,22 @@ public class GameStatus_1817 extends GameStatus {
         }
     }
 
-    
+    @Override
+    protected String formatShareText(int percentage, PublicCompany c, boolean isPresident) {
+        if (percentage == 0) return "";
+        
+        int unit = c.getShareUnit();
+        if (unit <= 0 || unit > 100) {
+            return percentage + "%" + (isPresident ? "P" : "");
+        }
+        
+        int held = percentage / unit;
+        int total = 100 / unit;
+        
+        String text = held + "/" + total;
+        if (isPresident) text += "P";
+        return text;
+    }
 
 
 }

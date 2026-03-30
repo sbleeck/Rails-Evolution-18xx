@@ -715,7 +715,6 @@ currentRoundName = "Game Start";
         }
         
         if (orUIManager != null) {
-            // ... (OR Logic) ...
              try {
                 orUIManager.updateStatus(myTurn);
             } catch (Exception e) {

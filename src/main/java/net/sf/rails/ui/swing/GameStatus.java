@@ -1940,8 +1940,11 @@ public class GameStatus extends GridPanel {
             return;
         }
 
-        // Ensure text visibility persists (Strict Trim Check)
-        String shareTxt = ipo.getShareModel(companies[i]).toText();
+// Ensure text visibility persists (Strict Trim Check)
+        int pct = ipo.getShare(companies[i]);
+        String shareTxt = formatShareText(pct, companies[i], false);
+
+
         boolean hasContent = (shareTxt != null && !shareTxt.trim().isEmpty() && !shareTxt.trim().equals("0"));
 
         ipoShareCards[i].setVisible(hasContent);
@@ -2017,8 +2020,10 @@ public class GameStatus extends GridPanel {
             return;
         }
 
-        // Ensure text visibility persists
-        String shareTxt = pool.getShareModel(companies[i]).toText();
+// Ensure text visibility persists
+        int pct = pool.getShare(companies[i]);
+        String shareTxt = formatShareText(pct, companies[i], false);
+
         poolShareCards[i].setVisible(shareTxt != null && !shareTxt.isEmpty());
 
         if (clickable && o != null) {
@@ -2077,8 +2082,10 @@ public class GameStatus extends GridPanel {
             return;
         }
 
-        // Text Content
-        String shareTxt = companies[i].getPortfolioModel().getShareModel(companies[i]).toText();
+// Text Content
+        int pct = companies[i].getPortfolioModel().getShare(companies[i]);
+        String shareTxt = formatShareText(pct, companies[i], false);
+        
         boolean hasContent = (shareTxt != null && !shareTxt.isEmpty() && !shareTxt.equals("0"));
 
         treasuryShareCards[i].setVisible(hasContent);
@@ -2891,7 +2898,9 @@ public class GameStatus extends GridPanel {
                 poolShareCards[i].getCertificates().clear();
                 poolShareCards[i].getCertificates().addAll(pool.getCertificates(c));
 
-                String shareTxt = pool.getShareModel(c).toText();
+int pct = pool.getShare(c);
+                String shareTxt = formatShareText(pct, c, false);
+                
                 if (shareTxt == null)
                     shareTxt = "";
 
@@ -2950,7 +2959,9 @@ public class GameStatus extends GridPanel {
                 ipoShareCards[i].getCertificates().clear();
                 ipoShareCards[i].getCertificates().addAll(ipo.getCertificates(c));
 
-                String shareTxt = ipo.getShareModel(c).toText(); // Get text from model
+int pct = ipo.getShare(c);
+                String shareTxt = formatShareText(pct, c, false);
+
                 if (shareTxt == null)
                     shareTxt = "";
 
@@ -3010,8 +3021,9 @@ public class GameStatus extends GridPanel {
                     osiShareCards[i].getCertificates().clear();
                     osiShareCards[i].getCertificates().addAll(osi.getCertificates(c));
 
-                    String shareTxt = osi.getShareModel(c).toText();
-                    if (shareTxt == null)
+int pct = osi.getShare(c);
+                    String shareTxt = formatShareText(pct, c, false);
+                                        if (shareTxt == null)
                         shareTxt = "";
 
                     String trimmed = shareTxt.trim();
@@ -3225,31 +3237,25 @@ public class GameStatus extends GridPanel {
                         card.getCertificates().clear();
                         card.getCertificates().addAll(player.getPortfolioModel().getCertificates(c));
 
-                        String raw = player.getPortfolioModel().getShareModel(c).toText();
-                        if (raw == null)
-                            raw = "";
-
-                        // Visibility Check
-                        String check = raw.replace("%", "").trim();
-                        boolean isZero = check.equals("0") || check.isEmpty();
+int pctHeld = player.getPortfolioModel().getShare(c);
+                        boolean isPresident = player.equals(c.getPresident());
+                        String cleanText = formatShareText(pctHeld, c, isPresident);
+                        boolean isZero = (pctHeld == 0);
 
                         card.setVisible(!isZero);
 
                         if (!isZero) {
                             card.setOpaque(true);
 
-                            String cleanText = raw.replace("PU", "P");
 
                             // TEXT LOGIC: Only show "Owner" for Minors (no stock price).
-                            // Majors should show "100%" (or "100%P" which we clean up)
-                            if (cleanText.contains("100%P")) {
-                                if (c.hasStockPrice()) {
-                                    cleanText = "100%"; // Majors
-                                } else {
-                                    cleanText = c.getId(); // Minors
-                                    card.setCompanyDetailsTooltip(c);
-                                }
+                            if (!c.hasStockPrice() && pctHeld == 100) {
+                                cleanText = c.getId(); 
+                                card.setCompanyDetailsTooltip(c);
                             }
+
+
+
                             // 2. BOLD LOGIC: Only bold the President's share ("P") or Owner
                             boolean isPrez = cleanText.contains("P") || cleanText.equals("Owner");
 
@@ -3623,6 +3629,13 @@ public class GameStatus extends GridPanel {
         repaint();
     }
 
+    protected String formatShareText(int percentage, PublicCompany c, boolean isPresident) {
+        if (percentage == 0) return "";
+        String text = percentage + "%";
+        if (isPresident) text += "P";
+        return text;
+    }
+
     protected void setOSICertButton(int i, boolean clickable, Object o) {
         RowVisibility observer = null;
         if (shareRowVisibilityObservers != null && i >= 0 && i < shareRowVisibilityObservers.length) {
@@ -3649,9 +3662,10 @@ public class GameStatus extends GridPanel {
             return;
         }
 
-        net.sf.rails.game.model.ShareModel sm = osi.getShareModel(companies[i]);
-        String shareTxt = (sm != null) ? sm.toText() : "";
-        boolean hasContent = (shareTxt != null && !shareTxt.trim().isEmpty() && !shareTxt.trim().equals("0")
+        int pct = osi.getShare(companies[i]);
+        String shareTxt = formatShareText(pct, companies[i], false);
+
+  boolean hasContent = (shareTxt != null && !shareTxt.trim().isEmpty() && !shareTxt.trim().equals("0")
                 && !shareTxt.trim().equals("0%"));
 
         osiShareCards[i].setVisible(hasContent);

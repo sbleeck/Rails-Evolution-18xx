@@ -576,11 +576,16 @@ public class OperatingRound extends Round implements Observer {
 
         }
 
-        ReportBuffer.add(this, " ");
+ReportBuffer.add(this, " ");
+        Player president = operatingCompany.value().getPresident();
+        String presId = (president != null) ? president.getId() : "None";
         ReportBuffer.add(this, LocalText.getText("CompanyOperates",
                 operatingCompany.value().getId(),
-                operatingCompany.value().getPresident().getId()));
-        playerManager.setCurrentPlayer(operatingCompany.value().getPresident());
+                presId));
+        if (president != null) {
+            playerManager.setCurrentPlayer(president);
+        }
+
 
         if (noMapMode && !operatingCompany.value().hasLaidHomeBaseTokens()) {
             // Lay base token in noMapMode
@@ -650,8 +655,9 @@ protected boolean setNextOperatingCompany(boolean initial) {
                 setOperatingCompany(operatingCompanies.get(index));
             }
 
-            if (operatingCompany.value().isClosed()
-                    || operatingCompany.value().isHibernating())
+if (operatingCompany.value().isClosed()
+                    || operatingCompany.value().isHibernating()
+                    || operatingCompany.value().getPresident() == null)
                 continue;
 
             return true;
@@ -5028,8 +5034,16 @@ if (train != null) {
         }
 
         // 2. SAFE RESET: Set to the first available company.
-        if (operatingCompanies != null && !operatingCompanies.isEmpty()) {
-            this.operatingCompany.set(operatingCompanies.get(0));
+if (operatingCompanies != null && !operatingCompanies.isEmpty()) {
+            boolean found = false;
+            for (PublicCompany comp : operatingCompanies.view()) {
+                if (!comp.isClosed() && comp.getPresident() != null) {
+                    this.operatingCompany.set(comp);
+                    found = true;
+                    break;
+                }
+            }
+            if (!found) this.operatingCompany.set(operatingCompanies.get(0));
         }
 
         // 3. Reset Step to ensure initTurn() runs when the real move starts

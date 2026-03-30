@@ -978,9 +978,10 @@ public class MergerAndAcquisitionRound_1817 extends Round {
         return false;
     }
 
-    private void updateCurrentPlayer() {
+private void updateCurrentPlayer() {
         net.sf.rails.game.Player p = getActingPlayer();
         if (p != null && !p.equals(gameManagerRef.getRoot().getPlayerManager().getCurrentPlayer())) {
+            gameManagerRef.getRoot().getPlayerManager().setCurrentPlayer(p);
         }
     }
 
