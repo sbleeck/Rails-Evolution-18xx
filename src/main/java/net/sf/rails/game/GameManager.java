@@ -1336,6 +1336,7 @@ public Integer getRoundStart(int currentIndex) {
         or.start();
     }
 
+// ... (lines of unchanged context code) ...
     public <T extends RoundFacade> T createRound(String roundClassName, String id) {
         // log.error("--- GM.createRound(String, String) CALLED. ClassName: {}, ID: {}",
         // roundClassName, id);
@@ -1348,9 +1349,16 @@ public Integer getRoundStart(int currentIndex) {
             // not the abstract StartRound.class
             round = Configure.create((Class<T>) roundClass, GameManager.class, this, id);
 
+// --- DELETE ---
+//        } catch (Exception e) {
+//            System.exit(1);
+//        }
+// --- START FIX ---
         } catch (Exception e) {
-            System.exit(1);
+            log.error("CRITICAL: Failed to create round " + roundClassName, e);
+            throw new RuntimeException("Failed to create round: " + roundClassName, e);
         }
+// --- END FIX ---
         setRound(round);
         return round;
     }
@@ -1367,13 +1375,20 @@ public Integer getRoundStart(int currentIndex) {
         T round = null;
         try {
             round = Configure.create(roundClass, GameManager.class, this, id);
+// --- DELETE ---
+//        } catch (Exception e) {
+//            System.exit(1);
+//        }
+// --- START FIX ---
         } catch (Exception e) {
-            System.exit(1);
+            log.error("CRITICAL: Failed to create round " + roundClass.getName(), e);
+            throw new RuntimeException("Failed to create round: " + roundClass.getName(), e);
         }
+// --- END FIX ---
         setRound(round);
         return round;
     }
-
+// ... (rest of the method) ...
     public void newPhaseChecks(RoundFacade round) {
 
     }
@@ -3087,7 +3102,7 @@ public Integer getRoundStart(int currentIndex) {
             if (company.isClosed()) {
                 continue;
             }
-            
+
             // Key must put companies in reverse operating order, because sort
             // is ascending.
             if (company.hasStockPrice() && company.hasStarted()) {

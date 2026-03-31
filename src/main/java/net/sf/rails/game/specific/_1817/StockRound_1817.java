@@ -51,6 +51,7 @@ public class StockRound_1817 extends StockRound {
     protected final net.sf.rails.game.state.StringState activeCompanyId;
     protected final net.sf.rails.game.state.BooleanState companyHasTakenLoan;
     protected final net.sf.rails.game.state.BooleanState companyHasBoughtShare;
+    protected final net.sf.rails.game.state.IntegerState auctionCounter;
 
     public StockRound_1817(GameManager parent, String id) {
         super(parent, id);
@@ -67,6 +68,7 @@ public class StockRound_1817 extends StockRound {
         activeCompanyId = net.sf.rails.game.state.StringState.create(this, "activeCompanyId_" + id, "");
         companyHasTakenLoan = new net.sf.rails.game.state.BooleanState(this, "companyHasTakenLoan_" + id, false);
         companyHasBoughtShare = new net.sf.rails.game.state.BooleanState(this, "companyHasBoughtShare_" + id, false);
+auctionCounter = net.sf.rails.game.state.IntegerState.create(this, "auctionCounter_" + id, 0);
 
     }
 
@@ -335,7 +337,7 @@ possibleActions.add(new Initiate1817IPO(gameManager.getRoot(), comp.getId()));
         ipoedThisRound.add(compId);
     }
 
-    private void startAuctionRound(PublicCompany_1817 comp, String hexId, int stationNumber, int bid) {
+private void startAuctionRound(PublicCompany_1817 comp, String hexId, int stationNumber, int bid) {
         net.sf.rails.game.Player initiator = gameManager.getCurrentPlayer();
         log.info("IPO INITIATED: Company " + comp.getId() + " by Player " + initiator.getName() +
                 " at Hex " + hexId + " Station " + stationNumber + " with starting bid $" + bid);
@@ -344,8 +346,16 @@ possibleActions.add(new Initiate1817IPO(gameManager.getRoot(), comp.getId()));
                 initiator.getName() + " initiates an IPO for " + comp.getId() + " at " + hexId
                         + " with a starting bid of " + net.sf.rails.game.financial.Bank.format(this, bid) + ".");
 
+// --- DELETE ---
+//        gameManager.setInterruptedRound(this);
+//        AuctionRound_1817 auctionRound = gameManager.createRound(AuctionRound_1817.class, "Auction_" + comp.getId());
+// --- START FIX ---
+        auctionCounter.set(auctionCounter.value() + 1);
+        String uniqueAuctionId = "Auction_" + comp.getId() + "_" + getId() + "_" + auctionCounter.value();
+
         gameManager.setInterruptedRound(this);
-        AuctionRound_1817 auctionRound = gameManager.createRound(AuctionRound_1817.class, "Auction_" + comp.getId());
+        AuctionRound_1817 auctionRound = gameManager.createRound(AuctionRound_1817.class, uniqueAuctionId);
+// --- END FIX ---
         auctionRound.setupAuction(comp, hexId, stationNumber, bid, initiator, gameManager.getPlayers());
     }
 

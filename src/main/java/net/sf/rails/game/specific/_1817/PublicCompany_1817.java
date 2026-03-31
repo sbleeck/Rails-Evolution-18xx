@@ -290,20 +290,26 @@ public class PublicCompany_1817 extends PublicCompany {
         getIsClosedModel().set(true);
     }
 
+// --- START FIX ---
     public void resetForReuse() {
-getIsClosedModel().set(false);
+        getIsClosedModel().set(false);
         setPresident(null);
         setNumberOfBonds(0);
         if (getCurrentSpace() != null) {
             getCurrentSpace().removeToken(this);
             setCurrentSpace(null);
         }
-                reinitialise();
 
-        
-net.sf.rails.game.financial.BankPortfolio ipo = getRoot().getBank().getIpo();
+        // Reinitialise must occur AFTER market token removal
+        reinitialise();
+
+        // CRITICAL: We must adjust the share count BEFORE sweeping certificates, 
+        // ensuring the newly generated 2-share certificates are moved to the IPO.
+        setShareCount(2);
+
+        net.sf.rails.game.financial.BankPortfolio ipo = getRoot().getBank().getIpo();
         net.sf.rails.game.financial.BankPortfolio unavailable = getRoot().getBank().getUnavailable();
-        
+
         // Sweep ALL certificates to sanitize the market state
         for (net.sf.rails.game.financial.PublicCertificate cert : getCertificates()) {
             if (cert instanceof ShortCertificate) {
@@ -312,16 +318,16 @@ net.sf.rails.game.financial.BankPortfolio ipo = getRoot().getBank().getIpo();
                 if (cert.getOwner() != ipo) cert.moveTo(ipo);
             }
         }
-        
+
         for (net.sf.rails.game.BaseToken t : new java.util.ArrayList<>(getLaidBaseTokens())) {
             t.moveTo(this);
         }
-        
-        // Must use the setter to trigger tokenCapacity recalculation and adjustCertificates
-        setShareCount(2);
-        
-        if (getCash() > 0) net.sf.rails.game.state.Currency.wire(this, getCash(), getRoot().getBank());
-    }
 
+
+if (getCash() > 0) {
+            net.sf.rails.game.state.Currency.wire(this, getCash(), getRoot().getBank());
+        }
+        }
+// --- END FIX ---
 
 }
