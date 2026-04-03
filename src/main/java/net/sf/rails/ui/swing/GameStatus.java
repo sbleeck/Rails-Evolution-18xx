@@ -62,17 +62,11 @@ public class GameStatus extends GridPanel {
 
     // Width Definitions
     // STRUCTURAL CONSTANTS FOR "SLOT" SYSTEM
-
-    // private final Dimension DIM_ARROW = new Dimension(20, 20); // 1. Visible
-    // Arrow
-    private final Dimension DIM_STD = new Dimension(52, 20); // 5. Fix clipping (was 45, now 52)
-
-    // Width Definitions
-    private final Dimension DIM_PLAYER = new Dimension(60, 20);
-    private final Dimension DIM_TOKENS = new Dimension(55, 20);
-
-    // Flexible height for privates (Point 4b) - Width 85, Height 0 (auto)
-    private final Dimension DIM_TRAIN = new Dimension(40, 20);
+    public double globalWidthScaler = 1.0;
+    protected Dimension dimStd;
+    protected Dimension dimPlayer;
+    protected Dimension dimTokens;
+    protected Dimension dimTrain;
 
     public static final Color BG_BUY_ACTIVE = new Color(144, 238, 144); // Light Green (#90EE90) - Standard "Buy"\
     public static final Color BG_DISCARD_VOLUNTARY = Color.CYAN; // Light Blue (#ADD8E6)
@@ -382,6 +376,7 @@ public class GameStatus extends GridPanel {
     protected RailCard[] futureTrainButtons;
 
     // 3. Labels and Panels
+    protected net.sf.rails.ui.swing.gamestatus.TrainMarketPanel trainMarketPanel;
     protected JPanel poolTrainsPanel;
     protected JPanel newTrainsPanel;
     protected JPanel futureTrainsPanel;
@@ -4011,30 +4006,6 @@ int pctHeld = player.getPortfolioModel().getShare(c);
         repaint();
     }
 
-    // Helper to create uniform Train Buttons using RailCard
-    // Replaces the old configureTrainButton static method
-    private RailCard createTrainButton() {
-        RailCard cf = new RailCard((net.sf.rails.game.Train) null, buySellGroup);
-
-        // CRITICAL FIX: Register GameStatus as the listener so clicks are processed.
-        // Without this, the button lights up Green but does nothing when clicked.
-        cf.addActionListener(this);
-
-        // 1. Apply Persistent Font (Responsiveness)
-        if (stickyFont != null) {
-            cf.setFont(stickyFont);
-        }
-
-        // 2. Enable Compact Mode (Center Alignment, No Table)
-        cf.setCompactMode(true);
-
-        // 3. Default Visuals (Passive)
-        cf.setBackground(BG_CARD_PASSIVE);
-
-        if (cf != null)
-            cf.setVisible(false);
-        return cf;
-    }
 
     // Changed to 'public static' to allow ORPanel to reuse this logic
     public static void configureTrainButton(ClickField btn, String text, boolean isBuyable) {
@@ -4204,7 +4175,32 @@ int pctHeld = player.getPortfolioModel().getShare(c);
     // A "weaker" background for placeholders (Pale Beige/White)
     private static final Color BG_PLACEHOLDER = new Color(250, 250, 245);
 
+
+    // --- START FIX ---
+    private void calculateDynamicDimensions() {
+        Font f = (stickyFont != null) ? stickyFont : new Font("SansSerif", Font.BOLD, 12);
+        FontMetrics fm = getFontMetrics(f);
+        
+        // Base height is font height plus minimal padding to prevent clipping
+        int baseHeight = fm.getHeight() + 4;
+        
+        // Calculate exact string widths for critical headers instead of using the excessively wide 'W'
+        int wStd = fm.stringWidth("Dividend") + 8;
+        int wPlayer = fm.stringWidth("Player W") + 8;
+        int wTokens = fm.stringWidth("TOKENS") + 8;
+        int wTrain = fm.stringWidth("TRAINS") + 8;
+
+        dimStd = new Dimension((int)(wStd * globalWidthScaler), baseHeight);
+        dimPlayer = new Dimension((int)(wPlayer * globalWidthScaler), baseHeight);
+        dimTokens = new Dimension((int)(wTokens * globalWidthScaler), baseHeight);
+        dimTrain = new Dimension((int)(wTrain * globalWidthScaler), baseHeight);
+    }
+// --- END FIX ---
+
+
     protected void initFields() {
+
+        calculateDynamicDimensions();
 
         // 1. Refresh Counts
         if (gameUIManager != null) {
@@ -4286,21 +4282,6 @@ int pctHeld = player.getPortfolioModel().getShare(c);
         if (poolPriceLabels == null || poolPriceLabels.length != nc)
             poolPriceLabels = new javax.swing.JLabel[nc];
 
-        // --- START FIX: NEW TRAIN (IPO) ARRAYS ---
-        // We must ensure the arrays AND the objects inside them exist before
-        // initTrainMarket uses them.
-        if (newTrainButtons == null || newTrainButtons.length != MAX_IPO_SLOTS) {
-            newTrainButtons = new RailCard[MAX_IPO_SLOTS];
-            for (int i = 0; i < MAX_IPO_SLOTS; i++) {
-                newTrainButtons[i] = createTrainButton();
-            }
-        }
-        if (newTrainQtyLabels == null || newTrainQtyLabels.length != MAX_IPO_SLOTS) {
-            newTrainQtyLabels = new javax.swing.JLabel[MAX_IPO_SLOTS];
-            for (int i = 0; i < MAX_IPO_SLOTS; i++) {
-                newTrainQtyLabels[i] = new javax.swing.JLabel("");
-            }
-        }
 
         if (playerSharePanels == null || playerSharePanels.length != nc)
             playerSharePanels = new JPanel[nc][np];
@@ -4448,7 +4429,7 @@ int pctHeld = player.getPortfolioModel().getShare(c);
             f.setBackground(BG_HEADER);
             f.setOpaque(true);
 
-            f.setPreferredSize(DIM_PLAYER);
+            f.setPreferredSize(dimPlayer);
             gbc.weightx = 1.0;
             gbc.fill = GridBagConstraints.HORIZONTAL;
             addField(f, certPerPlayerXOffset + i, 1, 1, 1, 0, true);
@@ -4458,16 +4439,18 @@ int pctHeld = player.getPortfolioModel().getShare(c);
         // Logic: Card (~5 chars) + Price (~3 chars) + Padding
         Font sizingFont = (stickyFont != null) ? stickyFont : new Font("SansSerif", Font.BOLD, 12);
         FontMetrics fm = getFontMetrics(sizingFont);
-        int charWidth = fm.charWidth('0');
-        int height = 20;
 
-        int wCard = (charWidth * 5) + 6;
-        // int wPrice = (charWidth * 3) + 6;
-        int wPrice = fm.stringWidth("$999") + 10;
-        int wTotal = wCard + wPrice + 4; // Card + Price + Gaps
+        int height = dimStd.height;
+        // Unify with initCompanyRows: use RailCard base size calculation
+        Dimension refDim = RailCard.calculateBaseSize(sizingFont, false, globalWidthScaler);
+        int wCard = refDim.width;
+        int wPrice = (int) ((fm.stringWidth("$999") + 10) * globalWidthScaler);
+
+        // wTotal must exactly match the sum of createShareCell components (card + price
+        // + 2px inset)
+        int wTotal = wCard + wPrice + 2;
 
         Dimension dimMarket = new Dimension(wTotal, height);
-
         f = new Caption(LocalText.getText("POOL"));
         f.setBorder(BorderFactory.createMatteBorder(0, 0, 1, 1, Color.GRAY));
         f.setPreferredSize(dimMarket); // Use dynamic width
@@ -4485,7 +4468,8 @@ int pctHeld = player.getPortfolioModel().getShare(c);
         if (compCanHoldOwnShares) {
             f = new Caption(LocalText.getText("TREASURY"));
             f.setBorder(BorderFactory.createMatteBorder(0, 0, 1, 1, Color.GRAY));
-            f.setPreferredSize(DIM_STD);
+
+f.setPreferredSize(dimStd);
             f.setBackground(BG_HEADER);
             f.setOpaque(true);
             addField(f, certInTreasuryXOffset, 1, 1, 1, 0, true);
@@ -4494,7 +4478,7 @@ int pctHeld = player.getPortfolioModel().getShare(c);
         if (hasOSI) {
             f = new Caption("OSI");
             f.setBorder(BorderFactory.createMatteBorder(0, 0, 1, 4, Color.BLACK));
-            f.setPreferredSize(DIM_STD);
+f.setPreferredSize(dimStd);
             f.setBackground(BG_HEADER);
             f.setOpaque(true);
             addField(f, certInOSIXOffset, 1, 1, 1, 0, true);
@@ -4507,7 +4491,7 @@ int pctHeld = player.getPortfolioModel().getShare(c);
         ((JLabel) f).setHorizontalAlignment(SwingConstants.RIGHT);
         f.setBackground(BG_HEADER);
         f.setOpaque(true);
-        f.setPreferredSize(DIM_STD);
+f.setPreferredSize(dimStd);
         addField(f, compCashXOffset, 1, 1, 1, 0, true);
 
         // 1. Trains Header
@@ -4515,7 +4499,7 @@ int pctHeld = player.getPortfolioModel().getShare(c);
         f.setBorder(BORDER_THIN);
         f.setBackground(BG_HEADER);
         f.setOpaque(true);
-        f.setPreferredSize(DIM_TRAIN);
+f.setPreferredSize(dimStd);
         addField(f, compTrainsXOffset, 1, 1, 1, 0, true);
 
         // 2. Dividend Header
@@ -4524,7 +4508,7 @@ int pctHeld = player.getPortfolioModel().getShare(c);
         ((JLabel) f).setHorizontalAlignment(SwingConstants.RIGHT);
         f.setBackground(BG_HEADER);
         f.setOpaque(true);
-        f.setPreferredSize(DIM_STD);
+f.setPreferredSize(dimStd);
         addField(f, compRevenueXOffset, 1, 1, 1, 0, true);
 
         // 3. Retained Header
@@ -4533,7 +4517,7 @@ int pctHeld = player.getPortfolioModel().getShare(c);
         ((JLabel) f).setHorizontalAlignment(SwingConstants.RIGHT);
         f.setBackground(BG_HEADER);
         f.setOpaque(true);
-        f.setPreferredSize(DIM_STD);
+        f.setPreferredSize(dimStd);
         addField(f, compRetainedXOffset, 1, 1, 1, 0, true);
 
         // 4. Markers Header
@@ -4541,13 +4525,13 @@ int pctHeld = player.getPortfolioModel().getShare(c);
         f.setBorder(BORDER_THIN);
         f.setBackground(BG_HEADER);
         f.setOpaque(true);
-        f.setPreferredSize(DIM_TOKENS);
+        f.setPreferredSize(dimTokens);
         addField(f, compTokensXOffset, 1, 1, 1, 0, true);
 
         if (compCanBuyPrivates) {
             f = new Caption(LocalText.getText("PRIVATES"));
             f.setBorder(BORDER_THIN);
-            f.setPreferredSize(DIM_STD);
+            f.setPreferredSize(dimStd);
             addField(f, compPrivatesXOffset, 1, 1, 1, 0, true);
         }
 
@@ -4556,7 +4540,7 @@ int pctHeld = player.getPortfolioModel().getShare(c);
             f.setBorder(BORDER_THIN);
             f.setBackground(BG_HEADER);
             f.setOpaque(true);
-            f.setPreferredSize(DIM_STD);
+            f.setPreferredSize(dimStd);
             addField(f, compLoansXOffset, 1, 1, 1, 0, true);
         }
 
@@ -4741,23 +4725,24 @@ int pctHeld = player.getPortfolioModel().getShare(c);
 
             // DELEGATE SIZING TO RAILCARD STATIC CALCULATOR
             // compactMode = false (Standard Share Width)
-            Dimension refDim = RailCard.calculateBaseSize(sizingFont, false, 1.0);
+Dimension refDim = RailCard.calculateBaseSize(sizingFont, false, globalWidthScaler);
 
-            int masterHeight = refDim.height;
-            int wCard = refDim.width;
+        int masterHeight = refDim.height;
+        int wCard = refDim.width;
 
-            // Accessories (Prices/Dots) still need a calculated width relative to font
-            FontMetrics fm = java.awt.Toolkit.getDefaultToolkit().getFontMetrics(sizingFont);
-            int charWidth = fm.charWidth('0');
-            // int wPrice = (charWidth * 3) + 6;
-            // Adjusted to fit "$123" (Currency symbol + 3 digits)
-            int wPrice = fm.stringWidth("$999") + 10;
+        // Accessories (Prices/Dots) still need a calculated width relative to font
+        FontMetrics fm = java.awt.Toolkit.getDefaultToolkit().getFontMetrics(sizingFont);
+        int charWidth = fm.charWidth('0');
+        // int wPrice = (charWidth * 3) + 6;
+        // Adjusted to fit "$123" (Currency symbol + 3 digits)
+        // --- DELETE --- int wPrice = fm.stringWidth("$999") + 10;
+        int wPrice = (int)((fm.stringWidth("$999") + 10) * globalWidthScaler);
 
-            int wDot = Math.max(8, masterHeight / 2);
+        int wDot = Math.max(8, masterHeight / 2);
 
-            Dimension dimCard = new Dimension(wCard, masterHeight);
-            Dimension dimPrice = new Dimension(wPrice, masterHeight);
-            Dimension dimDot = new Dimension(wDot, masterHeight);
+        Dimension dimCard = new Dimension(wCard, masterHeight);
+        Dimension dimPrice = new Dimension(wPrice, masterHeight);
+        Dimension dimDot = new Dimension(wDot, masterHeight);
 
             // 4. PLAYER COLUMNS
             for (int j = 0; j < np; j++) {
@@ -4916,7 +4901,7 @@ int pctHeld = player.getPortfolioModel().getShare(c);
             f.setBorder(BorderFactory.createCompoundBorder(bDet, BorderFactory.createEmptyBorder(0, 0, 0, 5)));
             ((JLabel) f).setHorizontalAlignment(SwingConstants.RIGHT);
 
-            f.setPreferredSize(new Dimension(60, 25));
+f.setPreferredSize(dimStd);
             addField(f, compCashXOffset, y, 1, 1, 0, visible);
 
             f = compCashButton[i] = new ClickField(compCash[i].getText(), CASH_CORRECT_CMD, "", this, buySellGroup);
@@ -4937,7 +4922,14 @@ int pctHeld = player.getPortfolioModel().getShare(c);
 
             compSubTrainButtons[i] = new RailCard[MAX_TRAIN_SLOTS];
             for (int t = 0; t < MAX_TRAIN_SLOTS; t++) {
-                RailCard cf = createTrainButton();
+
+                RailCard cf = new RailCard((net.sf.rails.game.Train) null, buySellGroup);
+                cf.addActionListener(this);
+                if (stickyFont != null) cf.setFont(stickyFont);
+                cf.setCompactMode(true);
+                cf.setBackground(BG_CARD_PASSIVE);
+                cf.setVisible(false);
+
                 compSubTrainButtons[i][t] = cf;
                 gbcT.insets = new Insets(0, 0, 0, (t == MAX_TRAIN_SLOTS - 1) ? 0 : 3);
                 compTrainsButtonPanel[i].add(cf, gbcT);
@@ -4969,7 +4961,7 @@ int pctHeld = player.getPortfolioModel().getShare(c);
             ((JLabel) f).setHorizontalAlignment(SwingConstants.RIGHT);
             if (f.getFont() != null)
                 f.setFont(f.getFont().deriveFont(Font.BOLD));
-            f.setPreferredSize(new Dimension(60, 25));
+f.setPreferredSize(dimStd);
             addField(f, compRevenueXOffset, y, 1, 1, 0, visible);
 
             // 3. RETAINED FIELD
@@ -4997,7 +4989,7 @@ int pctHeld = player.getPortfolioModel().getShare(c);
             ((JLabel) f).setHorizontalAlignment(SwingConstants.RIGHT);
             if (f.getFont() != null)
                 f.setFont(f.getFont().deriveFont(Font.BOLD));
-            f.setPreferredSize(new Dimension(60, 25));
+f.setPreferredSize(dimStd);
 
             // Restore Coal Mine tooltip logic for Retained column
             net.sf.rails.game.PrivateCompany coalMine = null;
@@ -5025,7 +5017,7 @@ int pctHeld = player.getPortfolioModel().getShare(c);
             compTokens[i].setOpaque(true);
             compTokens[i].setBackground(isOperating ? BG_OPERATING : (!isActive ? BG_INACTIVE : BG_MAUVE));
             compTokens[i].setBorder(bDet);
-            compTokens[i].setPreferredSize(DIM_TOKENS);
+            compTokens[i].setPreferredSize(dimTokens);
             updateCompanyTokenDisplay(i, c, compTokens[i]);
             addField(compTokens[i], compTokensXOffset, y, 1, 1, 0, visible);
 
@@ -5036,7 +5028,7 @@ int pctHeld = player.getPortfolioModel().getShare(c);
                 compPrivatesPanel[i].setBackground(isOperating ? BG_OPERATING : (!isActive ? BG_INACTIVE : BG_MAUVE));
                 compPrivatesPanel[i].setBorder(bDet);
                 // No fixed preference size; let it grow with content, but set minimum
-                compPrivatesPanel[i].setMinimumSize(DIM_STD);
+                compPrivatesPanel[i].setMinimumSize(dimStd);
 
                 addField(compPrivatesPanel[i], compPrivatesXOffset, y, 1, 1, 0, visible);
             }
@@ -5049,7 +5041,7 @@ int pctHeld = player.getPortfolioModel().getShare(c);
                 cf.setBackground(isOperating ? BG_OPERATING : (!isActive ? BG_INACTIVE : BG_MAUVE));
                 cf.setOpaque(true);
                 cf.setBorder(bDet);
-                cf.setPreferredSize(DIM_STD);
+                cf.setPreferredSize(dimStd);
                 cf.setHorizontalAlignment(SwingConstants.CENTER);
                 addField(cf, compLoansXOffset, y, 1, 1, 0, visible);
             }
@@ -5107,7 +5099,7 @@ int pctHeld = player.getPortfolioModel().getShare(c);
             f.setBorder(BORDER_THIN);
             Font currentFont = f.getFont();
             f.setFont(currentFont.deriveFont(Font.BOLD, currentFont.getSize()));
-            f.setPreferredSize(DIM_PLAYER);
+            f.setPreferredSize(dimPlayer);
             gbc.weightx = 1.0;
             addField(f, certPerPlayerXOffset + i, playerCashYOffset, 1, 1, 0, true);
             gbc.weightx = 0.0;
@@ -5128,7 +5120,7 @@ int pctHeld = player.getPortfolioModel().getShare(c);
         for (int i = 0; i < np; i++) {
             playerCertCount[i] = new CertLimitGauge();
             playerCertCount[i].setBorder(BORDER_THIN);
-            playerCertCount[i].setPreferredSize(DIM_PLAYER);
+            playerCertCount[i].setPreferredSize(dimPlayer);
 
             gbc.weightx = 1.0;
             addField(playerCertCount[i], certPerPlayerXOffset + i, playerCertCountYOffset, 1, 1, 0, true);
@@ -5156,17 +5148,10 @@ int pctHeld = player.getPortfolioModel().getShare(c);
         }
     }
 
+
+// ... (lines of unchanged context code) ...
     private void initTrainMarket() {
-        int trainY_Header = playerPrivatesYOffset;
-        int trainY_Data = playerPrivatesYOffset + 1;
-
-        // 1. Calculate Identical Dimensions (Responsive)
-        // We replicate the logic from initCompanyRows to ensure exact matching
-        Font sizingFont = (stickyFont != null) ? stickyFont : new Font("SansSerif", Font.BOLD, 12);
-
-        // Ask RailCard for the standard height
-        Dimension refDim = RailCard.calculateBaseSize(sizingFont, false, 1.0);
-        int masterHeight = refDim.height;
+        int trainY_Header = playerPrivatesYOffset; // We map the top of the new panel to this row
 
         // 4. Train Market Alignment
         int colUsed = certInPoolXOffset; // "Used" -> Pool
@@ -5175,121 +5160,33 @@ int pctHeld = player.getPortfolioModel().getShare(c);
 
         // Span the rest of the grid
         int spanFut = (rightCompCaptionXOffset - colFut);
-        if (spanFut < 1)
-            spanFut = 1;
+        if (spanFut < 1) spanFut = 1;
+        int totalSpan = (colFut + spanFut) - colUsed;
 
-        // Headers
-        f = new Caption("Used");
-        f.setFont(new Font("SansSerif", Font.BOLD, 11));
-        f.setBorder(B_TOP_L);
-        f.setBackground(BG_TRAINS);
-        f.setOpaque(true);
-        addField(f, colUsed, trainY_Header, 1, 1, 0, true);
+        // --- START FIX ---
+        // 1. Instantiate the extracted panel
+        trainMarketPanel = new net.sf.rails.ui.swing.gamestatus.TrainMarketPanel(buySellGroup, this, stickyFont);
 
-        f = new Caption("Current");
-        f.setFont(new Font("SansSerif", Font.BOLD, 11));
-        f.setBorder(B_TOP_M);
-        f.setBackground(BG_TRAINS);
-        f.setOpaque(true);
-        addField(f, colCurr, trainY_Header, 1, 1, 0, true);
+        // 2. Map the legacy arrays to the new panel's arrays so population logic doesn't break
+        this.poolTrainsPanel = trainMarketPanel.poolTrainsPanel;
+        this.newTrainsPanel = trainMarketPanel.newTrainsPanel;
+        this.futureTrainsPanel = trainMarketPanel.futureTrainsPanel;
 
-        f = new Caption("Future");
-        f.setFont(new Font("SansSerif", Font.BOLD, 11));
-        f.setBorder(B_TOP_R);
-        f.setBackground(BG_TRAINS);
-        f.setOpaque(true);
-        addField(f, colFut, trainY_Header, spanFut, 1, 0, true);
+        this.poolTrainButtons = trainMarketPanel.poolTrainButtons;
+        this.newTrainButtons = trainMarketPanel.newTrainButtons;
+        this.futureTrainButtons = trainMarketPanel.futureTrainButtons;
 
-        // Data Panels
+        this.poolTrainInfoLabels = trainMarketPanel.poolTrainInfoLabels;
+        this.newTrainQtyLabels = trainMarketPanel.newTrainQtyLabels;
+        this.futureTrainInfoLabels = trainMarketPanel.futureTrainInfoLabels;
 
-        // 1. POOL (USED) - RESTRICT TO 1 SLOT
-        // We revert to FlowLayout (Center) but strictly limit the loop to 1.
-        poolTrainsPanel = new JPanel(new FlowLayout(FlowLayout.CENTER, 3, 0));
-        // Add Padding (EmptyBorder) inside the Line Border (B_BOT_L)
-        poolTrainsPanel.setBorder(BorderFactory.createCompoundBorder(
-                B_BOT_L,
-                BorderFactory.createEmptyBorder(5, 0, 0, 0) // 5px Top Padding
-        ));
-
-        poolTrainsPanel.setBackground(BG_TRAINS);
-        poolTrainsPanel.setOpaque(true);
-
-        poolTrainButtons = new RailCard[MAX_POOL_SLOTS];
-        poolTrainInfoLabels = new javax.swing.JLabel[MAX_POOL_SLOTS];
-
-        for (int i = 0; i < MAX_POOL_SLOTS; i++) {
-            // Create a Slot Panel (Vertical Box) to hold Button + Label
-            JPanel slot = new JPanel(new BorderLayout());
-            slot.setOpaque(false);
-
-            poolTrainButtons[i] = createTrainButton();
-            slot.add(poolTrainButtons[i], BorderLayout.NORTH);
-
-            poolTrainInfoLabels[i] = new javax.swing.JLabel("", javax.swing.SwingConstants.CENTER);
-            poolTrainInfoLabels[i].setFont(new Font("SansSerif", Font.PLAIN, 10));
-            slot.add(poolTrainInfoLabels[i], BorderLayout.CENTER);
-
-            if (i < MAX_POOL_SLOTS)
-                poolTrainsPanel.add(slot);
-        }
-
-        addField(poolTrainsPanel, colUsed, trainY_Data, 1, 1, 0, true);
-
-        // 2. IPO (CURRENT)
-
-        // Refactor to handle multiple slots (MAX_IPO_SLOTS)
-        newTrainsPanel = new JPanel(new FlowLayout(FlowLayout.CENTER, 3, 0));
-        newTrainsPanel.setBorder(BorderFactory.createCompoundBorder(
-                B_BOT_M,
-                BorderFactory.createEmptyBorder(5, 0, 0, 0)));
-        newTrainsPanel.setBackground(BG_TRAINS);
-        newTrainsPanel.setOpaque(true);
-
-        for (int i = 0; i < MAX_IPO_SLOTS; i++) {
-            // Create a wrapper slot identical to Future/Pool
-            JPanel ipoSlot = new JPanel(new BorderLayout());
-            ipoSlot.setOpaque(false);
-
-            newTrainButtons[i] = createTrainButton();
-            ipoSlot.add(newTrainButtons[i], BorderLayout.NORTH);
-
-            newTrainQtyLabels[i] = new javax.swing.JLabel(" ");
-            newTrainQtyLabels[i].setFont(new Font("SansSerif", Font.PLAIN, 10));
-            newTrainQtyLabels[i].setHorizontalAlignment(javax.swing.SwingConstants.CENTER);
-            newTrainQtyLabels[i].setForeground(Color.BLACK);
-
-            ipoSlot.add(newTrainQtyLabels[i], BorderLayout.CENTER);
-            newTrainsPanel.add(ipoSlot);
-        }
-
-        addField(newTrainsPanel, colCurr, trainY_Data, 1, 1, 0, true);
-
-        futureTrainsPanel = new JPanel(new FlowLayout(FlowLayout.CENTER, 3, 0));
-        futureTrainsPanel.setBorder(BorderFactory.createCompoundBorder(
-                B_BOT_R,
-                BorderFactory.createEmptyBorder(5, 0, 0, 0)));
-        futureTrainsPanel.setBackground(BG_TRAINS);
-        futureTrainsPanel.setOpaque(true);
-
-        futureTrainButtons = new RailCard[MAX_FUTURE_SLOTS];
-        futureTrainInfoLabels = new javax.swing.JLabel[MAX_FUTURE_SLOTS];
-        for (int i = 0; i < MAX_FUTURE_SLOTS; i++) {
-            JPanel slot = new JPanel(new BorderLayout());
-            slot.setOpaque(false);
-
-            futureTrainButtons[i] = createTrainButton();
-            slot.add(futureTrainButtons[i], BorderLayout.NORTH);
-
-            futureTrainInfoLabels[i] = new javax.swing.JLabel("", javax.swing.SwingConstants.CENTER);
-            futureTrainInfoLabels[i].setFont(new Font("SansSerif", Font.PLAIN, 10));
-            slot.add(futureTrainInfoLabels[i], BorderLayout.CENTER);
-            futureTrainsPanel.add(slot);
-        }
-
+        // 3. Add the single composite panel to the grid spanning both Header and Data rows
         gbc.anchor = GridBagConstraints.NORTH;
         gbc.fill = GridBagConstraints.BOTH;
-        addField(futureTrainsPanel, colFut, trainY_Data, spanFut, 1, 0, true);
+        addField(trainMarketPanel, colUsed, trainY_Header, totalSpan, 2, 0, true);
+        // --- END FIX ---
     }
+// ... (rest of the method) ...
 
     private void initBankAndTimer() {
         int bankY = playerTimerYOffset;
@@ -5306,7 +5203,7 @@ int pctHeld = player.getPortfolioModel().getShare(c);
         for (int i = 0; i < np; i++) {
             f = playerFixedIncome[i] = new Field("");
             f.setBorder(BORDER_THIN);
-            f.setPreferredSize(DIM_PLAYER);
+            f.setPreferredSize(dimPlayer);
             gbc.weightx = 1.0;
             addField(f, certPerPlayerXOffset + i, playerFixedIncomeYOffset, 1, 1, 0, true);
             gbc.weightx = 0.0;

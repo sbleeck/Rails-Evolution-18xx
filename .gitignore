@@ -64,3 +64,4 @@ python/
 *.rails
 *.time
 gradle.properties
+.classpath

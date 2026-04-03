@@ -1260,7 +1260,6 @@ if (actions != null && !actions.isEmpty()) {
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         setupHotkeys();
 
-        this.setMinimumSize(new Dimension(800, 400));
 
         final JFrame frame = this;
         final GameUIManager guiMgr = gameUIManager;
@@ -1286,6 +1285,7 @@ if (actions != null && !actions.isEmpty()) {
         });
 
         gameUIManager.packAndApplySizing(this);
+        enforceDynamicMinimumSize();
     }
 
     /**
@@ -1347,7 +1347,32 @@ if (actions != null && !actions.isEmpty()) {
         if (buttonPanel != null) {
             updateComponentTreeFont(buttonPanel, baseFont);
         }
+        enforceDynamicMinimumSize();
     }
+
+    // --- START FIX ---
+    private void enforceDynamicMinimumSize() {
+        if (gameStatus != null && gameStatusPane != null) {
+            // 1. Force the ScrollPane to request the full, un-clipped size of the grid
+            Dimension gridRequiredSize = gameStatus.getPreferredSize();
+            
+            // Add a small 15px buffer to ensure OS window borders don't trigger scrollbars
+            gridRequiredSize.width += 30;
+            gridRequiredSize.height += 40;
+            
+            gameStatusPane.setMinimumSize(gridRequiredSize);
+            gameStatusPane.setPreferredSize(gridRequiredSize);
+        }
+        
+        // 2. Let the layout manager bubble up the new size constraints
+        pane.revalidate();
+        
+        // 3. Lock the OS window bounds. 
+        // This allows the user to expand the window, but physically prevents them 
+        // from shrinking it smaller than the required layout size.
+        this.setMinimumSize(this.getPreferredSize());
+    }
+// --- END FIX ---
 
     private void updateComponentTreeFont(Component comp, Font font) {
         comp.setFont(font);
@@ -2271,6 +2296,7 @@ boolean blockGlobalPass = false; // NEVER block the global pass button
                 endOfGame();
 
             gameUIManager.packAndApplySizing(this);
+            enforceDynamicMinimumSize();
 
         } catch (Exception e) {
             log.error("CRITICAL ERROR in StatusWindow.updateStatus", e);
