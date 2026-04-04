@@ -1543,7 +1543,7 @@ GameDef.OrStep step = getStep();
         }
 
         // 4. Central Diagnostic Logging
-        log.info("Baden Diagnosis: " + ctx.toString());
+        // log.info("Baden Diagnosis: " + ctx.toString());
 
         return ctx;
     }

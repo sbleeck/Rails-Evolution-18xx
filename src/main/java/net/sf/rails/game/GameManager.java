@@ -2079,6 +2079,9 @@ public Integer getRoundStart(int currentIndex) {
             // Save the new file
             gameSaver.saveGame(saveFile);
 
+            // Save complete game state as JSON alongside the autosave
+            saveJsonState(saveFile);
+
             // Delete old autosave files only for this specific game
             final String gamePrefix = getGameName() + "_";
             File[] oldFiles = dir.listFiles(
@@ -2112,8 +2115,10 @@ public Integer getRoundStart(int currentIndex) {
         File file = new File(saveAction.getFilepath());
         try {
             gameSaver.saveGame(file);
-            // Save the exact clock times to a sidecar file
-            saveTimeData(file);
+
+            // Save the complete game state to a sidecar JSON file
+            saveJsonState(file);
+
             // Save UI Window Positions & Scale
             // Save UI Window Positions & Scale, passing the Game Name
             if (gameUIManager != null) {
@@ -2200,7 +2205,13 @@ public Integer getRoundStart(int currentIndex) {
         GameLoader gameLoader = new GameLoader();
         String filepath = reloadAction.getFilepath();
 
-        if (!gameLoader.reloadGameFromFile(getRoot(), new File(filepath))) {
+        File file = new File(filepath);
+        if (!file.exists()) {
+            System.out.println("file not found");
+            return false;
+        }
+
+        if (!gameLoader.reloadGameFromFile(getRoot(), file)) {
             return false;
         }
 
@@ -2342,8 +2353,8 @@ public Integer getRoundStart(int currentIndex) {
         // FIXME (Rails2.0): CommentItems have to be replaced
         // ReportBuffer.setCommentItems(gameLoader.getComments());
 
-        // 1. Restore the exact times from the sidecar file (if it exists)
-        loadTimeData(new File(filepath));
+        // 1. Restore the exact times from the sidecar JSON file (if it exists)
+        loadJsonState(new File(filepath));
         // Reload Window Positions & Scale, passing the Game Name
         if (gameUIManager != null) {
             gameUIManager.loadWindowSettings(getGameName());
@@ -3679,46 +3690,45 @@ public PossibleAction getNextActionFromLog() {
         }
     }
 
-    private void saveTimeData(File saveFile) {
-        if (!isTimeManagementEnabled())
-            return;
 
-        File timeFile = new File(saveFile.getAbsolutePath() + ".time");
-        try (PrintWriter writer = new PrintWriter(timeFile)) {
-            for (Player p : getRoot().getPlayerManager().getPlayers()) {
-                // Format: PlayerName=Seconds
-                writer.println(p.getName() + "=" + p.getTimeBankModel().value());
-            }
+
+    private void saveJsonState(File saveFile) {
+        File metaFile = new File(saveFile.getAbsolutePath() + ".state.json");
+        try {
+            net.sf.rails.game.ai.snapshot.JsonStateSerializer.serialize(this, metaFile.getAbsolutePath());
         } catch (IOException e) {
+            log.error("Failed to write complete state JSON", e);
         }
     }
 
-    private void loadTimeData(File saveFile) {
-        if (!isTimeManagementEnabled())
-            return;
+    private void loadJsonState(File saveFile) {
+        if (!isTimeManagementEnabled()) return;
 
-        File timeFile = new File(saveFile.getAbsolutePath() + ".time");
-        if (!timeFile.exists()) {
+        File metaFile = new File(saveFile.getAbsolutePath() + ".state.json");
+        if (!metaFile.exists()) {
             return;
         }
 
-        try (java.io.BufferedReader reader = new java.io.BufferedReader(new java.io.FileReader(timeFile))) {
+        // Parse the JSON manually to extract just the time banks
+        try (java.io.BufferedReader reader = new java.io.BufferedReader(new java.io.FileReader(metaFile))) {
             String line;
+            String currentPlayer = null;
             while ((line = reader.readLine()) != null) {
-                String[] parts = line.split("=");
-                if (parts.length == 2) {
-                    String pName = parts[0];
-                    int seconds = Integer.parseInt(parts[1]);
-
+                if (line.contains("\"id\"")) {
+                    currentPlayer = line.split(":")[1].replace("\"", "").replace(",", "").trim();
+                } else if (line.contains("\"timeBankSeconds\"") && currentPlayer != null) {
+                    int seconds = Integer.parseInt(line.split(":")[1].replace(",", "").trim());
                     for (Player p : getRoot().getPlayerManager().getPlayers()) {
-                        if (p.getName().equals(pName)) {
+                        if (p.getName().equals(currentPlayer)) {
                             p.getTimeBankModel().set(seconds);
                             break;
                         }
                     }
+                    currentPlayer = null; // reset for next player
                 }
             }
         } catch (Exception e) {
+            log.error("Failed to read time data from state.json", e);
         }
     }
 

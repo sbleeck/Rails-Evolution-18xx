@@ -356,58 +356,50 @@ public class StatusWindow extends JFrame implements ActionListener, ActionPerfor
         optMenu.addSeparator();
 
         // Font Settings
-        menuItem = new JMenuItem(LocalText.getText("IncreaseFont"));
+        menuItem = new JMenuItem(LocalText.getText("IncreaseFont", "Increase Text Size"));
         menuItem.setActionCommand(FONT_INCREASE_CMD);
         menuItem.setAccelerator(KeyStroke.getKeyStroke(KeyEvent.VK_EQUALS, shortcutMask));
         menuItem.addActionListener(this);
         optMenu.add(menuItem);
 
-        menuItem = new JMenuItem(LocalText.getText("DecreaseFont"));
+        menuItem = new JMenuItem(LocalText.getText("DecreaseFont", "Decrease Text Size"));
         menuItem.setActionCommand(FONT_DECREASE_CMD);
         menuItem.setAccelerator(KeyStroke.getKeyStroke(KeyEvent.VK_MINUS, shortcutMask));
         menuItem.addActionListener(this);
         optMenu.add(menuItem);
 
-        menuBar.add(optMenu);
+        optMenu.addSeparator();
 
-        // --- 3. MAP ZOOM MENU ---
-        JMenu zoomMenu = new JMenu(LocalText.getText("MapZoom", "Map Zoom"));
-        zoomMenu.setMnemonic(KeyEvent.VK_Z);
-
-        // In
-        JMenuItem item = new JMenuItem(LocalText.getText("ZoomIn", "In"));
+        // Map Zoom Settings
+        JMenuItem item = new JMenuItem(LocalText.getText("ZoomMapIn", "Zoom Map In"));
         item.setActionCommand(MAP_ZOOM_IN_CMD);
         item.setAccelerator(KeyStroke.getKeyStroke(KeyEvent.VK_PLUS, ActionEvent.CTRL_MASK));
         item.addActionListener(this);
-        zoomMenu.add(item);
+        optMenu.add(item);
 
-        // Out
-        item = new JMenuItem(LocalText.getText("ZoomOut", "Out"));
+        item = new JMenuItem(LocalText.getText("ZoomMapOut", "Zoom Map Out"));
         item.setActionCommand(MAP_ZOOM_OUT_CMD);
         item.setAccelerator(KeyStroke.getKeyStroke(KeyEvent.VK_MINUS, ActionEvent.CTRL_MASK));
         item.addActionListener(this);
-        zoomMenu.add(item);
+        optMenu.add(item);
 
-        zoomMenu.addSeparator();
-
-        // Fit Options
-        item = new JMenuItem(LocalText.getText("FitWindow", "Fit to window"));
+        item = new JMenuItem(LocalText.getText("FitMapWindow", "Fit Map to Window"));
         item.setActionCommand(MAP_FIT_CMD);
         item.setAccelerator(KeyStroke.getKeyStroke(KeyEvent.VK_0, ActionEvent.CTRL_MASK));
         item.addActionListener(this);
-        zoomMenu.add(item);
+        optMenu.add(item);
 
-        item = new JMenuItem(LocalText.getText("FitWidth", "Fit to width"));
+        item = new JMenuItem(LocalText.getText("FitMapWidth", "Fit Map to Width"));
         item.setActionCommand("MapFitWidth");
         item.addActionListener(this);
-        zoomMenu.add(item);
+        optMenu.add(item);
 
-        item = new JMenuItem(LocalText.getText("FitHeight", "Fit to height"));
+        item = new JMenuItem(LocalText.getText("FitMapHeight", "Fit Map to Height"));
         item.setActionCommand("MapFitHeight");
         item.addActionListener(this);
-        zoomMenu.add(item);
+        optMenu.add(item);
 
-        menuBar.add(zoomMenu);
+        menuBar.add(optMenu);
 
         // --- 4. CHARTS MENU ---
         JMenu chartMenu = new JMenu(LocalText.getText("CHARTS", "Charts"));
@@ -874,12 +866,8 @@ if (actions != null && !actions.isEmpty()) {
             showHotkeysDialog();
 
         } else if (command.equals(FONT_INCREASE_CMD)) {
-            // 1. Update Global State (Saves to file)
-            gameUIManager.adjustGlobalFontScale(0.1);
-            // 2. Update Local Visuals (Resizes headers/tables immediately)
             updateFonts(currentBaseFontSize + 1f);
         } else if (command.equals(FONT_DECREASE_CMD)) {
-            gameUIManager.adjustGlobalFontScale(-0.1);
             updateFonts(Math.max(8f, currentBaseFontSize - 1f));
         } else if (command.equals("SHOW_MOVE_MONITOR")) {
             showMoveMonitor();
@@ -1067,8 +1055,7 @@ if (actions != null && !actions.isEmpty()) {
         actionMap.put(FONT_INC, new AbstractAction() {
             @Override
             public void actionPerformed(ActionEvent e) {
-                if (gameUIManager != null)
-                    gameUIManager.adjustGlobalFontScale(0.1);
+                updateFonts(currentBaseFontSize + 1f);
             }
         });
 
@@ -1079,8 +1066,7 @@ if (actions != null && !actions.isEmpty()) {
         actionMap.put(FONT_DEC, new AbstractAction() {
             @Override
             public void actionPerformed(ActionEvent e) {
-                if (gameUIManager != null)
-                    gameUIManager.adjustGlobalFontScale(-0.1);
+                updateFonts(Math.max(8f, currentBaseFontSize - 1f));
             }
         });
 

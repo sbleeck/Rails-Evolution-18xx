@@ -9,6 +9,7 @@ import java.awt.event.KeyEvent;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.util.Arrays;
+import java.util.ArrayList;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.SortedMap;
@@ -41,11 +42,7 @@ public class GameSetupWindow extends JDialog {
 
     private final JButton newButton = new JButton(LocalText.getText("NewGame"));
     private final JButton loadButton = new JButton(LocalText.getText("LoadGame"));
-    private final JButton recentButton = new JButton(LocalText.getText("LoadRecentGame"));
-    private final JButton recoveryButton = new JButton(LocalText.getText("RecoverGame"));
-    private final JButton quitButton = new JButton(LocalText.getText("QUIT"));
     private final JButton optionButton = new JButton(LocalText.getText("OPTIONS"));
-    private final JButton infoButton = new JButton(LocalText.getText("INFO"));
     private final JButton creditsButton = new JButton(LocalText.getText("CREDITS"));
     private final JButton configureButton = new JButton(LocalText.getText("CONFIG"));
     private final JButton randomizeButton = new JButton(LocalText.getText("RandomizePlayers"));
@@ -54,9 +51,13 @@ public class GameSetupWindow extends JDialog {
     private final JComboBox<String> configureBox = new JComboBox<>();
     private final JComboBox<String> gameNameBox = new JComboBox<>();
 
+    private DefaultListModel<String> rosterModel;
+    private JList<String> rosterList;
+
     private static class PlayerInfo {
         private final JLabel number = new JLabel();
-        private final JTextField name = new JTextField();
+        private final JTextField name = new JTextField(14);
+        private String fullName = "";
     }
 
     private final List<PlayerInfo> players = Lists.newArrayList();
@@ -81,11 +82,7 @@ public class GameSetupWindow extends JDialog {
     private void initialize() {
         newButton.setMnemonic(KeyEvent.VK_N);
         loadButton.setMnemonic(KeyEvent.VK_L);
-        recentButton.setMnemonic(KeyEvent.VK_D);
-        recoveryButton.setMnemonic(KeyEvent.VK_R);
-        quitButton.setMnemonic(KeyEvent.VK_Q);
         optionButton.setMnemonic(KeyEvent.VK_O);
-        infoButton.setMnemonic(KeyEvent.VK_G);
         creditsButton.setMnemonic(KeyEvent.VK_E);
         configureButton.setMnemonic(KeyEvent.VK_C);
         randomizeButton.setMnemonic(KeyEvent.VK_R);
@@ -95,7 +92,7 @@ public class GameSetupWindow extends JDialog {
         this.setTitle("Rails: New Game");
         this.setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
 
-        gameListPane.add(new JLabel("Available Games:"));
+        gameListPane.add(new JLabel("Games we want to play:"));
         gameListPane.add(gameNameBox);
         gameListPane.add(optionButton); // empty slot
         gameListPane.setLayout(new GridLayout(2, 2));
@@ -113,11 +110,7 @@ public class GameSetupWindow extends JDialog {
         });
 
         loadButton.addActionListener(controller.getLoadAction());
-        recentButton.addActionListener(controller.getRecentAction());
-        recoveryButton.addActionListener(controller.getRecoveryAction());
-        quitButton.addActionListener(controller.getQuitAction());
         optionButton.addActionListener(controller.getOptionPanelAction());
-        infoButton.addActionListener(controller.getInfoAction());
         creditsButton.addActionListener(controller.getCreditsAction());
         configureButton.addActionListener(controller.getConfigureAction());
         
@@ -134,11 +127,6 @@ public class GameSetupWindow extends JDialog {
         buttonPane.add(new JLabel()); // Placeholder
         buttonPane.add(newButton);
         buttonPane.add(loadButton);
-        buttonPane.add(recentButton);
-recoveryButton.setEnabled(Config.get("save.recovery.active", "yes").equalsIgnoreCase("yes"));        buttonPane.add(recoveryButton);
-
-        buttonPane.add(infoButton);
-        buttonPane.add(quitButton);
         buttonPane.add(creditsButton);
 
         buttonPane.setLayout(new GridLayout(0, 2));
@@ -290,37 +278,16 @@ recoveryButton.setEnabled(Config.get("save.recovery.active", "yes").equalsIgnore
 
         // 1. Remember names that have already been filled-in...
         List<String> prefilledPlayers = Lists.newArrayList();
+        List<String> prefilledFullNames = Lists.newArrayList();
         for (PlayerInfo player : players) {
             if (player.name != null
-                    && player.name.getText().length() > 0) {
-                prefilledPlayers.add(player.name.getText());
+                    && player.name.getText().trim().length() > 0) {
+                prefilledPlayers.add(player.name.getText().trim());
+                prefilledFullNames.add(player.fullName);
             }
         }
         // and remove existing players
         players.clear();
-
-        // 2. NEW LOGIC: Collect configured player names
-        List<String> configPlayers = Lists.newArrayList();
-        int maxConfigurablePlayers = selectedGame.getMaxPlayers(); // Only check up to max players
-        for (int i = 1; i <= maxConfigurablePlayers; i++) {
-            String playerName = Config.get("player.name." + i);
-            // Only add the name if the config key exists AND has a non-empty value
-            if (playerName.length() > 0) {
-                configPlayers.add(playerName);
-            } else {
-                // Stop once the sequence of configured names is broken
-                break;
-            }
-        }
-
-        // 3. PRIORITIZE: If custom names were found, use them
-        if (!configPlayers.isEmpty()) {
-            prefilledPlayers = configPlayers;
-        }
-        // OR use default players if neither user-typed nor custom config names are present
-        else if (prefilledPlayers.isEmpty()) {
-            prefilledPlayers = Arrays.asList(Config.get("default_players").split(","));
-        }
 
         // create playersPane
         playersPane.removeAll();
@@ -328,31 +295,30 @@ recoveryButton.setEnabled(Config.get("save.recovery.active", "yes").equalsIgnore
         int maxPlayers = selectedGame.getMaxPlayers();
         int minPlayers = selectedGame.getMinPlayers();
 
-        playersPane.setLayout(new GridLayout(maxPlayers + 1, 0, 0, 2));
-        playersPane.setBorder(BorderFactory.createLoweredBevelBorder());
-        playersPane.add(new JLabel("Players:"));
-
-        playersPane.add(randomizeButton);
+        playersPane.setLayout(new BorderLayout(10, 0));
+        playersPane.setBorder(BorderFactory.createTitledBorder(""));
+        
+        // --- ACTIVE PLAYERS PANEL (LEFT) ---
+        JPanel activePanel = new JPanel(new GridLayout(maxPlayers + 2, 1, 0, 2));
+        activePanel.setBorder(BorderFactory.createTitledBorder("Active Players"));
 
         for (int i = 0; i < maxPlayers; i++) {
 
             PlayerInfo player = new PlayerInfo();
 
-            player.number.setText(LocalText.getText("PlayerName", Integer.toString(i + 1)));
             player.name.setInputVerifier(controller.getPlayerNameVerifier());
 
             if (i < prefilledPlayers.size()) {
                 player.name.setText(prefilledPlayers.get(i));
+                player.fullName = prefilledFullNames.get(i);
             }
             if (i < minPlayers) {
                 player.name.setBorder(BorderFactory.createLineBorder(Color.RED));
             }
             if (i < minPlayers || i <= prefilledPlayers.size()) {
                 player.name.setEnabled(true);
-                player.number.setForeground(Color.BLACK);
             } else {
                 player.name.setEnabled(false);
-                player.number.setForeground(Color.GRAY);
             }
 
             // allow activation of the next field by mouse click
@@ -367,11 +333,232 @@ recoveryButton.setEnabled(Config.get("save.recovery.active", "yes").equalsIgnore
                 }
             });
 
-            playersPane.add(player.number);
-            playersPane.add(player.name);
+            JPanel slot = new JPanel(new BorderLayout(5, 0));
+            JLabel numberLabel = new JLabel((i + 1) + ".");
+            numberLabel.setPreferredSize(new Dimension(20, 20));
+            slot.add(numberLabel, BorderLayout.WEST);
+            slot.add(player.name, BorderLayout.CENTER);
+            
+            JButton clearBtn = new JButton("X");
+            clearBtn.setMargin(new Insets(0, 0, 0, 0));
+            clearBtn.setPreferredSize(new Dimension(24, 20));
+            clearBtn.addActionListener(e -> {
+                player.name.setText("");
+                player.fullName = "";
+                compactActivePlayers();
+            });
+            slot.add(clearBtn, BorderLayout.EAST);
+            
+            activePanel.add(slot);
             players.add(player);
         }
+        
+        JPanel buttonWrapper = new JPanel(new FlowLayout(FlowLayout.LEFT));
+        buttonWrapper.add(randomizeButton);
+        activePanel.add(buttonWrapper);
+
+        // --- ROSTER PANEL (RIGHT) ---
+        JPanel rosterPanel = new JPanel(new BorderLayout(0, 5));
+        rosterPanel.setBorder(BorderFactory.createTitledBorder("Player Roster"));
+        
+        rosterModel = new DefaultListModel<>();
+        loadRoster(rosterModel);
+        rosterList = new JList<>(rosterModel);
+        rosterList.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
+        rosterList.setVisibleRowCount(maxPlayers);
+        
+        rosterList.addMouseListener(new MouseAdapter() {
+            public void mouseClicked(MouseEvent evt) {
+                if (evt.getClickCount() == 2) {
+                    String selected = rosterList.getSelectedValue();
+                    if (selected != null) {
+                        addPlayerToActive(selected);
+                    }
+                }
+            }
+        });
+
+        JScrollPane scrollPane = new JScrollPane(rosterList);
+        rosterPanel.add(scrollPane, BorderLayout.CENTER);
+
+        JButton addRosterBtn = new JButton("Add...");
+        addRosterBtn.addActionListener(e -> {
+            String name = JOptionPane.showInputDialog(GameSetupWindow.this, "Enter Player Name:");
+            if (name != null && !name.trim().isEmpty()) {
+                String cleanName = name.trim();
+                if (!rosterModel.contains(cleanName)) {
+                    rosterModel.addElement(cleanName);
+                    saveRoster(rosterModel);
+                } else {
+                    JOptionPane.showMessageDialog(GameSetupWindow.this, 
+                        "Player '" + cleanName + "' is already in the roster!", 
+                        "Duplicate Player", JOptionPane.WARNING_MESSAGE);
+                }
+            }
+        });
+        
+        JButton removeRosterBtn = new JButton("Remove");
+        removeRosterBtn.addActionListener(e -> {
+            int selectedIndex = rosterList.getSelectedIndex();
+            if (selectedIndex != -1) {
+                rosterModel.remove(selectedIndex);
+                saveRoster(rosterModel);
+            }
+        });
+
+        JPanel rosterBtnPanel = new JPanel(new FlowLayout(FlowLayout.CENTER));
+        rosterBtnPanel.add(addRosterBtn);
+        rosterBtnPanel.add(removeRosterBtn);
+        rosterPanel.add(rosterBtnPanel, BorderLayout.SOUTH);
+
+        playersPane.add(activePanel, BorderLayout.WEST);
+        playersPane.add(rosterPanel, BorderLayout.CENTER);
+
         playersPane.setVisible(true);
+    }
+
+    private void compactActivePlayers() {
+        List<String> currentNames = new ArrayList<>();
+        List<String> currentFullNames = new ArrayList<>();
+        for (PlayerInfo p : players) {
+            if (!p.name.getText().trim().isEmpty()) {
+                currentNames.add(p.name.getText().trim());
+                currentFullNames.add(p.fullName);
+            }
+        }
+        for (int i = 0; i < players.size(); i++) {
+            if (i < currentNames.size()) {
+                players.get(i).name.setText(currentNames.get(i));
+                players.get(i).fullName = currentFullNames.get(i);
+                players.get(i).name.setEnabled(true);
+            } else {
+                players.get(i).name.setText("");
+                players.get(i).fullName = "";
+                if (i == currentNames.size()) {
+                    players.get(i).name.setEnabled(true);
+                } else {
+                    players.get(i).name.setEnabled(false);
+                }
+            }
+        }
+    }
+
+    private String extractShortName(String rosterEntry) {
+        int start = rosterEntry.lastIndexOf('(');
+        int end = rosterEntry.lastIndexOf(')');
+        if (start != -1 && end != -1 && end > start) {
+            return rosterEntry.substring(start + 1, end).trim();
+        }
+        // Dynamically extract first name as short name if no parentheses
+        String[] parts = rosterEntry.trim().split("\\s+");
+        if (parts.length > 0) {
+            return parts[0];
+        }
+        return rosterEntry;
+    }
+
+    private void addPlayerToActive(String fullRosterName) {
+        // 1. Prevent adding the exact same roster entry twice
+        for (PlayerInfo player : players) {
+            if (player.name.isEnabled() && !player.name.getText().trim().isEmpty()) {
+                if (fullRosterName.equals(player.fullName)) {
+                    JOptionPane.showMessageDialog(GameSetupWindow.this, 
+                        "Player '" + fullRosterName + "' is already in the game!", 
+                        "Duplicate Player", JOptionPane.WARNING_MESSAGE);
+                    return;
+                }
+            }
+        }
+
+        // 2. Find empty slot
+        PlayerInfo foundSlot = null;
+        for (PlayerInfo player : players) {
+            if (player.name.isEnabled() && player.name.getText().trim().isEmpty()) {
+                foundSlot = player;
+                break;
+            }
+        }
+        if (foundSlot == null) return;
+        final PlayerInfo targetSlot = foundSlot;
+
+        // 3. Resolve Short Name uniqueness
+        String baseShortName = extractShortName(fullRosterName);
+        boolean exactMatchFound = false;
+        boolean baseNameUsedInNumbered = false;
+        
+        for (PlayerInfo p : players) {
+            if (p == targetSlot || p.name.getText().trim().isEmpty()) continue;
+            String text = p.name.getText().trim();
+            if (text.equals(baseShortName)) exactMatchFound = true;
+            else if (text.startsWith(baseShortName + " ")) baseNameUsedInNumbered = true;
+        }
+
+        String finalShortName = baseShortName;
+        
+        if (exactMatchFound || baseNameUsedInNumbered) {
+            if (exactMatchFound) {
+                for (PlayerInfo p : players) {
+                    if (p != targetSlot && p.name.getText().trim().equals(baseShortName)) {
+                        int c = 1;
+                        while (true) {
+                            String test = baseShortName + " " + c;
+                            boolean taken = players.stream().anyMatch(other -> other != p && other.name.getText().trim().equals(test));
+                            if (!taken) { p.name.setText(test); break; }
+                            c++;
+                        }
+                        break;
+                    }
+                }
+            }
+            
+            int counter = 1;
+            while (true) {
+                String testName = baseShortName + " " + counter;
+                boolean taken = players.stream().anyMatch(p -> p != targetSlot && p.name.getText().trim().equals(testName));
+                if (!taken) { finalShortName = testName; break; }
+                counter++;
+            }
+        }
+
+        // 4. Assign to slot
+        targetSlot.name.setText(finalShortName);
+        targetSlot.fullName = fullRosterName;
+        compactActivePlayers();
+    }
+
+    private void loadRoster(DefaultListModel<String> model) {
+        java.io.File file = new java.io.File("PlayerNames18xx.txt");
+        if (file.exists()) {
+            try (java.io.BufferedReader br = new java.io.BufferedReader(new java.io.FileReader(file))) {
+                String line;
+                while ((line = br.readLine()) != null) {
+                    if (!line.trim().isEmpty()) {
+                        model.addElement(line.trim());
+                    }
+                }
+            } catch (Exception e) {
+                org.slf4j.LoggerFactory.getLogger(GameSetupWindow.class).error("Error loading roster file", e);
+            }
+        } else {
+            model.addElement("Stefan Bleeck");
+            model.addElement("Ralf Arenmann");
+            model.addElement("Rainer Kluge");
+            model.addElement("Bjoern Ebeling");
+            model.addElement("Mark Arnd");
+            model.addElement("Stefan Boehme");
+            model.addElement("Christian Stieling");
+        }
+    }
+
+    private void saveRoster(DefaultListModel<String> model) {
+        java.io.File file = new java.io.File("PlayerNames18xx.txt");
+        try (java.io.PrintWriter pw = new java.io.PrintWriter(new java.io.FileWriter(file))) {
+            for (int i = 0; i < model.size(); i++) {
+                pw.println(model.get(i));
+            }
+        } catch (Exception e) {
+            org.slf4j.LoggerFactory.getLogger(GameSetupWindow.class).error("Error saving roster file", e);
+        }
     }
 
     GameInfo getSelectedGame() {
@@ -393,6 +580,19 @@ recoveryButton.setEnabled(Config.get("save.recovery.active", "yes").equalsIgnore
             String name = player.name.getText();
             if (name != null && name.length() > 0) {
                 playerList.add(name);
+            }
+        }
+        return playerList.build();
+    }
+
+    ImmutableList<String> getFullNames() {
+        ImmutableList.Builder<String> playerList = ImmutableList.builder();
+        for (PlayerInfo player : players) {
+            String name = player.name.getText();
+            if (name != null && name.length() > 0) {
+                // Fallback to short name if fullName is somehow empty
+                String full = (player.fullName != null && !player.fullName.trim().isEmpty()) ? player.fullName : name;
+                playerList.add(full);
             }
         }
         return playerList.build();
@@ -462,22 +662,31 @@ recoveryButton.setEnabled(Config.get("save.recovery.active", "yes").equalsIgnore
     private void performRandomizationEffect(ActionEvent originalEvent) {
         // 1. Setup & Guard Clauses
         randomizeButton.setEnabled(false);
+
+        class PlayerIdentity {
+            String shortName;
+            String fullName;
+            PlayerIdentity(String s, String f) { shortName = s; fullName = f; }
+        }
         
-        List<String> originalNames = Lists.newArrayList(getPlayers());
-        int activeCount = originalNames.size();
-        
-        // If fewer than 2 players, just shuffle instantly and return
+        List<PlayerIdentity> originalIdentities = new ArrayList<>();
+        for (PlayerInfo p : players) {
+            if (!p.name.getText().trim().isEmpty()) {
+                originalIdentities.add(new PlayerIdentity(p.name.getText().trim(), p.fullName));
+            }
+        }
+        int activeCount = originalIdentities.size();
+
         if (activeCount < 2) {
-            java.util.Collections.shuffle(originalNames);
-            setPlayers(originalNames);
             randomizeButton.setEnabled(true);
             return;
         }
 
         // 2. Pre-calculate the "Destiny" (Final Result)
-        List<String> finalNames = Lists.newArrayList(originalNames);
-        java.util.Collections.shuffle(finalNames); 
+        List<PlayerIdentity> finalIdentities = new ArrayList<>(originalIdentities);
+        java.util.Collections.shuffle(finalIdentities);
 
+        
         // Track which UI rows (indices) are "locked"
         boolean[] locked = new boolean[activeCount]; 
         
@@ -510,9 +719,11 @@ recoveryButton.setEnabled(Config.get("save.recovery.active", "yes").equalsIgnore
                         int indexToLock = availableIndices.get((int)(Math.random() * availableIndices.size()));
                         locked[indexToLock] = true;
                         
-                        // Fix the value to the pre-calculated destiny
+// Fix the value to the pre-calculated destiny
                         PlayerInfo pInfo = players.get(indexToLock);
-                        pInfo.name.setText(finalNames.get(indexToLock));
+                        pInfo.name.setText(finalIdentities.get(indexToLock).shortName);
+                        pInfo.fullName = finalIdentities.get(indexToLock).fullName; // Sync full name
+
                         
                         // Visual Cue: Locked = Black & Bold
                         pInfo.name.setForeground(Color.BLACK); 
@@ -529,10 +740,10 @@ recoveryButton.setEnabled(Config.get("save.recovery.active", "yes").equalsIgnore
                         if (!locked[i]) {
                             PlayerInfo pInfo = players.get(i);
                             
-                            // Show random noise (pick any name from the original list)
-                            String randomName = originalNames.get((int)(Math.random() * activeCount));
+// Show random noise (pick any name from the original list)
+                            String randomName = originalIdentities.get((int)(Math.random() * activeCount)).shortName;
                             pInfo.name.setText(randomName);
-                            
+
                             // Visual Cue: Flux = Gray & Italic
                             pInfo.name.setForeground(Color.GRAY);
                             pInfo.name.setFont(pInfo.name.getFont().deriveFont(Font.ITALIC)); 
@@ -542,8 +753,12 @@ recoveryButton.setEnabled(Config.get("save.recovery.active", "yes").equalsIgnore
                     // --- Phase C: Finish ---
                     ((Timer)e.getSource()).stop();
                     
-                    // Final cleanup to ensure clean state
-                    setPlayers(finalNames); // Ensure text is exact
+// Final cleanup to ensure clean state
+                    for (int i = 0; i < activeCount; i++) {
+                        players.get(i).name.setText(finalIdentities.get(i).shortName);
+                        players.get(i).fullName = finalIdentities.get(i).fullName;
+                    }
+                    
                     
                     // Reset font styles for everyone
                     for (int i = 0; i < activeCount; i++) {

@@ -135,6 +135,18 @@ public class SplashWindow {
         //quit directly when no visualization required
         //all visualization related attributes remain null then
         if ("no".equals(Config.get("splash.window.open"))) return;
+        
+        // Clean up the display text to just show the Game Name (e.g., '1830') instead of the full filename
+        if (isLoad && initDetailsText != null) {
+            String fileName = new java.io.File(initDetailsText).getName();
+            if (fileName.contains("_")) {
+                initDetailsText = fileName.substring(0, fileName.indexOf('_'));
+            } else if (fileName.contains(".")) {
+                initDetailsText = fileName.substring(0, fileName.indexOf('.'));
+            } else {
+                initDetailsText = fileName;
+            }
+        }
 
         //calculate estimated duration for the respective steps
         cumulativeDuration = new long[STEP_DURATION.length];
@@ -170,7 +182,7 @@ public class SplashWindow {
 
         //set up static elements
 
-        JLabel railsLabel = new JLabel("Rails " +Config.getVersion());
+        JLabel railsLabel = new JLabel(initDetailsText);
         railsLabel.setFont(railsLabel.getFont().deriveFont(
                 (float)2.0 * railsLabel.getFont().getSize()));
         railsLabel.setAlignmentX(Component.CENTER_ALIGNMENT);

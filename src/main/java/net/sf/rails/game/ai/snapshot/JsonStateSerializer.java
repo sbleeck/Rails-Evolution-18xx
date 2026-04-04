@@ -129,6 +129,7 @@ private static GameStateData.PhaseData populatePhaseData(PhaseManager pm) {
         GameStateData.PlayerData data = new GameStateData.PlayerData();
         data.id = player.getId();
         data.cash = player.getCash();
+        data.fullName = player.getFullName();
         // Corrected method: value()
         data.timeBankSeconds = player.getTimeBankModel().value();
 

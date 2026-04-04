@@ -65,6 +65,11 @@ public class GameLoader {
     }
 
     public static void loadAndStartGame(File gameFile, int moveLimit) {
+        if (gameFile == null || !gameFile.exists()) {
+            System.out.println("file not found");
+            System.exit(1);
+        }
+        
         SplashWindow splashWindow = new SplashWindow(true, gameFile.getName());
 
         try {

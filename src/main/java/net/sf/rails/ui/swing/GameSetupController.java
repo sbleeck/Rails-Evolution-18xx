@@ -67,11 +67,7 @@ public class GameSetupController {
     // Actions
     private final ActionListener newAction = new NewAction();
     private final ActionListener loadAction = new LoadAction();
-    private final ActionListener recentAction = new RecentAction();
-    private final ActionListener recoveryAction = new RecoveryAction();
-    private final ActionListener quitAction = new QuitAction();
     private final ActionListener optionPanelAction = new OptionPanelAction();
-    private final ActionListener infoAction = new InfoAction();
     private final ActionListener creditsAction = new CreditsAction();
     private final ActionListener gameAction = new GameAction();
     private final ActionListener configureAction = new ConfigureAction();
@@ -196,9 +192,11 @@ public class GameSetupController {
             new Thread(this::startNewGame).start();
         }
 
+        
         private void startNewGame() {
             GameInfo selectedGame = window.getSelectedGame();
             List<String> players = window.getPlayers();
+            List<String> fullNames = window.getFullNames(); // NEW: Fetch full names
             GameOptionsSet.Builder selectedOptions = getAvailableOptions(selectedGame);
 
             // check against number of available players
@@ -222,10 +220,17 @@ public class GameSetupController {
 
             RailsRoot railsRoot = null;
             try {
-                // Get the final GameData, which should include time settings from the cached defaultGameManager
+                // Let the engine build the game using the SHORT names (for UI tabs, logs, etc.)
                 GameData gameData = GameData.create(selectedGame, selectedOptions, players);
-                
                 railsRoot = RailsRoot.create(gameData);
+
+                // NEW: Inject the FULL names into the newly created Player objects
+                List<net.sf.rails.game.Player> createdPlayers = railsRoot.getPlayerManager().getPlayers();
+                for (int i = 0; i < createdPlayers.size(); i++) {
+                    if (i < fullNames.size()) {
+                        createdPlayers.get(i).setFullName(fullNames.get(i));
+                    }
+                }
             } catch (ConfigurationException e) {
                 log.error("unable to continue", e);
                 // TODO: Fix this behavior, give more information?
@@ -293,108 +298,6 @@ public class GameSetupController {
 
     }
 
-    private class RecentAction extends AbstractAction {
-        private static final long serialVersionUID = 0L;
-
-        @Override
-        public void actionPerformed(ActionEvent arg0) {
-            File saveDirectory = new File(Config.get("save.directory"));
-
-            // define recent files
-            SortedSet<File> recentFiles = new TreeSet<>((a, b) -> ComparisonChain.start()
-                    .compare(b.lastModified(), a.lastModified())
-                    .compare(a.getName(), b.getName())
-                    .result());
-
-            // define saved file extension
-
-            // get recent files
-            getRecentFiles(recentFiles, saveDirectory);
-            if ( recentFiles.size() == 0 ) return;
-            File[] files = recentFiles.toArray(new File[]{});
-
-            int numOptions = 20;
-            numOptions = Math.min(numOptions, recentFiles.size());
-            String[] options = new String[numOptions];
-            int dirPathLength = saveDirectory.getPath().length();
-            for (int i=0; i<numOptions;i++) {
-                // Get path relative to saveDirectory
-                options[i] = files[i].getPath().substring(dirPathLength+1);
-            }
-            String text = LocalText.getText("Select");
-            String result = (String) JOptionPane.showInputDialog(window, text, text, JOptionPane.INFORMATION_MESSAGE, null, options, options[0]);
-            if (result == null) return;
-            final File selectedFile = files[Arrays.asList(options).indexOf(result)];
-            if (selectedFile != null) {
-                new Thread(() -> loadAndStartGame(selectedFile)).start();
-            }
-        }
-
-        private void getRecentFiles (SortedSet<File> recentFiles, File dir) {
-            if (!dir.exists() || !dir.isDirectory()) return;
-
-            boolean last_rails_only = Config.getBoolean("load.recent_files.include_only_last_rails", false);
-
-            Pattern include = null;
-            String regEx = Config.get("load.recent_files.include_regex");
-            if ( StringUtils.isNotBlank(regEx) ) {
-                include = Pattern.compile(regEx);
-            }
-
-            Pattern exclude = null;
-            regEx = Config.get("load.recent_files.exclude_regex");
-            if ( StringUtils.isNotBlank(regEx) ) {
-                exclude = Pattern.compile(regEx);
-            }
-
-            for (File entry : dir.listFiles()) {
-                if (entry.isFile() && isOurs(entry) ) {
-                    boolean doInclude = true;
-                    String ext = StringUtils.substringAfterLast(entry.getName(), ".");
-                    if ( last_rails_only ) {
-                        doInclude = GameUIManager.DEFAULT_SAVE_POLLING_EXTENSION.equals(ext);
-                    }
-                    if ( doInclude && include != null ) {
-                        doInclude = include.matcher(entry.getPath()).matches();
-                        log.debug("matching include against {}: included: {}", entry.getPath(), doInclude);
-                    }
-                    if ( doInclude && exclude != null ) {
-                        doInclude = ! exclude.matcher(entry.getPath()).matches();
-                        log.debug("matching exclude against {}: included: {}", entry.getPath(), doInclude);
-                    }
-
-                    if ( doInclude ) {
-                        recentFiles.add(entry);
-                    }
-                } else if (entry.isDirectory()){
-                    getRecentFiles(recentFiles, entry);
-                }
-            }
-        }
-    }
-
-    private class RecoveryAction extends AbstractAction {
-        private static final long serialVersionUID = 0L;
-
-        @Override
-        public void actionPerformed(ActionEvent arg0) {
-            new Thread(() -> {
-                String filePath = SystemOS.get().getConfigurationFolder(GameSaver.AUTOSAVE_FOLDER, true).getAbsolutePath()
-                        + File.separator + GameSaver.AUTOSAVE_FILE;
-                loadAndStartGame(new File(filePath));
-            }).start();
-        }
-    }
-
-    private static class QuitAction extends AbstractAction {
-        private static final long serialVersionUID = 0L;
-
-        @Override
-        public void actionPerformed(ActionEvent arg0) {
-            System.exit(0);
-        }
-    }
-
     private class OptionPanelAction extends AbstractAction {
         private static final long serialVersionUID = 0L;
 
@@ -458,19 +361,6 @@ public class GameSetupController {
             GameInfo game  = window.getSelectedGame();
             option.setSelectedValue(value);
             log.debug("GameOption {} set to {} for game {}", option, value, game);
-        }
-    }
-
-    private class InfoAction extends AbstractAction {
-        private static final long serialVersionUID = 0L;
-
-        @Override
-        public void actionPerformed(ActionEvent arg0) {
-            GameInfo game = window.getSelectedGame();
-            JOptionPane.showMessageDialog(window,
-                    game.getDescription(),
-                    "Information about " + game.getName(),
-                    JOptionPane.INFORMATION_MESSAGE);
         }
     }
 
@@ -561,24 +451,8 @@ public class GameSetupController {
         return loadAction;
     }
 
-    public ActionListener getRecentAction() {
-        return recentAction;
-    }
-
-    public ActionListener getRecoveryAction() {
-        return recoveryAction;
-    }
-
-    public ActionListener getQuitAction() {
-        return quitAction;
-    }
-
     public ActionListener getOptionPanelAction() {
         return optionPanelAction;
-    }
-
-    public ActionListener getInfoAction() {
-        return infoAction;
     }
 
     public ActionListener getCreditsAction() {

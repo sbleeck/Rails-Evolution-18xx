@@ -57,22 +57,22 @@ public class ExchangeForPrussianShare extends PossibleAction implements GuiTarge
 
     @Override
     public Color getButtonColor() { 
-        return new Color(152, 251, 152); // PaleGreen
+        return new Color(255, 140, 0); // Vibrant Orange
     }
 
     @Override
     public Color getHighlightBackgroundColor() {
-        return new Color(152, 251, 152); // PaleGreen
+        return new Color(255, 140, 0); // Vibrant Orange
     }
 
     @Override
     public Color getHighlightBorderColor() {
-        return new Color(34, 139, 34); // ForestGreen
+        return Color.BLACK;
     }
 
     @Override
     public Color getHighlightTextColor() {
-        return Color.BLACK;
+        return Color.WHITE;
     }
 
 

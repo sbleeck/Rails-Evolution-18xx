@@ -1475,6 +1475,10 @@ currentRoundName = "Game Start";
         // Apply the new font globally
         changeGlobalFont(font, this.currentFontScale);
 
+        if (orUIManager != null) {
+            orUIManager.updateScale();
+        }
+
         // Refresh all windows to apply the new layout
         updateWindowsLookAndFeel();
     }

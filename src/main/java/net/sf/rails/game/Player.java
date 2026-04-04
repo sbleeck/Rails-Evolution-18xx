@@ -19,6 +19,7 @@ import net.sf.rails.game.model.SoldThisRoundModel;
 import net.sf.rails.game.state.BooleanState;
 import net.sf.rails.game.state.ChangeActionOwner;
 import net.sf.rails.game.state.IntegerState;
+import net.sf.rails.game.state.GenericState;
 import net.sf.rails.game.state.Purse;
 import net.sf.rails.game.state.Currency;
 import net.sf.rails.game.GameManager;
@@ -61,6 +62,18 @@ public class Player extends RailsAbstractItem
     private final Map<PublicCompany, SoldThisRoundModel> soldThisRound = Maps.newHashMap();
     private final PlayerNameModel playerNameModel = PlayerNameModel.create(this);
 
+    private final GenericState<String> fullName = new GenericState<>(this, "fullName");
+
+    public void setFullName(String name) {
+        this.fullName.set(name);
+    }
+
+    public String getFullName() {
+        String name = this.fullName.value();
+        // Fallback to the short ID if the full name hasn't been explicitly set
+        return (name != null && !name.isEmpty()) ? name : getId(); 
+    }
+    
     private static final Logger log = LoggerFactory.getLogger(Player.class);
 
     private Player(PlayerManager parent, String id, int index) {

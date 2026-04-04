@@ -114,7 +114,6 @@ public class ORWindow extends DockingFrame implements ActionPerformer {
 
             // VERIFICATION LOG: Confirm the width is actually 300 (ORPanel.SIDEBAR_WIDTH)
             
-sidebarWrapper.setPreferredSize(new Dimension(ORPanel.SIDEBAR_WIDTH, 0));
             sidebarWrapper.add(orPanel.getSidebarPanel(), BorderLayout.CENTER);
 
             // 2. Map Wrapper (CENTER): Vertically stacks Map (Center) and Tiles (South)
@@ -309,13 +308,34 @@ sidebarWrapper.setPreferredSize(new Dimension(ORPanel.SIDEBAR_WIDTH, 0));
 
 
 
-private void setupGlobalHotkeys() {
+    // --- START FIX ---
+    private void setupGlobalHotkeys() {
         JComponent rootPane = this.getRootPane();
 
         InputMap inputMap = rootPane.getInputMap(JComponent.WHEN_IN_FOCUSED_WINDOW);
         ActionMap actionMap = rootPane.getActionMap();
         
-
+        int mask = Toolkit.getDefaultToolkit().getMenuShortcutKeyMaskEx();
+        
+        // Increase Font (Cmd = and Cmd +)
+        inputMap.put(KeyStroke.getKeyStroke(KeyEvent.VK_EQUALS, mask), "increaseFont");
+        inputMap.put(KeyStroke.getKeyStroke(KeyEvent.VK_ADD, mask), "increaseFont");
+        actionMap.put("increaseFont", new AbstractAction() {
+            private static final long serialVersionUID = 1L;
+            public void actionPerformed(ActionEvent e) {
+                if (orPanel != null) orPanel.adjustFontScale(0.1);
+            }
+        });
+        
+        // Decrease Font (Cmd -)
+        inputMap.put(KeyStroke.getKeyStroke(KeyEvent.VK_MINUS, mask), "decreaseFont");
+        inputMap.put(KeyStroke.getKeyStroke(KeyEvent.VK_SUBTRACT, mask), "decreaseFont");
+        actionMap.put("decreaseFont", new AbstractAction() {
+            private static final long serialVersionUID = 1L;
+            public void actionPerformed(ActionEvent e) {
+                if (orPanel != null) orPanel.adjustFontScale(-0.1);
+            }
+        });
 
         // SPACE KEY: toggle through visuals
         String SHOW_NUMBERS_KEY = "showNumbersAction";

@@ -67,6 +67,7 @@ public class GameStateData {
     public static class PlayerData {
         public String id;
         public int cash;
+        public String fullName;
         public List<CertificateData> certificates;
         public List<String> privateCompanyIds; // IDs of privates owned
         public int timeBankSeconds;

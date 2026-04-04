@@ -805,8 +805,7 @@ private void executeStartPrussian(boolean auto) {
             NullAction done = new NullAction(getRoot(), NullAction.Mode.DONE);
             String doneLabel = foldablePrePrussians.isEmpty() ? "Done (Nothing)" : "Pass (Keep)";
 
-            // Added Player Name to the Done Button for clarity
-            done.setButtonLabel("<html><center><b>D: " + doneLabel + "</b><br>" + playerName + "</center></html>");
+            done.setButtonLabel(doneLabel);
             possibleActions.add(done);
 
         } else if (getPrussianStep() == Step.DISCARD_TRAINS) {

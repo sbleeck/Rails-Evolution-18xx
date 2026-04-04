@@ -174,7 +174,7 @@ public class ORPanel extends GridPanel
     public ORPanel(ORWindow parent, ORUIManager orUIManager) {
         super();
         activeInstances.add(this);
-        setPreferredSize(new Dimension(SIDEBAR_WIDTH, 0));
+        setPreferredSize(new Dimension(getSidebarWidth(), 0));
 
         this.orWindow = parent;
         this.orUIManager = orUIManager;
@@ -443,7 +443,7 @@ disableRoutesDisplay();
                 BorderFactory.createEmptyBorder(3, 5, 3, 5)));
 
         btn.setAlignmentX(Component.CENTER_ALIGNMENT);
-        btn.setMaximumSize(new Dimension(SIDEBAR_WIDTH - 10, 30));
+        btn.setMaximumSize(new Dimension(getSidebarWidth() - scale(10), scale(30)));
         btn.setPossibleAction(action);
         btn.setEnabled(true);
         btn.addActionListener(this);
@@ -465,8 +465,8 @@ disableRoutesDisplay();
         b.setIcon(null);
         b.setHorizontalAlignment(SwingConstants.CENTER);
         b.setAlignmentX(Component.CENTER_ALIGNMENT);
-        b.setPreferredSize(new Dimension(SIDEBAR_WIDTH - 20, BTN_HEIGHT));
-        b.setMaximumSize(new Dimension(SIDEBAR_WIDTH - 20, BTN_HEIGHT));
+        b.setPreferredSize(new Dimension(getSidebarWidth() - scale(20), scale(BTN_HEIGHT)));
+        b.setMaximumSize(new Dimension(getSidebarWidth() - scale(20), scale(BTN_HEIGHT)));
 
         // --- STYLING ---
         // High Visibility Gold/Orange
@@ -1041,6 +1041,146 @@ disableRoutesDisplay();
     public static final int TRAIN_CARD_HEIGHT = 25;
     public static final int REVENUE_BUTTON_ROW_HEIGHT = 25;
     public static final int FOOTER_DONE_HEIGHT = 45;
+    
+    private double localFontScale = -1.0;
+
+    public double getFontScale() {
+        if (localFontScale < 0) {
+            if (orUIManager != null && orUIManager.getGameUIManager() != null) {
+                localFontScale = orUIManager.getGameUIManager().getFontScale();
+            } else {
+                localFontScale = 1.0;
+            }
+        }
+        return localFontScale;
+    }
+
+    public void adjustFontScale(double delta) {
+        localFontScale = getFontScale() + delta;
+        if (localFontScale < 0.5) localFontScale = 0.5;
+        if (localFontScale > 3.0) localFontScale = 3.0;
+        updateScale();
+    }
+    
+    public int scale(int value) {
+        return (int) (value * getFontScale());
+    }
+
+    public int getSidebarWidth() {
+        return scale(SIDEBAR_WIDTH);
+    }
+    
+    public void updateScale() {
+        int sw = getSidebarWidth();
+        
+        this.setPreferredSize(new Dimension(sw, 0));
+        
+        if (sidebarPanel != null) {
+            sidebarPanel.setPreferredSize(new Dimension(sw, scale(SIDEBAR_HEIGHT)));
+            sidebarPanel.setMinimumSize(new Dimension(sw, scale(SIDEBAR_HEIGHT)));
+            sidebarPanel.setMaximumSize(new Dimension(sw, Short.MAX_VALUE));
+        }
+        
+        if (lblCompanyInfo != null) {
+            lblCompanyInfo.setPreferredSize(new Dimension(sw, scale(HEADER_INFO_HEIGHT)));
+            lblCompanyInfo.setMaximumSize(new Dimension(sw, scale(HEADER_INFO_HEIGHT)));
+        }
+        
+        if (lblPhaseInstruction != null) {
+            lblPhaseInstruction.setPreferredSize(new Dimension(sw, scale(HEADER_PHASE_HEIGHT)));
+            lblPhaseInstruction.setMaximumSize(new Dimension(sw, scale(HEADER_PHASE_HEIGHT)));
+        }
+        
+        if (lblPlayerInfo != null) {
+            lblPlayerInfo.setPreferredSize(new Dimension(sw, scale(20)));
+            lblPlayerInfo.setMaximumSize(new Dimension(sw, scale(20)));
+        }
+        
+        if (cashPanel != null) {
+            cashPanel.setPreferredSize(new Dimension(sw, scale(READOUT_PANEL_HEIGHT)));
+            cashPanel.setMinimumSize(new Dimension(sw, scale(READOUT_PANEL_HEIGHT)));
+            cashPanel.setMaximumSize(new Dimension(sw, scale(READOUT_PANEL_HEIGHT)));
+        }
+        
+        if (loansPanel != null) {
+            loansPanel.setPreferredSize(new Dimension(sw, scale(READOUT_PANEL_HEIGHT)));
+            loansPanel.setMinimumSize(new Dimension(sw, scale(READOUT_PANEL_HEIGHT)));
+            loansPanel.setMaximumSize(new Dimension(sw, scale(READOUT_PANEL_HEIGHT)));
+        }
+        
+        if (btnTileConfirm != null) updateBtnSize(btnTileConfirm, sw - scale(20), scale(BTN_HEIGHT));
+        if (btnTokenConfirm != null) updateBtnSize(btnTokenConfirm, sw - scale(20), scale(BTN_HEIGHT));
+        if (btnTrainSkip != null) updateBtnSize(btnTrainSkip, sw - scale(20), scale(BTN_HEIGHT));
+        if (btnDone != null) updateBtnSize(btnDone, sw - scale(10), scale(40));
+        
+        if (btnDone != null) btnDone.setFont(new Font("SansSerif", Font.BOLD, scale(14)));
+        if (btnTileConfirm != null) btnTileConfirm.setFont(new Font("SansSerif", Font.BOLD, scale(12)));
+        if (btnTokenConfirm != null) btnTokenConfirm.setFont(new Font("SansSerif", Font.BOLD, scale(12)));
+        if (btnTrainSkip != null) btnTrainSkip.setFont(new Font("SansSerif", Font.BOLD, scale(12)));
+        if (btnRevPayout != null) btnRevPayout.setFont(new Font("SansSerif", Font.BOLD, scale(12)));
+        if (btnRevWithhold != null) btnRevWithhold.setFont(new Font("SansSerif", Font.BOLD, scale(12)));
+        if (btnRevSplit != null) btnRevSplit.setFont(new Font("SansSerif", Font.BOLD, scale(12)));
+        
+        if (lblCash != null) lblCash.setFont(new Font("SansSerif", Font.BOLD, scale(22)));
+        if (lblLoans != null) lblLoans.setFont(new Font("SansSerif", Font.BOLD, scale(22)));
+        if (lblFixed != null) lblFixed.setFont(new Font("SansSerif", Font.BOLD, scale(18)));
+        if (lblRoute != null) lblRoute.setFont(new Font("SansSerif", Font.BOLD, scale(18)));
+        
+        if (specialNotificationPanel != null) {
+            for (Component c : specialNotificationPanel.getComponents()) {
+                if (c instanceof ActionButton) {
+                    updateBtnSize((ActionButton) c, sw - scale(20), scale(BTN_HEIGHT));
+                    c.setFont(new Font("SansSerif", Font.BOLD, scale(12)));
+                }
+            }
+        }
+        
+        if (specialPanel != null) {
+            for (Component c : specialPanel.getComponents()) {
+                if (c instanceof ActionButton) {
+                    ((ActionButton) c).setMaximumSize(new Dimension(sw - scale(20), scale(60)));
+                    c.setFont(new Font("SansSerif", Font.BOLD, scale(12)));
+                }
+            }
+        }
+        
+        if (specialActionsButtonPanel != null) {
+            for (Component c : specialActionsButtonPanel.getComponents()) {
+                if (c instanceof ActionButton) {
+                    ((ActionButton) c).setMaximumSize(new Dimension(sw - scale(10), scale(30)));
+                    c.setFont(new Font("SansSerif", Font.BOLD, scale(10)));
+                }
+            }
+        }
+        
+        if (trainButtonsPanel != null) {
+            for (Component c : trainButtonsPanel.getComponents()) {
+                if (c instanceof ActionButton) {
+                    ((ActionButton) c).setMaximumSize(new Dimension(sw - scale(10), scale(30)));
+                    c.setFont(new Font("SansSerif", Font.BOLD, scale(12)));
+                }
+            }
+        }
+        
+        if (sidebarPanel != null) {
+            sidebarPanel.revalidate();
+            sidebarPanel.repaint();
+        }
+        if (orWindow != null && orWindow.getContentPane() != null) {
+            orWindow.getContentPane().revalidate();
+            orWindow.getContentPane().repaint();
+        }
+        
+        this.revalidate();
+        this.repaint();
+    }
+    
+    private void updateBtnSize(JComponent btn, int w, int h) {
+        if (btn != null) {
+            btn.setPreferredSize(new Dimension(w, h));
+            btn.setMaximumSize(new Dimension(w, h));
+        }
+    }
 
     private void initSidebar() {
         sidebarPanel = new JPanel();
@@ -1048,9 +1188,9 @@ disableRoutesDisplay();
 
         // 1. Force sidebar to fixed width
         // Sidebar strict width, flexible height
-        sidebarPanel.setPreferredSize(new Dimension(SIDEBAR_WIDTH, SIDEBAR_HEIGHT));
-        sidebarPanel.setMinimumSize(new Dimension(SIDEBAR_WIDTH, SIDEBAR_HEIGHT));
-        sidebarPanel.setMaximumSize(new Dimension(SIDEBAR_WIDTH, Short.MAX_VALUE));
+        sidebarPanel.setPreferredSize(new Dimension(getSidebarWidth(), scale(SIDEBAR_HEIGHT)));
+        sidebarPanel.setMinimumSize(new Dimension(getSidebarWidth(), scale(SIDEBAR_HEIGHT)));
+        sidebarPanel.setMaximumSize(new Dimension(getSidebarWidth(), Short.MAX_VALUE));
 
         sidebarPanel.setBackground(BG_DETAILS);
         sidebarPanel.setOpaque(true);
@@ -1060,23 +1200,23 @@ disableRoutesDisplay();
         lblCompanyInfo.setBackground(Color.LIGHT_GRAY);
         lblCompanyInfo.setAlignmentX(Component.CENTER_ALIGNMENT);
         // Fixed dimensions ensure it fills the width
-        lblCompanyInfo.setPreferredSize(new Dimension(SIDEBAR_WIDTH, HEADER_INFO_HEIGHT));
-        lblCompanyInfo.setMaximumSize(new Dimension(SIDEBAR_WIDTH, HEADER_INFO_HEIGHT));
+        lblCompanyInfo.setPreferredSize(new Dimension(getSidebarWidth(), scale(HEADER_INFO_HEIGHT)));
+        lblCompanyInfo.setMaximumSize(new Dimension(getSidebarWidth(), scale(HEADER_INFO_HEIGHT)));
 
         // 2. Bottom Component: Phase Instruction
         lblPhaseInstruction = new JLabel("", SwingConstants.CENTER);
         lblPhaseInstruction.setOpaque(true); // Critical for background color
         lblPhaseInstruction.setAlignmentX(Component.CENTER_ALIGNMENT);
-        lblPhaseInstruction.setPreferredSize(new Dimension(SIDEBAR_WIDTH, HEADER_PHASE_HEIGHT));
-        lblPhaseInstruction.setMaximumSize(new Dimension(SIDEBAR_WIDTH, HEADER_PHASE_HEIGHT));
+        lblPhaseInstruction.setPreferredSize(new Dimension(getSidebarWidth(), scale(HEADER_PHASE_HEIGHT)));
+        lblPhaseInstruction.setMaximumSize(new Dimension(getSidebarWidth(), scale(HEADER_PHASE_HEIGHT)));
         sidebarPanel.add(lblCompanyInfo);
 
         lblPlayerInfo = new JLabel("", SwingConstants.CENTER);
         lblPlayerInfo.setOpaque(true);
         lblPlayerInfo.setBackground(Color.LIGHT_GRAY);
         lblPlayerInfo.setAlignmentX(Component.CENTER_ALIGNMENT);
-        lblPlayerInfo.setPreferredSize(new Dimension(SIDEBAR_WIDTH, 20)); // Smaller height for player
-        lblPlayerInfo.setMaximumSize(new Dimension(SIDEBAR_WIDTH, 20));
+        lblPlayerInfo.setPreferredSize(new Dimension(getSidebarWidth(), scale(20))); // Smaller height for player
+        lblPlayerInfo.setMaximumSize(new Dimension(getSidebarWidth(), scale(20)));
         sidebarPanel.add(lblPlayerInfo);
 
         sidebarPanel.add(lblPhaseInstruction);
@@ -1150,7 +1290,7 @@ disableRoutesDisplay();
 
         JPanel revDisplayPanel = new JPanel(new GridLayout(1, 2, 5, 0));
         revDisplayPanel.setOpaque(false);
-        revDisplayPanel.setMaximumSize(new Dimension(SIDEBAR_WIDTH - 10, 45));
+        revDisplayPanel.setMaximumSize(new Dimension(getSidebarWidth() - scale(10), scale(45)));
 
         JPanel divBox = new JPanel();
         divBox.setLayout(new BoxLayout(divBox, BoxLayout.Y_AXIS));
@@ -1217,7 +1357,7 @@ disableRoutesDisplay();
         phase4Panel.add(Box.createVerticalStrut(5));
         JSeparator trainSep = new JSeparator();
         trainSep.setForeground(Color.LIGHT_GRAY);
-        trainSep.setMaximumSize(new Dimension(SIDEBAR_WIDTH - 20, 2));
+        trainSep.setMaximumSize(new Dimension(getSidebarWidth() - scale(20), scale(2)));
         phase4Panel.add(trainSep);
         phase4Panel.add(Box.createVerticalStrut(5));
 
@@ -1252,19 +1392,19 @@ disableRoutesDisplay();
         // Rename to "END TURN" and set initial state to Disabled/Grey
         btnDone = createSidebarButton("END TURN", DONE_CMD);
         btnDone.setFont(new Font("SansSerif", Font.BOLD, 14));
-        btnDone.setPreferredSize(new Dimension(SIDEBAR_WIDTH - 10, 40));
+        btnDone.setPreferredSize(new Dimension(getSidebarWidth() - scale(10), scale(40)));
         btnDone.setEnabled(false);
         resetButtonStyle(btnDone); // Forces grey/standard look
 
         // Add Done Button
         footerPanel.add(btnDone);
 
-        focusLight = new JLabel("● Focus Initializing", SwingConstants.CENTER);
-        focusLight.setFont(new Font("SansSerif", Font.BOLD, 11));
-        focusLight.setForeground(Color.GRAY);
-        focusLight.setAlignmentX(Component.CENTER_ALIGNMENT);
-        footerPanel.add(Box.createVerticalStrut(6));
-        footerPanel.add(focusLight);
+        // focusLight = new JLabel("● Focus Initializing", SwingConstants.CENTER);
+        // focusLight.setFont(new Font("SansSerif", Font.BOLD, 11));
+        // focusLight.setForeground(Color.GRAY);
+        // focusLight.setAlignmentX(Component.CENTER_ALIGNMENT);
+        // footerPanel.add(Box.createVerticalStrut(6));
+        // footerPanel.add(focusLight);
 
         // 9. Special Notifications (Attached directly below Done)
         specialNotificationPanel = new JPanel();
@@ -1296,9 +1436,9 @@ disableRoutesDisplay();
         p.add(valueLabel);
 
         // Strict readout dimensions
-        p.setPreferredSize(new Dimension(SIDEBAR_WIDTH, READOUT_PANEL_HEIGHT));
-        p.setMinimumSize(new Dimension(SIDEBAR_WIDTH, READOUT_PANEL_HEIGHT));
-        p.setMaximumSize(new Dimension(SIDEBAR_WIDTH, READOUT_PANEL_HEIGHT));
+        p.setPreferredSize(new Dimension(getSidebarWidth(), scale(READOUT_PANEL_HEIGHT)));
+        p.setMinimumSize(new Dimension(getSidebarWidth(), scale(READOUT_PANEL_HEIGHT)));
+        p.setMaximumSize(new Dimension(getSidebarWidth(), scale(READOUT_PANEL_HEIGHT)));
         return p;
     }
 
@@ -1311,14 +1451,14 @@ disableRoutesDisplay();
                 // By making Max Height = Preferred Height, the panel refuses to stretch
                 // vertically to fill empty space.
                 Dimension pref = getPreferredSize();
-                return new Dimension(SIDEBAR_WIDTH, pref.height);
+                return new Dimension(getSidebarWidth(), pref.height);
             }
 
             @Override
             public Dimension getPreferredSize() {
                 // Ensure width is always fixed to sidebar width, but height is dynamic
                 Dimension superPref = super.getPreferredSize();
-                return new Dimension(SIDEBAR_WIDTH, Math.max(superPref.height, MIN_PHASE_PANEL_HEIGHT));
+                return new Dimension(getSidebarWidth(), Math.max(superPref.height, scale(MIN_PHASE_PANEL_HEIGHT)));
             }
         };
 
@@ -1346,8 +1486,8 @@ disableRoutesDisplay();
         b.setHorizontalAlignment(SwingConstants.CENTER);
         b.setFont(BTN_FONT);
         b.setAlignmentX(Component.CENTER_ALIGNMENT);
-        b.setPreferredSize(new Dimension(SIDEBAR_WIDTH - 20, BTN_HEIGHT));
-        b.setMaximumSize(new Dimension(SIDEBAR_WIDTH - 20, BTN_HEIGHT));
+        b.setPreferredSize(new Dimension(getSidebarWidth() - scale(20), scale(BTN_HEIGHT)));
+        b.setMaximumSize(new Dimension(getSidebarWidth() - scale(20), scale(BTN_HEIGHT)));
         return b;
     }
 
@@ -1886,7 +2026,7 @@ disableRoutesDisplay();
                 BorderFactory.createEmptyBorder(3, 5, 3, 5)));
 
         btn.setAlignmentX(Component.CENTER_ALIGNMENT);
-        btn.setMaximumSize(new Dimension(SIDEBAR_WIDTH - 10, 30));
+        btn.setMaximumSize(new Dimension(getSidebarWidth() - scale(10), scale(30)));
         btn.setPossibleAction(action);
         btn.addActionListener(this);
         if (trainButtonsPanel != null) {
@@ -1978,6 +2118,46 @@ disableRoutesDisplay();
     private void updateSidebarData() {
         if (specialModeActive)
             return;
+            
+        RoundFacade currentRound = null;
+        if (orUIManager != null && orUIManager.getGameUIManager() != null && orUIManager.getGameUIManager().getGameManager() != null) {
+            currentRound = orUIManager.getGameUIManager().getGameManager().getCurrentRound();
+        }
+        
+        // Intercept Prussian Formation Round to cleanly display the Director's name
+        if (currentRound != null && currentRound.getClass().getSimpleName().contains("Formation")) {
+            if (lblCompanyInfo != null) {
+                String playerName = "";
+                if (currentRound.getCurrentPlayer() != null) {
+                    playerName = currentRound.getCurrentPlayer().getName();
+                }
+                
+                String topText = "<html><center><font face='SansSerif' size='6'><b>" + playerName + "</b></font></center></html>";
+                lblCompanyInfo.setText(topText);
+                
+                Color formationBg = new Color(152, 251, 152); // PaleGreen
+                lblCompanyInfo.setBackground(formationBg);
+                lblCompanyInfo.setForeground(Color.BLACK);
+                lblCompanyInfo.setBorder(BorderFactory.createMatteBorder(1, 1, 0, 1, Color.DARK_GRAY));
+                lblCompanyInfo.setVisible(true);
+
+                if (lblPlayerInfo != null) {
+                    lblPlayerInfo.setVisible(false);
+                }
+
+                String bottomText = "<html><center><font face='SansSerif' size='4'><b>Prussian Formation</b></font></center></html>";
+                lblPhaseInstruction.setText(bottomText);
+                lblPhaseInstruction.setBackground(formationBg);
+                lblPhaseInstruction.setForeground(Color.BLACK);
+                lblPhaseInstruction.setBorder(BorderFactory.createMatteBorder(0, 1, 1, 1, Color.DARK_GRAY));
+                lblPhaseInstruction.setVisible(true);
+            }
+            
+            setStandardPanelsVisible(false);
+            
+            colorizeActivePhase(null);
+            return;
+        }
 
         if (orComp == null) {
             if (lblCash != null)
@@ -2296,10 +2476,21 @@ disableRoutesDisplay();
             borderColor = gta.getHighlightBorderColor();
             textColor = gta.getHighlightTextColor();
         } else if (action instanceof NullAction) {
-            label = ((NullAction) action).getMode() == NullAction.Mode.PASS ? "Decline" : "Done";
+            if (label == null || label.isEmpty()) {
+                label = ((NullAction) action).getMode() == NullAction.Mode.PASS ? "Decline" : "Done";
+            }
             bgColor = UITheme.ACTION_SKIP;
             borderColor = bgColor.darker();
             textColor = Color.WHITE;
+            
+            if (orUIManager != null && orUIManager.getGameUIManager() != null && orUIManager.getGameUIManager().getGameManager() != null) {
+                RoundFacade currentRound = orUIManager.getGameUIManager().getGameManager().getCurrentRound();
+                if (currentRound != null && currentRound.getClass().getSimpleName().contains("Formation")) {
+                    bgColor = new Color(152, 251, 152); // PaleGreen
+                    borderColor = new Color(34, 139, 34); // ForestGreen
+                    textColor = Color.BLACK;
+                }
+            }
         } else if (action instanceof LayBaseToken) {
             highlightTarget = ((LayBaseToken) action).getCompany();
         }
@@ -2318,7 +2509,7 @@ disableRoutesDisplay();
         btn.setEnabled(true);
         btn.setAlignmentX(Component.CENTER_ALIGNMENT);
         // Allow button to be taller to fit the HTML content
-        btn.setMaximumSize(new Dimension(SIDEBAR_WIDTH - 20, 60));
+        btn.setMaximumSize(new Dimension(getSidebarWidth() - scale(20), scale(60)));
         bindActionHotkey(btn, action);
 
         // Attach HexHighlightMouseListener based on specific Company type
@@ -2593,6 +2784,9 @@ boolean hasOpComp = false;
                 specialPanel.removeAll();
                 for (PossibleAction spa : specialActions) {
                     addSpecialActionButton(spa);
+                }
+                if (deferredNullAction != null) {
+                    addSpecialActionButton(deferredNullAction);
                 }
                 specialPanel.revalidate();
             } else if (specialContainer != null) {

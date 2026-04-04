@@ -66,3 +66,4 @@ python/
 gradle.properties
 .classpath
 .classpath
+autosave/*

@@ -1,20 +1,23 @@
 #!/bin/bash
 
 # --- CONFIGURATION ---
-GAME_JAR="./build/libs/rails-all.jar"
-SOURCE_FILE="./src/RegressionTest.java"
-CLASSPATH="src:$GAME_JAR:./lib/*"
 TEST_DIR="./testgames"
 
-# 1. Compile (Only once!)
-echo "Compiling RegressionTest..."
-javac -cp "$CLASSPATH" "$SOURCE_FILE"
+# 1. Move RegressionTest to the main source folder so Gradle manages it automatically
+if [ -f "./src/RegressionTest.java" ]; then
+    echo "Moving RegressionTest.java to src/main/java/ to allow Gradle to manage dependencies..."
+    mv "./src/RegressionTest.java" "./src/main/java/RegressionTest.java"
+fi
+
+# 2. Compile via Gradle to ensure all dependencies and classes are ready
+echo "Compiling project..."
+./gradlew classes
 if [ $? -ne 0 ]; then
     echo "Compilation failed."
     exit 1
 fi
 
-# 2. Loop through files in the shell
+# 3. Loop through files in the shell
 echo "Starting Regression Suite (Process Isolation Mode)..."
 count=0
 passed=0
@@ -29,8 +32,10 @@ for file in "$TEST_DIR"/*.rails; do
     echo "Processing [$count]: $filename"
     
  # --- START FIX ---
-    # Capture output to check for "leaked" errors that bypass the Java capture
-    output=$(java -cp "$CLASSPATH" -Djava.awt.headless=true RegressionTest "$file" 2>&1)
+    # Use Gradle's run task to automatically resolve the SLF4J classpath and run the test!
+    # We pass the file as an argument and enforce headless mode via JAVA_OPTS.
+    export JAVA_OPTS="-Djava.awt.headless=true"
+    output=$(./gradlew -q run -PmainClass=RegressionTest --args="$file" 2>&1)
     exit_code=$?
 
     # Print the output so you can still see it

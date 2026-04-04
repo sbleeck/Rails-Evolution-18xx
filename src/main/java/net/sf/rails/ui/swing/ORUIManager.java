@@ -151,6 +151,12 @@ public class ORUIManager implements DialogOwner {
         }
     }
 
+    public void updateScale() {
+        if (orPanel != null) {
+            orPanel.updateScale();
+        }
+    }
+
     // --- MAIN STATUS UPDATE LOGIC ---
 
     public void updateStatus(boolean myTurn) {
