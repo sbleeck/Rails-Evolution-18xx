@@ -538,6 +538,12 @@ public int getWorth() {
         this.cash.getPurse().setAmount_AI(cash); // FIXED: Use new public setter
     }
 
+    public void setSoldThisRound_AI(PublicCompany company, boolean sold) {
+        if (soldThisRound.containsKey(company)) {
+            soldThisRound.get(company).set(sold);
+        }
+    }
+    
     private net.sf.rails.game.ai.Actor actor = null;
 
     // NEW GETTER: Provides the actor instance required by

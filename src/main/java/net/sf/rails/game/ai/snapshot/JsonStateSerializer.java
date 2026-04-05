@@ -28,6 +28,7 @@ public class JsonStateSerializer {
 
     private static GameStateData.GameManagerData populateGameManagerData(GameManager gm) {
         GameStateData.GameManagerData data = new GameStateData.GameManagerData();
+        data.gameName = gm.getGameName();
 // FIX: We must use the 'actionCount' (IntegerState) which is incremented
         // during replay, not 'absoluteActionCounter' (int) which is not.
         data.absoluteActionCounter = gm.getActionCountModel().value();
@@ -68,29 +69,21 @@ private static GameStateData.PhaseData populatePhaseData(PhaseManager pm) {
             if (or.getOperatingCompany() != null) {
                 data.operatingCompanyId = or.getOperatingCompany().getId();
             }
+            if (or.getOperatingCompanies() != null) {
+                data.operatingCompanyQueueIds = or.getOperatingCompanies().stream()
+                        .map(net.sf.rails.game.PublicCompany::getId)
+                        .collect(Collectors.toList());
+            }
         } else if (round instanceof StockRound) {
             data.type = "StockRound";
-            // Removed .getStep() as it caused an error
+            data.numPasses = ((StockRound) round).getNumPasses();
         } else {
             data.type = "Other";
         }
         return data;
     }
 
-    // This function becomes much simpler:
-    private static GameStateData.BankData populateBankData(Bank bank) {
-        GameStateData.BankData data = new GameStateData.BankData();
-        data.cash = bank.getCash();
-
-        data.poolCertificates = bank.getPool().getPortfolioModel().getCertificates().stream()
-                .map(JsonStateSerializer::populateCertificateData)
-                .collect(Collectors.toList());
-
-        // REMOVE THE ENTIRE ipoTrains loop
-
-        return data;
-    }
-
+    
     private static GameStateData.MapData populateMapData(MapManager mm) {
         GameStateData.MapData data = new GameStateData.MapData();
         data.hexes = mm.getHexes().stream()
@@ -132,7 +125,13 @@ private static GameStateData.PhaseData populatePhaseData(PhaseManager pm) {
         data.fullName = player.getFullName();
         // Corrected method: value()
         data.timeBankSeconds = player.getTimeBankModel().value();
-
+// Record which companies the player has sold this round
+        if (player.getParent() != null && player.getParent().getRoot() != null) {
+            data.soldCompanyIdsThisRound = player.getParent().getRoot().getCompanyManager().getAllPublicCompanies().stream()
+                    .filter(player::hasSoldThisRound)
+                    .map(net.sf.rails.game.PublicCompany::getId)
+                    .collect(Collectors.toList());
+        }
         data.certificates = player.getPortfolioModel().getCertificates().stream()
                 .map(JsonStateSerializer::populateCertificateData)
                 .collect(Collectors.toList());
@@ -151,30 +150,61 @@ private static GameStateData.PhaseData populatePhaseData(PhaseManager pm) {
             data.presidentId = co.getPresident().getId();
         }
         data.hasFloated = co.hasStarted();
+        data.closed = co.isClosed();
         if (co.getCurrentSpace() != null) {
             // Corrected method: getPrice()
             data.stockPrice = co.getCurrentSpace().getPrice();
             data.stockRow = co.getCurrentSpace().getRow();
             data.stockCol = co.getCurrentSpace().getColumn();
+            data.stockStackIndex = co.getCurrentSpace().getStackPosition(co);
         }
+        // Capture dynamic token count (crucial for merged companies like Prussia)
+        data.totalTokens = co.getNumberOfBaseTokens();
+        data.hasOperated = co.hasOperated();
+        data.bankLoan = co.getBankLoan();
+        data.lastRevenue = co.getLastRevenue();
+        data.lastDividend = co.getLastDividend();
+        data.lastRevenueAllocation = co.getlastRevenueAllocationText();
+        data.lastDirectIncome = co.getLastDirectIncome();
+        data.directIncomeRevenue = co.getDirectIncomeRevenue();
 
         // Removed train logic
-        // Removed token logic
 
         data.treasuryCertificates = co.getPortfolioModel().getCertificates().stream()
                 .map(JsonStateSerializer::populateCertificateData)
                 .collect(Collectors.toList());
         return data;
     }
+    private static GameStateData.TrainData populateTrainData(Train t) {
+        GameStateData.TrainData data = new GameStateData.TrainData();
+        data.id = t.getId();
+        data.name = t.toText();
+        if (t.getOwner() != null) {
+            data.ownerId = t.getOwner().getId();
+        }
+        data.obsolete = t.isObsolete();
+        return data;
+    }
+
+    private static GameStateData.SpecialPropertyData populateSpecialPropertyData(net.sf.rails.game.special.SpecialProperty sp) {
+        GameStateData.SpecialPropertyData data = new GameStateData.SpecialPropertyData();
+        data.id = sp.getId();
+        data.exercised = sp.isExercised();
+        data.occurred = sp.getOccurred();
+        return data;
+    }
 
     private static GameStateData.PrivateCompanyData populatePrivateCompanyData(PrivateCompany pc) {
         GameStateData.PrivateCompanyData data = new GameStateData.PrivateCompanyData();
         data.id = pc.getId();
-        // Corrected type: List<Integer>
         data.revenue = pc.getRevenue();
         if (pc.getOwner() != null) {
             data.ownerId = pc.getOwner().getId();
         }
+        data.closed = pc.isClosed();
+        data.specialProperties = pc.getSpecialProperties().stream()
+                .map(JsonStateSerializer::populateSpecialPropertyData)
+                .collect(Collectors.toList());
         return data;
     }
 
@@ -183,22 +213,6 @@ private static GameStateData.PhaseData populatePhaseData(PhaseManager pm) {
         data.companyId = cert.getCompany().getId();
         data.percentage = cert.getShare();
         data.isPresident = cert.isPresidentShare();
-        return data;
-    }
-
-    private static GameStateData.TrainData populateTrainData(Train train) {
-        GameStateData.TrainData data = new GameStateData.TrainData();
-
-        // FIX: Use the unique ID (e.g., "3_2"), not the display name (e.g., "3")
-        data.name = train.getId();
-
-        // This part is (presumably) correct
-        if (train.getOwner() != null) {
-            data.ownerId = train.getOwner().getId();
-        } else {
-            // This case should not happen for a serialized train, but good to have
-            data.ownerId = "null";
-        }
         return data;
     }
 
@@ -253,7 +267,50 @@ private static GameStateData.PhaseData populatePhaseData(PhaseManager pm) {
                 .map(JsonStateSerializer::populateTrainData)
                 .collect(Collectors.toList());
                 
+                // Serialize Map Tiles (only those that differ from the printed board)
+        if (root.getMapManager() != null && root.getMapManager().getHexes() != null) {
+            state.mapHexes = root.getMapManager().getHexes().stream()
+                    .filter(hex -> !hex.isPreprintedTileCurrent())
+                    .map(JsonStateSerializer::populateHexData)
+                    .collect(Collectors.toList());
+        }
+        if (root.getGameOptions() != null) {
+            state.gameOptions = root.getGameOptions().getOptions();
+        }
         return state;
     }
 
+    private static GameStateData.HexData populateHexData(MapHex hex) {
+        GameStateData.HexData data = new GameStateData.HexData();
+        data.id = hex.getId();
+        data.tileId = hex.getCurrentTile().getId();
+        data.rotation = hex.getTileRotation();
+        return data;
+    }
+
+    private static GameStateData.PortfolioData populatePortfolioData(net.sf.rails.game.financial.BankPortfolio bp) {
+        GameStateData.PortfolioData data = new GameStateData.PortfolioData();
+        data.certificates = bp.getPortfolioModel().getCertificates().stream()
+                .map(JsonStateSerializer::populateCertificateData)
+                .collect(Collectors.toList());
+        data.privateCompanies = bp.getPortfolioModel().getPrivateCompanies().stream()
+                .map(JsonStateSerializer::populatePrivateCompanyData)
+                .collect(Collectors.toList());
+        return data;
+    }
+
+    private static GameStateData.BankData populateBankData(Bank bank) {
+        GameStateData.BankData data = new GameStateData.BankData();
+        data.cash = bank.getCash();
+        data.isBroken = bank.isBroken();
+
+        data.ipo = populatePortfolioData(bank.getIpo());
+        data.pool = populatePortfolioData(bank.getPool());
+        data.unavailable = populatePortfolioData(bank.getUnavailable());
+        data.scrapHeap = populatePortfolioData(bank.getScrapHeap());
+        data.osi = populatePortfolioData(bank.getOSI());
+
+        return data;
+    }
+    
 }

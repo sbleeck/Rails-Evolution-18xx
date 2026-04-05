@@ -209,7 +209,11 @@ public abstract class PossibleAction implements ChangeAction, Serializable {
         return equalsAs(pa, false);
     }
 
-    protected RailsRoot getRoot() {
+    public void setRoot(RailsRoot root) {
+        this.root = root;
+    }
+    
+    public RailsRoot getRoot() {
         return root;
     }
 

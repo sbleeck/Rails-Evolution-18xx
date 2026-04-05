@@ -267,5 +267,7 @@ public static final String OSI_NAME = "OSI";
     public void setCash_AI(int newAmount) {
         this.cash.getPurse().setAmount_AI(newAmount);
     }
-    
+    public boolean isBroken() {
+        return broken.value();
+    }
 }

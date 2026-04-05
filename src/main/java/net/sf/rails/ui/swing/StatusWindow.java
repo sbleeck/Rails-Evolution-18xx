@@ -263,12 +263,29 @@ public class StatusWindow extends JFrame implements ActionListener, ActionPerfor
         actionMenuItem.setPossibleAction(new GameAction(gameUIManager.getRoot(), GameAction.Mode.NEW));
         fileMenu.add(actionMenuItem);
 
-        actionMenuItem = new ActionMenuItem(LOAD_CMD);
-        actionMenuItem.setActionCommand(LOAD_CMD);
-        actionMenuItem.addActionListener(this);
-        actionMenuItem.setEnabled(true);
-        actionMenuItem.setPossibleAction(new GameAction(gameUIManager.getRoot(), GameAction.Mode.LOAD));
-        fileMenu.add(actionMenuItem);
+   
+        JMenuItem loadJsonItem = new JMenuItem("Load JSON State...");
+        loadJsonItem.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                JFileChooser fileChooser = new JFileChooser();
+                fileChooser.setDialogTitle("Select JSON Save File");
+                fileChooser.setCurrentDirectory(new File(Config.get("save.directory", System.getProperty("user.dir"))));
+
+                if (fileChooser.showOpenDialog(StatusWindow.this) == JFileChooser.APPROVE_OPTION) {
+                    File fileToLoad = fileChooser.getSelectedFile();
+                    log.info("User selected JSON file: {}", fileToLoad.getAbsolutePath());
+
+                    new Thread(() -> {
+                        gameUIManager.closeGame();
+                        // Call the standard load method, as your GameLoader now supports .json!
+                        net.sf.rails.util.GameLoader.loadAndStartGame(fileToLoad);
+                    }).start();
+                }
+            }
+        });
+        fileMenu.add(loadJsonItem);
+        
 
         actionMenuItem = new ActionMenuItem(LocalText.getText("SAVE"));
         actionMenuItem.setActionCommand(SAVE_CMD);

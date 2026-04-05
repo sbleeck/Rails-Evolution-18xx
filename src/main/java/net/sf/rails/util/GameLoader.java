@@ -87,12 +87,19 @@ public class GameLoader {
                 // 2. Restore the state
                 GameStateRestorer restorer = new GameStateRestorer();
                 RailsRoot railsRoot = restorer.restoreState(loadedState);
-                // log.info("Game state successfully re-hydrated in memory.");
 
-                // 3. Start the UI in "JSON load" mode
+// 3. Wake up the engine to generate legal moves for the restored state
+                GameManager gm = railsRoot.getGameManager();
+                if (gm.getCurrentRound() != null) {
+                    gm.getCurrentRound().setPossibleActions();
+                }
+
+                // 4. Start the UI in "Loaded" mode
                 GameUIManager gameUIManager = startGameUIManager(railsRoot, true, splashWindow);
-                gameUIManager.gameUIInit(true); // true indicates new game
-
+                gameUIManager.setGameFile(gameFile);
+                gameUIManager.startLoadedGame();
+                
+                
                 splashWindow.finalizeGameInit();
                 gameUIManager.notifyOfSplashFinalization();
 

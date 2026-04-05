@@ -102,7 +102,6 @@ public class StockRound extends Round implements I_MapRenderableRound {
     protected final ArrayListState<Integer> recordedBuyShareChoices;
     protected final IntegerState buyShareChoiceIndex;
 
-
     // Transient choice container (reset every action)
     public static List<Integer> manualSwapChoice = null;
 
@@ -131,7 +130,7 @@ public class StockRound extends Round implements I_MapRenderableRound {
      * turn state is reset (e.g., hasActed = false) *after*
      * they satisfy the limit, giving them a fresh "normal" turn.
      */
-protected final BooleanState playerWasInForcedSell = new BooleanState(this, "playerWasInForcedSell");
+    protected final BooleanState playerWasInForcedSell = new BooleanState(this, "playerWasInForcedSell");
 
     /**
      * Autopasses
@@ -163,7 +162,7 @@ protected final BooleanState playerWasInForcedSell = new BooleanState(this, "pla
         recordedSwapChoices = new ArrayListState<>(parent, "recordedSwapChoices_" + uniqueId);
         swapChoiceIndex = IntegerState.create(parent, "swapChoiceIndex_" + uniqueId);
 
-recordedBuyShareChoices = new ArrayListState<>(parent, "recordedBuyShareChoices_" + uniqueId);
+        recordedBuyShareChoices = new ArrayListState<>(parent, "recordedBuyShareChoices_" + uniqueId);
         buyShareChoiceIndex = IntegerState.create(parent, "buyShareChoiceIndex_" + uniqueId);
 
         numberOfPlayers = getRoot().getPlayerManager().getPlayers().size();
@@ -270,7 +269,7 @@ recordedBuyShareChoices = new ArrayListState<>(parent, "recordedBuyShareChoices_
 
         if (certificateCount > certificateLimit) {
 
-playerWasInForcedSell.set(true); // SET THE FLAG
+            playerWasInForcedSell.set(true); // SET THE FLAG
             if (sellShareActions != null && !sellShareActions.isEmpty()) {
                 possibleActions.addAll(sellShareActions);
             }
@@ -281,7 +280,7 @@ playerWasInForcedSell.set(true); // SET THE FLAG
         // 3. CHECK FOR FORCED COMPANY HOLDING LIMIT (e.g., >60%)
         if (isOverLimits) {
 
-playerWasInForcedSell.set(true); // SET THE FLAG
+            playerWasInForcedSell.set(true); // SET THE FLAG
             if (sellShareActions != null && !sellShareActions.isEmpty()) {
                 possibleActions.addAll(sellShareActions);
             }
@@ -292,9 +291,9 @@ playerWasInForcedSell.set(true); // SET THE FLAG
         // 4. CHECK IF FORCED SELL JUST COMPLETED
         // If we *were* in a forced sell, but (from the checks above)
         // are not anymore, this is the start of the player's *real* turn.
-if (playerWasInForcedSell.value()) {
+        if (playerWasInForcedSell.value()) {
 
-playerWasInForcedSell.set(false); // Reset flag on turn end
+            playerWasInForcedSell.set(false); // Reset flag on turn end
             // Reset the turn state to give them a "new go"
             companyBoughtThisTurnWrapper.set(null);
             hasSoldThisTurnBeforeBuying.set(false);
@@ -576,7 +575,7 @@ playerWasInForcedSell.set(false); // Reset flag on turn end
                     number = 1;
                     /* Would the player exceed the per-company share hold limit? */
                     if (!checkAgainstHoldLimit(currentPlayer, comp, number * shares))
-                            continue;
+                        continue;
 
                     /* Would the player exceed the total certificate limit? */
                     if (!stockSpace.isNoCertLimit()
@@ -1019,15 +1018,23 @@ playerWasInForcedSell.set(false); // Reset flag on turn end
     // overridden by:
     // StockRound 18EU
     public boolean startCompany(String playerName, StartCompany action) {
+
         PublicCompany company = action.getCompany();
         int price = action.getPrice();
         int shares = action.getNumberBought();
+
+        // Ensure raw actions default to 1 share instead of a silent 0-share loop
+        if (shares <= 0) {
+            shares = 1;
+            action.setNumberBought(1);
+        }
 
         String errMsg = null;
         StockSpace startSpace = null;
         int numberOfCertsToBuy = 0;
         PublicCertificate cert = null;
         String companyName = company.getId();
+
         int cost = 0;
 
         currentPlayer = playerManager.getCurrentPlayer();
@@ -1167,11 +1174,33 @@ playerWasInForcedSell.set(false); // Reset flag on turn end
     // TreasuryShareRound
     public boolean buyShares(String playerName, BuyCertificate action) {
 
+        System.out.println("=== DEBUG: buyShares TRIGGERED ===");
+        System.out.println("Player: " + playerName);
+        System.out.println("Action CompanyName: " + action.getCompanyName());
+        
+        try {
+            System.out.println("Resolved Company: " + (action.getCompany() != null ? action.getCompany().getId() : "NULL"));
+            System.out.println("Resolved Portfolio: " + (action.getFromPortfolio() != null ? action.getFromPortfolio().getName() : "NULL"));
+            System.out.println("Number Bought: " + action.getNumberBought());
+            System.out.println("Share Per Cert: " + action.getSharePerCertificate());
+            System.out.println("Price: " + action.getPrice());
+        } catch (Exception e) {
+            System.out.println("CRASH DURING RESOLUTION: " + e.getMessage());
+            e.printStackTrace();
+        }
+
         PublicCompany company = action.getCompany();
         PublicCertificate cert = null;
         PortfolioModel from = action.getFromPortfolio();
         String companyName = company.getId();
         int number = action.getNumberBought();
+
+        // Ensure raw actions default to 1 share instead of a silent 0-share loop
+        if (number <= 0) {
+            number = 1;
+            action.setNumberBought(1);
+        }
+
         int shareUnit = company.getShareUnit();
         int sharePerCert = action.getSharePerCertificate();
         int share = number * sharePerCert;
@@ -1209,10 +1238,17 @@ playerWasInForcedSell.set(false); // Reset flag on turn end
                 break;
             }
 
-            if (!company.isBuyable()) {
-                errMsg = LocalText.getText("NotYetStarted", companyName);
-                break;
+if (!company.isBuyable()) {
+                // JSON State Recovery: If the certificate is physically present in the IPO or Pool, 
+                // the company has been legally released. Restore the lost state flag.
+                if (from == ipo || from == pool) {
+                    company.setBuyable(true);
+                } else {
+                    errMsg = LocalText.getText("NotYetStarted", companyName);
+                    break;
+                }
             }
+
 
             // The player may not have bought this turn, unless the company
             // bought before and now is in the brown area.
@@ -1231,17 +1267,16 @@ playerWasInForcedSell.set(false); // Reset flag on turn end
                 break;
             }
 
+            if (from == pool && number == 1) {
 
-
-          if (from == pool && number == 1 ) {
-                
                 List<Integer> validSizes = new ArrayList<>();
                 StockSpace poolSpace = (company.hasStockPrice()) ? company.getCurrentSpace() : null;
-                
+
                 // 1. Identify valid certificate sizes
                 for (PublicCertificate c : from.getCertificates(company)) {
                     int size = c.getShare();
-                    if (validSizes.contains(size)) continue;
+                    if (validSizes.contains(size))
+                        continue;
 
                     // Cert Limit
                     if ((!company.hasStockPrice() || (poolSpace != null && !poolSpace.isNoCertLimit()))
@@ -1256,7 +1291,8 @@ playerWasInForcedSell.set(false); // Reset flag on turn end
                     // Cash Check
                     int checkPrice = (company.hasStockPrice()) ? poolSpace.getPrice() : company.getFixedPrice();
                     int checkCost = (size / shareUnit) * checkPrice / company.getShareUnitsForSharePrice();
-                    if (currentPlayer.getCashValue() < checkCost) continue;
+                    if (currentPlayer.getCashValue() < checkCost)
+                        continue;
 
                     validSizes.add(size);
                 }
@@ -1265,14 +1301,15 @@ playerWasInForcedSell.set(false); // Reset flag on turn end
 
                 // 2. Resolve Ambiguity
                 if (validSizes.size() > 1) {
-                    
-                    // CHECK: Does the action already specify a valid size? (e.g. from Reload or specific Button)
+
+                    // CHECK: Does the action already specify a valid size? (e.g. from Reload or
+                    // specific Button)
                     int actionSize = action.getSharePerCertificate();
-                    
+
                     if (validSizes.contains(actionSize)) {
                         // Trust the action - skip dialog
                         sharePerCert = actionSize;
-                        
+
                     } else {
                         // Ambiguous Action (sharePerCert=0 or invalid) -> Ask User
                         List<String> options = new ArrayList<>();
@@ -1280,16 +1317,18 @@ playerWasInForcedSell.set(false); // Reset flag on turn end
                         for (int i = 0; i < validSizes.size(); i++) {
                             int s = validSizes.get(i);
                             options.add(s + "%");
-                            if (s == sharePerCert) currentSelectionIndex = i;
+                            if (s == sharePerCert)
+                                currentSelectionIndex = i;
                         }
                         options.add("Cancel");
 
-                        String defaultOption = (currentSelectionIndex >= 0) ? options.get(currentSelectionIndex) : options.get(0);
+                        String defaultOption = (currentSelectionIndex >= 0) ? options.get(currentSelectionIndex)
+                                : options.get(0);
 
-                        int choice = JOptionPane.showOptionDialog(null, 
-                                "Select certificate size for " + companyName + " (Pool):", 
+                        int choice = JOptionPane.showOptionDialog(null,
+                                "Select certificate size for " + companyName + " (Pool):",
                                 "Buy Certificate",
-                                JOptionPane.DEFAULT_OPTION, JOptionPane.QUESTION_MESSAGE, null, 
+                                JOptionPane.DEFAULT_OPTION, JOptionPane.QUESTION_MESSAGE, null,
                                 options.toArray(), defaultOption);
 
                         if (choice == -1 || choice == options.size() - 1) {
@@ -1297,7 +1336,7 @@ playerWasInForcedSell.set(false); // Reset flag on turn end
                         }
 
                         sharePerCert = validSizes.get(choice);
-                        
+
                         // CRITICAL: Update the action so the Replay Log records the specific choice
                         action.setSharePerCertificate(sharePerCert);
                     }
@@ -1305,16 +1344,13 @@ playerWasInForcedSell.set(false); // Reset flag on turn end
                     // Apply the specific choice
                     share = number * sharePerCert;
                     shares = share / shareUnit;
-                    
+
                     president = false;
                     if (from.findCertificate(company, sharePerCert / shareUnit, true) != null) {
                         president = true;
                     }
                 }
             }
-
-
-
 
             StockSpace currentSpace;
             if (from == ipo && company.hasParPrice()) {
@@ -1367,7 +1403,9 @@ playerWasInForcedSell.set(false); // Reset flag on turn end
             break;
         }
 
-        if (errMsg != null) {
+if (errMsg != null) {
+            System.out.println("=== DEBUG: buyShares ABORTED ===");
+            System.out.println("Reason: " + errMsg);
             DisplayBuffer.add(this, LocalText.getText("CantBuy",
                     playerName,
                     shares,
@@ -1376,6 +1414,7 @@ playerWasInForcedSell.set(false); // Reset flag on turn end
                     errMsg));
             return false;
         }
+
 
         // All seems OK, now buy the shares.
         MoneyOwner priceRecipient = getSharePriceRecipient(company, from.getParent(), cost);
@@ -1539,7 +1578,6 @@ playerWasInForcedSell.set(false); // Reset flag on turn end
      */
     // called by:
     // StockRound: buyShares, startCompany
-
 
     protected MoneyOwner getSharePriceRecipient(PublicCompany comp,
             Owner from, int price) {
@@ -1722,6 +1760,8 @@ playerWasInForcedSell.set(false); // Reset flag on turn end
                 for (PublicCertificate c : certsToSell) {
                 }
             } else {
+                errMsg = LocalText.getText("NotEnoughShares");
+                break;
             }
 
             // reduce numberToSell to double check
@@ -2172,8 +2212,8 @@ playerWasInForcedSell.set(false); // Reset flag on turn end
         // [] All "Global Check" logic is removed.
         setNextPlayer(); // This is the original call
 
-playerWasInForcedSell.set(false); // Reset flag on turn end
-//         sellPrices.clear();
+        playerWasInForcedSell.set(false); // Reset flag on turn end
+        // sellPrices.clear();
     }
 
     // not overridden
@@ -2283,8 +2323,15 @@ playerWasInForcedSell.set(false); // Reset flag on turn end
     // StockRound: mayCurrentPlayerSellAnything, sellShares
 
     // not overridden
-    private boolean checkFirstRoundSellRestriction() {
+private boolean checkFirstRoundSellRestriction() {
         if (noSaleInFirstSR() && getStockRoundNumber() == 1) {
+            
+            // JSON State Recovery: If companies are actively trading, we are past the first round.
+            // Bypassing the restriction prevents soft-locks caused by lost 'firstAllPlayersPassed' states.
+            for (PublicCompany comp : companyManager.getAllPublicCompanies()) {
+                if (comp.hasStockPrice()) return false;
+            }
+
             // depending on GameOption restriction is either valid during the first (true)
             // Stock Round or the first Round
             if ("First Stock Round".equals(GameOption.getValue(this, "FirstRoundSellRestriction"))) {
@@ -2340,16 +2387,15 @@ playerWasInForcedSell.set(false); // Reset flag on turn end
 
     // overridden by
     // StockRound 1880
-    public boolean mayPlayerSellShareOfCompany(PublicCompany company) {
+public boolean mayPlayerSellShareOfCompany(PublicCompany company) {
 
-        // Can't sell shares that have no price
-        if (!company.hasStarted() || !company.hasStockPrice())
+        // JSON State Recovery: The 'hasStarted' and 'hasOperated' boolean flags 
+        // are lost during JSON re-hydration. If a company is actively on the stock market 
+        // (hasStockPrice), it is functionally started and sellable. We bypass the strict
+        // boolean checks to prevent the engine from falsely rejecting the shares.
+        if (!company.hasStockPrice()) {
             return false;
-
-        // In some games, can't sell shares if not operated
-        if (noSaleIfNotOperated()
-                && !company.hasOperated())
-            return false;
+        }
 
         // In SOH, can't sell shares of company started this round
         return !noSaleIfJustStarted()
@@ -2598,7 +2644,20 @@ playerWasInForcedSell.set(false); // Reset flag on turn end
         swapChoiceIndex.set(0);
     }
 
-    // ... (lines of unchanged context code) ...
+    /**
+     * AI Accessor: Gets the current number of consecutive passes.
+     */
+    public int getNumPasses() {
+        return this.numPasses.value();
+    }
+
+    /**
+     * AI Accessor: Restores the consecutive pass count upon reload.
+     */
+    public void setNumPasses_AI(int passes) {
+        this.numPasses.set(passes);
+    }
+
     public boolean hasAmbiguousCertificatesForSell(PublicCompany company) {
         // 1. Safety check: Certificate splitting (like 1830) removes ambiguity.
         boolean splitAllowed = checkIfCertificateSplitAllowed();

@@ -601,7 +601,13 @@ public class PrivateCompany extends RailsOwnableItem<PrivateCompany> implements 
     public boolean isClosed() {
         return closed.value();
     }
-
+/**
+     * AI Accessor: Restores the closed state without triggering closing side-effects.
+     */
+    public void setClosed_AI(boolean isClosed) {
+        this.closed.set(isClosed);
+    }
+    
     @Override
     public String getLongName() {
         return longName;

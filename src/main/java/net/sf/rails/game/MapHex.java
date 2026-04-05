@@ -858,13 +858,20 @@ int statNum = station.getNumber();
                 
                 stops.put(station, stop);
             }
-
         }
-
     }
 
 
-
+/**
+     * AI Accessor: Restores the historical tile and rotation directly to the hex during reload.
+     */
+    public void setTile_AI(Tile newTile, int rotationInt) {
+        if (newTile != null) {
+            HexSide rotation = HexSide.get(rotationInt);
+            // Re-use executeTileLay to construct the internal stops safely
+            this.executeTileLay(newTile, rotation, null);
+        }
+    }
 
 
 

@@ -51,6 +51,11 @@ private boolean isAKeyPressed = false;
         if (e.getID() != KeyEvent.KEY_PRESSED) {
             return false;
         }
+        // --- SAFETY CHECK: DIALOGS ---
+        java.awt.Window activeWindow = KeyboardFocusManager.getCurrentKeyboardFocusManager().getActiveWindow();
+        if (activeWindow instanceof javax.swing.JDialog) {
+            return false; 
+        }
 
         // --- SAFETY CHECK: TYPING ---
         Component focusOwner = KeyboardFocusManager.getCurrentKeyboardFocusManager().getFocusOwner();
@@ -101,21 +106,9 @@ private boolean isAKeyPressed = false;
         if (!isCtrlDown && !e.isAltDown() && !e.isShiftDown() && keyCode == KeyEvent.VK_ENTER) {
            if (!isEnterKeyPressed) {
                 isEnterKeyPressed = true; // Lock until release
-                if (focusOwner != null) {
-                    // Guard 1: Yield to Text Fields (e.g. Chat or input boxes)
-                    if (focusOwner instanceof JTextComponent && ((JTextComponent) focusOwner).isEditable()) {
-                        return false; 
-                    }
-                    // Guard 2: Yield if focus is inside a Modal/Dialog (e.g. Confirmation Popup)
-                    java.awt.Window activeWindow = javax.swing.SwingUtilities.getWindowAncestor(focusOwner);
-                    if (activeWindow instanceof javax.swing.JDialog) {
-                        return false;
-                    }
-                }
                 // We are in the main window. Intercept and route to smart handler so 'Done' is default.
                 triggerEnter();
             }
-
             return true;
         }
 

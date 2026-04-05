@@ -56,7 +56,13 @@ public class GameStateRestorer {
         // 1. Initialize ConfigManager
         log.debug("Initializing ConfigManager for test mode...");
         ConfigManager.initConfiguration(true);
-        String gameVariant = ConfigManager.getInstance().getValue("default_game", "1835");
+
+        if (pojoState.gameManager == null || pojoState.gameManager.gameName == null) {
+            throw new Exception("CRITICAL ERROR: Game name is missing from the JSON state. " +
+                                "Restoration cannot proceed without knowing the game variant.");
+        }
+        String gameVariant = pojoState.gameManager.gameName;
+
 
         // 2. Create RailsRoot
         log.debug("Creating GameData for variant: {}", gameVariant);
@@ -65,12 +71,22 @@ public class GameStateRestorer {
                 .collect(Collectors.toList());
         GameInfo gameInfo = GameInfo.builder().withName(gameVariant).build();
         GameOptionsSet.Builder optionsBuilder = GameOptionsSet.builder();
-        optionsBuilder.withNumberOfPlayers(playerNames.size());
-        GameOptionsSet gameOptions = optionsBuilder.build();
+
+if (pojoState.gameOptions != null) {
+            optionsBuilder.withRawOptions(pojoState.gameOptions);
+        } else {
+            optionsBuilder.withNumberOfPlayers(playerNames.size());
+        }
+
         GameData gameData = GameData.create(gameInfo, optionsBuilder, playerNames);
 
         log.debug("Creating new RailsRoot via factory...");
         this.liveGameRoot = RailsRoot.create(gameData);
+
+        // Initialize StartPackets so that StartItems are correctly linked to their primary certificates
+        if (this.liveGameRoot.getCompanyManager() != null && this.liveGameRoot.getGameManager() != null) {
+            this.liveGameRoot.getCompanyManager().initStartPackets(this.liveGameRoot.getGameManager());
+        }
 
         buildRotationNameMap();
 
@@ -161,6 +177,7 @@ public class GameStateRestorer {
         } else if (pojoState.currentRound.id != null && pojoState.currentRound.id.startsWith("SR_")) {
             StockRound liveSR = gm.createRound(gm.getStockRoundClass(), pojoState.currentRound.id);
             gm.setCurrentRound_AI(liveSR);
+            liveSR.setNumPasses_AI(pojoState.currentRound.numPasses);
         } else if (pojoState.currentRound.id != null && pojoState.currentRound.id.startsWith("IR_")) {
             // FIX: We must use the game's *specific* concrete StartRound class,
             // not the abstract base class.
@@ -186,7 +203,17 @@ public class GameStateRestorer {
             Player livePlayer = playerRegistry.get(playerData.id);
             if (livePlayer != null) {
                 livePlayer.setCash_AI(playerData.cash);
-                livePlayer.getTimeBankModel().set(playerData.timeBankSeconds);
+                if (playerData.fullName != null) {
+                    livePlayer.setFullName(playerData.fullName);
+                }
+                                if (playerData.soldCompanyIdsThisRound != null) {
+                    for (String compId : playerData.soldCompanyIdsThisRound) {
+                        PublicCompany liveCompany = companyRegistry.get(compId);
+                        if (liveCompany != null) {
+                            livePlayer.setSoldThisRound_AI(liveCompany, true);
+                        }
+                    }
+                }
             }
         }
 
@@ -197,8 +224,21 @@ public class GameStateRestorer {
             if (liveCompany != null) {
                 liveCompany.setCash_AI(companyData.cash);
                 liveCompany.setHasFloated_AI(companyData.hasFloated);
-                StockMarket sm = liveGameRoot.getStockMarket();
-                if (companyData.stockRow > 0 || companyData.stockCol > 0) {
+                liveCompany.setClosed_AI(companyData.closed);
+
+                liveCompany.setTotalTokens_AI(companyData.totalTokens);
+                liveCompany.setHasOperated_AI(companyData.hasOperated);
+                liveCompany.setBankLoan_AI(companyData.bankLoan);
+
+                liveCompany.setLastRevenue_AI(companyData.lastRevenue);
+                liveCompany.setLastDividend_AI(companyData.lastDividend);
+                liveCompany.setLastRevenueAllocation_AI(companyData.lastRevenueAllocation);
+                liveCompany.setLastDirectIncome_AI(companyData.lastDirectIncome);
+                liveCompany.setDirectIncomeRevenue_AI(companyData.directIncomeRevenue);
+
+               StockMarket sm = liveGameRoot.getStockMarket();
+                // Check price rather than row/col coordinates, as row 0 (A) is a valid coordinate
+                if (companyData.stockPrice > 0) {
                     StockSpace space = sm.getStockSpace(companyData.stockRow, companyData.stockCol);
                     if (space != null) {
                         liveCompany.setCurrentSpace(space);
@@ -206,13 +246,45 @@ public class GameStateRestorer {
                         log.warn("Could not find StockSpace at [{}, {}] for company {}",
                                 companyData.stockRow, companyData.stockCol, companyData.id);
                     }
+                }
+
+            }
+        }
+        
+// 2g. Map state (Tiles)
+        log.debug("  - Reconstructing Physical Map Tiles...");
+        if (pojoState.mapHexes != null && liveGameRoot.getMapManager() != null) {
+            for (GameStateData.HexData hexData : pojoState.mapHexes) {
+                MapHex liveHex = liveGameRoot.getMapManager().getHex(hexData.id);
+                Tile liveTile = liveGameRoot.getTileManager().getTile(hexData.tileId);
+                if (liveHex != null && liveTile != null) {
+                    liveHex.setTile_AI(liveTile, hexData.rotation);
                 } else {
-                    log.trace("Skipping stock price for unfloated company: {}", companyData.id);
+                    log.warn("Could not restore tile {} to hex {}", hexData.tileId, hexData.id);
                 }
             }
         }
         
-        // 2g. Map state -- MOVED TO PASS 3
+        // 2h. PrivateCompany simple data
+        log.debug("  - Setting PrivateCompany simple data...");
+        for (GameStateData.PrivateCompanyData privateData : pojoState.privateCompanies) {
+            PrivateCompany livePrivate = privateRegistry.get(privateData.id);
+            if (livePrivate != null) {
+                livePrivate.setClosed_AI(privateData.closed);
+                
+                if (privateData.specialProperties != null) {
+                    for (GameStateData.SpecialPropertyData spData : privateData.specialProperties) {
+                        for (net.sf.rails.game.special.SpecialProperty liveSp : livePrivate.getSpecialProperties()) {
+                            if (liveSp.getId().equals(spData.id)) {
+                                liveSp.setExercised_AI(spData.exercised);
+                                liveSp.setOccurred_AI(spData.occurred);
+                                break;
+                            }
+                        }
+                    }
+                }
+            }
+        }
     }
 
     
@@ -231,12 +303,29 @@ public class GameStateRestorer {
         liveGameRoot.getPlayerManager().setCurrentPlayer(playerRegistry.get(pojoState.gameManager.currentPlayerId));
         liveGameRoot.getPlayerManager().setPriorityPlayer(playerRegistry.get(pojoState.gameManager.priorityPlayerId));
 
-        // 3b. CurrentRound operating company
-        log.debug("  - Linking CurrentRound OperatingCompany...");
-        if (gm.getCurrentRound() instanceof OperatingRound && pojoState.currentRound.operatingCompanyId != null) {
-            PublicCompany opCo = companyRegistry.get(pojoState.currentRound.operatingCompanyId);
-            if (opCo != null) {
-                ((OperatingRound) gm.getCurrentRound()).setOperatingCompany_AI(opCo);
+       // 3b. CurrentRound Operating Company & Queue
+        log.debug("  - Linking CurrentRound OperatingCompany and Queue...");
+        if (gm.getCurrentRound() instanceof OperatingRound) {
+            OperatingRound liveOR = (OperatingRound) gm.getCurrentRound();
+            
+            // Link the pointer
+            if (pojoState.currentRound.operatingCompanyId != null) {
+                PublicCompany opCo = companyRegistry.get(pojoState.currentRound.operatingCompanyId);
+                if (opCo != null) {
+                    liveOR.setOperatingCompany_AI(opCo);
+                }
+            }
+            
+            // Link the queue
+            if (pojoState.currentRound.operatingCompanyQueueIds != null) {
+                java.util.List<PublicCompany> queue = new java.util.ArrayList<>();
+                for (String qId : pojoState.currentRound.operatingCompanyQueueIds) {
+                    PublicCompany qc = companyRegistry.get(qId);
+                    if (qc != null) {
+                        queue.add(qc);
+                    }
+                }
+                liveOR.setOperatingCompanies_AI(queue);
             }
         }
 
@@ -260,6 +349,31 @@ public class GameStateRestorer {
             if (livePrivate != null && newOwner != null) {
                 if (livePrivate.getOwner() != newOwner) {
                     livePrivate.moveTo(newOwner);
+                }
+            }
+        }
+
+        // 3x. Stock Market Stacks
+        log.debug("  - Reconstructing Stock Market Stacks...");
+        java.util.Map<StockSpace, java.util.List<GameStateData.CompanyData>> spaceMap = new java.util.HashMap<>();
+        
+        for (GameStateData.CompanyData companyData : pojoState.publicCompanies) {
+            if (companyData.stockStackIndex >= 0) {
+                StockSpace space = liveGameRoot.getStockMarket().getStockSpace(companyData.stockRow, companyData.stockCol);
+                if (space != null) {
+                    spaceMap.computeIfAbsent(space, k -> new java.util.ArrayList<>()).add(companyData);
+                }
+            }
+        }
+        
+        for (java.util.Map.Entry<StockSpace, java.util.List<GameStateData.CompanyData>> entry : spaceMap.entrySet()) {
+            StockSpace space = entry.getKey();
+            java.util.List<GameStateData.CompanyData> companiesOnSpace = entry.getValue();
+            companiesOnSpace.sort(java.util.Comparator.comparingInt(c -> c.stockStackIndex));
+            for (GameStateData.CompanyData cd : companiesOnSpace) {
+                PublicCompany liveCompany = companyRegistry.get(cd.id);
+                if (liveCompany != null) {
+                    space.addToken(liveCompany);
                 }
             }
         }
@@ -289,46 +403,40 @@ public class GameStateRestorer {
             }
         }
         
-        if (pojoState.bank != null && pojoState.bank.poolCertificates != null) {
-            Owner targetOwner = bank.getPool();
-            for (GameStateData.CertificateData certData : pojoState.bank.poolCertificates) {
-                PublicCertificate liveCert = findCertificate(liveGameRoot, certData);
-                if (liveCert != null) {
-                    if (liveCert.getOwner() != targetOwner) {
-                        liveCert.moveTo(targetOwner);
-                    }
-                }
-            }
+if (pojoState.bank != null) {
+            log.debug("  - Distributing Bank Certificates & Privates...");
+            restoreBankPortfolio(bank.getIpo(), pojoState.bank.ipo);
+            restoreBankPortfolio(bank.getPool(), pojoState.bank.pool);
+            restoreBankPortfolio(bank.getUnavailable(), pojoState.bank.unavailable);
+            restoreBankPortfolio(bank.getScrapHeap(), pojoState.bank.scrapHeap);
+            restoreBankPortfolio(bank.getOSI(), pojoState.bank.osi);
         } else {
-            log.debug("  - No Bank Pool certificates to restore.");
+            log.debug("  - No Bank data to restore.");
         }
 
-        // 3f. Trains
+       // 3f. Trains
         log.debug("  - Distributing Trains...");
-        TrainManager trainManager = liveGameRoot.getTrainManager();
-        if (pojoState.trains != null) {
+        if (pojoState.trains != null && liveGameRoot.getTrainManager() != null) {
             for (GameStateData.TrainData trainData : pojoState.trains) {
-                Train liveTrain = trainManager.getTrainByUniqueId(trainData.name);
-                if (liveTrain == null) {
-                    log.warn("Could not find live train for ID: {}", trainData.name);
-                    continue;
+                // Find the live train by its unique ID
+                Train liveTrain = null;
+                for (Train t : liveGameRoot.getTrainManager().getAllTrains()) {
+                    if (t.getId().equals(trainData.id)) {
+                        liveTrain = t;
+                        break;
+                    }
                 }
-                TrainCard liveCard = liveTrain.getCard();
-                if (liveCard == null) {
-                     log.warn("Train {} has no parent TrainCard!", trainData.name);
-                     continue;
-                }
-                Owner newOwner = ownerRegistry.get(trainData.ownerId); 
-                if (newOwner == null) {
-                    log.warn("Could not find new owner for train {}: {}", trainData.name, trainData.ownerId);
-                    continue;
-                }
-                if (liveCard.getOwner() != newOwner) {
-                    liveCard.moveTo(newOwner);
+                
+                if (liveTrain != null) {
+                    liveTrain.setObsolete_AI(trainData.obsolete);
+                    Owner newOwner = ownerRegistry.get(trainData.ownerId);
+                    if (newOwner != null) {
+                        liveTrain.setOwner_AI(newOwner);
+                    }
+                } else {
+                    log.warn("Could not find live train for ID: {}", trainData.id);
                 }
             }
-        } else {
-            log.debug("  - No master train list found in JSON.");
         }
 
         // 3g. Map state (MOVED FROM PASS 2)
@@ -408,6 +516,43 @@ public class GameStateRestorer {
                 liveToken.moveTo(targetStop);
             }
         }
+        // 3i. Synchronize StartPackets
+        log.debug("  - Synchronizing StartPackets...");
+        try {
+            // Find the SOLD constant dynamically (Usually 3 in Rails)
+            int soldStatus = 3; 
+            try {
+                java.lang.reflect.Field soldField = StartItem.class.getDeclaredField("SOLD");
+                soldField.setAccessible(true);
+                soldStatus = soldField.getInt(null);
+            } catch (Exception e) {}
+
+            if (liveGameRoot.getCompanyManager().getStartPackets() != null) {
+                for (StartPacket packet : liveGameRoot.getCompanyManager().getStartPackets()) {
+                    java.lang.reflect.Field itemsField = StartPacket.class.getDeclaredField("items");
+                    itemsField.setAccessible(true);
+                    java.util.List<StartItem> items = (java.util.List<StartItem>) itemsField.get(packet);
+                    
+                    if (items != null) {
+                        for (StartItem item : items) {
+                            java.lang.reflect.Field primaryField = StartItem.class.getDeclaredField("primary");
+                            primaryField.setAccessible(true);
+                            net.sf.rails.game.financial.Certificate primary = (net.sf.rails.game.financial.Certificate) primaryField.get(item);
+                            
+                            if (primary != null && primary.getOwner() != null) {
+                                Owner owner = primary.getOwner();
+                                // If owned by a Player, a Company, or in the ScrapHeap (closed private)
+                                if (owner instanceof Player || owner instanceof PublicCompany || owner == bank.getScrapHeap()) {
+                                    item.setStatus(soldStatus);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        } catch (Exception e) {
+            log.warn("Failed to synchronize StartPackets", e);
+        }
     }
     
 
@@ -455,4 +600,28 @@ public class GameStateRestorer {
 
         return null; // No match found at all
     }
+
+    /**
+     * Helper to move both certificates and privates from a JSON portfolio to a live BankPortfolio.
+     */
+    private void restoreBankPortfolio(BankPortfolio liveBp, GameStateData.PortfolioData pojoBp) {
+        if (pojoBp == null) return;
+
+        // Restore Certificates
+        for (GameStateData.CertificateData certData : pojoBp.certificates) {
+            PublicCertificate liveCert = findCertificate(liveGameRoot, certData);
+            if (liveCert != null && liveCert.getOwner() != liveBp) {
+                liveCert.moveTo(liveBp);
+            }
+        }
+        // Restore Private Companies
+        for (GameStateData.PrivateCompanyData privData : pojoBp.privateCompanies) {
+            PrivateCompany livePriv = privateRegistry.get(privData.id);
+            if (livePriv != null && livePriv.getOwner() != liveBp) {
+                livePriv.moveTo(liveBp);
+            }
+        }
+    }
+
+
 }

@@ -33,6 +33,13 @@ public class GameOptionsSet {
 
         private int numberOfPlayers;
 
+        private Map<String, String> rawOptions = null;
+
+        public Builder withRawOptions(Map<String, String> raw) {
+            this.rawOptions = raw;
+            return this;
+        }
+
         private Builder() {
             // do nothing
         }
@@ -55,6 +62,10 @@ public class GameOptionsSet {
         }
 
         public GameOptionsSet build() {
+            // If we injected a raw map during a reload, skip the standard build process
+            if (rawOptions != null) {
+                return new GameOptionsSet(rawOptions);
+            }
             final Map<String, String> gameOptions = Maps.newLinkedHashMap();
 
             gameOptions.put(GameOption.NUMBER_OF_PLAYERS, Integer.toString(numberOfPlayers));

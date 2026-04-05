@@ -4100,13 +4100,6 @@ if (train != null) {
         }
     }
 
-    /**
-     * Directly sets the operating company for state re-hydration.
-     */
-    public void setOperatingCompany_AI(PublicCompany company) {
-        this.operatingCompany.set(company); // Directly set the GenericState
-    }
-    // ++ END AI STATE RESTORATION SETTERS ++
 
     /**
      * Creates a human-readable button label for a specific train purchase.
@@ -4448,27 +4441,17 @@ if (train != null) {
                     break;
                 }
             }
-            // //Auto-Skip Buy Train ---
-            // // If no trains can be bought, and it's not a forced situation
-            // (emergency.value() is false),
-            // // automatically skip this step to streamline gameplay.
-            // if (!hasBuyActions && !emergency.value()) {
-            // // Clear any actions generated so far
-            // possibleActions.clear();
-
-            // // Advance to next step (Trading or Final)
-            // nextStep();
-
-            // // Recursively call setPossibleActions for the NEW step
-            // return setPossibleActions();
-            // }
-
             // This is the DONE/SKIP logic block for BUY_TRAIN
             if (hasBuyActions) {
-                // 'SKIP' (Done Buying) button.");
-                possibleActions.add(new NullAction(getRoot(), NullAction.Mode.SKIP));
+                // 'SKIP' (Done Buying) button.
+                // JSON State Recovery / Logic Fix: Ensure SKIP is not offered if purchase is mandatory.
+                boolean mustBuy = !operatingCompany.value().hasTrains() && 
+                                 (operatingCompany.value().mustOwnATrain() || gameManager.isReloading());
+                if (!mustBuy) {
+                    possibleActions.add(new NullAction(getRoot(), NullAction.Mode.SKIP));
+                }
             } else {
-                // 'doneAllowed = true'.");
+                // 'doneAllowed = true'.
                 doneAllowed.set(true);
             }
 
@@ -4863,6 +4846,12 @@ if (train != null) {
         // Forced Buy Condition: No trains AND company rules require ownership.
         boolean mustBuyTrain = !hasTrains && company.mustOwnATrain();
 
+        // JSON State Recovery: If the hex route cache is not fully hydrated, mustOwnATrain() 
+        // may falsely evaluate to false. This causes the engine to filter out unaffordable 
+        // trains and silently bypass the step. We enforce the buy condition during reloads.
+        if (gameManager.isReloading() && !hasTrains) {
+            mustBuyTrain = true;
+        }
         // Check Phase Restrictions (e.g. "One train per turn")
         boolean canBuyMoreTrains = Phase.getCurrent(this).canBuyMoreTrainsPerTurn();
         boolean alreadyBought = !trainsBoughtThisTurn.isEmpty();
@@ -5048,6 +5037,24 @@ if (operatingCompanies != null && !operatingCompanies.isEmpty()) {
 
         // 3. Reset Step to ensure initTurn() runs when the real move starts
         setStep(GameDef.OrStep.INITIAL);
+    }
+
+    /**
+     * AI Accessor: Re-hydrates the exact list of companies remaining to operate.
+     */
+    public void setOperatingCompanies_AI(List<PublicCompany> companies) {
+        if (companies != null) {
+            this.operatingCompanies.setTo(companies);
+        }
+    }
+
+    /**
+     * AI Accessor: Sets the active company pointer.
+     */
+    public void setOperatingCompany_AI(PublicCompany comp) {
+        if (comp != null) {
+            this.operatingCompany.set(comp);
+        }
     }
 
     public int getBaseRevenueOnly(PublicCompany company) {

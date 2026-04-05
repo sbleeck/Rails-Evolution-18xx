@@ -371,6 +371,13 @@ public class CompanyManager extends RailsManager implements Configurable {
     }
 
     /**
+     * AI Accessor: Returns the list of start packets for state synchronization.
+     */
+    public java.util.List<StartPacket> getStartPackets() {
+        return startPackets;
+    }
+
+    /**
      * @param id of the startItem
      * @return the startItem with that id
      */

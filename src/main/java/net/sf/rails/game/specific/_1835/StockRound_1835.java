@@ -381,7 +381,7 @@ public class StockRound_1835 extends StockRound {
         if (cBad != null && cPru != null && !cPru.isBuyable() && !cPru.hasStarted()) {
             // Check if Baden President is owned by a player (not IPO)
             if (cBad.getPresidentsShare().getOwner() != ipo) {
-                log.info("TRIGGER: Baden Director sold. Releasing Prussia (PR).");
+                // log.info("TRIGGER: Baden Director sold. Releasing Prussia (PR).");
                 // We cannot force setBuyable() directly if it's private, but typically
                 // the engine checks release rules. If the engine missed it, we assume
                 // the ReleaseRule in XML works. We log it to be sure.

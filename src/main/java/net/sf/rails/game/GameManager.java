@@ -1048,6 +1048,7 @@ public Integer getRoundStart(int currentIndex) {
         }
         // ++ END TIME MANAGEMENT ++
 
+        clearStateLogs();
         beginStartRound();
         markRoundBoundary();
     }
@@ -1560,15 +1561,9 @@ public Integer getRoundStart(int currentIndex) {
 
     public boolean process(PossibleAction action) {
 
-        // // --- START DEBUG INSTRUMENTATION ---
-        // if (action != null) {
-        //     String actionHash = Integer.toHexString(System.identityHashCode(action));
-            
-        //     // Log what the engine *thought* was possible before this move
-        //     debugLogPossibleActions();
-        // } else {
-        // }
-        // // --- END DEBUG INSTRUMENTATION ---
+        if (action != null && action.getRoot() == null) {
+            action.setRoot(this.getRoot());
+        }
 
         // EMERGENCY OVERRIDE: Check for "FORCE_SKIP" signal
         if (action != null && action.toString().contains("FORCE_SKIP")) {
@@ -1783,6 +1778,12 @@ public Integer getRoundStart(int currentIndex) {
                 // Overwrite timeline: clear future boundaries that are no longer valid
                 truncateRoundBoundaries(changeStack.getCurrentIndex());
 
+
+                // Capture worth and payout snapshots per action
+                String moveId = String.valueOf(absoluteActionCounter);
+                capturePlayerWorthSnapshot(moveId);
+                captureCompanyPayoutSnapshot(moveId);
+                
                 // Autosave logic
                 RoundFacade roundAfter = getCurrentRound();
                 Object actorAfter = getCurrentPlayer();
@@ -1798,9 +1799,15 @@ public Integer getRoundStart(int currentIndex) {
                 boolean actorChanged = (actorBefore == null && actorAfter != null) ||
                         (actorBefore != null && !actorBefore.equals(actorAfter));
 
+String rId = (getCurrentRound() != null) ? getCurrentRound().getId() : "Start";
+                String snapId = "Move_" + actionCount.value() + ":" + rId;
+                capturePlayerWorthSnapshot(snapId);
+                captureCompanyPayoutSnapshot(snapId);
+
                 if (roundChanged || actorChanged) {
                     recoverySave();
                 }
+
 
                 if (Config.getBoolean("ai.save.state.on.move", false)) {
                     File stateDir = new File("logs/state");
@@ -1962,6 +1969,9 @@ public Integer getRoundStart(int currentIndex) {
                 } else {
                     changeStack.undo(index);
                 }
+
+                // Truncate orphaned future states
+                truncateStateLogs(actionCount.value());
 
                 // 4. CAPTURE STATE AFTER UNDO
                 Player playerAfter = getCurrentPlayer();
@@ -2211,6 +2221,7 @@ public Integer getRoundStart(int currentIndex) {
             return false;
         }
 
+        clearStateLogs();
         if (!gameLoader.reloadGameFromFile(getRoot(), file)) {
             return false;
         }
@@ -2689,10 +2700,12 @@ public Integer getRoundStart(int currentIndex) {
     }
 
     protected void capturePlayerWorthSnapshot(String roundId) {
-        // Ensure the map is initialized
         LinkedHashMap<String, Map<String, Double>> history = playerWorthHistory.value();
+        LinkedHashMap<String, Map<String, Double>> newHistory;
         if (history == null) {
-            history = new LinkedHashMap<>();
+            newHistory = new LinkedHashMap<>();
+        } else {
+            newHistory = new LinkedHashMap<>(history);
         }
 
         Map<String, Double> snapshot = new HashMap<>();
@@ -2704,13 +2717,17 @@ public Integer getRoundStart(int currentIndex) {
         }
 
         // Only log if we have not already logged this ID (e.g. from an interruption)
-        if (!history.containsKey(roundId)) {
-            history.put(roundId, snapshot);
-            playerWorthHistory.set(history); // Update the state object
+        if (!newHistory.containsKey(roundId)) {
+            newHistory.put(roundId, snapshot);
+            playerWorthHistory.set(newHistory); // Update the state object
         }
+        
         LinkedHashMap<String, Map<String, PlayerAssetSnapshot>> assetHistory = playerAssetHistory.value();
+        LinkedHashMap<String, Map<String, PlayerAssetSnapshot>> newAssetHistory;
         if (assetHistory == null)
-            assetHistory = new LinkedHashMap<>();
+            newAssetHistory = new LinkedHashMap<>();
+        else
+            newAssetHistory = new LinkedHashMap<>(assetHistory);
 
         Map<String, PlayerAssetSnapshot> roundAssets = new HashMap<>();
 
@@ -2730,10 +2747,10 @@ public Integer getRoundStart(int currentIndex) {
             }
             roundAssets.put(p.getName(), asset);
         }
-        assetHistory.put(roundId, roundAssets);
-        playerAssetHistory.set(assetHistory);
-
+        newAssetHistory.put(roundId, roundAssets);
+        playerAssetHistory.set(newAssetHistory);
     }
+
 
     public LinkedHashMap<String, Map<String, PlayerAssetSnapshot>> getPlayerAssetHistory() {
         return playerAssetHistory.value();
@@ -2778,6 +2795,7 @@ public Integer getRoundStart(int currentIndex) {
 
         }
     }
+    
 
     protected void updatePayoutTracker(PossibleAction action) {
         if (action == null)
@@ -3327,8 +3345,13 @@ public Integer getRoundStart(int currentIndex) {
         this.relativeORNumber.set(count);
     }
 
+ 
     public void setCurrentRound_AI(Round round) {
         this.currentRound.set(round);
+        // Also sync the macro-round tracker so the engine knows we are inside an active OR/SR
+        if (round instanceof OperatingRound || round instanceof StockRound) {
+            this.currentSRorOR.set(round);
+        }
     }
 
     /**
@@ -3480,6 +3503,12 @@ public PossibleAction getNextActionFromLog() {
         if (roundBefore != roundAfter) {
             markRoundBoundary();
         }
+
+        // Capture snapshots during reload so the chart populates historical moves
+        String rId = (getCurrentRound() != null) ? getCurrentRound().getId() : "Start";
+        String snapId = "Move_" + actionCount.value() + ":" + rId;
+        capturePlayerWorthSnapshot(snapId);
+        captureCompanyPayoutSnapshot(snapId);
 
 
         if (!isGameOver())
@@ -3729,6 +3758,35 @@ public PossibleAction getNextActionFromLog() {
             }
         } catch (Exception e) {
             log.error("Failed to read time data from state.json", e);
+        }
+    }
+
+    private void clearStateLogs() {
+        java.io.File dir = new java.io.File("logs/state");
+        if (dir.exists() && dir.isDirectory()) {
+            for (java.io.File f : dir.listFiles()) {
+                if (f.getName().endsWith(".json")) {
+                    f.delete();
+                }
+            }
+        } else {
+            dir.mkdirs();
+        }
+    }
+
+    private void truncateStateLogs(int currentMove) {
+        java.io.File dir = new java.io.File("logs/state");
+        if (dir.exists() && dir.isDirectory()) {
+            for (java.io.File f : dir.listFiles()) {
+                if (f.getName().startsWith("state_") && f.getName().endsWith(".json")) {
+                    try {
+                        int move = Integer.parseInt(f.getName().substring(6, 11));
+                        if (move > currentMove) f.delete();
+                    } catch (NumberFormatException e) {
+                        // Ignore files that do not match the exact pattern
+                    }
+                }
+            }
         }
     }
 

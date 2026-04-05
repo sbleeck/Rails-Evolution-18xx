@@ -261,25 +261,24 @@ public class PublicCompany extends RailsAbstractItem
     protected BooleanState hibernating = new BooleanState(this, "hibernating");
 
     /**
-* Helper: Returns a list of all Trains owned by this company.
-* Extracts the actual Train objects from the TrainCards stored in the portfolio.
-*/
-public List<Train> getTrains() {
-if (portfolio == null || portfolio.getTrainsModel() == null) {
-return new ArrayList<>();
-}
-List<Train> list = new ArrayList<>();
-for (Object item : portfolio.getTrainsModel().getPortfolio().items()) {
-if (item instanceof net.sf.rails.game.TrainCard) {
-list.add(((net.sf.rails.game.TrainCard) item).getActualTrain());
-} else if (item instanceof Train) {
-list.add((Train) item);
-}
-}
-return list;
-}
-
-
+     * Helper: Returns a list of all Trains owned by this company.
+     * Extracts the actual Train objects from the TrainCards stored in the
+     * portfolio.
+     */
+    public List<Train> getTrains() {
+        if (portfolio == null || portfolio.getTrainsModel() == null) {
+            return new ArrayList<>();
+        }
+        List<Train> list = new ArrayList<>();
+        for (Object item : portfolio.getTrainsModel().getPortfolio().items()) {
+            if (item instanceof net.sf.rails.game.TrainCard) {
+                list.add(((net.sf.rails.game.TrainCard) item).getActualTrain());
+            } else if (item instanceof Train) {
+                list.add((Train) item);
+            }
+        }
+        return list;
+    }
 
     /**
      * Helper: Returns a list of all Private Companies owned by this company.
@@ -1335,9 +1334,9 @@ return list;
             Currency.wireAll(otherCompany, this);
         }
         portfolio.transferAssetsFrom(otherCompany.getPortfolioModel());
-       for (PrivateCompany priv : new java.util.ArrayList<>(otherCompany.getPrivates())) {
+        for (PrivateCompany priv : new java.util.ArrayList<>(otherCompany.getPrivates())) {
             priv.moveTo(this.getPortfolioModel());
-            
+
             java.util.Set<net.sf.rails.game.special.SpecialProperty> sps = priv.getSpecialProperties();
             if (sps != null && !sps.isEmpty()) {
                 getRoot().getGameManager().allocateSpecialProperties(this, sps);
@@ -2939,16 +2938,13 @@ return list;
         return numberOfBonds > 0;
     }
 
-
     public int getNumberOfBonds() {
         return numberOfBonds;
     }
 
     public void setNumberOfBonds(int bonds) {
-        this.numberOfBonds=bonds;
+        this.numberOfBonds = bonds;
     }
-
-
 
     public int getPriceOfBonds() {
         return priceOfBonds;
@@ -2973,11 +2969,71 @@ return list;
     }
 
     /**
-     * AI Accessor: Required for StateVectorBuilder.
+     * * Restores dynamic token counts (e.g., Prussia inheriting Minor tokens in
+     * 1835).
+     */
+    public void setTotalTokens_AI(int targetTokens) {
+        int current = getNumberOfBaseTokens();
+        if (targetTokens > current) {
+            java.util.SortedSet<BaseToken> tokens = new java.util.TreeSet<>(baseTokens.getAllBaseTokens());
+            for (int i = current; i < targetTokens; i++) {
+                tokens.add(BaseToken.create(this));
+            }
+            baseTokens.initBaseTokens(tokens);
+        }
+    }
+    /**
+     * AI Accessor: Restores the 'hasOperated' flag to ensure mid-round continuity.
+     */
+    public void setHasOperated_AI(boolean operated) {
+        this.hasOperated.set(operated);
+    }
+
+    /**
+     * AI Accessor: Restores the bank loan amount for 1835/1837.
+     */
+    public void setBankLoan_AI(int amount) {
+        this.bankLoan.set(amount);
+    }
+
+    /**
+     * AI Accessor: Restores the closed state without triggering closing side-effects.
+     */
+    public void setClosed_AI(boolean isClosed) {
+        // Assuming 'closed' is a BooleanState inherited or defined in the class
+        this.closed.set(isClosed); 
+    }
+    /**
+     * AI Accessor: Required for StateVectorBuilder and MultiplierChart.
      * Aliases to the existing getMarketPrice() to satisfy the Interface.
      */
     public int getCurrentPrice() {
         return getMarketPrice();
     }
+    /**
+     * AI Accessors: Restore the exact dividend history and allocations to preserve UI continuity.
+     */
+    public void setLastRevenue_AI(int amount) {
+        this.lastRevenue.set(amount);
+    }
+
+    public void setLastDividend_AI(int amount) {
+        this.lastDividend.set(amount);
+    }
+
+    public void setLastRevenueAllocation_AI(String allocation) {
+        if (allocation != null) {
+            this.lastRevenueAllocation.set(allocation);
+        }
+    }
+
+    public void setLastDirectIncome_AI(int amount) {
+        this.lastDirectIncome.set(amount);
+    }
+
+    public void setDirectIncomeRevenue_AI(int amount) {
+        this.directIncomeRevenue.set(amount);
+    }
+
 
 }

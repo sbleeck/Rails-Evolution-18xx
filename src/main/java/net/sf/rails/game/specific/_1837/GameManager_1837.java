@@ -66,7 +66,7 @@ public class GameManager_1837 extends GameManager {
         }
         
         if (hasForcingTrain) {
-            log.info("1837_TRIGGER: Compulsory KK formation forced by train (4+1 or 5).");
+            // log.info("1837_TRIGGER: Compulsory KK formation forced by train (4+1 or 5).");
             forced = true;
         }
 
@@ -108,7 +108,7 @@ public class GameManager_1837 extends GameManager {
             }
             
             if (has5) {
-                log.info("1837_TRIGGER: Compulsory Ug formation forced by train (5).");
+                // log.info("1837_TRIGGER: Compulsory Ug formation forced by train (5).");
                 forced = true;
             }
         } catch (Exception e) {
