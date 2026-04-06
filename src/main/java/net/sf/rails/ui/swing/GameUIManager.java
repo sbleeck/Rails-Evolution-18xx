@@ -512,6 +512,7 @@ public class GameUIManager implements DialogOwner {
 
     }
 
+    
     protected boolean processOnServer(PossibleAction action) {
         boolean result;
         int currentActionCount = getGameManager().getCurrentActionCount(); // Get count *before* processing
@@ -1327,6 +1328,46 @@ currentRoundName = "Game Start";
     public void setSaveDirectory(String saveDirectory) {
         this.saveDirectory = saveDirectory;
     }
+
+    /**
+     * Swaps the active RailsRoot and forces all visible UI components to refresh
+     * their data references. This enables "Visual Rehydration".
+     */
+    public void updateAllVisuals(RailsRoot historicalRoot) {
+        this.railsRoot = historicalRoot;
+        
+        // 1. Refresh the Status Window
+        if (statusWindow != null) {
+            statusWindow.updateStatus(true);
+        }
+
+        // 2. Refresh the Map (Search for MapPanel in the ORWindow)
+        if (orWindow != null) {
+            // We use a generic approach to find the MapPanel since we are the manager
+            MapPanel panel = findMapPanel(orWindow);
+            if (panel != null) panel.updateData();
+        }
+
+        // 3. Refresh the Stock Market
+        if (stockChartWindow != null && stockChartWindow.isVisible()) {
+            stockChartWindow.repaint();
+        }
+        
+        // 4. Update the "Thinking" alert in the Activity Panel
+        updateActivityPanel();
+    }
+
+    private MapPanel findMapPanel(Container container) {
+        for (Component c : container.getComponents()) {
+            if (c instanceof MapPanel) return (MapPanel) c;
+            if (c instanceof Container) {
+                MapPanel found = findMapPanel((Container) c);
+                if (found != null) return found;
+            }
+        }
+        return null;
+    }
+    
 
     public PossibleAction getLastAction() {
         return lastAction;

@@ -336,27 +336,27 @@ public class GameManager extends RailsManager implements Configurable, Owner {
     protected final GenericState<Map<String, Integer>> currentRoundPayouts = new GenericState<>(
             this, "currentRoundPayouts");
 
-
-            /**
+    /**
      * Tracks ChangeStack indices where rounds begin.
-     * Must NOT be a State variable, so it survives UNDO and allows "Next Round" navigation.
+     * Must NOT be a State variable, so it survives UNDO and allows "Next Round"
+     * navigation.
      */
     private final TreeSet<Integer> roundBoundaries = new TreeSet<>();
 
     public void markRoundBoundary() {
-        if (getRoot() == null || getRoot().getStateManager() == null) return;
+        if (getRoot() == null || getRoot().getStateManager() == null)
+            return;
         ChangeStack changeStack = getRoot().getStateManager().getChangeStack();
         if (changeStack != null) {
             roundBoundaries.add(changeStack.getCurrentIndex());
         }
     }
 
-   
     private void truncateRoundBoundaries(int currentIndex) {
         roundBoundaries.tailSet(currentIndex, false).clear();
     }
 
-public Integer getRoundStart(int currentIndex) {
+    public Integer getRoundStart(int currentIndex) {
         return roundBoundaries.floor(currentIndex);
     }
 
@@ -367,7 +367,6 @@ public Integer getRoundStart(int currentIndex) {
     public Integer getNextRoundIndex(int currentIndex) {
         return roundBoundaries.higher(currentIndex);
     }
-
 
     /**
      * Flag used to track if any CorrectionModeAction is currently active (e.g.,
@@ -1048,6 +1047,7 @@ public Integer getRoundStart(int currentIndex) {
         }
         // ++ END TIME MANAGEMENT ++
 
+        clearAutosaves();
         clearStateLogs();
         beginStartRound();
         markRoundBoundary();
@@ -1176,7 +1176,6 @@ public Integer getRoundStart(int currentIndex) {
                             // Fallback to 1 OR if everything is broken
                             numOfORs.set(1);
                         }
-                        
 
                         log.info("Phase={} ORs={}", currentPhase.toText(), numOfORs);
 
@@ -1233,8 +1232,7 @@ public Integer getRoundStart(int currentIndex) {
                     startStockRound();
                 }
             }
-        }
-        else if (round instanceof net.sf.rails.game.specific._1817.AuctionRound_1817) {
+        } else if (round instanceof net.sf.rails.game.specific._1817.AuctionRound_1817) {
             // Resume the Stock Round that was interrupted by the IPO auction
             net.sf.rails.game.round.RoundFacade roundToResume = getInterruptedRound();
             setInterruptedRound(null);
@@ -1337,7 +1335,7 @@ public Integer getRoundStart(int currentIndex) {
         or.start();
     }
 
-// ... (lines of unchanged context code) ...
+    // ... (lines of unchanged context code) ...
     public <T extends RoundFacade> T createRound(String roundClassName, String id) {
         // log.error("--- GM.createRound(String, String) CALLED. ClassName: {}, ID: {}",
         // roundClassName, id);
@@ -1350,16 +1348,11 @@ public Integer getRoundStart(int currentIndex) {
             // not the abstract StartRound.class
             round = Configure.create((Class<T>) roundClass, GameManager.class, this, id);
 
-// --- DELETE ---
-//        } catch (Exception e) {
-//            System.exit(1);
-//        }
-// --- START FIX ---
+
         } catch (Exception e) {
             log.error("CRITICAL: Failed to create round " + roundClassName, e);
             throw new RuntimeException("Failed to create round: " + roundClassName, e);
         }
-// --- END FIX ---
         setRound(round);
         return round;
     }
@@ -1372,24 +1365,18 @@ public Integer getRoundStart(int currentIndex) {
             roundClass = (Class<T>) net.sf.rails.game.specific._1817.OperatingRound_1817.class;
         }
 
-
         T round = null;
         try {
             round = Configure.create(roundClass, GameManager.class, this, id);
-// --- DELETE ---
-//        } catch (Exception e) {
-//            System.exit(1);
-//        }
-// --- START FIX ---
+
         } catch (Exception e) {
             log.error("CRITICAL: Failed to create round " + roundClass.getName(), e);
             throw new RuntimeException("Failed to create round: " + roundClass.getName(), e);
         }
-// --- END FIX ---
         setRound(round);
         return round;
     }
-// ... (rest of the method) ...
+
     public void newPhaseChecks(RoundFacade round) {
 
     }
@@ -1558,7 +1545,6 @@ public Integer getRoundStart(int currentIndex) {
         }
     }
 
-
     public boolean process(PossibleAction action) {
 
         if (action != null && action.getRoot() == null) {
@@ -1610,7 +1596,7 @@ public Integer getRoundStart(int currentIndex) {
                         if (!isGameOver()) {
                             setCorrectionActions();
                         }
-                        
+
                         ChangeStack changeStack = getRoot().getStateManager().getChangeStack();
                         if (changeStack.isUndoPossible()) {
                             possibleActions.add(new GameAction(getRoot(), GameAction.Mode.FORCED_UNDO));
@@ -1778,12 +1764,11 @@ public Integer getRoundStart(int currentIndex) {
                 // Overwrite timeline: clear future boundaries that are no longer valid
                 truncateRoundBoundaries(changeStack.getCurrentIndex());
 
-
                 // Capture worth and payout snapshots per action
                 String moveId = String.valueOf(absoluteActionCounter);
                 capturePlayerWorthSnapshot(moveId);
                 captureCompanyPayoutSnapshot(moveId);
-                
+
                 // Autosave logic
                 RoundFacade roundAfter = getCurrentRound();
                 Object actorAfter = getCurrentPlayer();
@@ -1799,15 +1784,15 @@ public Integer getRoundStart(int currentIndex) {
                 boolean actorChanged = (actorBefore == null && actorAfter != null) ||
                         (actorBefore != null && !actorBefore.equals(actorAfter));
 
-String rId = (getCurrentRound() != null) ? getCurrentRound().getId() : "Start";
-                String snapId = "Move_" + actionCount.value() + ":" + rId;
-                capturePlayerWorthSnapshot(snapId);
-                captureCompanyPayoutSnapshot(snapId);
-
                 if (roundChanged || actorChanged) {
+                    // Capture worth and payout snapshots at the end of each turn
+                    String rId = (getCurrentRound() != null) ? getCurrentRound().getId() : "Start";
+                    String snapId = "Move_" + actionCount.value() + ":" + rId;
+                    capturePlayerWorthSnapshot(snapId);
+                    captureCompanyPayoutSnapshot(snapId);
+
                     recoverySave();
                 }
-
 
                 if (Config.getBoolean("ai.save.state.on.move", false)) {
                     File stateDir = new File("logs/state");
@@ -1851,8 +1836,6 @@ String rId = (getCurrentRound() != null) ? getCurrentRound().getId() : "Start";
 
         return result;
     }
-
-
 
     protected void logActionTaken(PossibleAction action) {
         if (action instanceof NullAction
@@ -1914,7 +1897,7 @@ String rId = (getCurrentRound() != null) ? getCurrentRound().getId() : "Start";
                             shouldFlush = true;
                         }
                     } catch (Exception e) {
-                        shouldFlush = true; 
+                        shouldFlush = true;
                     }
                 }
 
@@ -1922,14 +1905,14 @@ String rId = (getCurrentRound() != null) ? getCurrentRound().getId() : "Start";
                     RoundFacade currentRound = getCurrentRound();
                     if (currentRound instanceof OperatingRound) {
                         ((OperatingRound) currentRound).resetTransientStateOnLoad();
-                        log.info("MAP CORRECTION: Flushed OperatingRound transient caches to maintain state consistency.");
+                        log.info(
+                                "MAP CORRECTION: Flushed OperatingRound transient caches to maintain state consistency.");
                     } else if (currentRound instanceof StockRound) {
                         ((StockRound) currentRound).resetTransientStateOnLoad();
                     }
                 }
             }
 
-            
         }
 
         return result;
@@ -2077,9 +2060,6 @@ String rId = (getCurrentRound() != null) ? getCurrentRound().getId() : "Start";
         if (!dir.exists())
             dir.mkdirs();
 
-
-
-
         String dateStr = new java.text.SimpleDateFormat("yyyyMMdd_HHmmss").format(new java.util.Date());
         String filename = String.format("%s_%s_%05d.rails", getGameName(), dateStr, actionCount.value());
         File saveFile = new File(dir, filename);
@@ -2104,7 +2084,6 @@ String rId = (getCurrentRound() != null) ? getCurrentRound().getId() : "Start";
                 }
             }
 
-            
             // Automatically persist UI window states during the recovery autosave cycle
             if (gameUIManager != null) {
                 gameUIManager.saveWindowSettings(getGameName());
@@ -2239,7 +2218,7 @@ String rId = (getCurrentRound() != null) ? getCurrentRound().getId() : "Start";
 
         setReloading(true);
 
-        // This is the fix for the save/load crash 
+        // This is the fix for the save/load crash
         // We must clean up all *active round references* in the GameManager
         // to clear 'transient' fields of stale data *before* we replay any actions.
 
@@ -2287,42 +2266,45 @@ String rId = (getCurrentRound() != null) ? getCurrentRound().getId() : "Start";
         try {
             // for (PossibleAction savedAction : savedActions) { // <-- DELETE
             for (this.reloadActionIndex = 0; this.reloadActionIndex < savedActions.size(); this.reloadActionIndex++) {
-                
-// INSTRUMENTATION: Identity Check
-            try {
-                GameManager rootGM = getRoot().getGameManager();
-                RoundFacade currentRound = getCurrentRound();
-                Object roundGM = null;
-                
-                // Reflection to get the GM from the Round
-                if (currentRound != null) {
-                    try {
-                        java.lang.reflect.Field gmField = currentRound.getClass().getSuperclass().getDeclaredField("gameManager"); // Assumes Round.java has this
-                        gmField.setAccessible(true);
-                        roundGM = gmField.get(currentRound);
-                    } catch (Exception e) {
-                        roundGM = "ReflectionFailed";
+
+                // INSTRUMENTATION: Identity Check
+                try {
+                    GameManager rootGM = getRoot().getGameManager();
+                    RoundFacade currentRound = getCurrentRound();
+                    Object roundGM = null;
+
+                    // Reflection to get the GM from the Round
+                    if (currentRound != null) {
+                        try {
+                            java.lang.reflect.Field gmField = currentRound.getClass().getSuperclass()
+                                    .getDeclaredField("gameManager"); // Assumes Round.java has this
+                            gmField.setAccessible(true);
+                            roundGM = gmField.get(currentRound);
+                        } catch (Exception e) {
+                            roundGM = "ReflectionFailed";
+                        }
                     }
+
+                    log.info(String.format("DEBUG_ID: Reload Loop Step %d", this.reloadActionIndex));
+                    log.info(String.format("DEBUG_ID: GM_Current (this) = %d", System.identityHashCode(this)));
+                    log.info(String.format("DEBUG_ID: GM_Root     = %s",
+                            (rootGM == null ? "null" : System.identityHashCode(rootGM))));
+                    log.info(String.format("DEBUG_ID: GM_Round    = %s",
+                            (roundGM instanceof GameManager ? System.identityHashCode(roundGM) : roundGM)));
+
+                    // Attempt Aggressive Sync if we find a mismatch
+                    if (roundGM instanceof GameManager && roundGM != this) {
+                        log.info("DEBUG_ID: MISMATCH DETECTED! Attempting Sync to GM_Round...");
+                        GameManager target = (GameManager) roundGM;
+                        target.actionsBeingReloaded = this.actionsBeingReloaded;
+                        target.reloadActionIndex = this.reloadActionIndex;
+                        target.setReloading(true);
+                    }
+
+                } catch (Exception e) {
+                    log.error("DEBUG_ID: Error in instrumentation", e);
                 }
 
-                log.info(String.format("DEBUG_ID: Reload Loop Step %d", this.reloadActionIndex));
-                log.info(String.format("DEBUG_ID: GM_Current (this) = %d", System.identityHashCode(this)));
-                log.info(String.format("DEBUG_ID: GM_Root     = %s", (rootGM == null ? "null" : System.identityHashCode(rootGM))));
-                log.info(String.format("DEBUG_ID: GM_Round    = %s", (roundGM instanceof GameManager ? System.identityHashCode(roundGM) : roundGM)));
-                
-                // Attempt Aggressive Sync if we find a mismatch
-                if (roundGM instanceof GameManager && roundGM != this) {
-                    log.info("DEBUG_ID: MISMATCH DETECTED! Attempting Sync to GM_Round...");
-                    GameManager target = (GameManager) roundGM;
-                    target.actionsBeingReloaded = this.actionsBeingReloaded;
-                    target.reloadActionIndex = this.reloadActionIndex;
-                    target.setReloading(true);
-                }
-
-            } catch (Exception e) {
-                log.error("DEBUG_ID: Error in instrumentation", e);
-            }
-                
                 PossibleAction savedAction = savedActions.get(this.reloadActionIndex);
                 if (this.reloadActionIndex < executedActionsCount) { // <-- USE MEMBER
                     executedAction = executedActions.get(this.reloadActionIndex); // <-- USE MEMBER
@@ -2487,7 +2469,6 @@ String rId = (getCurrentRound() != null) ? getCurrentRound().getId() : "Start";
         ((OperatingRound) getCurrentRound()).nextStep();
     }
 
-
     public void registerPlayerBankruptcy(Player player) {
         endedByBankruptcy.set(true);
         String message = LocalText.getText("PlayerIsBankrupt",
@@ -2498,8 +2479,7 @@ String rId = (getCurrentRound() != null) ? getCurrentRound().getId() : "Start";
         // House Rule: End game immediately instead of attempting player elimination
         String warningMsg = "Game Over by Bankruptcy (House Rule):\n" +
                 "Some games might eliminate the player and continue the game.\n" +
-                "However, this is stupid.\n" +
-                "This implementation ends the game here.";
+                "However, this implementation ends the game here.\n" ;
 
         ReportBuffer.add(this, warningMsg);
 
@@ -2663,17 +2643,38 @@ String rId = (getCurrentRound() != null) ? getCurrentRound().getId() : "Start";
         String message = LocalText.getText("GameOver");
         ReportBuffer.add(this, message);
 
-        // FIXME: Rails 2.0 this is not allowed as this causes troubles with Undo
-        // DisplayBuffer.add(this, message);
-
         ReportBuffer.add(this, "");
 
-        // Trigger the Final Ranking Window (Player Value Window)
-        // We use invokeLater to ensure it stacks correctly on the EDT and gains focus,
-        // preventing the "unresponsive window" issue caused by race conditions with
-        // other dialogs.
         if (!java.awt.GraphicsEnvironment.isHeadless()) {
-            javax.swing.SwingUtilities.invokeLater(() -> displayWorthChart(null));
+            javax.swing.SwingUtilities.invokeLater(() -> {
+                // Gather player names and final net worths for potential upload
+                java.util.List<String> names = new java.util.ArrayList<>();
+                java.util.List<Integer> scores = new java.util.ArrayList<>();
+                for (Player p : getRoot().getPlayerManager().getPlayers()) {
+                    names.add(p.getName());
+                    scores.add(p.getWorth());
+                }
+
+                // Prompt the user
+                // upload will go to https://docs.google.com/spreadsheets/d/1lXyCBjjLLzfeajpdS_PEqI3z4IGDIqj5gRAtiPpyqck/edit?pli=1&gid=0#gid=0
+                
+                int dialogResult = javax.swing.JOptionPane.showConfirmDialog(null,
+                        "Do you want to save and upload the final results?",
+                        "Upload Results",
+                        javax.swing.JOptionPane.YES_NO_OPTION,
+                        javax.swing.JOptionPane.QUESTION_MESSAGE);
+
+                if (dialogResult == javax.swing.JOptionPane.YES_OPTION) {
+                    try {
+                        ResultUploader.uploadGameResult(getGameName() + "-Championship", names, scores);
+                        log.info("results upload triggered.");
+                    } catch (Exception e) {
+                        log.error("Failed to transmit results: " + e.getMessage());
+                    }
+                }
+
+                displayWorthChart(null);
+            });
         }
 
         // Create the round and get a reference to it
@@ -2699,7 +2700,9 @@ String rId = (getCurrentRound() != null) ? getCurrentRound().getId() : "Start";
 
     }
 
+
     protected void capturePlayerWorthSnapshot(String roundId) {
+        // Ensure the map is initialized and CLONED to trigger StateManager updates
         LinkedHashMap<String, Map<String, Double>> history = playerWorthHistory.value();
         LinkedHashMap<String, Map<String, Double>> newHistory;
         if (history == null) {
@@ -2721,13 +2724,14 @@ String rId = (getCurrentRound() != null) ? getCurrentRound().getId() : "Start";
             newHistory.put(roundId, snapshot);
             playerWorthHistory.set(newHistory); // Update the state object
         }
-        
+
         LinkedHashMap<String, Map<String, PlayerAssetSnapshot>> assetHistory = playerAssetHistory.value();
         LinkedHashMap<String, Map<String, PlayerAssetSnapshot>> newAssetHistory;
-        if (assetHistory == null)
+        if (assetHistory == null) {
             newAssetHistory = new LinkedHashMap<>();
-        else
+        } else {
             newAssetHistory = new LinkedHashMap<>(assetHistory);
+        }
 
         Map<String, PlayerAssetSnapshot> roundAssets = new HashMap<>();
 
@@ -2749,9 +2753,9 @@ String rId = (getCurrentRound() != null) ? getCurrentRound().getId() : "Start";
         }
         newAssetHistory.put(roundId, roundAssets);
         playerAssetHistory.set(newAssetHistory);
+
     }
-
-
+    
     public LinkedHashMap<String, Map<String, PlayerAssetSnapshot>> getPlayerAssetHistory() {
         return playerAssetHistory.value();
     }
@@ -2795,7 +2799,6 @@ String rId = (getCurrentRound() != null) ? getCurrentRound().getId() : "Start";
 
         }
     }
-    
 
     protected void updatePayoutTracker(PossibleAction action) {
         if (action == null)
@@ -3211,7 +3214,6 @@ String rId = (getCurrentRound() != null) ? getCurrentRound().getId() : "Start";
         return getRoot().getPlayerManager().getPlayerCertificateLimit(player);
     }
 
-
     // shortcut to PlayerManager
     public Player getCurrentPlayer() {
         RoundFacade round = getCurrentRound();
@@ -3247,7 +3249,6 @@ String rId = (getCurrentRound() != null) ? getCurrentRound().getId() : "Start";
      * }
      */
 
-   
     /**
      * Registry of exchanged certificates to be denied income
      * because their precursors produced revenue in the same OR.
@@ -3345,10 +3346,10 @@ String rId = (getCurrentRound() != null) ? getCurrentRound().getId() : "Start";
         this.relativeORNumber.set(count);
     }
 
- 
     public void setCurrentRound_AI(Round round) {
         this.currentRound.set(round);
-        // Also sync the macro-round tracker so the engine knows we are inside an active OR/SR
+        // Also sync the macro-round tracker so the engine knows we are inside an active
+        // OR/SR
         if (round instanceof OperatingRound || round instanceof StockRound) {
             this.currentSRorOR.set(round);
         }
@@ -3361,7 +3362,7 @@ String rId = (getCurrentRound() != null) ? getCurrentRound().getId() : "Start";
      * @return The *next* PossibleAction in the log, or null if not reloading
      *         or if at the end of the list.
      */
-public PossibleAction getNextActionFromLog() {
+    public PossibleAction getNextActionFromLog() {
         // --- START FIX ---
         // INSTRUMENTATION: Strict logging to diagnose Fatal Reload Error
         boolean reloadingState = isReloading();
@@ -3371,7 +3372,8 @@ public PossibleAction getNextActionFromLog() {
         int targetIndex = currentIndex + 1;
 
         log.info("DEBUG_INSTRUMENTATION: getNextActionFromLog() called.");
-        log.info(String.format("DEBUG_INSTRUMENTATION: State -> isReloading=%b, listExists=%b, size=%d, currentIndex=%d, targetIndex=%d",
+        log.info(String.format(
+                "DEBUG_INSTRUMENTATION: State -> isReloading=%b, listExists=%b, size=%d, currentIndex=%d, targetIndex=%d",
                 reloadingState, listExists, listSize, currentIndex, targetIndex));
 
         if (!reloadingState) {
@@ -3400,6 +3402,10 @@ public PossibleAction getNextActionFromLog() {
     public boolean processOnReload(PossibleAction action) {
         getRoot().getReportManager().getDisplayBuffer().clear();
         RoundFacade roundBefore = getCurrentRound();
+        Object actorBefore = getCurrentPlayer();
+        if (roundBefore instanceof OperatingRound) {
+            actorBefore = ((OperatingRound) roundBefore).operatingCompany.value();
+        }
 
         if (this.logOutputDirectory != null) {
             try {
@@ -3419,16 +3425,17 @@ public PossibleAction getNextActionFromLog() {
         }
 
         if (!possibleActions.validate(action)) {
-           boolean classMatch = false;
+            boolean classMatch = false;
             for (PossibleAction pa : possibleActions.getList()) {
                 if (pa.getClass().equals(action.getClass())) {
                     classMatch = true;
                     break;
                 }
             }
-            
+
             if (classMatch) {
-                log.warn("RELOAD WARNING: Player mismatch on action " + action + ". Bypassing strict validation to allow Round to sync state.");
+                log.warn("RELOAD WARNING: Player mismatch on action " + action
+                        + ". Bypassing strict validation to allow Round to sync state.");
             } else {
                 DisplayBuffer.add(this, LocalText.getText("ActionNotAllowed", action.toString()));
 
@@ -3495,21 +3502,35 @@ public PossibleAction getNextActionFromLog() {
         executedActions.add(action);
         updatePayoutTracker(action);
 
+       // Capture snapshots per move so the timeline slider works when loaded from a save
+        String moveId = String.valueOf(getActionCountModel().value());
+        capturePlayerWorthSnapshot(moveId);
+        captureCompanyPayoutSnapshot(moveId);
+
         possibleActions.clear();
         getCurrentRound().setPossibleActions();
         changeStack.close(action);
 
         RoundFacade roundAfter = getCurrentRound();
-        if (roundBefore != roundAfter) {
+        Object actorAfter = getCurrentPlayer();
+        if (roundAfter instanceof OperatingRound) {
+            actorAfter = ((OperatingRound) roundAfter).operatingCompany.value();
+        }
+
+        boolean roundChanged = (roundBefore != roundAfter);
+        if (roundChanged) {
             markRoundBoundary();
         }
 
-        // Capture snapshots during reload so the chart populates historical moves
-        String rId = (getCurrentRound() != null) ? getCurrentRound().getId() : "Start";
-        String snapId = "Move_" + actionCount.value() + ":" + rId;
-        capturePlayerWorthSnapshot(snapId);
-        captureCompanyPayoutSnapshot(snapId);
+        boolean actorChanged = (actorBefore == null && actorAfter != null) ||
+                (actorBefore != null && !actorBefore.equals(actorAfter));
 
+        if (roundChanged || actorChanged) {
+            String rId = (getCurrentRound() != null) ? getCurrentRound().getId() : "Start";
+            String snapId = "Move_" + getActionCountModel().value() + ":" + rId;
+            capturePlayerWorthSnapshot(snapId);
+            captureCompanyPayoutSnapshot(snapId);
+        }
 
         if (!isGameOver())
             setCorrectionActions();
@@ -3719,8 +3740,6 @@ public PossibleAction getNextActionFromLog() {
         }
     }
 
-
-
     private void saveJsonState(File saveFile) {
         File metaFile = new File(saveFile.getAbsolutePath() + ".state.json");
         try {
@@ -3731,7 +3750,8 @@ public PossibleAction getNextActionFromLog() {
     }
 
     private void loadJsonState(File saveFile) {
-        if (!isTimeManagementEnabled()) return;
+        if (!isTimeManagementEnabled())
+            return;
 
         File metaFile = new File(saveFile.getAbsolutePath() + ".state.json");
         if (!metaFile.exists()) {
@@ -3761,6 +3781,24 @@ public PossibleAction getNextActionFromLog() {
         }
     }
 
+    private void clearAutosaves() {
+        String path = Config.get("save.recovery.filepath");
+        File dir;
+        if (Util.hasValue(path)) {
+            dir = new File(path).getParentFile();
+        } else {
+            dir = new File("autosave");
+        }
+        if (dir != null && dir.exists() && dir.isDirectory()) {
+            File[] files = dir.listFiles((d, name) -> name.endsWith(".rails") || name.endsWith(".json"));
+            if (files != null) {
+                for (File f : files) {
+                    f.delete();
+                }
+            }
+        }
+    }
+
     private void clearStateLogs() {
         java.io.File dir = new java.io.File("logs/state");
         if (dir.exists() && dir.isDirectory()) {
@@ -3781,7 +3819,8 @@ public PossibleAction getNextActionFromLog() {
                 if (f.getName().startsWith("state_") && f.getName().endsWith(".json")) {
                     try {
                         int move = Integer.parseInt(f.getName().substring(6, 11));
-                        if (move > currentMove) f.delete();
+                        if (move > currentMove)
+                            f.delete();
                     } catch (NumberFormatException e) {
                         // Ignore files that do not match the exact pattern
                     }
@@ -3802,7 +3841,7 @@ public PossibleAction getNextActionFromLog() {
         logAction(action, actionCount.value());
     }
 
-public void logAction(PossibleAction action, int moveNumber) {
+    public void logAction(PossibleAction action, int moveNumber) {
         if (action == null)
             return;
 
@@ -4066,40 +4105,30 @@ public void logAction(PossibleAction action, int moveNumber) {
         }
     }
 
+    private void debugLogPossibleActions() {
+        // if (possibleActions == null || possibleActions.getList() == null ||
+        // possibleActions.getList().isEmpty()) {
+        // return;
+        // }
 
-private void debugLogPossibleActions() {
-//         if (possibleActions == null || possibleActions.getList() == null || possibleActions.getList().isEmpty()) {
-//             return;
-//         }
+        // StringBuilder sb = new StringBuilder();
+        // sb.append("\n=== GM STATE: Current PossibleActions List ===\n");
+        // int count = 0;
+        // for (PossibleAction pa : possibleActions.getList()) {
+        // // Filter out CorrectionModeAction entries from the log output
+        // if (pa.toString().contains("CorrectionModeAction")) {
+        // continue;
+        // }
 
-//         StringBuilder sb = new StringBuilder();
-//         sb.append("\n=== GM STATE: Current PossibleActions List ===\n");
-//         int count = 0;
-//         for (PossibleAction pa : possibleActions.getList()) {
-//             // Filter out CorrectionModeAction entries from the log output
-//             if (pa.toString().contains("CorrectionModeAction")) {
-//                 continue;
-//             }
-            
-//             String hash = Integer.toHexString(System.identityHashCode(pa));
-//             sb.append(String.format(" [%d] Class: %-20s | Hash: %s | Str: %s\n", 
-//                 count++, 
-//                 pa.getClass().getSimpleName(), 
-//                 hash, 
-//                 pa.toString()));
-//         }
-//         sb.append("==============================================\n");
-//         log.info(sb.toString());
+        // String hash = Integer.toHexString(System.identityHashCode(pa));
+        // sb.append(String.format(" [%d] Class: %-20s | Hash: %s | Str: %s\n",
+        // count++,
+        // pa.getClass().getSimpleName(),
+        // hash,
+        // pa.toString()));
+        // }
+        // sb.append("==============================================\n");
+        // log.info(sb.toString());
     }
-
-
-
-
-
-
-
-
-
-
 
 }

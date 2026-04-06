@@ -17,6 +17,7 @@ import java.awt.geom.Path2D;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -52,6 +53,8 @@ public class WorthChartWindow extends JDialog {
     private JButton nextButton;
     private DefaultTableModel tableModel;
     private JSplitPane splitPane;
+    private JSlider timeSlider;
+    private LegendPanel legendPanel;
 
     public WorthChartWindow(JFrame parentFrame, GameManager gm) {
         super(parentFrame, "Player Worth History Chart - Reveal Mode", false);
@@ -77,7 +80,7 @@ public class WorthChartWindow extends JDialog {
 
         // Top: Chart
         relativePanel = new WorthChartPanel(data, true, revealController);
-        relativePanel.setPreferredSize(new Dimension(550, 250));
+        relativePanel.setPreferredSize(new Dimension(1000, 250));
 
         relativePanel.addMouseListener(new java.awt.event.MouseAdapter() {
             @Override
@@ -106,13 +109,24 @@ public class WorthChartWindow extends JDialog {
         nextButton = new JButton();
 
         int maxSnaps = Math.max(0, data.roundKeys.size() - 1);
-        JSlider timeSlider = new JSlider(JSlider.HORIZONTAL, 0, maxSnaps, 0);
-        // Disable uniform ticks because they correspond to individual moves, not rounds
+// --- DELETE ---
+//        timeSlider = new JSlider(JSlider.HORIZONTAL, 0, maxSnaps, 0);
+//        // Disable uniform ticks because they correspond to individual moves, not rounds
+//        timeSlider.setPaintTicks(false);
+//
+//String initLabel = data.roundKeys.isEmpty() ? "Start" : formatSliderLabel(data.roundKeys.get(0));
+//        roundLabel = new JLabel(initLabel, SwingConstants.CENTER); // FIX CRASH
+//
+//        roundLabel = new JLabel(initLabel, SwingConstants.CENTER);
+// --- START FIX ---
+        timeSlider = new JSlider(JSlider.HORIZONTAL, 0, maxSnaps, 0);
+        timeSlider.setMinorTickSpacing(1);
+        timeSlider.setSnapToTicks(true);
         timeSlider.setPaintTicks(false);
 
         String initLabel = data.roundKeys.isEmpty() ? "Start" : formatSliderLabel(data.roundKeys.get(0));
-
         roundLabel = new JLabel(initLabel, SwingConstants.CENTER);
+// --- END FIX ---
         roundLabel.setFont(new Font("Arial", Font.BOLD, 14));
         roundLabel.setPreferredSize(new Dimension(150, 20));
 
@@ -122,19 +136,33 @@ public class WorthChartWindow extends JDialog {
                 String snapKey = data.roundKeys.get(snapIndex);
                 roundLabel.setText(formatSliderLabel(snapKey));
 
+// --- DELETE ---
+//                revealController.setRevealedCount(snapIndex + 1);
+//                relativePanel.repaint();
+//                if (legendPanel != null) { 
+//                    legendPanel.repaint(); 
+//                    legendPanel.revalidate(); 
+//                }
+//                if (tableScroll.isVisible())
+//                    updateTableData();
+// --- START FIX ---
                 revealController.setRevealedCount(snapIndex + 1);
                 relativePanel.repaint();
+                if (legendPanel != null) { 
+                    legendPanel.updateLegend(); 
+                }
                 if (tableScroll.isVisible())
                     updateTableData();
+// --- END FIX ---
 
                 if (!timeSlider.getValueIsAdjusting()) {
                     try {
                         if (snapKey.startsWith("Move_")) {
 
-                            String movePart = snapKey.split(":")[0];
+String movePart = snapKey.split(":")[0];
                             int selectedMove = Integer.parseInt(movePart.substring(5));
+                            rehydrateGameState(selectedMove); // TRIGGER REHYDRATION
 
-                            rehydrateGameState(selectedMove);
                         }
                     } catch (NumberFormatException ex) {
                         log.warn("Cannot rehydrate: invalid move format: " + snapKey);
@@ -147,14 +175,14 @@ public class WorthChartWindow extends JDialog {
         navPanel.add(timeSlider, BorderLayout.CENTER);
         navPanel.add(roundLabel, BorderLayout.EAST);
 
-        LegendPanel legendPanel = new LegendPanel(data);
+        legendPanel = new LegendPanel(data, revealController);
 
         footerPanel.add(navPanel, BorderLayout.NORTH);
         footerPanel.add(legendPanel, BorderLayout.SOUTH);
         contentPanel.add(footerPanel, BorderLayout.SOUTH);
 
         this.setContentPane(contentPanel);
-        this.setPreferredSize(new Dimension(600, 450));
+        this.setPreferredSize(new Dimension(1200, 450));
         this.pack();
         this.setLocationRelativeTo(getOwner());
 
@@ -205,21 +233,17 @@ public class WorthChartWindow extends JDialog {
         return new JScrollPane(summaryTable);
     }
 
+
     private String formatMacroName(String macro) {
-        if (macro == null)
-            return "";
-        if (macro.startsWith("OR_") || macro.startsWith("SR_")) {
-            return macro.replace("_", " ");
-        }
-        if (macro.equalsIgnoreCase("Start") || macro.equalsIgnoreCase("End") || macro.equalsIgnoreCase("Time Adj")) {
-            return macro;
-        }
+        if (macro == null) return "";
+        if (macro.startsWith("OR_") || macro.startsWith("SR_") || macro.startsWith("MR_")) return macro.replace("_", " ");
+        if (macro.contains("M&A") || macro.contains("Merger") || macro.contains("Acquisition")) return macro.replace("_", " ");
+        if (macro.equalsIgnoreCase("Start") || macro.equalsIgnoreCase("End") || macro.equalsIgnoreCase("Time Adj")) return macro;
         return macro.length() > 3 ? macro.substring(0, 3) : macro;
     }
 
     private String formatSliderLabel(String snapKey) {
-        if (!snapKey.contains(":"))
-            return snapKey;
+        if (!snapKey.contains(":")) return snapKey;
         String[] parts = snapKey.split(":");
         String movePart = parts[0].replace("_", " ");
         String macroPart = formatMacroName(parts[1]);
@@ -329,6 +353,11 @@ public class WorthChartWindow extends JDialog {
         } else if (direction < 0 && revealController.canUnreveal()) {
             revealController.unrevealOne();
         }
+        
+        // Keep slider physical position in sync with arrow key navigation
+        if (timeSlider != null && timeSlider.getValue() != revealController.getRevealedCount() - 1) {
+            timeSlider.setValue(revealController.getRevealedCount() - 1);
+        }
 
         // Show table only when we reach the end (End or Time Adj)
         // Check if we are at the second-to-last ("End") or last ("Time Adj")
@@ -343,10 +372,24 @@ public class WorthChartWindow extends JDialog {
             nextButton.setVisible(true);
         }
 
+// --- DELETE ---
+//        relativePanel.repaint();
+//        if (legendPanel != null) { 
+//            legendPanel.repaint(); 
+//            legendPanel.revalidate(); 
+//        }
+//        if (tableScroll.isVisible())
+//            updateTableData();
+//        updateNavState();
+// --- START FIX ---
         relativePanel.repaint();
+        if (legendPanel != null) { 
+            legendPanel.updateLegend(); 
+        }
         if (tableScroll.isVisible())
             updateTableData();
         updateNavState();
+// --- END FIX ---
     }
 
     private void updateNavState() {
@@ -412,42 +455,81 @@ public class WorthChartWindow extends JDialog {
     }
 
     // --- Helpers ---
+// --- DELETE ---
+//    private class RevealController {
+//        private int revealedRounds = 1;
+//        private final int totalRounds;
+//
+//        public RevealController(int totalRounds) {
+//            this.totalRounds = totalRounds;
+//        }
+//
+//        public boolean canReveal() {
+//            return revealedRounds < totalRounds;
+//        }
+//
+//        public boolean canUnreveal() {
+//            return revealedRounds > 1;
+//        }
+//
+//        public void unrevealOne() {
+//            if (canUnreveal())
+//                revealedRounds--;
+//        }
+//
+//        public void revealOne() {
+//            if (canReveal())
+//                revealedRounds++;
+//        }
+//
+//        public int getRevealedCount() {
+//            return revealedRounds;
+//        }
+//
+//        public void setRevealedCount(int count) {
+//            if (count >= 1 && count <= totalRounds) {
+//                this.revealedRounds = count;
+//            }
+//        }
+//    }
+// --- START FIX ---
     private class RevealController {
-        private int revealedRounds = 1;
-        private final int totalRounds;
+        private int revealedSnapshots = 1;
+        private final int totalSnapshots;
 
-        public RevealController(int totalRounds) {
-            this.totalRounds = totalRounds;
+        public RevealController(int totalSnapshots) {
+            this.totalSnapshots = totalSnapshots;
         }
 
         public boolean canReveal() {
-            return revealedRounds < totalRounds;
+            return revealedSnapshots < totalSnapshots;
         }
 
         public boolean canUnreveal() {
-            return revealedRounds > 1;
+            return revealedSnapshots > 1;
         }
 
         public void unrevealOne() {
             if (canUnreveal())
-                revealedRounds--;
+                revealedSnapshots--;
         }
 
         public void revealOne() {
             if (canReveal())
-                revealedRounds++;
+                revealedSnapshots++;
         }
 
         public int getRevealedCount() {
-            return revealedRounds;
+            return revealedSnapshots;
         }
 
         public void setRevealedCount(int count) {
-            if (count >= 1 && count <= totalRounds) {
-                this.revealedRounds = count;
+            if (count >= 1 && count <= totalSnapshots) {
+                this.revealedSnapshots = count;
             }
         }
     }
+// --- END FIX ---
 
     private class WorthData {
         public final LinkedHashMap<String, Map<String, Double>> history;
@@ -616,16 +698,26 @@ public class WorthChartWindow extends JDialog {
             }
             java.util.List<RoundBand> bands = new java.util.ArrayList<>();
             String currentMacro = null;
+            String lastMajorMacro = null;
             int startIdx = 0;
             for (int i = 0; i < data.roundKeys.size(); i++) {
                 String fullKey = data.roundKeys.get(i);
                 String macro = fullKey.contains(":") ? fullKey.split(":")[1] : fullKey;
-                if (currentMacro == null) {
-                    currentMacro = macro;
-                } else if (!macro.equals(currentMacro)) {
+                
+                boolean isMajor = macro.startsWith("OR") || macro.startsWith("SR") 
+                               || macro.contains("M&A") || macro.contains("Merger") 
+                               || macro.startsWith("MR") || macro.equalsIgnoreCase("Start") 
+                               || macro.equalsIgnoreCase("End") || macro.equalsIgnoreCase("Time Adj");
+                
+                String effectiveMacro = isMajor ? macro : (lastMajorMacro != null ? lastMajorMacro : macro);
+                if (isMajor) lastMajorMacro = macro;
+
+               if (currentMacro == null) {
+                    currentMacro = effectiveMacro;
+                } else if (!effectiveMacro.equals(currentMacro)) {
                     bands.add(new RoundBand(WorthChartWindow.this.formatMacroName(currentMacro), currentMacro, startIdx,
                             i));
-                    currentMacro = macro;
+                    currentMacro = effectiveMacro;
                     startIdx = i;
                 }
             }
@@ -634,58 +726,70 @@ public class WorthChartWindow extends JDialog {
                         data.roundKeys.size() - 1));
             }
 
-            
+            Set<Integer> boundaryIndices = new HashSet<>();
+            for (RoundBand band : bands) {
+                boundaryIndices.add(band.startIdx);
+                boundaryIndices.add(band.endIdx);
+            }
 
             int globalMaxOrCycle = -1;
+            int globalMaxSubRound = 1;
             for (String key : data.roundKeys) {
                 String macro = key.contains(":") ? key.split(":")[1] : key;
                 if (macro.startsWith("OR_")) {
                     try {
-                        int cycle = Integer.parseInt(macro.substring(3).split("\\.")[0]);
-                        if (cycle > globalMaxOrCycle) globalMaxOrCycle = cycle;
-                    } catch (Exception ex) {}
+                        String[] parts = macro.substring(3).split("\\.");
+                        int cycle = Integer.parseInt(parts[0]);
+                        int sub = parts.length > 1 ? Integer.parseInt(parts[1]) : 1;
+                        if (cycle > globalMaxOrCycle)
+                            globalMaxOrCycle = cycle;
+                        if (sub > globalMaxSubRound)
+                            globalMaxSubRound = sub;
+                    } catch (Exception ex) {
+                    }
                 }
             }
 
             for (RoundBand band : bands) {
                 int startX = (int) (padLeft + band.startIdx * xStep);
                 int endX = (int) (padLeft + band.endIdx * xStep);
-                if (band.endIdx == data.roundKeys.size() - 1) endX = w - padRight;
-                
+                if (band.endIdx == data.roundKeys.size() - 1)
+                    endX = w - padRight;
+
                 Color bgColor = Color.WHITE;
                 if (band.originalMacro.startsWith("OR_")) {
                     try {
                         String[] parts = band.originalMacro.substring(3).split("\\.");
-                        String orCycleStr = parts[0]; 
+                        String orCycleStr = parts[0];
                         int currentOrCycle = Integer.parseInt(orCycleStr);
-                        
-                        if (currentOrCycle == globalMaxOrCycle) {
-                            bgColor = new Color(245, 235, 220); // Force Brown for the final set
-                        } else {
-                            int maxSubRound = 1;
-                            String targetMacroPrefix = "OR_" + orCycleStr + ".";
-                            for (String key : data.roundKeys) {
-                                String macro = key.contains(":") ? key.split(":")[1] : key;
-                                if (macro.startsWith(targetMacroPrefix)) {
-                                    try {
-                                        int sub = Integer.parseInt(macro.substring(targetMacroPrefix.length()));
-                                        if (sub > maxSubRound) maxSubRound = sub;
-                                    } catch (Exception ex) {}
-                                }
-                            }
 
-                            if (maxSubRound == 1) bgColor = new Color(255, 255, 230); // Light Yellow
-                            else if (maxSubRound == 2) bgColor = new Color(235, 255, 235); // Light Green
-                            else bgColor = new Color(245, 235, 220); // Light Brown
+                        int maxSubRound = 1;
+                        String targetMacroPrefix = "OR_" + orCycleStr + ".";
+                        for (String key : data.roundKeys) {
+                            String macro = key.contains(":") ? key.split(":")[1] : key;
+                            if (macro.startsWith(targetMacroPrefix)) {
+                                try {
+                                    int sub = Integer.parseInt(macro.substring(targetMacroPrefix.length()));
+                                    if (sub > maxSubRound) maxSubRound = sub;
+                                } catch (Exception ex) {}
+                            }
                         }
+                        if (currentOrCycle == globalMaxOrCycle) {
+                            maxSubRound = Math.max(maxSubRound, globalMaxSubRound);
+                        }
+                        
+                        if (maxSubRound == 1) bgColor = new Color(255, 255, 230); // Light Yellow
+                        else if (maxSubRound == 2) bgColor = new Color(235, 255, 235); // Light Green
+                        else if (maxSubRound == 3) bgColor = new Color(245, 235, 220); // Light Brown
+                        else bgColor = new Color(230, 230, 230); // Light Gray
                     } catch (Exception e) {
                         bgColor = new Color(245, 245, 245);
                     }
                 } else if (band.originalMacro.startsWith("SR_")) {
                     bgColor = new Color(245, 245, 245); // Light Grey
+                } else if (band.originalMacro.contains("M&A") || band.originalMacro.contains("Merger")) {
+                    bgColor = new Color(230, 240, 255); // Light Blue for M&A
                 }
-                
-
 
                 g2d.setColor(bgColor);
                 g2d.fillRect(startX, padTop, endX - startX, chartH);
@@ -743,11 +847,8 @@ public class WorthChartWindow extends JDialog {
                         path.lineTo(x, y);
                     }
 
-                    // Dynamically size the data points to avoid giant blobs when there are hundreds
-                    // of moves
-                    if (data.roundKeys.size() > 100) {
-                        g2d.fillOval((int) x - 1, (int) y - 1, 2, 2);
-                    } else {
+                   // Only draw dots at the macro-round boundaries or the current revealed position
+                   if (boundaryIndices.contains(i) || i == roundsToPlot - 1) {
                         g2d.fillOval((int) x - 3, (int) y - 3, 6, 6);
                     }
 
@@ -757,36 +858,107 @@ public class WorthChartWindow extends JDialog {
         }
     }
 
+
     private class LegendPanel extends JPanel {
         private final WorthData data;
+        private final RevealController revealController;
+        private final JTable legendTable;
+        private final DefaultTableModel tableModel;
 
-        public LegendPanel(WorthData data) {
+        public LegendPanel(WorthData data, RevealController rc) {
             this.data = data;
-            this.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
+            this.revealController = rc;
+            this.setLayout(new FlowLayout(FlowLayout.CENTER, 0, 0));
+            this.setBorder(BorderFactory.createTitledBorder("Player Legend (Current Snapshot)"));
+
+            String[] columns = {"Color", "Player Name", "Worth", "% of Leader"};
+            tableModel = new DefaultTableModel(null, columns) {
+                @Override
+                public boolean isCellEditable(int row, int column) { return false; }
+            };
+
+            legendTable = new JTable(tableModel);
+            legendTable.setRowHeight(24);
+            legendTable.setFont(new Font("SansSerif", Font.PLAIN, 12));
+            legendTable.getTableHeader().setFont(new Font("SansSerif", Font.BOLD, 12));
+            
+            // Custom renderer to draw the color squares inside the cell
+            legendTable.getColumnModel().getColumn(0).setCellRenderer(new DefaultTableCellRenderer() {
+                @Override
+                public Component getTableCellRendererComponent(JTable table, Object value, boolean isSelected, boolean hasFocus, int row, int column) {
+                    JLabel label = (JLabel) super.getTableCellRendererComponent(table, "", isSelected, hasFocus, row, column);
+                    if (value instanceof Color) {
+                        label.setIcon(new javax.swing.Icon() {
+                            public void paintIcon(Component c, Graphics g, int x, int y) {
+                                g.setColor((Color) value);
+                                g.fillRect(x + 5, y + 2, 16, 16);
+                                g.setColor(Color.BLACK);
+                                g.drawRect(x + 5, y + 2, 16, 16);
+                            }
+                            public int getIconWidth() { return 26; }
+                            public int getIconHeight() { return 20; }
+                        });
+                    }
+                    label.setHorizontalAlignment(SwingConstants.CENTER);
+                    return label;
+                }
+            });
+
+            DefaultTableCellRenderer centerRenderer = new DefaultTableCellRenderer();
+            centerRenderer.setHorizontalAlignment(JLabel.CENTER);
+            for (int i = 1; i < columns.length; i++) {
+                legendTable.getColumnModel().getColumn(i).setCellRenderer(centerRenderer);
+            }
+
+            legendTable.getColumnModel().getColumn(0).setPreferredWidth(50);
+            legendTable.getColumnModel().getColumn(1).setPreferredWidth(120);
+            legendTable.getColumnModel().getColumn(2).setPreferredWidth(100);
+            legendTable.getColumnModel().getColumn(3).setPreferredWidth(100);
+
+            JScrollPane scrollPane = new JScrollPane(legendTable);
+            scrollPane.setPreferredSize(new Dimension(390, 130));
+            this.add(scrollPane);
+
+            updateLegend();
         }
 
-        @Override
-        protected void paintComponent(Graphics g) {
-            super.paintComponent(g);
-            Graphics2D g2d = (Graphics2D) g;
-            g2d.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-            int startX = 10;
-            int startY = 10;
-            int lineSpacing = 20;
-            int pIdx = 0;
-            g2d.drawString("Player Legend:", startX, startY);
-            for (String player : data.playerNames) {
-                g2d.setColor(data.getPlayerColor(player));
-                int y = startY + (pIdx + 1) * lineSpacing;
-                g2d.fillRect(startX + 10, y - 10, 12, 12);
-                g2d.drawRect(startX + 10, y - 10, 12, 12);
-                g2d.setColor(Color.BLACK);
-                g2d.drawString(player, startX + 35, y);
-                pIdx++;
+        public void updateLegend() {
+            tableModel.setRowCount(0);
+
+            int currentIdx = revealController.getRevealedCount();
+            String currentRoundKey = "";
+            if (currentIdx > 0 && currentIdx <= data.roundKeys.size()) {
+                currentRoundKey = data.roundKeys.get(currentIdx - 1);
             }
-            this.setPreferredSize(new Dimension(getWidth(), startY + (pIdx + 1) * lineSpacing));
+
+            class PlayerInfo {
+                String name;
+                double worth;
+                Color color;
+                PlayerInfo(String n, double w, Color c) { name = n; worth = w; color = c; }
+            }
+
+            List<PlayerInfo> players = new ArrayList<>();
+            double maxWorth = 0;
+            Map<String, Double> snapshot = data.history.get(currentRoundKey);
+            if (snapshot == null) snapshot = Collections.emptyMap();
+
+            for (String pName : data.playerNames) {
+                double worth = snapshot.getOrDefault(pName, 0.0);
+                if (worth > maxWorth) maxWorth = worth;
+                players.add(new PlayerInfo(pName, worth, data.getPlayerColor(pName)));
+            }
+
+            // Sort descending by current snapshot worth
+            players.sort((a, b) -> Double.compare(b.worth, a.worth));
+
+            for (PlayerInfo p : players) {
+                String pctStr = (maxWorth > 0) ? String.format("%.1f%%", (p.worth / maxWorth) * 100.0) : "0.0%";
+                tableModel.addRow(new Object[]{p.color, p.name, String.format("%,.0f", p.worth), pctStr});
+            }
         }
     }
+
 
     private void rehydrateGameState(int moveNumber) {
         try {
@@ -809,8 +981,11 @@ public class WorthChartWindow extends JDialog {
                 net.sf.rails.game.ai.snapshot.GameStateRestorer restorer = new net.sf.rails.game.ai.snapshot.GameStateRestorer();
                 net.sf.rails.game.RailsRoot newRoot = restorer.restoreState(pojo);
 
-                // You must bind this newRoot to the GameUIManager here:
-                // data.gameManager.getGameUIManager().bindNewRoot(newRoot);
+                // Visual-only update: Swap references and refresh UI
+                if (data.gameManager.getGameUIManager() != null) {
+                    data.gameManager.getGameUIManager().updateAllVisuals(newRoot);
+                }
+
             }
         } catch (Exception e) {
             log.error("Failed to rehydrate game state for move " + moveNumber, e);

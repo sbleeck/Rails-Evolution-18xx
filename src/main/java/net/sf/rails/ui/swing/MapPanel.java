@@ -20,7 +20,8 @@ import org.slf4j.LoggerFactory;
 public class MapPanel extends JPanel {
 
     private static final long serialVersionUID = 1L;
-    //defines how many pixels should be left as safety margin when calculating fit zooms
+    // defines how many pixels should be left as safety margin when calculating fit
+    // zooms
     private static final int ZOOM_FIT_SAFETY_MARGIN = 4;
 
     private MapManager mmgr;
@@ -34,7 +35,7 @@ public class MapPanel extends JPanel {
     private Dimension originalMapSize;
     private Dimension currentMapSize;
 
-    //active fit-to zoom options
+    // active fit-to zoom options
     private boolean fitToWidth = false;
     private boolean fitToHeight = false;
 
@@ -42,7 +43,6 @@ public class MapPanel extends JPanel {
 
     public MapPanel(GameUIManager gameUIManager) {
         this.gameUIManager = gameUIManager;
-
 
         setLayout(new BorderLayout());
 
@@ -62,7 +62,7 @@ public class MapPanel extends JPanel {
         // lightwight tooltip possible since tool tip has its own layer in hex map
         ToolTipManager.sharedInstance().setLightWeightPopupEnabled(true);
 
-        //tooltip should not be dismissed after at all
+        // tooltip should not be dismissed after at all
         ToolTipManager.sharedInstance().setDismissDelay(Integer.MAX_VALUE);
 
         layeredPane = new JLayeredPane();
@@ -72,8 +72,8 @@ public class MapPanel extends JPanel {
         map.addLayers(layeredPane, 1);
 
         if (mmgr.isMapImageUsed()) {
-            mapImage = new HexMapImage ();
-            mapImage.init(mmgr,map);
+            mapImage = new HexMapImage();
+            mapImage.init(mmgr, map);
             mapImage.setPreferredSize(originalMapSize);
             mapImage.setBounds(0, 0, originalMapSize.width, originalMapSize.height);
             layeredPane.add(mapImage, -1);
@@ -86,17 +86,30 @@ public class MapPanel extends JPanel {
         setSize(originalMapSize);
         setLocation(25, 25);
 
-        //add listener for auto fit upon resize events
+        // add listener for auto fit upon resize events
         addComponentListener(new ComponentAdapter() {
             @Override
             public void componentResized(ComponentEvent e) {
                 super.componentResized(e);
-                zoomFit (fitToWidth, fitToHeight);
+                zoomFit(fitToWidth, fitToHeight);
             }
         });
     }
 
-public void zoomIn() {
+    /**
+     * Redirects the panel's data source to the current MapManager of the active
+     * root.
+     */
+    public void updateData() {
+        this.mmgr = gameUIManager.getRoot().getMapManager();
+        if (this.map != null) {
+            // Re-initialize the HexMap with the new manager's data
+            this.map.init(gameUIManager.getORUIManager(), mmgr);
+        }
+        this.repaint();
+    }
+
+    public void zoomIn() {
         if (map != null) {
             zoom(true); // Call LOCAL method, not map.zoomIn()
             this.revalidate();
@@ -112,12 +125,12 @@ public void zoomIn() {
         }
     }
 
-
     public void toggleDisplayHexNames() {
         if (map != null) {
             // Fix: Use getDisplayHexNames() instead of isDisplayHexNames()
-            // If getDisplayHexNames() doesn't exist, check HexMap.java for the correct getter
-            boolean current = map.getDisplayHexNames(); 
+            // If getDisplayHexNames() doesn't exist, check HexMap.java for the correct
+            // getter
+            boolean current = map.getDisplayHexNames();
             map.setDisplayHexNames(!current);
             this.repaint(); // Call repaint on the Panel, not the map object
         }
@@ -132,10 +145,10 @@ public void zoomIn() {
         }
     }
 
-
     public void scrollPaneShowRectangle(Rectangle rectangle) {
 
-        if (rectangle == null) return;
+        if (rectangle == null)
+            return;
 
         JViewport viewport = scrollPane.getViewport();
         log.debug("ScrollPane viewPort ={}", viewport);
@@ -146,13 +159,13 @@ public void zoomIn() {
         log.debug("viewport size ={}", viewport.getSize());
 
         double setX, setY;
-        setX = Math.max(0, (rectangle.getCenterX() - viewport.getWidth() / (double)2));
-        setY = Math.max(0, (rectangle.getCenterY() - viewport.getHeight() / (double)2));
+        setX = Math.max(0, (rectangle.getCenterX() - viewport.getWidth() / (double) 2));
+        setY = Math.max(0, (rectangle.getCenterY() - viewport.getHeight() / (double) 2));
 
-        setX = Math.min(setX, Math.max(0, map.getSize().getWidth() -  viewport.getWidth()));
+        setX = Math.min(setX, Math.max(0, map.getSize().getWidth() - viewport.getWidth()));
         setY = Math.min(setY, Math.max(0, map.getSize().getHeight() - viewport.getHeight()));
 
-        final Point viewPosition = new Point((int)setX, (int)setY);
+        final Point viewPosition = new Point((int) setX, (int) setY);
         log.debug("ViewPosition for ScrollPane = {}", viewPosition);
         SwingUtilities.invokeLater(new Runnable() {
             public void run() {
@@ -161,21 +174,22 @@ public void zoomIn() {
         });
     }
 
-    private void adjustToNewMapZoom () {
+    private void adjustToNewMapZoom() {
         currentMapSize = map.getCurrentSize();
         log.debug("Map.size = {}", currentMapSize);
         layeredPane.setPreferredSize(currentMapSize);
         map.setBounds(0, 0, currentMapSize.width, currentMapSize.height);
         if (mapImage != null) {
-            mapImage.setBoundsAndResize(currentMapSize,map.getZoomStep());
+            mapImage.setBoundsAndResize(currentMapSize, map.getZoomStep());
         }
-        //access from map panel to or panel not nice but currently necessary for route drawing
+        // access from map panel to or panel not nice but currently necessary for route
+        // drawing
         if (gameUIManager.getORUIManager() != null && gameUIManager.getORUIManager().getORPanel() != null)
             gameUIManager.getORUIManager().getORPanel().redrawRoutes();
         layeredPane.revalidate();
     }
 
-    public void zoom (boolean in) {
+    public void zoom(boolean in) {
         removeFitToOption();
         map.zoom(in);
         adjustToNewMapZoom();
@@ -186,35 +200,35 @@ public void zoomIn() {
      * In order to achieve correctly fitting zoom, continuous adjustment factors are
      * determined on top of that.
      */
-    private void zoomFit (boolean fitToWidth, boolean fitToHeight) {
-        if (!fitToWidth && !fitToHeight) return;
-
+    private void zoomFit(boolean fitToWidth, boolean fitToHeight) {
+        if (!fitToWidth && !fitToHeight)
+            return;
 
         if (originalMapSize == null) {
             log.error("zoomFit aborted: originalMapSize is null. The Map failed to initialize.");
             return;
         }
-        
+
         ImageLoader imageLoader = ImageLoader.getInstance();
         int zoomStep = map.getZoomStep();
 
-        //reset adjustment factor
+        // reset adjustment factor
         imageLoader.resetAdjustmentFactor();
 
-        //determine the available size to fit to
-        //(double needed for subsequent calculations)
+        // determine the available size to fit to
+        // (double needed for subsequent calculations)
         double width = getSize().width - ZOOM_FIT_SAFETY_MARGIN;
         double height = getSize().height - ZOOM_FIT_SAFETY_MARGIN;
 
         double idealFactorWidth = width / originalMapSize.width;
         double idealFactorHeight = height / originalMapSize.height;
 
-        //determine which dimension will be the critical one for the resize
-        boolean isWidthCritical = ( !fitToHeight
+        // determine which dimension will be the critical one for the resize
+        boolean isWidthCritical = (!fitToHeight
                 || (fitToWidth && idealFactorWidth < idealFactorHeight));
 
-        //check whether scrollbar will appear in the fit-to dimension and
-        //reduce available size accordingly (not relevant for fit-to-window)
+        // check whether scrollbar will appear in the fit-to dimension and
+        // reduce available size accordingly (not relevant for fit-to-window)
         if (isWidthCritical && idealFactorWidth > idealFactorHeight) {
             width -= scrollPane.getVerticalScrollBar().getPreferredSize().width;
             idealFactorWidth = width / originalMapSize.width;
@@ -224,77 +238,71 @@ public void zoomIn() {
             idealFactorHeight = height / originalMapSize.height;
         }
 
-        //abort resize if no space available
-        if (width < 0 || height < 0) return;
+        // abort resize if no space available
+        if (width < 0 || height < 0)
+            return;
 
-        //increase zoomFactor until constraints do not hold
-        //OR zoom cannot be increased any more
-        while
-            (
-                    (
-                            (!fitToWidth || idealFactorWidth > imageLoader.getZoomFactor(zoomStep))
-                            &&
-                            (!fitToHeight || idealFactorHeight > imageLoader.getZoomFactor(zoomStep))
-                    )
-                    &&
-                    imageLoader.getZoomFactor(zoomStep+1) != imageLoader.getZoomFactor(zoomStep)
-            )
+        // increase zoomFactor until constraints do not hold
+        // OR zoom cannot be increased any more
+        while (((!fitToWidth || idealFactorWidth > imageLoader.getZoomFactor(zoomStep))
+                &&
+                (!fitToHeight || idealFactorHeight > imageLoader.getZoomFactor(zoomStep)))
+                &&
+                imageLoader.getZoomFactor(zoomStep + 1) != imageLoader.getZoomFactor(zoomStep))
             zoomStep++;
 
-        //decrease zoomFactor until constraints do hold
-        //OR zoom cannot be decreased any more
-        while
-            (
-                    (
-                            (fitToWidth && idealFactorWidth < imageLoader.getZoomFactor(zoomStep))
-                            ||
-                            (fitToHeight && idealFactorHeight < imageLoader.getZoomFactor(zoomStep))
-                    )
-                    &&
-                    imageLoader.getZoomFactor(zoomStep-1) != imageLoader.getZoomFactor(zoomStep)
-            )
+        // decrease zoomFactor until constraints do hold
+        // OR zoom cannot be decreased any more
+        while (((fitToWidth && idealFactorWidth < imageLoader.getZoomFactor(zoomStep))
+                ||
+                (fitToHeight && idealFactorHeight < imageLoader.getZoomFactor(zoomStep)))
+                &&
+                imageLoader.getZoomFactor(zoomStep - 1) != imageLoader.getZoomFactor(zoomStep))
             zoomStep--;
 
-        //Determine and apply adjustment factor for precise fit
+        // Determine and apply adjustment factor for precise fit
         double idealFactor = isWidthCritical ? idealFactorWidth : idealFactorHeight;
-        imageLoader.setZoomAdjustmentFactor (
+        imageLoader.setZoomAdjustmentFactor(
                 idealFactor / imageLoader.getZoomFactor(zoomStep));
 
-        //trigger zoom execution
+        // trigger zoom execution
         map.setZoomStep(zoomStep);
 
         adjustToNewMapZoom();
     }
 
-    private void fitToOption (boolean fitToWidth, boolean fitToHeight) {
-        //ignore if nothing has changed
-        if (this.fitToWidth == fitToWidth && this.fitToHeight == fitToHeight ) return;
+    private void fitToOption(boolean fitToWidth, boolean fitToHeight) {
+        // ignore if nothing has changed
+        if (this.fitToWidth == fitToWidth && this.fitToHeight == fitToHeight)
+            return;
 
         this.fitToWidth = fitToWidth;
         this.fitToHeight = fitToHeight;
         zoomFit(fitToWidth, fitToHeight);
     }
 
-    public void fitToWindow () {
-        fitToOption (true, true);
+    public void fitToWindow() {
+        fitToOption(true, true);
     }
 
-    public void fitToWidth () {
-        fitToOption (true, false);
+    public void fitToWidth() {
+        fitToOption(true, false);
     }
 
-    public void fitToHeight () {
-        fitToOption (false, true);
+    public void fitToHeight() {
+        fitToOption(false, true);
     }
 
-    public void removeFitToOption () {
+    public void removeFitToOption() {
         fitToWidth = false;
         fitToHeight = false;
     }
 
-    public void keyPressed(KeyEvent e) {}
+    public void keyPressed(KeyEvent e) {
+    }
 
-    public void keyReleased(KeyEvent e) {}
+    public void keyReleased(KeyEvent e) {
+    }
 
     public HexMap getMap() {
         return map;
@@ -310,33 +318,33 @@ public void zoomIn() {
      */
     public void clearOverlays() {
         if (map != null) {
-            // log.info("MapPanel: Aggressive clear invoked. Resetting all hex states and overlays.");
-            
+            // log.info("MapPanel: Aggressive clear invoked. Resetting all hex states and
+            // overlays.");
+
             // 1. Force the global flag to false
             // map.setDisplayBuildNumbers(false);
-            
+
             // 2. NUCLEAR OPTION: Iterate EVERY hex to scrub state
             // This fixes "Ghost in some cases" where the upgrade list might be stale
             for (GUIHex hex : map.getHexes()) {
                 boolean changed = false;
-                
+
                 // Clear Red/Selectable Highlights (Fixes Token Phase issue)
                 if (hex.getState() != GUIHex.State.NORMAL) {
                     hex.setState(GUIHex.State.NORMAL);
                     changed = true;
                 }
-                
+
                 // Clear Ghost Numbers
                 if (hex.getCustomOverlayText() != null) {
                     hex.setCustomOverlayText(null);
                     changed = true;
                 }
             }
-            
+
             // 3. Force a full repaint
             this.repaint();
         }
     }
-
 
 }
