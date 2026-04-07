@@ -1174,20 +1174,7 @@ public class StockRound extends Round implements I_MapRenderableRound {
     // TreasuryShareRound
     public boolean buyShares(String playerName, BuyCertificate action) {
 
-        System.out.println("=== DEBUG: buyShares TRIGGERED ===");
-        System.out.println("Player: " + playerName);
-        System.out.println("Action CompanyName: " + action.getCompanyName());
-        
-        try {
-            System.out.println("Resolved Company: " + (action.getCompany() != null ? action.getCompany().getId() : "NULL"));
-            System.out.println("Resolved Portfolio: " + (action.getFromPortfolio() != null ? action.getFromPortfolio().getName() : "NULL"));
-            System.out.println("Number Bought: " + action.getNumberBought());
-            System.out.println("Share Per Cert: " + action.getSharePerCertificate());
-            System.out.println("Price: " + action.getPrice());
-        } catch (Exception e) {
-            System.out.println("CRASH DURING RESOLUTION: " + e.getMessage());
-            e.printStackTrace();
-        }
+
 
         PublicCompany company = action.getCompany();
         PublicCertificate cert = null;
@@ -1404,8 +1391,7 @@ if (!company.isBuyable()) {
         }
 
 if (errMsg != null) {
-            System.out.println("=== DEBUG: buyShares ABORTED ===");
-            System.out.println("Reason: " + errMsg);
+
             DisplayBuffer.add(this, LocalText.getText("CantBuy",
                     playerName,
                     shares,

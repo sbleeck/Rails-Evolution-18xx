@@ -51,10 +51,14 @@ public class WorthChartWindow extends JDialog {
     private JLabel roundLabel;
     private JButton prevButton;
     private JButton nextButton;
+    private JButton prevRoundButton;
+    private JButton nextRoundButton;
+
     private DefaultTableModel tableModel;
     private JSplitPane splitPane;
     private JSlider timeSlider;
     private LegendPanel legendPanel;
+    private String[] macroGroups;
 
     public WorthChartWindow(JFrame parentFrame, GameManager gm) {
         super(parentFrame, "Player Worth History Chart - Reveal Mode", false);
@@ -73,6 +77,21 @@ public class WorthChartWindow extends JDialog {
         titleLabel.setFont(new Font("Arial", Font.BOLD, 20));
         titleLabel.setBorder(BorderFactory.createEmptyBorder(10, 0, 10, 0));
         contentPanel.add(titleLabel, BorderLayout.NORTH);
+
+        // Pre-compute unified macro groups to aggressively clump "Start" phases 
+        // and provide accurate boundary indices for the chart and navigation.
+        macroGroups = new String[data.roundKeys.size()];
+        String lastMajor = "Start";
+        for (int i = 0; i < data.roundKeys.size(); i++) {
+            String fullKey = data.roundKeys.get(i);
+            String macro = fullKey.contains(":") ? fullKey.split(":")[1] : fullKey;
+            boolean isMajor = macro.startsWith("OR") || macro.startsWith("SR")
+                    || macro.contains("M&A") || macro.contains("Merger")
+                    || macro.startsWith("MR") || macro.equalsIgnoreCase("Start")
+                    || macro.equalsIgnoreCase("End") || macro.equalsIgnoreCase("Time Adj");
+            if (isMajor) lastMajor = macro;
+            macroGroups[i] = lastMajor;
+        }
 
         // 2. Split Pane (Chart Top, Table Bottom)
         splitPane = new JSplitPane(JSplitPane.VERTICAL_SPLIT);
@@ -104,21 +123,36 @@ public class WorthChartWindow extends JDialog {
         JPanel navPanel = new JPanel(new BorderLayout(10, 0));
         navPanel.setBorder(BorderFactory.createEmptyBorder(10, 20, 10, 20));
 
-        // Dummy buttons to prevent NullPointerExceptions in legacy methods
-        prevButton = new JButton();
-        nextButton = new JButton();
+        JPanel buttonPanel = new JPanel(new FlowLayout(FlowLayout.CENTER, 5, 0));
+        prevRoundButton = new JButton("<< Round");
+        prevButton = new JButton("< Move");
+        nextButton = new JButton("Move >");
+        nextRoundButton = new JButton("Round >>");
+
+        prevRoundButton.addActionListener(e -> stepRound(-1));
+        prevButton.addActionListener(e -> stepReveal(-1));
+        nextButton.addActionListener(e -> stepReveal(1));
+        nextRoundButton.addActionListener(e -> stepRound(1));
+
+        buttonPanel.add(prevRoundButton);
+        buttonPanel.add(prevButton);
+        buttonPanel.add(nextButton);
+        buttonPanel.add(nextRoundButton);
 
         int maxSnaps = Math.max(0, data.roundKeys.size() - 1);
-// --- DELETE ---
-//        timeSlider = new JSlider(JSlider.HORIZONTAL, 0, maxSnaps, 0);
-//        // Disable uniform ticks because they correspond to individual moves, not rounds
-//        timeSlider.setPaintTicks(false);
-//
-//String initLabel = data.roundKeys.isEmpty() ? "Start" : formatSliderLabel(data.roundKeys.get(0));
-//        roundLabel = new JLabel(initLabel, SwingConstants.CENTER); // FIX CRASH
-//
-//        roundLabel = new JLabel(initLabel, SwingConstants.CENTER);
-// --- START FIX ---
+
+        // --- DELETE ---
+        // timeSlider = new JSlider(JSlider.HORIZONTAL, 0, maxSnaps, 0);
+        // // Disable uniform ticks because they correspond to individual moves, not
+        // rounds
+        // timeSlider.setPaintTicks(false);
+        //
+        // String initLabel = data.roundKeys.isEmpty() ? "Start" :
+        // formatSliderLabel(data.roundKeys.get(0));
+        // roundLabel = new JLabel(initLabel, SwingConstants.CENTER); // FIX CRASH
+        //
+        // roundLabel = new JLabel(initLabel, SwingConstants.CENTER);
+        // --- START FIX ---
         timeSlider = new JSlider(JSlider.HORIZONTAL, 0, maxSnaps, 0);
         timeSlider.setMinorTickSpacing(1);
         timeSlider.setSnapToTicks(true);
@@ -126,7 +160,7 @@ public class WorthChartWindow extends JDialog {
 
         String initLabel = data.roundKeys.isEmpty() ? "Start" : formatSliderLabel(data.roundKeys.get(0));
         roundLabel = new JLabel(initLabel, SwingConstants.CENTER);
-// --- END FIX ---
+        // --- END FIX ---
         roundLabel.setFont(new Font("Arial", Font.BOLD, 14));
         roundLabel.setPreferredSize(new Dimension(150, 20));
 
@@ -136,44 +170,55 @@ public class WorthChartWindow extends JDialog {
                 String snapKey = data.roundKeys.get(snapIndex);
                 roundLabel.setText(formatSliderLabel(snapKey));
 
-// --- DELETE ---
-//                revealController.setRevealedCount(snapIndex + 1);
-//                relativePanel.repaint();
-//                if (legendPanel != null) { 
-//                    legendPanel.repaint(); 
-//                    legendPanel.revalidate(); 
-//                }
-//                if (tableScroll.isVisible())
-//                    updateTableData();
-// --- START FIX ---
                 revealController.setRevealedCount(snapIndex + 1);
                 relativePanel.repaint();
-                if (legendPanel != null) { 
-                    legendPanel.updateLegend(); 
+                if (legendPanel != null) {
+                    legendPanel.updateLegend();
                 }
                 if (tableScroll.isVisible())
                     updateTableData();
-// --- END FIX ---
+
+                if (macroGroups != null && snapIndex < macroGroups.length) {
+                    String m = macroGroups[snapIndex];
+                    if (m.startsWith("OR")) {
+                        if (prevButton != null) prevButton.setText("< Company");
+                        if (nextButton != null) nextButton.setText("Company >");
+                    } else if (m.startsWith("SR")) {
+                        if (prevButton != null) prevButton.setText("< Player");
+                        if (nextButton != null) nextButton.setText("Player >");
+                    } else {
+                        if (prevButton != null) prevButton.setText("< Move");
+                        if (nextButton != null) nextButton.setText("Move >");
+                    }
+                }
 
                 if (!timeSlider.getValueIsAdjusting()) {
                     try {
+                        int targetMove = -1;
                         if (snapKey.startsWith("Move_")) {
+                            targetMove = Integer.parseInt(snapKey.split(":")[0].substring(5));
+                        } else if (snapKey.matches("\\d+")) {
+                            targetMove = Integer.parseInt(snapKey);
+                        }
 
-String movePart = snapKey.split(":")[0];
-                            int selectedMove = Integer.parseInt(movePart.substring(5));
-                            rehydrateGameState(selectedMove); // TRIGGER REHYDRATION
-
+                        if (targetMove >= 0) {
+                            scrubToMove(targetMove);
                         }
                     } catch (NumberFormatException ex) {
-                        log.warn("Cannot rehydrate: invalid move format: " + snapKey);
+                        log.warn("Cannot scrub: invalid move format: " + snapKey);
                     }
                 }
+
             }
         });
 
-        navPanel.add(new JLabel("Start"), BorderLayout.WEST);
-        navPanel.add(timeSlider, BorderLayout.CENTER);
-        navPanel.add(roundLabel, BorderLayout.EAST);
+        JPanel sliderPanel = new JPanel(new BorderLayout(10, 0));
+        sliderPanel.add(new JLabel("Start"), BorderLayout.WEST);
+        sliderPanel.add(timeSlider, BorderLayout.CENTER);
+        sliderPanel.add(roundLabel, BorderLayout.EAST);
+
+        navPanel.add(sliderPanel, BorderLayout.NORTH);
+        navPanel.add(buttonPanel, BorderLayout.SOUTH);
 
         legendPanel = new LegendPanel(data, revealController);
 
@@ -233,17 +278,21 @@ String movePart = snapKey.split(":")[0];
         return new JScrollPane(summaryTable);
     }
 
-
     private String formatMacroName(String macro) {
-        if (macro == null) return "";
-        if (macro.startsWith("OR_") || macro.startsWith("SR_") || macro.startsWith("MR_")) return macro.replace("_", " ");
-        if (macro.contains("M&A") || macro.contains("Merger") || macro.contains("Acquisition")) return macro.replace("_", " ");
-        if (macro.equalsIgnoreCase("Start") || macro.equalsIgnoreCase("End") || macro.equalsIgnoreCase("Time Adj")) return macro;
+        if (macro == null)
+            return "";
+        if (macro.startsWith("OR_") || macro.startsWith("SR_") || macro.startsWith("MR_"))
+            return macro.replace("_", " ");
+        if (macro.contains("M&A") || macro.contains("Merger") || macro.contains("Acquisition"))
+            return macro.replace("_", " ");
+        if (macro.equalsIgnoreCase("Start") || macro.equalsIgnoreCase("End") || macro.equalsIgnoreCase("Time Adj"))
+            return macro;
         return macro.length() > 3 ? macro.substring(0, 3) : macro;
     }
 
     private String formatSliderLabel(String snapKey) {
-        if (!snapKey.contains(":")) return snapKey;
+        if (!snapKey.contains(":"))
+            return snapKey;
         String[] parts = snapKey.split(":");
         String movePart = parts[0].replace("_", " ");
         String macroPart = formatMacroName(parts[1]);
@@ -353,7 +402,7 @@ String movePart = snapKey.split(":")[0];
         } else if (direction < 0 && revealController.canUnreveal()) {
             revealController.unrevealOne();
         }
-        
+
         // Keep slider physical position in sync with arrow key navigation
         if (timeSlider != null && timeSlider.getValue() != revealController.getRevealedCount() - 1) {
             timeSlider.setValue(revealController.getRevealedCount() - 1);
@@ -368,34 +417,75 @@ String movePart = snapKey.split(":")[0];
         if (current >= total - 1 && !tableScroll.isVisible()) {
             tableScroll.setVisible(true);
             splitPane.setDividerLocation(0.65);
-            prevButton.setVisible(true);
-            nextButton.setVisible(true);
         }
 
-// --- DELETE ---
-//        relativePanel.repaint();
-//        if (legendPanel != null) { 
-//            legendPanel.repaint(); 
-//            legendPanel.revalidate(); 
-//        }
-//        if (tableScroll.isVisible())
-//            updateTableData();
-//        updateNavState();
-// --- START FIX ---
         relativePanel.repaint();
-        if (legendPanel != null) { 
-            legendPanel.updateLegend(); 
+        if (legendPanel != null) {
+            legendPanel.updateLegend();
         }
         if (tableScroll.isVisible())
             updateTableData();
         updateNavState();
-// --- END FIX ---
+    }
+
+
+    private void stepRound(int direction) {
+        if (timeSlider == null || macroGroups == null || macroGroups.length == 0) return;
+        
+        int currentIdx = timeSlider.getValue();
+        String currentMacro = macroGroups[currentIdx];
+        int targetIdx = currentIdx;
+
+        if (direction > 0) {
+            // Seek start of the next block
+            for (int i = currentIdx + 1; i < macroGroups.length; i++) {
+                if (!macroGroups[i].equals(currentMacro)) {
+                    targetIdx = i;
+                    break;
+                }
+            }
+            if (targetIdx == currentIdx) targetIdx = macroGroups.length - 1;
+        } else {
+            // Find the start of the current block
+            int startOfCurrent = currentIdx;
+            for (int i = currentIdx; i >= 0; i--) {
+                if (macroGroups[i].equals(currentMacro)) startOfCurrent = i;
+                else break;
+            }
+
+            if (currentIdx > startOfCurrent) {
+                // We were mid-round, jump to the beginning of the current round
+                targetIdx = startOfCurrent;
+            } else if (startOfCurrent > 0) {
+                // We were already at the start, jump to the beginning of the previous round
+                String prevMacro = macroGroups[startOfCurrent - 1];
+                int startOfPrev = startOfCurrent - 1;
+                for (int i = startOfCurrent - 1; i >= 0; i--) {
+                    if (macroGroups[i].equals(prevMacro)) startOfPrev = i;
+                    else break;
+                }
+                targetIdx = startOfPrev;
+            }
+        }
+
+        if (targetIdx != currentIdx) {
+            revealController.setRevealedCount(targetIdx + 1);
+            timeSlider.setValue(targetIdx);
+        }
     }
 
     private void updateNavState() {
-        boolean tableVisible = tableScroll.isVisible();
-        prevButton.setEnabled(tableVisible && revealController.canUnreveal());
-        nextButton.setEnabled(tableVisible && revealController.canReveal());
+        boolean canUnreveal = revealController.canUnreveal();
+        boolean canReveal = revealController.canReveal();
+
+        if (prevButton != null)
+            prevButton.setEnabled(canUnreveal);
+        if (nextButton != null)
+            nextButton.setEnabled(canReveal);
+        if (prevRoundButton != null)
+            prevRoundButton.setEnabled(canUnreveal);
+        if (nextRoundButton != null)
+            nextRoundButton.setEnabled(canReveal);
     }
 
     private void setupHotkeys() {
@@ -455,44 +545,44 @@ String movePart = snapKey.split(":")[0];
     }
 
     // --- Helpers ---
-// --- DELETE ---
-//    private class RevealController {
-//        private int revealedRounds = 1;
-//        private final int totalRounds;
-//
-//        public RevealController(int totalRounds) {
-//            this.totalRounds = totalRounds;
-//        }
-//
-//        public boolean canReveal() {
-//            return revealedRounds < totalRounds;
-//        }
-//
-//        public boolean canUnreveal() {
-//            return revealedRounds > 1;
-//        }
-//
-//        public void unrevealOne() {
-//            if (canUnreveal())
-//                revealedRounds--;
-//        }
-//
-//        public void revealOne() {
-//            if (canReveal())
-//                revealedRounds++;
-//        }
-//
-//        public int getRevealedCount() {
-//            return revealedRounds;
-//        }
-//
-//        public void setRevealedCount(int count) {
-//            if (count >= 1 && count <= totalRounds) {
-//                this.revealedRounds = count;
-//            }
-//        }
-//    }
-// --- START FIX ---
+    // --- DELETE ---
+    // private class RevealController {
+    // private int revealedRounds = 1;
+    // private final int totalRounds;
+    //
+    // public RevealController(int totalRounds) {
+    // this.totalRounds = totalRounds;
+    // }
+    //
+    // public boolean canReveal() {
+    // return revealedRounds < totalRounds;
+    // }
+    //
+    // public boolean canUnreveal() {
+    // return revealedRounds > 1;
+    // }
+    //
+    // public void unrevealOne() {
+    // if (canUnreveal())
+    // revealedRounds--;
+    // }
+    //
+    // public void revealOne() {
+    // if (canReveal())
+    // revealedRounds++;
+    // }
+    //
+    // public int getRevealedCount() {
+    // return revealedRounds;
+    // }
+    //
+    // public void setRevealedCount(int count) {
+    // if (count >= 1 && count <= totalRounds) {
+    // this.revealedRounds = count;
+    // }
+    // }
+    // }
+    // --- START FIX ---
     private class RevealController {
         private int revealedSnapshots = 1;
         private final int totalSnapshots;
@@ -529,7 +619,7 @@ String movePart = snapKey.split(":")[0];
             }
         }
     }
-// --- END FIX ---
+    // --- END FIX ---
 
     private class WorthData {
         public final LinkedHashMap<String, Map<String, Double>> history;
@@ -696,36 +786,21 @@ String movePart = snapKey.split(":")[0];
                     endIdx = e;
                 }
             }
+            
             java.util.List<RoundBand> bands = new java.util.ArrayList<>();
-            String currentMacro = null;
-            String lastMajorMacro = null;
-            int startIdx = 0;
-            for (int i = 0; i < data.roundKeys.size(); i++) {
-                String fullKey = data.roundKeys.get(i);
-                String macro = fullKey.contains(":") ? fullKey.split(":")[1] : fullKey;
-                
-                boolean isMajor = macro.startsWith("OR") || macro.startsWith("SR") 
-                               || macro.contains("M&A") || macro.contains("Merger") 
-                               || macro.startsWith("MR") || macro.equalsIgnoreCase("Start") 
-                               || macro.equalsIgnoreCase("End") || macro.equalsIgnoreCase("Time Adj");
-                
-                String effectiveMacro = isMajor ? macro : (lastMajorMacro != null ? lastMajorMacro : macro);
-                if (isMajor) lastMajorMacro = macro;
-
-               if (currentMacro == null) {
-                    currentMacro = effectiveMacro;
-                } else if (!effectiveMacro.equals(currentMacro)) {
-                    bands.add(new RoundBand(WorthChartWindow.this.formatMacroName(currentMacro), currentMacro, startIdx,
-                            i));
-                    currentMacro = effectiveMacro;
-                    startIdx = i;
+            if (WorthChartWindow.this.macroGroups != null && WorthChartWindow.this.macroGroups.length > 0) {
+                String currentMacro = WorthChartWindow.this.macroGroups[0];
+                int startIdx = 0;
+                for (int i = 1; i < WorthChartWindow.this.macroGroups.length; i++) {
+                    if (!WorthChartWindow.this.macroGroups[i].equals(currentMacro)) {
+                        bands.add(new RoundBand(WorthChartWindow.this.formatMacroName(currentMacro), currentMacro, startIdx, i - 1));
+                        currentMacro = WorthChartWindow.this.macroGroups[i];
+                        startIdx = i;
+                    }
                 }
+                bands.add(new RoundBand(WorthChartWindow.this.formatMacroName(currentMacro), currentMacro, startIdx, WorthChartWindow.this.macroGroups.length - 1));
             }
-            if (currentMacro != null) {
-                bands.add(new RoundBand(WorthChartWindow.this.formatMacroName(currentMacro), currentMacro, startIdx,
-                        data.roundKeys.size() - 1));
-            }
-
+            
             Set<Integer> boundaryIndices = new HashSet<>();
             for (RoundBand band : bands) {
                 boundaryIndices.add(band.startIdx);
@@ -770,18 +845,24 @@ String movePart = snapKey.split(":")[0];
                             if (macro.startsWith(targetMacroPrefix)) {
                                 try {
                                     int sub = Integer.parseInt(macro.substring(targetMacroPrefix.length()));
-                                    if (sub > maxSubRound) maxSubRound = sub;
-                                } catch (Exception ex) {}
+                                    if (sub > maxSubRound)
+                                        maxSubRound = sub;
+                                } catch (Exception ex) {
+                                }
                             }
                         }
                         if (currentOrCycle == globalMaxOrCycle) {
                             maxSubRound = Math.max(maxSubRound, globalMaxSubRound);
                         }
-                        
-                        if (maxSubRound == 1) bgColor = new Color(255, 255, 230); // Light Yellow
-                        else if (maxSubRound == 2) bgColor = new Color(235, 255, 235); // Light Green
-                        else if (maxSubRound == 3) bgColor = new Color(245, 235, 220); // Light Brown
-                        else bgColor = new Color(230, 230, 230); // Light Gray
+
+                        if (maxSubRound == 1)
+                            bgColor = new Color(255, 255, 230); // Light Yellow
+                        else if (maxSubRound == 2)
+                            bgColor = new Color(235, 255, 235); // Light Green
+                        else if (maxSubRound == 3)
+                            bgColor = new Color(245, 235, 220); // Light Brown
+                        else
+                            bgColor = new Color(230, 230, 230); // Light Gray
                     } catch (Exception e) {
                         bgColor = new Color(245, 245, 245);
                     }
@@ -847,8 +928,8 @@ String movePart = snapKey.split(":")[0];
                         path.lineTo(x, y);
                     }
 
-                   // Only draw dots at the macro-round boundaries or the current revealed position
-                   if (boundaryIndices.contains(i) || i == roundsToPlot - 1) {
+                    // Only draw dots at the macro-round boundaries or the current revealed position
+                    if (boundaryIndices.contains(i) || i == roundsToPlot - 1) {
                         g2d.fillOval((int) x - 3, (int) y - 3, 6, 6);
                     }
 
@@ -857,7 +938,6 @@ String movePart = snapKey.split(":")[0];
             }
         }
     }
-
 
     private class LegendPanel extends JPanel {
         private final WorthData data;
@@ -871,22 +951,26 @@ String movePart = snapKey.split(":")[0];
             this.setLayout(new FlowLayout(FlowLayout.CENTER, 0, 0));
             this.setBorder(BorderFactory.createTitledBorder("Player Legend (Current Snapshot)"));
 
-            String[] columns = {"Color", "Player Name", "Worth", "% of Leader"};
+            String[] columns = { "Color", "Player Name", "Worth", "% of Leader" };
             tableModel = new DefaultTableModel(null, columns) {
                 @Override
-                public boolean isCellEditable(int row, int column) { return false; }
+                public boolean isCellEditable(int row, int column) {
+                    return false;
+                }
             };
 
             legendTable = new JTable(tableModel);
             legendTable.setRowHeight(24);
             legendTable.setFont(new Font("SansSerif", Font.PLAIN, 12));
             legendTable.getTableHeader().setFont(new Font("SansSerif", Font.BOLD, 12));
-            
+
             // Custom renderer to draw the color squares inside the cell
             legendTable.getColumnModel().getColumn(0).setCellRenderer(new DefaultTableCellRenderer() {
                 @Override
-                public Component getTableCellRendererComponent(JTable table, Object value, boolean isSelected, boolean hasFocus, int row, int column) {
-                    JLabel label = (JLabel) super.getTableCellRendererComponent(table, "", isSelected, hasFocus, row, column);
+                public Component getTableCellRendererComponent(JTable table, Object value, boolean isSelected,
+                        boolean hasFocus, int row, int column) {
+                    JLabel label = (JLabel) super.getTableCellRendererComponent(table, "", isSelected, hasFocus, row,
+                            column);
                     if (value instanceof Color) {
                         label.setIcon(new javax.swing.Icon() {
                             public void paintIcon(Component c, Graphics g, int x, int y) {
@@ -895,8 +979,14 @@ String movePart = snapKey.split(":")[0];
                                 g.setColor(Color.BLACK);
                                 g.drawRect(x + 5, y + 2, 16, 16);
                             }
-                            public int getIconWidth() { return 26; }
-                            public int getIconHeight() { return 20; }
+
+                            public int getIconWidth() {
+                                return 26;
+                            }
+
+                            public int getIconHeight() {
+                                return 20;
+                            }
                         });
                     }
                     label.setHorizontalAlignment(SwingConstants.CENTER);
@@ -935,17 +1025,24 @@ String movePart = snapKey.split(":")[0];
                 String name;
                 double worth;
                 Color color;
-                PlayerInfo(String n, double w, Color c) { name = n; worth = w; color = c; }
+
+                PlayerInfo(String n, double w, Color c) {
+                    name = n;
+                    worth = w;
+                    color = c;
+                }
             }
 
             List<PlayerInfo> players = new ArrayList<>();
             double maxWorth = 0;
             Map<String, Double> snapshot = data.history.get(currentRoundKey);
-            if (snapshot == null) snapshot = Collections.emptyMap();
+            if (snapshot == null)
+                snapshot = Collections.emptyMap();
 
             for (String pName : data.playerNames) {
                 double worth = snapshot.getOrDefault(pName, 0.0);
-                if (worth > maxWorth) maxWorth = worth;
+                if (worth > maxWorth)
+                    maxWorth = worth;
                 players.add(new PlayerInfo(pName, worth, data.getPlayerColor(pName)));
             }
 
@@ -954,41 +1051,101 @@ String movePart = snapKey.split(":")[0];
 
             for (PlayerInfo p : players) {
                 String pctStr = (maxWorth > 0) ? String.format("%.1f%%", (p.worth / maxWorth) * 100.0) : "0.0%";
-                tableModel.addRow(new Object[]{p.color, p.name, String.format("%,.0f", p.worth), pctStr});
+                tableModel.addRow(new Object[] { p.color, p.name, String.format("%,.0f", p.worth), pctStr });
             }
         }
     }
 
+    private void scrubToMove(int targetMove) {
+        GameManager gm = data.gameManager;
+        if (gm == null || gm.getRoot() == null)
+            return;
 
-    private void rehydrateGameState(int moveNumber) {
-        try {
-            java.io.File logDir = new java.io.File("logs/state");
-            String filename = String.format("state_%05d.json", moveNumber);
-            java.io.File stateFile = new java.io.File(logDir, filename);
+        net.sf.rails.ui.swing.GameUIManager uiMgr = gm.getGameUIManager();
 
-            if (!stateFile.exists()) {
-                log.warn("Cannot scrub to move {}: File {} not found.", moveNumber, stateFile.getAbsolutePath());
-                return;
-            }
-
-            log.info("Rehydrating game state from {}", stateFile.getAbsolutePath());
-
-            try (java.io.FileReader reader = new java.io.FileReader(stateFile)) {
-                com.google.gson.Gson gson = new com.google.gson.Gson();
-                net.sf.rails.game.ai.snapshot.GameStateData pojo = gson.fromJson(reader,
-                        net.sf.rails.game.ai.snapshot.GameStateData.class);
-
-                net.sf.rails.game.ai.snapshot.GameStateRestorer restorer = new net.sf.rails.game.ai.snapshot.GameStateRestorer();
-                net.sf.rails.game.RailsRoot newRoot = restorer.restoreState(pojo);
-
-                // Visual-only update: Swap references and refresh UI
-                if (data.gameManager.getGameUIManager() != null) {
-                    data.gameManager.getGameUIManager().updateAllVisuals(newRoot);
+        // --- UI Manager Fallback Resolution ---
+        // gm.getGameUIManager() returns null during certain lifecycle states.
+        // We actively resolve it by traversing the active window hierarchy.
+        if (uiMgr == null) {
+            for (java.awt.Window w : java.awt.Window.getWindows()) {
+                Class<?> clazz = w.getClass();
+                while (clazz != null && clazz != Object.class) {
+                    for (java.lang.reflect.Field f : clazz.getDeclaredFields()) {
+                        if (net.sf.rails.ui.swing.GameUIManager.class.isAssignableFrom(f.getType())) {
+                            f.setAccessible(true);
+                            try {
+                                net.sf.rails.ui.swing.GameUIManager temp = (net.sf.rails.ui.swing.GameUIManager) f
+                                        .get(w);
+                                if (temp != null && temp.getRoot() == gm.getRoot()) {
+                                    uiMgr = temp;
+                                    break;
+                                }
+                            } catch (Exception e) {
+                            }
+                        }
+                    }
+                    if (uiMgr != null)
+                        break;
+                    clazz = clazz.getSuperclass();
                 }
-
+                if (uiMgr != null)
+                    break;
             }
+        }
+
+        if (uiMgr == null) {
+            log.warn("Cannot scrub: GameUIManager is null and could not be resolved via reflection.");
+            return;
+        }
+
+        net.sf.rails.game.state.ChangeStack changeStack = gm.getRoot().getStateManager().getChangeStack();
+        int currentMove = gm.getActionCountModel().value();
+
+        if (currentMove == targetMove)
+            return;
+
+        log.info("Scrubbing timeline to move {}", targetMove);
+        this.setCursor(java.awt.Cursor.getPredefinedCursor(java.awt.Cursor.WAIT_CURSOR));
+
+        try {
+            // 1. Single-Pass Proportional Search
+            // We nudge the model directly to the target. No reverting, no triple-execution.
+            int loops = 0;
+            while (gm.getActionCountModel().value() != targetMove && loops < 100) {
+                currentMove = gm.getActionCountModel().value();
+                int currentIndex = changeStack.getCurrentIndex();
+                int diff = currentMove - targetMove;
+
+                if (diff > 0) {
+                    int nextIdx = Math.max(1, currentIndex - diff);
+                    if (currentIndex > nextIdx && changeStack.isUndoPossible()) {
+                        changeStack.undo(nextIdx);
+                    } else
+                        break;
+                } else if (diff < 0) {
+                    int nextIdx = Math.min(changeStack.getMaximumIndex(), currentIndex - diff);
+                    if (currentIndex < nextIdx && changeStack.isRedoPossible()) {
+                        changeStack.redo(nextIdx);
+                    } else
+                        break;
+                }
+                loops++;
+            }
+
+            // 2. Synchronize UI Structure
+            // changeStack triggers Observer data updates, but updateUI() forces structural
+            // rebuilds
+            // (e.g., StatusWindow layout, Company properties) bypassing the async
+            // processAction queue.
+            uiMgr.updateUI();
+            if (uiMgr.getStatusWindow() != null) {
+                uiMgr.getStatusWindow().setGameActions();
+            }
+
         } catch (Exception e) {
-            log.error("Failed to rehydrate game state for move " + moveNumber, e);
+            log.error("Error during timeline scrubbing.", e);
+        } finally {
+            this.setCursor(java.awt.Cursor.getDefaultCursor());
         }
     }
 
