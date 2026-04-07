@@ -2666,7 +2666,7 @@ public class GameManager extends RailsManager implements Configurable, Owner {
 
                 if (dialogResult == javax.swing.JOptionPane.YES_OPTION) {
                     try {
-                        ResultUploader.uploadGameResult(getGameName() + "-Championship", names, scores);
+                        ResultUploader.uploadGameResult(getGameName(), names, scores);
                         log.info("results upload triggered.");
                     } catch (Exception e) {
                         log.error("Failed to transmit results: " + e.getMessage());
