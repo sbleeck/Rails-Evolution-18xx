@@ -4445,9 +4445,9 @@ if (train != null) {
             if (hasBuyActions) {
                 // 'SKIP' (Done Buying) button.
                 // JSON State Recovery / Logic Fix: Ensure SKIP is not offered if purchase is mandatory.
-                boolean mustBuy = !operatingCompany.value().hasTrains() && 
-                                 (operatingCompany.value().mustOwnATrain() || gameManager.isReloading());
-                if (!mustBuy) {
+ boolean mustBuy = !operatingCompany.value().hasTrains() && 
+                                 operatingCompany.value().mustOwnATrain();
+                                                 if (!mustBuy) {
                     possibleActions.add(new NullAction(getRoot(), NullAction.Mode.SKIP));
                 }
             } else {
@@ -4846,15 +4846,10 @@ if (train != null) {
         // Forced Buy Condition: No trains AND company rules require ownership.
         boolean mustBuyTrain = !hasTrains && company.mustOwnATrain();
 
-        // JSON State Recovery: If the hex route cache is not fully hydrated, mustOwnATrain() 
-        // may falsely evaluate to false. This causes the engine to filter out unaffordable 
-        // trains and silently bypass the step. We enforce the buy condition during reloads.
-        if (gameManager.isReloading() && !hasTrains) {
-            mustBuyTrain = true;
-        }
-        // Check Phase Restrictions (e.g. "One train per turn")
+// Check Phase Restrictions (e.g. "One train per turn")
         boolean canBuyMoreTrains = Phase.getCurrent(this).canBuyMoreTrainsPerTurn();
         boolean alreadyBought = !trainsBoughtThisTurn.isEmpty();
+
 
         // If we already bought a train, and the phase says "Only 1", and we aren't
         // forced to buy another...
