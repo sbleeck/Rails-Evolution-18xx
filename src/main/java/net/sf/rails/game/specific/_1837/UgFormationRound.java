@@ -35,31 +35,10 @@ public class UgFormationRound extends NationalFormationRound {
             // Inject starting capital!
             net.sf.rails.game.state.Currency.fromBank(875, major);
             major.setFloated();
-            log.info("1837_UG_NFR: Ug successfully floated and received 875K.");
-        }
-
-        if ("U1".equals(minor.getId())) {
-            net.sf.rails.game.financial.BankPortfolio unavailable = net.sf.rails.game.financial.Bank.getUnavailable(gameManager.getRoot());
+            net.sf.rails.common.ReportBuffer.add(gameManager, major.getId() + " successfully floated and received 875K starting capital.");
+net.sf.rails.common.ReportBuffer.add(gameManager, "Initial " + major.getId() + " State:\n" + Merger1837.build1837StateReport(gameManager, major));
             
-            for (Player p : gameManager.getPlayers()) {
-                for (Object obj : new java.util.ArrayList<>(p.getPortfolioModel().getCertificates())) {
-                    if (obj instanceof net.sf.rails.game.financial.PublicCertificate) {
-                        net.sf.rails.game.financial.PublicCertificate cert = (net.sf.rails.game.financial.PublicCertificate) obj;
-                        if (cert.getCompany().equals(minor)) {
-                            boolean needsPresident = cert.isPresidentShare();
-                            cert.moveTo(unavailable);
-                            
-                            for (net.sf.rails.game.financial.PublicCertificate pc : major.getCertificates()) {
-                                if (pc.isPresidentShare() == needsPresident && !(pc.getOwner() instanceof Player)) {
-                                    pc.moveTo(p);
-                                    log.info("1837_UG_NFR: U1 owner " + p.getName() + " received Ug share (President=" + needsPresident + ").");
-                                    break;
-                                }
-                            }
-                        }
-                    }
-                }
-            }
+            log.info("1837_UG_NFR: Ug successfully floated and received 875K.");
         }
 
         // Asset transfer natively executes the U1/U3 forced co-exchange by sweeping all minor certs

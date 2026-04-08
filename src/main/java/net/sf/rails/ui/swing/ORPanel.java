@@ -2124,8 +2124,8 @@ disableRoutesDisplay();
             currentRound = orUIManager.getGameUIManager().getGameManager().getCurrentRound();
         }
         
-        // Intercept Prussian Formation Round to cleanly display the Director's name
-        if (currentRound != null && currentRound.getClass().getSimpleName().contains("Formation")) {
+        // Intercept specific Special Rounds to cleanly display the Actor's name
+        if (currentRound != null && (currentRound.getClass().getSimpleName().contains("Formation") || currentRound.getClass().getSimpleName().contains("CoalExchange"))) {
             if (lblCompanyInfo != null) {
                 String playerName = "";
                 if (currentRound.getCurrentPlayer() != null) {
@@ -2135,8 +2135,9 @@ disableRoutesDisplay();
                 String topText = "<html><center><font face='SansSerif' size='6'><b>" + playerName + "</b></font></center></html>";
                 lblCompanyInfo.setText(topText);
                 
-                Color formationBg = new Color(152, 251, 152); // PaleGreen
-                lblCompanyInfo.setBackground(formationBg);
+                Color bg = currentRound.getClass().getSimpleName().contains("CoalExchange") ? new Color(200, 200, 255) : new Color(152, 251, 152);
+                
+                lblCompanyInfo.setBackground(bg);
                 lblCompanyInfo.setForeground(Color.BLACK);
                 lblCompanyInfo.setBorder(BorderFactory.createMatteBorder(1, 1, 0, 1, Color.DARK_GRAY));
                 lblCompanyInfo.setVisible(true);
@@ -2145,9 +2146,10 @@ disableRoutesDisplay();
                     lblPlayerInfo.setVisible(false);
                 }
 
-                String bottomText = "<html><center><font face='SansSerif' size='4'><b>Prussian Formation</b></font></center></html>";
+                String phaseName = currentRound.getClass().getSimpleName().contains("Formation") ? "Prussian Formation" : "Coal Exchange";
+                String bottomText = "<html><center><font face='SansSerif' size='4'><b>" + phaseName + "</b></font></center></html>";
                 lblPhaseInstruction.setText(bottomText);
-                lblPhaseInstruction.setBackground(formationBg);
+                lblPhaseInstruction.setBackground(bg);
                 lblPhaseInstruction.setForeground(Color.BLACK);
                 lblPhaseInstruction.setBorder(BorderFactory.createMatteBorder(0, 1, 1, 1, Color.DARK_GRAY));
                 lblPhaseInstruction.setVisible(true);
@@ -2653,10 +2655,11 @@ boolean hasOpComp = false;
                         hasOpComp = true;
                     } catch (Exception e) {}
 
-                    boolean isOperatingPhase = rf instanceof net.sf.rails.game.OperatingRound ||
+boolean isOperatingPhase = rf instanceof net.sf.rails.game.OperatingRound ||
                                                rfName.contains("Operating") ||
                                                rfName.contains("Merger") ||
                                                rfName.contains("Formation") ||
+                                               rfName.contains("CoalExchange") ||
                                                hasOpComp;
 
                     if (!isOperatingPhase) {
@@ -2733,8 +2736,9 @@ boolean hasOpComp = false;
                 validOrActions.add(pa);
 
                 boolean is1817Special = paName.contains("1817");
+                boolean is1837Special = paName.contains("ExchangeMinor") || paName.contains("DiscardTrain");
 
-                if (is1817Special) {
+                if (is1817Special || is1837Special) {
                     specialActions.add(pa);
                 } else if (pa instanceof GuiTargetedAction && !(pa instanceof BuyTrain) && !(pa instanceof SetDividend)
                         && !(pa instanceof LayTile) && !(pa instanceof LayToken)) {

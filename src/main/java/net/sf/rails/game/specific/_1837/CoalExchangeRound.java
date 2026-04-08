@@ -156,7 +156,11 @@ public class CoalExchangeRound extends Round implements GuiTargetedAction {
             PublicCompany target = Merger1837.getMergeTarget(gameManager, comp);
             if (target != null && target.getId().equals(currentMajorId) && comp.getPresident() == p) {
                 ExchangeMinorAction action = new ExchangeMinorAction(comp, target, false);
-                action.setButtonLabel(LocalText.getText("ExchangeMinorForShare", comp.getId(), target.getId()));
+
+// Expand abbreviations by pulling the full company name if available.
+                String minorName = (comp.getId() != null && !comp.getId().isEmpty()) ? comp.getId() : "Minor";
+                action.setButtonLabel("Exchange " + comp.getId() + " (" + minorName + ") for " + target.getId() + " Share");
+
                 possibleActions.add(action);
                 processed.add(comp.getId());
             }
@@ -186,8 +190,12 @@ public class CoalExchangeRound extends Round implements GuiTargetedAction {
         // left for this player for this specific major.
         if (!isMandatory || !hasExchangeableMinorsForMajor(p, currentMajor)) {
             NullAction done = new NullAction(getRoot(), NullAction.Mode.DONE);
-            done.setLabel("Done / Skip " + currentMajorId);
-            possibleActions.add(done);
+
+// The UI renderer defaults to the class name ("NullAction") if the button label is not explicitly set.
+            // setLabel() is insufficient for UI rendering in this context.
+            done.setButtonLabel("Skip / Done with " + currentMajorId);
+            done.setLabel("Skip / Done with " + currentMajorId);
+                        possibleActions.add(done);
         }
 
 

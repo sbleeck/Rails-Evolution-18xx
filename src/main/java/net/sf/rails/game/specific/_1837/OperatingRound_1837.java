@@ -457,7 +457,7 @@ public class OperatingRound_1837 extends OperatingRound {
                 for (Train t : company.getPortfolioModel().getTrainList()) {
                     if (t.getName().contains("G")) {
                         hasGTrains = true;
-                          break;
+                        break;
                     }
                 }
             }
@@ -467,7 +467,6 @@ public class OperatingRound_1837 extends OperatingRound {
 
             int revenueToUse = company.getLastRevenue();
             int directIncomeToUse = company.getLastDirectIncome();
-
 
             // We force this if it's a G-Train owner (Major) OR a Mandatory Split (Minor).
             // We removed the checks for "== 0" to ensure we ALWAYS get the correct Mine
@@ -480,7 +479,6 @@ public class OperatingRound_1837 extends OperatingRound {
                         ra.initRevenueCalculator(true); // true = multigraph support
                         revenueToUse = ra.calculateRevenue();
                         directIncomeToUse = ra.getSpecialRevenue(); // Capture 1837 Mine Revenue logic
-
 
                     } else {
                     }
@@ -513,7 +511,6 @@ public class OperatingRound_1837 extends OperatingRound {
                     revenueToUse, // Total Revenue
                     directIncomeToUse, // Fixed/Mine Revenue (goes to Treasury)
                     true, allowedRevenueActions, defaultAllocation));
-
 
         } else {
         }
@@ -697,6 +694,7 @@ public class OperatingRound_1837 extends OperatingRound {
         PublicCompany major = action.getTargetMajor();
         String minorId = minor.getId();
 
+
         // 1. Formation: Par & Float ONLY (No Flush)
         boolean isFormationTrigger = action.isFormation() || "K1".equals(minorId) || "U1".equals(minorId)
                 || "S1".equals(minorId);
@@ -751,109 +749,24 @@ public class OperatingRound_1837 extends OperatingRound {
             // We will fetch them one-by-one as needed below.
         }
 
-        // 2. Identify TRUE Shareholders
-        // U1/U3 force all shareholders to exchange. Others (K1-K3) are individual.
-        // We scan for anyone holding the minor's paper.
-        Set<Player> playersToProcess = new HashSet<>();
-
-        // Use generic Owner check to be safe
-        for (Player p : gameManager.getPlayers()) {
-            if (p instanceof PortfolioOwner) {
-                PortfolioModel pm = ((PortfolioOwner) p).getPortfolioModel();
-                for (Object obj : pm.getCertificates()) {
-                    if (obj instanceof PublicCertificate) {
-                        PublicCertificate pc = (PublicCertificate) obj;
-                        if (pc.getCompany().equals(minor)) {
-                            playersToProcess.add(p);
-                        }
-                    }
-                }
-            }
-        }
-
-        // Fallback for Director weirdness
-        if (playersToProcess.isEmpty()) {
-
-            playersToProcess.add(action.getPlayer());
-        }
-
-        net.sf.rails.game.financial.BankPortfolio unavailable = net.sf.rails.game.financial.Bank
-                .getUnavailable(gameManager.getRoot());
-        // 3. Execute Exchange (Just-In-Time Fetch)
-        for (Player p : playersToProcess) {
-            PortfolioModel pm = ((PortfolioOwner) p).getPortfolioModel();
-
-            // Collect minor shares to swap
-            List<PublicCertificate> toSwap = new ArrayList<>();
-            for (Object obj : pm.getCertificates()) {
-                if (obj instanceof PublicCertificate) {
-                    PublicCertificate cert = (PublicCertificate) obj;
-                    if (cert.getCompany().equals(minor)) {
-                        toSwap.add(cert);
-                    }
-                }
-            }
-
-            for (PublicCertificate minorCert : toSwap) {
-                // Determine needed share type
-                boolean targetPresidentShare = false;
-                if ("K1".equals(minorId)) {
-                    targetPresidentShare = true;
-                } else if ("U1".equals(minorId) && minorCert.isPresidentShare()) {
-                    targetPresidentShare = true;
-                }
-
-                // A. Surrender Minor Share to unavailable
-                minorCert.moveTo(unavailable);
-                // B. Find Available Major Share (Anywhere except Player hands)
-                PublicCertificate newShare = null;
-                List<PublicCertificate> allMajorCerts = major.getCertificates();
-
-                // 1. Try to find exact match that is NOT owned by a player
-                for (PublicCertificate pc : allMajorCerts) {
-                    if (pc.isPresidentShare() == targetPresidentShare) {
-                        if (!(pc.getOwner() instanceof Player)) {
-                            newShare = pc;
-                            break;
-                        }
-                    }
-                }
-
-                // 2. Fallback: Try to find ANY share not owned by a player
-                if (newShare == null) {
-                    for (PublicCertificate pc : allMajorCerts) {
-                        if (!(pc.getOwner() instanceof Player)) {
-                            newShare = pc;
-                            break;
-                        }
-                    }
-                }
-
-                if (newShare != null) {
-
-                    newShare.moveTo(p);
-                }
-            }
-        }
-
         
 
         Merger1837.mergeMinor(gameManager, minor, major);
         Merger1837.fixDirectorship(gameManager, major);
 
         if (major.getNumberOfTrains() > major.getCurrentTrainLimit()) {
+            net.sf.rails.common.ReportBuffer.add(this,
+                    "TRAIN LIMIT EXCEEDED: " + major.getId() + " owns " + major.getNumberOfTrains() + " trains (Limit: "
+                            + major.getCurrentTrainLimit() + "). Halting for mandatory discard.");
 
             // Rails uses BUY_TRAIN step for discard resolution when over limit
             setStep(GameDef.OrStep.BUY_TRAIN);
 
             operatingCompany.set(major);
             setPossibleActions();
-        }
-
-        // Use shared helper to check limits and generate discard actions if needed
-        if (checkAndGenerateDiscardActions(major)) {
-            String warning = "WARNING: " + major.getId() + " exceeds train limit after voluntary merger.";
-            ReportBuffer.add(this, warning);
+        } else {
+            net.sf.rails.common.ReportBuffer.add(this, "TRAIN LIMIT CHECK: " + major.getId() + " is within limits ("
+                    + major.getNumberOfTrains() + " / " + major.getCurrentTrainLimit() + ").");
         }
 
         return true;
@@ -915,7 +828,6 @@ public class OperatingRound_1837 extends OperatingRound {
         }
     }
 
-
     @Override
     public int getBaseRevenueOnly(PublicCompany company) {
         String type = company.getType().getId();
@@ -931,7 +843,6 @@ public class OperatingRound_1837 extends OperatingRound {
         int total = ra.calculateRevenue();
         return total - ra.getSpecialRevenue();
     }
-
 
     @Override
     public void finishRound() {
@@ -975,7 +886,6 @@ public class OperatingRound_1837 extends OperatingRound {
     public void nextSpecialActionPlayer() {
         List<Player> players = gameManager.getPlayers();
         int start = specialActionCurrentIndex.value();
-
 
         // Start checking from the *next* player
         int checkIndex = (start == -1) ? 0 : (start + 1) % players.size();
@@ -1123,14 +1033,16 @@ public class OperatingRound_1837 extends OperatingRound {
                     // Forced execution: call the upgrade directly on the hex model
                     g17.upgrade(lt);
 
-                    // Post-upgrade recovery: Find tokens left on zombie stops and return them to the charter
+                    // Post-upgrade recovery: Find tokens left on zombie stops and return them to
+                    // the charter
                     PublicCompany kk = getRoot().getCompanyManager().getPublicCompany("KK");
                     if (kk != null) {
                         int recovered = 0;
                         for (BaseToken token : kk.getAllBaseTokens()) {
                             if (token.isPlaced() && token.getOwner() instanceof Stop) {
                                 Stop stop = (Stop) token.getOwner();
-                                // Identify if the token is stuck on an old G17 stop that is no longer part of the hex
+                                // Identify if the token is stuck on an old G17 stop that is no longer part of
+                                // the hex
                                 if (stop.getHex() != null && "G17".equals(stop.getHex().getId())) {
                                     if (!g17.getStops().contains(stop)) {
                                         token.moveTo(kk);
@@ -1140,7 +1052,6 @@ public class OperatingRound_1837 extends OperatingRound {
                             }
                         }
                     }
-
 
                     return true; // Report success to the reloader to bypass the "PossibleActions" check
                 } catch (Exception e) {
@@ -1254,9 +1165,10 @@ public class OperatingRound_1837 extends OperatingRound {
             return;
         }
 
-// Delegate to the base class to handle the automatic train transfer and standard UI refresh
+        // Delegate to the base class to handle the automatic train transfer and
+        // standard UI refresh
         super.resume();
-        
+
     }
 
     private void executeSdFormation(PublicCompany_1837 sd) {
@@ -1328,8 +1240,6 @@ public class OperatingRound_1837 extends OperatingRound {
         }
     }
 
-
-
     @Override
     public String getRevenueDisplayString(PublicCompany company) {
 
@@ -1345,7 +1255,6 @@ public class OperatingRound_1837 extends OperatingRound {
                 ra.initRevenueCalculator(true);
                 int total = ra.calculateRevenue();
                 int mine = ra.getSpecialRevenue();
-                
 
                 // Prevent negative route revenue from stale adapter states
                 if (mine > 0 && total >= mine) {
@@ -1359,8 +1268,6 @@ public class OperatingRound_1837 extends OperatingRound {
         }
         return super.getRevenueDisplayString(company);
     }
-
-
 
     @Override
     public int getSpecialRevenueOnly(PublicCompany company) {

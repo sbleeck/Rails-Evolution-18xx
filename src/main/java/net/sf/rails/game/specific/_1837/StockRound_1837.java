@@ -427,6 +427,16 @@ public class StockRound_1837 extends StockRound {
         }
     }
 
+    @Override
+    public boolean mayPlayerSellShareOfCompany(PublicCompany company) {
+        if (!super.mayPlayerSellShareOfCompany(company)) {
+            return false;
+        }
+        
+        // Enforce 1837 Rule 9.1: No shares may be sold in a corporation that has not yet operated.
+        return company.hasOperated();
+    }
+
 
 
 

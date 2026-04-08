@@ -1,38 +1,62 @@
 {
   "gameManager" : {
     "gameName" : "1837",
-    "absoluteActionCounter" : 257,
+    "absoluteActionCounter" : 447,
     "startRoundNumber" : 1,
-    "stockRoundNumber" : 2,
-    "absoluteORNumber" : 2,
+    "stockRoundNumber" : 4,
+    "absoluteORNumber" : 3,
     "relativeORNumber" : 1,
-    "currentPlayerId" : "Rainer",
-    "priorityPlayerId" : "Rainer"
+    "currentPlayerId" : "Stefan",
+    "priorityPlayerId" : "Marc"
   },
   "phase" : {
     "currentPhaseName" : "2",
     "offBoardRevenueStep" : 1
   },
   "currentRound" : {
-    "type" : "OperatingRound",
-    "id" : "OR_2.1",
-    "step" : "LAY_TRACK",
-    "operatingCompanyId" : "EPP",
-    "numPasses" : 0,
-    "operatingCompanyQueueIds" : [ "EPP", "RGTE", "EOD", "EKT", "MLB", "ZKB", "SPB", "LRB", "BB", "EHS", "S1", "S2", "S3", "S4", "S5", "K1", "K2", "K3", "U1", "U2", "U3" ]
+    "type" : "StockRound",
+    "id" : "SR_4",
+    "step" : null,
+    "operatingCompanyId" : null,
+    "numPasses" : 2,
+    "operatingCompanyQueueIds" : [ ]
   },
   "mapHexes" : [ {
+    "id" : "B10",
+    "tileId" : "8",
+    "rotation" : 3
+  }, {
     "id" : "B12",
     "tileId" : "7",
     "rotation" : 2
+  }, {
+    "id" : "C13",
+    "tileId" : "7",
+    "rotation" : 0
+  }, {
+    "id" : "C23",
+    "tileId" : "401",
+    "rotation" : 1
   }, {
     "id" : "C31",
     "tileId" : "2",
     "rotation" : 5
   }, {
+    "id" : "C33",
+    "tileId" : "201",
+    "rotation" : 1
+  }, {
     "id" : "D10",
     "tileId" : "3",
     "rotation" : 4
+  }, {
+    "id" : "D12",
+    "tileId" : "7",
+    "rotation" : 1
+  }, {
+    "id" : "D16",
+    "tileId" : "7",
+    "rotation" : 3
   }, {
     "id" : "D18",
     "tileId" : "58",
@@ -42,21 +66,49 @@
     "tileId" : "3",
     "rotation" : 2
   }, {
+    "id" : "D24",
+    "tileId" : "7",
+    "rotation" : 1
+  }, {
+    "id" : "D32",
+    "tileId" : "7",
+    "rotation" : 2
+  }, {
+    "id" : "E15",
+    "tileId" : "3",
+    "rotation" : 4
+  }, {
     "id" : "E17",
     "tileId" : "402",
     "rotation" : 0
+  }, {
+    "id" : "E29",
+    "tileId" : "9",
+    "rotation" : 3
   }, {
     "id" : "F16",
     "tileId" : "3",
     "rotation" : 4
   }, {
+    "id" : "F24",
+    "tileId" : "7",
+    "rotation" : 0
+  }, {
     "id" : "F28",
     "tileId" : "57",
+    "rotation" : 0
+  }, {
+    "id" : "G13",
+    "tileId" : "404",
     "rotation" : 0
   }, {
     "id" : "G15",
     "tileId" : "9",
     "rotation" : 1
+  }, {
+    "id" : "G23",
+    "tileId" : "4",
+    "rotation" : 0
   }, {
     "id" : "H16",
     "tileId" : "9",
@@ -66,13 +118,53 @@
     "tileId" : "404",
     "rotation" : 3
   }, {
+    "id" : "I5",
+    "tileId" : "9",
+    "rotation" : 4
+  }, {
     "id" : "I7",
     "tileId" : "201",
     "rotation" : 1
   }, {
+    "id" : "I15",
+    "tileId" : "5",
+    "rotation" : 5
+  }, {
+    "id" : "I17",
+    "tileId" : "7",
+    "rotation" : 1
+  }, {
+    "id" : "I19",
+    "tileId" : "8",
+    "rotation" : 5
+  }, {
     "id" : "I21",
     "tileId" : "3",
     "rotation" : 2
+  }, {
+    "id" : "I23",
+    "tileId" : "56",
+    "rotation" : 4
+  }, {
+    "id" : "I25",
+    "tileId" : "9",
+    "rotation" : 4
+  }, {
+    "id" : "I27",
+    "tileId" : "4",
+    "rotation" : 2
+  }, {
+    "id" : "I33",
+    "tileId" : "58",
+    "rotation" : 3
+  }, {
+    "id" : "I35",
+    "tileId" : "7",
+    "rotation" : 5
+  }, {
+    "id" : "J6",
+    "tileId" : "9",
+    "rotation" : 0
   }, {
     "id" : "J14",
     "tileId" : "7",
@@ -81,6 +173,10 @@
     "id" : "J20",
     "tileId" : "9",
     "rotation" : 2
+  }, {
+    "id" : "J28",
+    "tileId" : "404",
+    "rotation" : 0
   }, {
     "id" : "J30",
     "tileId" : "8",
@@ -94,6 +190,10 @@
     "tileId" : "57",
     "rotation" : 0
   }, {
+    "id" : "K27",
+    "tileId" : "9",
+    "rotation" : 4
+  }, {
     "id" : "K29",
     "tileId" : "58",
     "rotation" : 5
@@ -102,21 +202,249 @@
     "tileId" : "202",
     "rotation" : 5
   }, {
+    "id" : "L4",
+    "tileId" : "8",
+    "rotation" : 1
+  }, {
+    "id" : "M15",
+    "tileId" : "7",
+    "rotation" : 0
+  }, {
+    "id" : "N16",
+    "tileId" : "8",
+    "rotation" : 5
+  }, {
     "id" : "O19",
     "tileId" : "8",
     "rotation" : 5
   } ],
   "bank" : {
-    "cash" : 13723,
+    "cash" : 9425,
     "isBroken" : false,
     "ipo" : {
       "certificates" : [ {
-        "companyId" : "U1",
-        "percentage" : 50,
+        "companyId" : "BH",
+        "percentage" : 20,
+        "isPresident" : true
+      }, {
+        "companyId" : "BH",
+        "percentage" : 10,
         "isPresident" : false
       }, {
-        "companyId" : "U3",
-        "percentage" : 50,
+        "companyId" : "BH",
+        "percentage" : 10,
+        "isPresident" : false
+      }, {
+        "companyId" : "BH",
+        "percentage" : 10,
+        "isPresident" : false
+      }, {
+        "companyId" : "BH",
+        "percentage" : 10,
+        "isPresident" : false
+      }, {
+        "companyId" : "BH",
+        "percentage" : 10,
+        "isPresident" : false
+      }, {
+        "companyId" : "BH",
+        "percentage" : 10,
+        "isPresident" : false
+      }, {
+        "companyId" : "BH",
+        "percentage" : 10,
+        "isPresident" : false
+      }, {
+        "companyId" : "BK",
+        "percentage" : 10,
+        "isPresident" : false
+      }, {
+        "companyId" : "BK",
+        "percentage" : 10,
+        "isPresident" : false
+      }, {
+        "companyId" : "BK",
+        "percentage" : 10,
+        "isPresident" : false
+      }, {
+        "companyId" : "CL",
+        "percentage" : 20,
+        "isPresident" : true
+      }, {
+        "companyId" : "CL",
+        "percentage" : 10,
+        "isPresident" : false
+      }, {
+        "companyId" : "CL",
+        "percentage" : 10,
+        "isPresident" : false
+      }, {
+        "companyId" : "CL",
+        "percentage" : 10,
+        "isPresident" : false
+      }, {
+        "companyId" : "CL",
+        "percentage" : 10,
+        "isPresident" : false
+      }, {
+        "companyId" : "CL",
+        "percentage" : 10,
+        "isPresident" : false
+      }, {
+        "companyId" : "CL",
+        "percentage" : 10,
+        "isPresident" : false
+      }, {
+        "companyId" : "CL",
+        "percentage" : 10,
+        "isPresident" : false
+      }, {
+        "companyId" : "GT",
+        "percentage" : 20,
+        "isPresident" : true
+      }, {
+        "companyId" : "GT",
+        "percentage" : 10,
+        "isPresident" : false
+      }, {
+        "companyId" : "GT",
+        "percentage" : 10,
+        "isPresident" : false
+      }, {
+        "companyId" : "GT",
+        "percentage" : 10,
+        "isPresident" : false
+      }, {
+        "companyId" : "GT",
+        "percentage" : 10,
+        "isPresident" : false
+      }, {
+        "companyId" : "GT",
+        "percentage" : 10,
+        "isPresident" : false
+      }, {
+        "companyId" : "GT",
+        "percentage" : 10,
+        "isPresident" : false
+      }, {
+        "companyId" : "GT",
+        "percentage" : 10,
+        "isPresident" : false
+      }, {
+        "companyId" : "GT",
+        "percentage" : 10,
+        "isPresident" : false
+      }, {
+        "companyId" : "KK",
+        "percentage" : 10,
+        "isPresident" : false
+      }, {
+        "companyId" : "KK",
+        "percentage" : 10,
+        "isPresident" : false
+      }, {
+        "companyId" : "KK",
+        "percentage" : 10,
+        "isPresident" : false
+      }, {
+        "companyId" : "KK",
+        "percentage" : 10,
+        "isPresident" : false
+      }, {
+        "companyId" : "KK",
+        "percentage" : 10,
+        "isPresident" : false
+      }, {
+        "companyId" : "KK",
+        "percentage" : 10,
+        "isPresident" : false
+      }, {
+        "companyId" : "MS",
+        "percentage" : 10,
+        "isPresident" : false
+      }, {
+        "companyId" : "MS",
+        "percentage" : 10,
+        "isPresident" : false
+      }, {
+        "companyId" : "MS",
+        "percentage" : 10,
+        "isPresident" : false
+      }, {
+        "companyId" : "SB",
+        "percentage" : 20,
+        "isPresident" : true
+      }, {
+        "companyId" : "SB",
+        "percentage" : 10,
+        "isPresident" : false
+      }, {
+        "companyId" : "SB",
+        "percentage" : 10,
+        "isPresident" : false
+      }, {
+        "companyId" : "SB",
+        "percentage" : 10,
+        "isPresident" : false
+      }, {
+        "companyId" : "SB",
+        "percentage" : 10,
+        "isPresident" : false
+      }, {
+        "companyId" : "SB",
+        "percentage" : 10,
+        "isPresident" : false
+      }, {
+        "companyId" : "SB",
+        "percentage" : 10,
+        "isPresident" : false
+      }, {
+        "companyId" : "Sd",
+        "percentage" : 10,
+        "isPresident" : false
+      }, {
+        "companyId" : "Sd",
+        "percentage" : 10,
+        "isPresident" : false
+      }, {
+        "companyId" : "Sd",
+        "percentage" : 10,
+        "isPresident" : false
+      }, {
+        "companyId" : "Sd",
+        "percentage" : 10,
+        "isPresident" : false
+      }, {
+        "companyId" : "Sd",
+        "percentage" : 10,
+        "isPresident" : false
+      }, {
+        "companyId" : "TH",
+        "percentage" : 20,
+        "isPresident" : true
+      }, {
+        "companyId" : "TH",
+        "percentage" : 10,
+        "isPresident" : false
+      }, {
+        "companyId" : "TH",
+        "percentage" : 10,
+        "isPresident" : false
+      }, {
+        "companyId" : "TH",
+        "percentage" : 10,
+        "isPresident" : false
+      }, {
+        "companyId" : "TH",
+        "percentage" : 10,
+        "isPresident" : false
+      }, {
+        "companyId" : "TH",
+        "percentage" : 10,
+        "isPresident" : false
+      }, {
+        "companyId" : "TH",
+        "percentage" : 10,
         "isPresident" : false
       } ],
       "privateCompanies" : [ ]
@@ -128,66 +456,6 @@
     "unavailable" : {
       "certificates" : [ {
         "companyId" : "BH",
-        "percentage" : 20,
-        "isPresident" : true
-      }, {
-        "companyId" : "BH",
-        "percentage" : 10,
-        "isPresident" : false
-      }, {
-        "companyId" : "BH",
-        "percentage" : 10,
-        "isPresident" : false
-      }, {
-        "companyId" : "BH",
-        "percentage" : 10,
-        "isPresident" : false
-      }, {
-        "companyId" : "BH",
-        "percentage" : 10,
-        "isPresident" : false
-      }, {
-        "companyId" : "BH",
-        "percentage" : 10,
-        "isPresident" : false
-      }, {
-        "companyId" : "BH",
-        "percentage" : 10,
-        "isPresident" : false
-      }, {
-        "companyId" : "BH",
-        "percentage" : 10,
-        "isPresident" : false
-      }, {
-        "companyId" : "BH",
-        "percentage" : 10,
-        "isPresident" : false
-      }, {
-        "companyId" : "BK",
-        "percentage" : 20,
-        "isPresident" : true
-      }, {
-        "companyId" : "BK",
-        "percentage" : 10,
-        "isPresident" : false
-      }, {
-        "companyId" : "BK",
-        "percentage" : 10,
-        "isPresident" : false
-      }, {
-        "companyId" : "BK",
-        "percentage" : 10,
-        "isPresident" : false
-      }, {
-        "companyId" : "BK",
-        "percentage" : 10,
-        "isPresident" : false
-      }, {
-        "companyId" : "BK",
-        "percentage" : 10,
-        "isPresident" : false
-      }, {
-        "companyId" : "BK",
         "percentage" : 10,
         "isPresident" : false
       }, {
@@ -200,74 +468,6 @@
         "isPresident" : false
       }, {
         "companyId" : "CL",
-        "percentage" : 20,
-        "isPresident" : true
-      }, {
-        "companyId" : "CL",
-        "percentage" : 10,
-        "isPresident" : false
-      }, {
-        "companyId" : "CL",
-        "percentage" : 10,
-        "isPresident" : false
-      }, {
-        "companyId" : "CL",
-        "percentage" : 10,
-        "isPresident" : false
-      }, {
-        "companyId" : "CL",
-        "percentage" : 10,
-        "isPresident" : false
-      }, {
-        "companyId" : "CL",
-        "percentage" : 10,
-        "isPresident" : false
-      }, {
-        "companyId" : "CL",
-        "percentage" : 10,
-        "isPresident" : false
-      }, {
-        "companyId" : "CL",
-        "percentage" : 10,
-        "isPresident" : false
-      }, {
-        "companyId" : "CL",
-        "percentage" : 10,
-        "isPresident" : false
-      }, {
-        "companyId" : "GT",
-        "percentage" : 20,
-        "isPresident" : true
-      }, {
-        "companyId" : "GT",
-        "percentage" : 10,
-        "isPresident" : false
-      }, {
-        "companyId" : "GT",
-        "percentage" : 10,
-        "isPresident" : false
-      }, {
-        "companyId" : "GT",
-        "percentage" : 10,
-        "isPresident" : false
-      }, {
-        "companyId" : "GT",
-        "percentage" : 10,
-        "isPresident" : false
-      }, {
-        "companyId" : "GT",
-        "percentage" : 10,
-        "isPresident" : false
-      }, {
-        "companyId" : "GT",
-        "percentage" : 10,
-        "isPresident" : false
-      }, {
-        "companyId" : "GT",
-        "percentage" : 10,
-        "isPresident" : false
-      }, {
-        "companyId" : "GT",
         "percentage" : 10,
         "isPresident" : false
       }, {
@@ -283,95 +483,11 @@
         "percentage" : 10,
         "isPresident" : false
       }, {
-        "companyId" : "KK",
-        "percentage" : 10,
-        "isPresident" : false
-      }, {
-        "companyId" : "KK",
-        "percentage" : 10,
-        "isPresident" : false
-      }, {
-        "companyId" : "KK",
-        "percentage" : 10,
-        "isPresident" : false
-      }, {
-        "companyId" : "KK",
-        "percentage" : 10,
-        "isPresident" : false
-      }, {
-        "companyId" : "KK",
-        "percentage" : 10,
-        "isPresident" : false
-      }, {
-        "companyId" : "KK",
-        "percentage" : 10,
-        "isPresident" : false
-      }, {
-        "companyId" : "KK",
-        "percentage" : 10,
-        "isPresident" : false
-      }, {
-        "companyId" : "MS",
-        "percentage" : 20,
-        "isPresident" : true
-      }, {
         "companyId" : "MS",
         "percentage" : 10,
         "isPresident" : false
       }, {
         "companyId" : "MS",
-        "percentage" : 10,
-        "isPresident" : false
-      }, {
-        "companyId" : "MS",
-        "percentage" : 10,
-        "isPresident" : false
-      }, {
-        "companyId" : "MS",
-        "percentage" : 10,
-        "isPresident" : false
-      }, {
-        "companyId" : "MS",
-        "percentage" : 10,
-        "isPresident" : false
-      }, {
-        "companyId" : "MS",
-        "percentage" : 10,
-        "isPresident" : false
-      }, {
-        "companyId" : "MS",
-        "percentage" : 10,
-        "isPresident" : false
-      }, {
-        "companyId" : "MS",
-        "percentage" : 10,
-        "isPresident" : false
-      }, {
-        "companyId" : "SB",
-        "percentage" : 20,
-        "isPresident" : true
-      }, {
-        "companyId" : "SB",
-        "percentage" : 10,
-        "isPresident" : false
-      }, {
-        "companyId" : "SB",
-        "percentage" : 10,
-        "isPresident" : false
-      }, {
-        "companyId" : "SB",
-        "percentage" : 10,
-        "isPresident" : false
-      }, {
-        "companyId" : "SB",
-        "percentage" : 10,
-        "isPresident" : false
-      }, {
-        "companyId" : "SB",
-        "percentage" : 10,
-        "isPresident" : false
-      }, {
-        "companyId" : "SB",
         "percentage" : 10,
         "isPresident" : false
       }, {
@@ -400,54 +516,6 @@
         "isPresident" : false
       }, {
         "companyId" : "Sd",
-        "percentage" : 10,
-        "isPresident" : false
-      }, {
-        "companyId" : "Sd",
-        "percentage" : 10,
-        "isPresident" : false
-      }, {
-        "companyId" : "Sd",
-        "percentage" : 10,
-        "isPresident" : false
-      }, {
-        "companyId" : "Sd",
-        "percentage" : 10,
-        "isPresident" : false
-      }, {
-        "companyId" : "Sd",
-        "percentage" : 10,
-        "isPresident" : false
-      }, {
-        "companyId" : "Sd",
-        "percentage" : 10,
-        "isPresident" : false
-      }, {
-        "companyId" : "TH",
-        "percentage" : 20,
-        "isPresident" : true
-      }, {
-        "companyId" : "TH",
-        "percentage" : 10,
-        "isPresident" : false
-      }, {
-        "companyId" : "TH",
-        "percentage" : 10,
-        "isPresident" : false
-      }, {
-        "companyId" : "TH",
-        "percentage" : 10,
-        "isPresident" : false
-      }, {
-        "companyId" : "TH",
-        "percentage" : 10,
-        "isPresident" : false
-      }, {
-        "companyId" : "TH",
-        "percentage" : 10,
-        "isPresident" : false
-      }, {
-        "companyId" : "TH",
         "percentage" : 10,
         "isPresident" : false
       }, {
@@ -462,26 +530,6 @@
         "companyId" : "Ug",
         "percentage" : 10,
         "isPresident" : true
-      }, {
-        "companyId" : "Ug",
-        "percentage" : 10,
-        "isPresident" : false
-      }, {
-        "companyId" : "Ug",
-        "percentage" : 10,
-        "isPresident" : false
-      }, {
-        "companyId" : "Ug",
-        "percentage" : 10,
-        "isPresident" : false
-      }, {
-        "companyId" : "Ug",
-        "percentage" : 10,
-        "isPresident" : false
-      }, {
-        "companyId" : "Ug",
-        "percentage" : 10,
-        "isPresident" : false
       }, {
         "companyId" : "Ug",
         "percentage" : 10,
@@ -531,8 +579,8 @@
       "tokens" : [ ]
     }, {
       "id" : "B10",
-      "tileId" : "0",
-      "rotationName" : "SW",
+      "tileId" : "8",
+      "rotationName" : "NE",
       "tokens" : [ ]
     }, {
       "id" : "B12",
@@ -586,10 +634,13 @@
       "id" : "C11",
       "tileId" : "-37402",
       "rotationName" : "SW",
-      "tokens" : [ ]
+      "tokens" : [ {
+        "companyId" : "BK",
+        "stationIndex" : 1
+      } ]
     }, {
       "id" : "C13",
-      "tileId" : "0",
+      "tileId" : "7",
       "rotationName" : "SW",
       "tokens" : [ ]
     }, {
@@ -620,8 +671,8 @@
       } ]
     }, {
       "id" : "C23",
-      "tileId" : "-37007",
-      "rotationName" : "SW",
+      "tileId" : "401",
+      "rotationName" : "W",
       "tokens" : [ ]
     }, {
       "id" : "C25",
@@ -645,8 +696,8 @@
       "tokens" : [ ]
     }, {
       "id" : "C33",
-      "tileId" : "-3007",
-      "rotationName" : "SW",
+      "tileId" : "201",
+      "rotationName" : "W",
       "tokens" : [ ]
     }, {
       "id" : "C35",
@@ -660,8 +711,8 @@
       "tokens" : [ ]
     }, {
       "id" : "D12",
-      "tileId" : "0",
-      "rotationName" : "SW",
+      "tileId" : "7",
+      "rotationName" : "W",
       "tokens" : [ ]
     }, {
       "id" : "D14",
@@ -670,8 +721,8 @@
       "tokens" : [ ]
     }, {
       "id" : "D16",
-      "tileId" : "0",
-      "rotationName" : "SW",
+      "tileId" : "7",
+      "rotationName" : "NE",
       "tokens" : [ ]
     }, {
       "id" : "D18",
@@ -690,8 +741,8 @@
       "tokens" : [ ]
     }, {
       "id" : "D24",
-      "tileId" : "0",
-      "rotationName" : "SW",
+      "tileId" : "7",
+      "rotationName" : "W",
       "tokens" : [ ]
     }, {
       "id" : "D26",
@@ -710,8 +761,8 @@
       "tokens" : [ ]
     }, {
       "id" : "D32",
-      "tileId" : "0",
-      "rotationName" : "SW",
+      "tileId" : "7",
+      "rotationName" : "NW",
       "tokens" : [ ]
     }, {
       "id" : "D34",
@@ -743,14 +794,17 @@
       "tokens" : [ ]
     }, {
       "id" : "E15",
-      "tileId" : "-1",
-      "rotationName" : "SW",
+      "tileId" : "3",
+      "rotationName" : "E",
       "tokens" : [ ]
     }, {
       "id" : "E17",
       "tileId" : "402",
       "rotationName" : "SW",
-      "tokens" : [ ]
+      "tokens" : [ {
+        "companyId" : "MS",
+        "stationIndex" : 1
+      } ]
     }, {
       "id" : "E19",
       "tileId" : "0",
@@ -778,8 +832,8 @@
       "tokens" : [ ]
     }, {
       "id" : "E29",
-      "tileId" : "0",
-      "rotationName" : "SW",
+      "tileId" : "9",
+      "rotationName" : "NE",
       "tokens" : [ ]
     }, {
       "id" : "E31",
@@ -833,7 +887,7 @@
       "tokens" : [ ]
     }, {
       "id" : "F24",
-      "tileId" : "0",
+      "tileId" : "7",
       "rotationName" : "SW",
       "tokens" : [ ]
     }, {
@@ -886,7 +940,7 @@
       "tokens" : [ ]
     }, {
       "id" : "G13",
-      "tileId" : "-20",
+      "tileId" : "404",
       "rotationName" : "SW",
       "tokens" : [ ]
     }, {
@@ -923,7 +977,7 @@
       "tokens" : [ ]
     }, {
       "id" : "G23",
-      "tileId" : "-1",
+      "tileId" : "4",
       "rotationName" : "SW",
       "tokens" : [ ]
     }, {
@@ -1049,8 +1103,8 @@
       "tokens" : [ ]
     }, {
       "id" : "I5",
-      "tileId" : "0",
-      "rotationName" : "SW",
+      "tileId" : "9",
+      "rotationName" : "E",
       "tokens" : [ ]
     }, {
       "id" : "I7",
@@ -1077,18 +1131,18 @@
       "tokens" : [ ]
     }, {
       "id" : "I15",
-      "tileId" : "-10",
-      "rotationName" : "SW",
+      "tileId" : "5",
+      "rotationName" : "SE",
       "tokens" : [ ]
     }, {
       "id" : "I17",
-      "tileId" : "0",
-      "rotationName" : "SW",
+      "tileId" : "7",
+      "rotationName" : "W",
       "tokens" : [ ]
     }, {
       "id" : "I19",
-      "tileId" : "0",
-      "rotationName" : "SW",
+      "tileId" : "8",
+      "rotationName" : "SE",
       "tokens" : [ ]
     }, {
       "id" : "I21",
@@ -1097,18 +1151,18 @@
       "tokens" : [ ]
     }, {
       "id" : "I23",
-      "tileId" : "-2",
-      "rotationName" : "SW",
+      "tileId" : "56",
+      "rotationName" : "E",
       "tokens" : [ ]
     }, {
       "id" : "I25",
-      "tileId" : "0",
-      "rotationName" : "SW",
+      "tileId" : "9",
+      "rotationName" : "E",
       "tokens" : [ ]
     }, {
       "id" : "I27",
-      "tileId" : "-1",
-      "rotationName" : "SW",
+      "tileId" : "4",
+      "rotationName" : "NW",
       "tokens" : [ ]
     }, {
       "id" : "I29",
@@ -1122,13 +1176,13 @@
       "tokens" : [ ]
     }, {
       "id" : "I33",
-      "tileId" : "-1",
-      "rotationName" : "SW",
+      "tileId" : "58",
+      "rotationName" : "NE",
       "tokens" : [ ]
     }, {
       "id" : "I35",
-      "tileId" : "0",
-      "rotationName" : "W",
+      "tileId" : "7",
+      "rotationName" : "SE",
       "tokens" : [ ]
     }, {
       "id" : "I37",
@@ -1142,7 +1196,7 @@
       "tokens" : [ ]
     }, {
       "id" : "J6",
-      "tileId" : "0",
+      "tileId" : "9",
       "rotationName" : "SW",
       "tokens" : [ ]
     }, {
@@ -1200,7 +1254,7 @@
       "tokens" : [ ]
     }, {
       "id" : "J28",
-      "tileId" : "-20",
+      "tileId" : "404",
       "rotationName" : "SW",
       "tokens" : [ ]
     }, {
@@ -1299,8 +1353,8 @@
       "tokens" : [ ]
     }, {
       "id" : "K27",
-      "tileId" : "0",
-      "rotationName" : "SW",
+      "tileId" : "9",
+      "rotationName" : "E",
       "tokens" : [ ]
     }, {
       "id" : "K29",
@@ -1325,8 +1379,8 @@
       } ]
     }, {
       "id" : "L4",
-      "tileId" : "0",
-      "rotationName" : "SW",
+      "tileId" : "8",
+      "rotationName" : "W",
       "tokens" : [ ]
     }, {
       "id" : "L6",
@@ -1413,7 +1467,7 @@
       "tokens" : [ ]
     }, {
       "id" : "M15",
-      "tileId" : "0",
+      "tileId" : "7",
       "rotationName" : "SW",
       "tokens" : [ ]
     }, {
@@ -1438,8 +1492,8 @@
       "tokens" : [ ]
     }, {
       "id" : "N16",
-      "tileId" : "0",
-      "rotationName" : "SW",
+      "tileId" : "8",
+      "rotationName" : "SE",
       "tokens" : [ ]
     }, {
       "id" : "N18",
@@ -1674,7 +1728,7 @@
   }, {
     "id" : "2_7",
     "name" : "2",
-    "ownerId" : "IPO",
+    "ownerId" : "U1",
     "obsolete" : false
   }, {
     "id" : "2_8",
@@ -1767,9 +1821,25 @@
   },
   "players" : [ {
     "id" : "Rainer",
-    "cash" : 90,
-    "fullName" : "Rainer Kluge",
+    "cash" : 420,
+    "fullName" : "Rainer",
     "certificates" : [ {
+      "companyId" : "BK",
+      "percentage" : 20,
+      "isPresident" : true
+    }, {
+      "companyId" : "BK",
+      "percentage" : 10,
+      "isPresident" : false
+    }, {
+      "companyId" : "BK",
+      "percentage" : 10,
+      "isPresident" : false
+    }, {
+      "companyId" : "BK",
+      "percentage" : 10,
+      "isPresident" : false
+    }, {
       "companyId" : "EKT",
       "percentage" : 100,
       "isPresident" : true
@@ -1798,18 +1868,54 @@
       "percentage" : 100,
       "isPresident" : true
     }, {
+      "companyId" : "U1",
+      "percentage" : 50,
+      "isPresident" : false
+    }, {
       "companyId" : "U2",
       "percentage" : 100,
       "isPresident" : true
+    }, {
+      "companyId" : "Ug",
+      "percentage" : 10,
+      "isPresident" : false
+    }, {
+      "companyId" : "Ug",
+      "percentage" : 10,
+      "isPresident" : false
+    }, {
+      "companyId" : "Ug",
+      "percentage" : 10,
+      "isPresident" : false
     } ],
     "privateCompanyIds" : [ "KB" ],
-    "timeBankSeconds" : -141,
+    "timeBankSeconds" : 256,
     "soldCompanyIdsThisRound" : [ ]
   }, {
     "id" : "Stefan",
-    "cash" : 135,
-    "fullName" : "Stefan Bleeck",
+    "cash" : 677,
+    "fullName" : "Stefan",
     "certificates" : [ {
+      "companyId" : "KK",
+      "percentage" : 10,
+      "isPresident" : false
+    }, {
+      "companyId" : "MS",
+      "percentage" : 20,
+      "isPresident" : true
+    }, {
+      "companyId" : "MS",
+      "percentage" : 10,
+      "isPresident" : false
+    }, {
+      "companyId" : "MS",
+      "percentage" : 10,
+      "isPresident" : false
+    }, {
+      "companyId" : "MS",
+      "percentage" : 10,
+      "isPresident" : false
+    }, {
       "companyId" : "RGTE",
       "percentage" : 100,
       "isPresident" : true
@@ -1830,17 +1936,21 @@
       "percentage" : 100,
       "isPresident" : true
     }, {
+      "companyId" : "U3",
+      "percentage" : 50,
+      "isPresident" : false
+    }, {
       "companyId" : "ZKB",
       "percentage" : 100,
       "isPresident" : true
     } ],
     "privateCompanyIds" : [ "AB", "BrB", "KwB", "SmB" ],
-    "timeBankSeconds" : 164,
+    "timeBankSeconds" : 219,
     "soldCompanyIdsThisRound" : [ ]
   }, {
     "id" : "Marc",
-    "cash" : 140,
-    "fullName" : "Marc Arndt",
+    "cash" : 1084,
+    "fullName" : "Marc",
     "certificates" : [ {
       "companyId" : "BB",
       "percentage" : 100,
@@ -1869,14 +1979,22 @@
       "companyId" : "U3",
       "percentage" : 50,
       "isPresident" : true
+    }, {
+      "companyId" : "Ug",
+      "percentage" : 10,
+      "isPresident" : false
+    }, {
+      "companyId" : "Ug",
+      "percentage" : 10,
+      "isPresident" : false
     } ],
     "privateCompanyIds" : [ "TB", "WB" ],
-    "timeBankSeconds" : 50,
+    "timeBankSeconds" : 204,
     "soldCompanyIdsThisRound" : [ ]
   } ],
   "publicCompanies" : [ {
     "id" : "EPP",
-    "cash" : 0,
+    "cash" : 50,
     "presidentId" : "Rainer",
     "hasFloated" : true,
     "closed" : false,
@@ -1888,14 +2006,14 @@
     "totalTokens" : 1,
     "hasOperated" : true,
     "bankLoan" : 0,
-    "lastRevenue" : 0,
-    "lastDividend" : 0,
-    "lastRevenueAllocation" : "No train",
-    "lastDirectIncome" : 0,
+    "lastRevenue" : 30,
+    "lastDividend" : 10,
+    "lastRevenueAllocation" : "Split",
+    "lastDirectIncome" : 20,
     "directIncomeRevenue" : 0
   }, {
     "id" : "RGTE",
-    "cash" : 0,
+    "cash" : 105,
     "presidentId" : "Stefan",
     "hasFloated" : true,
     "closed" : false,
@@ -1907,14 +2025,14 @@
     "totalTokens" : 1,
     "hasOperated" : true,
     "bankLoan" : 0,
-    "lastRevenue" : 0,
-    "lastDividend" : 0,
-    "lastRevenueAllocation" : "No train",
-    "lastDirectIncome" : 0,
+    "lastRevenue" : 60,
+    "lastDividend" : 30,
+    "lastRevenueAllocation" : "Withhold",
+    "lastDirectIncome" : 30,
     "directIncomeRevenue" : 0
   }, {
     "id" : "EOD",
-    "cash" : 0,
+    "cash" : 50,
     "presidentId" : "Rainer",
     "hasFloated" : true,
     "closed" : false,
@@ -1926,14 +2044,14 @@
     "totalTokens" : 1,
     "hasOperated" : true,
     "bankLoan" : 0,
-    "lastRevenue" : 0,
-    "lastDividend" : 0,
-    "lastRevenueAllocation" : "No train",
-    "lastDirectIncome" : 0,
+    "lastRevenue" : 30,
+    "lastDividend" : 10,
+    "lastRevenueAllocation" : "Split",
+    "lastDirectIncome" : 20,
     "directIncomeRevenue" : 0
   }, {
     "id" : "EKT",
-    "cash" : 0,
+    "cash" : 90,
     "presidentId" : "Rainer",
     "hasFloated" : true,
     "closed" : false,
@@ -1945,14 +2063,14 @@
     "totalTokens" : 1,
     "hasOperated" : true,
     "bankLoan" : 0,
-    "lastRevenue" : 0,
-    "lastDividend" : 0,
-    "lastRevenueAllocation" : "No train",
-    "lastDirectIncome" : 0,
+    "lastRevenue" : 65,
+    "lastDividend" : 40,
+    "lastRevenueAllocation" : "Split",
+    "lastDirectIncome" : 25,
     "directIncomeRevenue" : 0
   }, {
     "id" : "MLB",
-    "cash" : 0,
+    "cash" : 85,
     "presidentId" : "Marc",
     "hasFloated" : true,
     "closed" : false,
@@ -1964,14 +2082,14 @@
     "totalTokens" : 1,
     "hasOperated" : true,
     "bankLoan" : 0,
-    "lastRevenue" : 0,
-    "lastDividend" : 0,
-    "lastRevenueAllocation" : "No train",
-    "lastDirectIncome" : 0,
+    "lastRevenue" : 70,
+    "lastDividend" : 50,
+    "lastRevenueAllocation" : "Split",
+    "lastDirectIncome" : 20,
     "directIncomeRevenue" : 0
   }, {
     "id" : "ZKB",
-    "cash" : 0,
+    "cash" : 95,
     "presidentId" : "Stefan",
     "hasFloated" : true,
     "closed" : false,
@@ -1983,14 +2101,14 @@
     "totalTokens" : 1,
     "hasOperated" : true,
     "bankLoan" : 0,
-    "lastRevenue" : 0,
-    "lastDividend" : 0,
-    "lastRevenueAllocation" : "No train",
-    "lastDirectIncome" : 0,
+    "lastRevenue" : 75,
+    "lastDividend" : 50,
+    "lastRevenueAllocation" : "Split",
+    "lastDirectIncome" : 25,
     "directIncomeRevenue" : 0
   }, {
     "id" : "SPB",
-    "cash" : 0,
+    "cash" : 85,
     "presidentId" : "Marc",
     "hasFloated" : true,
     "closed" : false,
@@ -2002,14 +2120,14 @@
     "totalTokens" : 1,
     "hasOperated" : true,
     "bankLoan" : 0,
-    "lastRevenue" : 0,
-    "lastDividend" : 0,
-    "lastRevenueAllocation" : "No train",
-    "lastDirectIncome" : 0,
+    "lastRevenue" : 60,
+    "lastDividend" : 30,
+    "lastRevenueAllocation" : "Split",
+    "lastDirectIncome" : 30,
     "directIncomeRevenue" : 0
   }, {
     "id" : "LRB",
-    "cash" : 0,
+    "cash" : 60,
     "presidentId" : "Rainer",
     "hasFloated" : true,
     "closed" : false,
@@ -2021,14 +2139,14 @@
     "totalTokens" : 1,
     "hasOperated" : true,
     "bankLoan" : 0,
-    "lastRevenue" : 0,
-    "lastDividend" : 0,
-    "lastRevenueAllocation" : "No train",
-    "lastDirectIncome" : 0,
+    "lastRevenue" : 35,
+    "lastDividend" : 10,
+    "lastRevenueAllocation" : "Split",
+    "lastDirectIncome" : 25,
     "directIncomeRevenue" : 0
   }, {
     "id" : "BB",
-    "cash" : 0,
+    "cash" : 95,
     "presidentId" : "Marc",
     "hasFloated" : true,
     "closed" : false,
@@ -2040,14 +2158,14 @@
     "totalTokens" : 1,
     "hasOperated" : true,
     "bankLoan" : 0,
-    "lastRevenue" : 0,
-    "lastDividend" : 0,
-    "lastRevenueAllocation" : "No train",
-    "lastDirectIncome" : 0,
+    "lastRevenue" : 65,
+    "lastDividend" : 30,
+    "lastRevenueAllocation" : "Split",
+    "lastDirectIncome" : 35,
     "directIncomeRevenue" : 0
   }, {
     "id" : "EHS",
-    "cash" : 0,
+    "cash" : 70,
     "presidentId" : "Marc",
     "hasFloated" : true,
     "closed" : false,
@@ -2059,14 +2177,14 @@
     "totalTokens" : 1,
     "hasOperated" : true,
     "bankLoan" : 0,
-    "lastRevenue" : 0,
-    "lastDividend" : 0,
-    "lastRevenueAllocation" : "No train",
-    "lastDirectIncome" : 0,
+    "lastRevenue" : 50,
+    "lastDividend" : 30,
+    "lastRevenueAllocation" : "Split",
+    "lastDirectIncome" : 20,
     "directIncomeRevenue" : 0
   }, {
     "id" : "S1",
-    "cash" : 0,
+    "cash" : 60,
     "presidentId" : "Stefan",
     "hasFloated" : true,
     "closed" : false,
@@ -2078,9 +2196,9 @@
     "totalTokens" : 1,
     "hasOperated" : true,
     "bankLoan" : 0,
-    "lastRevenue" : 0,
-    "lastDividend" : 0,
-    "lastRevenueAllocation" : "No train",
+    "lastRevenue" : 60,
+    "lastDividend" : 60,
+    "lastRevenueAllocation" : "Split",
     "lastDirectIncome" : 0,
     "directIncomeRevenue" : 0
   }, {
@@ -2099,12 +2217,12 @@
     "bankLoan" : 0,
     "lastRevenue" : 0,
     "lastDividend" : 0,
-    "lastRevenueAllocation" : "No train",
+    "lastRevenueAllocation" : "Withhold",
     "lastDirectIncome" : 0,
     "directIncomeRevenue" : 0
   }, {
     "id" : "S3",
-    "cash" : 0,
+    "cash" : 75,
     "presidentId" : "Stefan",
     "hasFloated" : true,
     "closed" : false,
@@ -2116,14 +2234,14 @@
     "totalTokens" : 1,
     "hasOperated" : true,
     "bankLoan" : 0,
-    "lastRevenue" : 0,
-    "lastDividend" : 0,
-    "lastRevenueAllocation" : "No train",
+    "lastRevenue" : 50,
+    "lastDividend" : 50,
+    "lastRevenueAllocation" : "Withhold",
     "lastDirectIncome" : 0,
     "directIncomeRevenue" : 0
   }, {
     "id" : "S4",
-    "cash" : 0,
+    "cash" : 50,
     "presidentId" : "Stefan",
     "hasFloated" : true,
     "closed" : false,
@@ -2135,14 +2253,14 @@
     "totalTokens" : 1,
     "hasOperated" : true,
     "bankLoan" : 0,
-    "lastRevenue" : 0,
-    "lastDividend" : 0,
-    "lastRevenueAllocation" : "No train",
+    "lastRevenue" : 50,
+    "lastDividend" : 50,
+    "lastRevenueAllocation" : "Split",
     "lastDirectIncome" : 0,
     "directIncomeRevenue" : 0
   }, {
     "id" : "S5",
-    "cash" : 0,
+    "cash" : 50,
     "presidentId" : "Rainer",
     "hasFloated" : true,
     "closed" : false,
@@ -2154,14 +2272,14 @@
     "totalTokens" : 1,
     "hasOperated" : true,
     "bankLoan" : 0,
-    "lastRevenue" : 0,
-    "lastDividend" : 0,
-    "lastRevenueAllocation" : "No train",
+    "lastRevenue" : 50,
+    "lastDividend" : 50,
+    "lastRevenueAllocation" : "Split",
     "lastDirectIncome" : 0,
     "directIncomeRevenue" : 0
   }, {
     "id" : "K1",
-    "cash" : 0,
+    "cash" : 50,
     "presidentId" : "Rainer",
     "hasFloated" : true,
     "closed" : false,
@@ -2173,14 +2291,14 @@
     "totalTokens" : 1,
     "hasOperated" : true,
     "bankLoan" : 0,
-    "lastRevenue" : 0,
-    "lastDividend" : 0,
-    "lastRevenueAllocation" : "No train",
+    "lastRevenue" : 50,
+    "lastDividend" : 50,
+    "lastRevenueAllocation" : "Split",
     "lastDirectIncome" : 0,
     "directIncomeRevenue" : 0
   }, {
     "id" : "K2",
-    "cash" : 0,
+    "cash" : 60,
     "presidentId" : "Rainer",
     "hasFloated" : true,
     "closed" : false,
@@ -2192,14 +2310,14 @@
     "totalTokens" : 1,
     "hasOperated" : true,
     "bankLoan" : 0,
-    "lastRevenue" : 0,
-    "lastDividend" : 0,
-    "lastRevenueAllocation" : "No train",
+    "lastRevenue" : 60,
+    "lastDividend" : 60,
+    "lastRevenueAllocation" : "Split",
     "lastDirectIncome" : 0,
     "directIncomeRevenue" : 0
   }, {
     "id" : "K3",
-    "cash" : 0,
+    "cash" : 50,
     "presidentId" : "Marc",
     "hasFloated" : true,
     "closed" : false,
@@ -2211,14 +2329,14 @@
     "totalTokens" : 1,
     "hasOperated" : true,
     "bankLoan" : 0,
-    "lastRevenue" : 0,
-    "lastDividend" : 0,
-    "lastRevenueAllocation" : "No train",
+    "lastRevenue" : 50,
+    "lastDividend" : 50,
+    "lastRevenueAllocation" : "Split",
     "lastDirectIncome" : 0,
     "directIncomeRevenue" : 0
   }, {
     "id" : "U1",
-    "cash" : 90,
+    "cash" : 10,
     "presidentId" : "Marc",
     "hasFloated" : true,
     "closed" : false,
@@ -2230,14 +2348,14 @@
     "totalTokens" : 1,
     "hasOperated" : true,
     "bankLoan" : 0,
-    "lastRevenue" : 0,
-    "lastDividend" : 0,
-    "lastRevenueAllocation" : "No train",
+    "lastRevenue" : 60,
+    "lastDividend" : 60,
+    "lastRevenueAllocation" : "Split",
     "lastDirectIncome" : 0,
     "directIncomeRevenue" : 0
   }, {
     "id" : "U2",
-    "cash" : 0,
+    "cash" : 40,
     "presidentId" : "Rainer",
     "hasFloated" : true,
     "closed" : false,
@@ -2249,14 +2367,14 @@
     "totalTokens" : 1,
     "hasOperated" : true,
     "bankLoan" : 0,
-    "lastRevenue" : 0,
-    "lastDividend" : 0,
-    "lastRevenueAllocation" : "No train",
+    "lastRevenue" : 40,
+    "lastDividend" : 40,
+    "lastRevenueAllocation" : "Split",
     "lastDirectIncome" : 0,
     "directIncomeRevenue" : 0
   }, {
     "id" : "U3",
-    "cash" : 90,
+    "cash" : 40,
     "presidentId" : "Marc",
     "hasFloated" : true,
     "closed" : false,
@@ -2268,9 +2386,9 @@
     "totalTokens" : 1,
     "hasOperated" : true,
     "bankLoan" : 0,
-    "lastRevenue" : 0,
-    "lastDividend" : 0,
-    "lastRevenueAllocation" : "No train",
+    "lastRevenue" : 50,
+    "lastDividend" : 50,
+    "lastRevenueAllocation" : "Split",
     "lastDirectIncome" : 0,
     "directIncomeRevenue" : 0
   }, {
@@ -2294,15 +2412,15 @@
     "directIncomeRevenue" : 0
   }, {
     "id" : "BK",
-    "cash" : 0,
-    "presidentId" : null,
-    "hasFloated" : false,
+    "cash" : 560,
+    "presidentId" : "Rainer",
+    "hasFloated" : true,
     "closed" : false,
     "treasuryCertificates" : [ ],
-    "stockPrice" : 0,
-    "stockRow" : 0,
-    "stockCol" : 0,
-    "stockStackIndex" : -1,
+    "stockPrice" : 70,
+    "stockRow" : 6,
+    "stockCol" : 2,
+    "stockStackIndex" : 0,
     "totalTokens" : 3,
     "hasOperated" : false,
     "bankLoan" : 0,
@@ -2351,15 +2469,15 @@
     "directIncomeRevenue" : 0
   }, {
     "id" : "MS",
-    "cash" : 0,
-    "presidentId" : null,
-    "hasFloated" : false,
+    "cash" : 832,
+    "presidentId" : "Stefan",
+    "hasFloated" : true,
     "closed" : false,
     "treasuryCertificates" : [ ],
-    "stockPrice" : 0,
+    "stockPrice" : 104,
     "stockRow" : 0,
-    "stockCol" : 0,
-    "stockStackIndex" : -1,
+    "stockCol" : 2,
+    "stockStackIndex" : 0,
     "totalTokens" : 3,
     "hasOperated" : false,
     "bankLoan" : 0,
@@ -2501,7 +2619,7 @@
     "closed" : false,
     "specialProperties" : [ {
       "id" : "SpecialProperty_4",
-      "exercised" : false,
+      "exercised" : true,
       "occurred" : 0
     } ]
   }, {
