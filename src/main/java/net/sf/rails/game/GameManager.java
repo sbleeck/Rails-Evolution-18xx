@@ -1038,7 +1038,7 @@ public class GameManager extends RailsManager implements Configurable, Owner {
         showCompositeORNumber = !"simple".equalsIgnoreCase(Config.get("or.number_format"));
     }
 
-public void startGame() {
+    public void startGame() {
         setGuiParameters();
         getRoot().getCompanyManager().initStartPackets(this);
 
@@ -1349,7 +1349,6 @@ public void startGame() {
             // 2. Call Configure.create with the specific CLASS object,
             // not the abstract StartRound.class
             round = Configure.create((Class<T>) roundClass, GameManager.class, this, id);
-
 
         } catch (Exception e) {
             log.error("CRITICAL: Failed to create round " + roundClassName, e);
@@ -1892,14 +1891,17 @@ public void startGame() {
                 if (ca instanceof rails.game.correct.MapCorrectionAction) {
                     shouldFlush = true;
                 } else if (ca.getClass().getSimpleName().equals("CorrectionModeAction")) {
-                    try {
-                        java.lang.reflect.Method isActiveMethod = ca.getClass().getMethod("isActive");
-                        Boolean isActive = (Boolean) isActiveMethod.invoke(ca);
-                        if (!isActive) {
+                    if (ct != CorrectionType.CORRECT_CASH && ct != CorrectionType.CORRECT_TRAINS) {
+                        try {
+                            java.lang.reflect.Method isActiveMethod = ca.getClass().getMethod("isActive");
+                            Boolean isActive = (Boolean) isActiveMethod.invoke(ca);
+                            if (!isActive) {
+                                shouldFlush = true;
+                            }
+                        } catch (Exception e) {
                             shouldFlush = true;
+
                         }
-                    } catch (Exception e) {
-                        shouldFlush = true;
                     }
                 }
 
@@ -2045,7 +2047,7 @@ public void startGame() {
      * recoverySave method
      * Uses filePath defined in save.recovery.filepath
      */
-protected void recoverySave() {
+    protected void recoverySave() {
         if (Config.get("save.recovery.active", "yes").equalsIgnoreCase("no"))
             return;
 
@@ -2062,7 +2064,8 @@ protected void recoverySave() {
         } else {
             baseDir = new File("autosave");
         }
-        if (baseDir == null) baseDir = new File(".");
+        if (baseDir == null)
+            baseDir = new File(".");
 
         // Create game-specific subfolder (e.g., autosave/1817)
         File dir = new File(baseDir, getGameName());
@@ -2070,9 +2073,11 @@ protected void recoverySave() {
             dir.mkdirs();
         }
 
-        // Filename uses the session timestamp to group saves from the exact same play session
+        // Filename uses the session timestamp to group saves from the exact same play
+        // session
         String dateStr = new java.text.SimpleDateFormat("yyyyMMdd_HHmmss").format(new java.util.Date());
-        String filename = String.format("%s_%s_%05d.rails", getGameName(), this.sessionStartTimestamp, actionCount.value());
+        String filename = String.format("%s_%s_%05d.rails", getGameName(), this.sessionStartTimestamp,
+                actionCount.value());
         File saveFile = new File(dir, filename);
 
         GameSaver gameSaver = new GameSaver(getRoot().getGameData(), executedActions.view());
@@ -2086,10 +2091,10 @@ protected void recoverySave() {
             // Delete old autosave files ONLY for THIS SPECIFIC session within the subfolder
             final String sessionPrefix = getGameName() + "_" + this.sessionStartTimestamp + "_";
             File[] oldFiles = dir.listFiles(
-                    (d, name) -> name.startsWith(sessionPrefix) && 
-                    (name.endsWith(".rails") || name.endsWith(".json")) && 
-                    !name.equals(filename) && 
-                    !name.equals(filename + ".state.json"));
+                    (d, name) -> name.startsWith(sessionPrefix) &&
+                            (name.endsWith(".rails") || name.endsWith(".json")) &&
+                            !name.equals(filename) &&
+                            !name.equals(filename + ".state.json"));
 
             if (oldFiles != null) {
                 for (File f : oldFiles) {
@@ -2111,7 +2116,7 @@ protected void recoverySave() {
             }
         }
     }
-    
+
     protected boolean save(GameAction saveAction) {
         GameSaver gameSaver = new GameSaver(getRoot().getGameData(), executedActions.view());
         File file = new File(saveAction.getFilepath());
@@ -2492,7 +2497,7 @@ protected void recoverySave() {
         // House Rule: End game immediately instead of attempting player elimination
         String warningMsg = "Game Over by Bankruptcy (House Rule):\n" +
                 "Some games might eliminate the player and continue the game.\n" +
-                "However, this implementation ends the game here.\n" ;
+                "However, this implementation ends the game here.\n";
 
         ReportBuffer.add(this, warningMsg);
 
@@ -2669,8 +2674,9 @@ protected void recoverySave() {
                 }
 
                 // Prompt the user
-                // upload will go to https://docs.google.com/spreadsheets/d/1lXyCBjjLLzfeajpdS_PEqI3z4IGDIqj5gRAtiPpyqck/edit?pli=1&gid=0#gid=0
-                
+                // upload will go to
+                // https://docs.google.com/spreadsheets/d/1lXyCBjjLLzfeajpdS_PEqI3z4IGDIqj5gRAtiPpyqck/edit?pli=1&gid=0#gid=0
+
                 int dialogResult = javax.swing.JOptionPane.showConfirmDialog(null,
                         "Do you want to save and upload the final results?",
                         "Upload Results",
@@ -2712,7 +2718,6 @@ protected void recoverySave() {
         }
 
     }
-
 
     protected void capturePlayerWorthSnapshot(String roundId) {
         // Ensure the map is initialized and CLONED to trigger StateManager updates
@@ -2768,7 +2773,7 @@ protected void recoverySave() {
         playerAssetHistory.set(newAssetHistory);
 
     }
-    
+
     public LinkedHashMap<String, Map<String, PlayerAssetSnapshot>> getPlayerAssetHistory() {
         return playerAssetHistory.value();
     }
@@ -3515,7 +3520,8 @@ protected void recoverySave() {
         executedActions.add(action);
         updatePayoutTracker(action);
 
-       // Capture snapshots per move so the timeline slider works when loaded from a save
+        // Capture snapshots per move so the timeline slider works when loaded from a
+        // save
         String moveId = String.valueOf(getActionCountModel().value());
         capturePlayerWorthSnapshot(moveId);
         captureCompanyPayoutSnapshot(moveId);
@@ -3550,7 +3556,6 @@ protected void recoverySave() {
 
         return true;
     }
-
 
     public LinkedHashMap<String, Map<String, Integer>> getInstantaneousPayoutHistory() {
         return instantaneousPayoutHistory.value();

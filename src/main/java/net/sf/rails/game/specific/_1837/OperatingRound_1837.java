@@ -102,10 +102,21 @@ public class OperatingRound_1837 extends OperatingRound {
             }
         }
 
-        // Add the Skip/Pass Action
-        NullAction done = new NullAction(getRoot(), NullAction.Mode.DONE);
-        done.setLabel("Done / Keep Trains");
-        possibleActions.add(done);
+// Modify the existing NullAction (Done) rather than duplicating it
+        boolean foundDone = false;
+        for (PossibleAction pa : possibleActions.getList()) {
+            if (pa instanceof NullAction && ((NullAction) pa).getMode() == NullAction.Mode.DONE) {
+                ((NullAction) pa).setLabel("Done / Keep Trains");
+                foundDone = true;
+                break;
+            }
+        }
+        
+        if (!foundDone) {
+            NullAction done = new NullAction(getRoot(), NullAction.Mode.DONE);
+            done.setLabel("Done / Keep Trains");
+            possibleActions.add(done);
+        }
     }
 
     /**

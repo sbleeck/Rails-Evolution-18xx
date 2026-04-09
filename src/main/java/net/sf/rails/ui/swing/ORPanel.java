@@ -2824,9 +2824,9 @@ public class ORPanel extends GridPanel
                 for (PossibleAction spa : specialActions) {
                     addSpecialActionButton(spa);
                 }
-                if (deferredNullAction != null) {
-                    addSpecialActionButton(deferredNullAction);
-                }
+                // Suppress rendering of NullAction in the special panel to avoid duplication,
+                // as it is inherently bound to the global 'btnDone' (END TURN) button.
+
                 specialPanel.revalidate();
             } else if (specialContainer != null) {
                 specialContainer.setVisible(false);

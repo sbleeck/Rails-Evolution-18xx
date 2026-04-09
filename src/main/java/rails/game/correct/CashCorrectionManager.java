@@ -224,9 +224,9 @@ public class CashCorrectionManager extends CorrectionManager {
                         text);
             }
             ReportBuffer.add(this, msg);
-            getParent().addToNextPlayerMessages(msg, true);
+            DisplayBuffer.add(this, msg);
             result = true;
-            
+
             // Force UI Refresh
             if (getParent().getGameUIManager() != null) {
                 getParent().getGameUIManager().forceFullUIRefresh();
