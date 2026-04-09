@@ -1637,73 +1637,32 @@ public class GameStatus extends GridPanel {
             originalOrder.put(c, orderIndex++);
             if (c.isClosed())
                 continue;
-            boolean isActive = c.hasFloated() || (c.getPresidentsShare() != null
-                    && c.getPresidentsShare().getOwner() instanceof net.sf.rails.game.Player);
-            if (isStockRound || isActive) {
-                displayList.add(c);
-            } else {
-                inactiveList.add(c);
-            }
+            if (!isStockRound && !c.hasFloated() && c.getClass().getName().contains("1817"))
+                continue;
+
+            displayList.add(c);
         }
 
         // 2. Sort
         compNameCaption = new Caption[nc];
-        // Delegate sorting directly to the Engine's authoritative running order to
-        // prevent MVC desync.
-        final java.util.List<PublicCompany> engineOrder = gameUIManager.getGameManager().getCompaniesInRunningOrder();
+        java.util.Collections.sort(displayList, (c1, c2) -> {
+            boolean c1IsPR = "PR".equals(c1.getId());
+            boolean c2IsPR = "PR".equals(c2.getId());
 
-        StringBuilder orderLog = new StringBuilder();
-        if (engineOrder != null) {
-            for (PublicCompany comp : engineOrder) {
-                orderLog.append(comp.getId()).append(", ");
-            }
-        }
+            int p1 = c1.getCurrentSpace() != null ? c1.getCurrentSpace().getPrice()
+                    : (c1.getStartSpace() != null ? c1.getStartSpace().getPrice() : 0);
+            int p2 = c2.getCurrentSpace() != null ? c2.getCurrentSpace().getPrice()
+                    : (c2.getStartSpace() != null ? c2.getStartSpace().getPrice() : 0);
 
-        java.util.List<PublicCompany> minorsList = new java.util.ArrayList<>();
-        java.util.List<PublicCompany> majorsList = new java.util.ArrayList<>();
+            boolean c1Minor = c1IsPR ? (p1 == 0) : !c1.hasStockPrice();
+            boolean c2Minor = c2IsPR ? (p2 == 0) : !c2.hasStockPrice();
 
-        for (PublicCompany c : displayList) {
-            if (!c.hasStockPrice()) {
-                minorsList.add(c);
-            } else {
-                majorsList.add(c);
-            }
-        }
-
-        // Minors maintain static creation order
-        java.util.Collections.sort(minorsList, (c1, c2) -> Integer.compare(c1.getPublicNumber(), c2.getPublicNumber()));
-
-        // Majors strictly follow the engine's authoritative order
-        java.util.Collections.sort(majorsList, (c1, c2) -> {
-            int idx1 = engineOrder != null ? engineOrder.indexOf(c1) : -1;
-            int idx2 = engineOrder != null ? engineOrder.indexOf(c2) : -1;
-
-            if (idx1 >= 0 && idx2 >= 0)
-                return Integer.compare(idx1, idx2);
-            if (idx1 >= 0)
-                return -1;
-            if (idx2 >= 0)
-                return 1;
+            if (c1Minor && !c2Minor) return -1;
+            if (!c1Minor && c2Minor) return 1;
+            if (c1Minor) return Integer.compare(c1.getPublicNumber(), c2.getPublicNumber());
+            if (p1 != p2) return Integer.compare(p2, p1);
             return Integer.compare(c1.getPublicNumber(), c2.getPublicNumber());
         });
-
-        displayList.clear();
-        displayList.addAll(minorsList);
-        displayList.addAll(majorsList);
-
-        // Append Padding (Inactive) Companies to the BOTTOM
-        if (!isStockRound && displayList.size() < 10) {
-            java.util.List<PublicCompany> inactivePool = new java.util.ArrayList<>();
-            for (PublicCompany c : allCompanies) {
-                if (c.isClosed() || displayList.contains(c))
-                    continue;
-                inactivePool.add(c);
-            }
-            int needed = 10 - displayList.size();
-            for (int i = 0; i < Math.min(needed, inactivePool.size()); i++) {
-                displayList.add(inactivePool.get(i));
-            }
-        }
 
         // 3. Build Signature
         java.util.List<String> currentSignature = new java.util.ArrayList<>();
@@ -2577,7 +2536,8 @@ public class GameStatus extends GridPanel {
                 if (lbl != null) {
                     String qtyStr = tct.hasInfiniteQuantity() ? "\u221E" : "(" + count + ")";
                     lbl.setText("<html><center>" + qtyStr + "<br>" +
-                            "<font face='" + FONT_FAMILY_CURRENCY + "' color='#000080'><b>" + gameUIManager.format(cost) + "</b></font>" +
+                            "<font face='" + FONT_FAMILY_CURRENCY + "' color='#000080'><b>" + gameUIManager.format(cost)
+                            + "</b></font>" +
                             "</center></html>");
                     lbl.setVisible(true);
                 }
@@ -2693,7 +2653,8 @@ public class GameStatus extends GridPanel {
                 if (lbl != null) {
                     String qtyStr = tct.hasInfiniteQuantity() ? "\u221E" : "(" + tct.getQuantity() + ")";
                     lbl.setText("<html><center>" + qtyStr + "<br>" +
-                            "<font face='" + FONT_FAMILY_CURRENCY + "' color='#000080'><b>" + (cost > 0 ? gameUIManager.format(cost) : "") + "</b></font>" +
+                            "<font face='" + FONT_FAMILY_CURRENCY + "' color='#000080'><b>"
+                            + (cost > 0 ? gameUIManager.format(cost) : "") + "</b></font>" +
                             "</center></html>");
                     lbl.setVisible(true);
                 }
@@ -2848,7 +2809,7 @@ public class GameStatus extends GridPanel {
             // Fix: Compare IDs to ensure the horizontal yellow line works
             boolean isOperating = (opCompId != null) && c.getId().equals(opCompId);
 
-            boolean isMinor = !c.hasStockPrice();
+boolean isMinor = "PR".equals(c.getId()) ? (c.getStartSpace() == null || c.getStartSpace().getPrice() == 0) : !c.hasStockPrice();
 
             boolean hasOwner = c.getPresidentsShare() != null && c.getPresidentsShare().getOwner() instanceof Player;
             // Check if shares are available in the IPO
@@ -2938,8 +2899,11 @@ public class GameStatus extends GridPanel {
 
             // Update Pool Price Label
             if (poolPriceLabels[i] != null) {
-                if (c.hasStockPrice() && c.getCurrentSpace() != null && !isPadding) {
-                    poolPriceLabels[i].setText(gameUIManager.format(c.getCurrentSpace().getPrice()));
+                boolean showPrice = c.hasStockPrice() || "PR".equals(c.getId());
+                if (showPrice && (c.getCurrentSpace() != null || c.getStartSpace() != null) && !isPadding) {
+                    int price = c.getCurrentSpace() != null ? c.getCurrentSpace().getPrice()
+                            : c.getStartSpace().getPrice();
+                    poolPriceLabels[i].setText(gameUIManager.format(price));
                     poolPriceLabels[i].setForeground(new Color(0, 0, 128)); // Navy Blue
 
                     applyCurrencyFont(poolPriceLabels[i]);
@@ -3045,8 +3009,8 @@ public class GameStatus extends GridPanel {
                 parPrice[i].setBackground(bgIpo);
                 parPrice[i].setOpaque(true);
             }
-            if (c.hasStockPrice() && currPrice[i] != null) {
-                currPrice[i].setBackground(bgCurr);
+if ((c.hasStockPrice() || "PR".equals(c.getId())) && currPrice[i] != null) {
+                    currPrice[i].setBackground(bgCurr);
                 currPrice[i].setOpaque(true);
             }
 
@@ -4101,7 +4065,8 @@ public class GameStatus extends GridPanel {
             int cost = representative.getType().getCost();
             if (lbl != null) {
                 lbl.setText("<html><center>(" + count + ")<br>" +
-                        "<font face='" + FONT_FAMILY_CURRENCY + "' color='#000080'><b>" + gameUIManager.format(cost) + "</b></font>" +
+                        "<font face='" + FONT_FAMILY_CURRENCY + "' color='#000080'><b>" + gameUIManager.format(cost)
+                        + "</b></font>" +
                         "</center></html>");
             }
 
@@ -4333,37 +4298,20 @@ public class GameStatus extends GridPanel {
 
         int actual_nc = 0;
         int actual_nb = 0;
-        java.util.List<PublicCompany> gridList = new java.util.ArrayList<>();
-        java.util.List<PublicCompany> inactiveGridList = new java.util.ArrayList<>();
 
         net.sf.rails.game.round.RoundFacade currentRoundForFields = gameUIManager.getGameManager().getCurrentRound();
-        boolean isStockRoundFields = isMarketOrAuctionRound(currentRoundForFields);
+        boolean isStockRoundFields = currentRoundForFields instanceof net.sf.rails.game.financial.StockRound;
 
         if (companies != null) {
             for (PublicCompany c : companies) {
                 if (c.isClosed())
                     continue;
-                boolean isActive = c.hasFloated()
-                        || (c.getPresidentsShare() != null && c.getPresidentsShare().getOwner() instanceof Player);
-                if (isStockRoundFields || isActive) {
-                    gridList.add(c);
-                } else {
-                    inactiveGridList.add(c);
-                }
+                if (!isStockRoundFields && !c.hasFloated() && c.getClass().getName().contains("1817"))
+                    continue;
+                actual_nc++;
+                if (c.hasBonds())
+                    actual_nb++;
             }
-        }
-
-        if (!isStockRoundFields && gridList.size() < 10) {
-            int needed = 10 - gridList.size();
-            for (int i = 0; i < Math.min(needed, inactiveGridList.size()); i++) {
-                gridList.add(inactiveGridList.get(i));
-            }
-        }
-
-        actual_nc = gridList.size();
-        for (PublicCompany c : gridList) {
-            if (c.hasBonds())
-                actual_nb++;
         }
 
         int startY = 2;
@@ -4559,104 +4507,41 @@ public class GameStatus extends GridPanel {
         int y = startY;
 
         java.util.List<PublicCompany> displayList = new java.util.ArrayList<>();
-        java.util.List<PublicCompany> inactiveList = new java.util.ArrayList<>();
 
         net.sf.rails.game.round.RoundFacade currentRound = gameUIManager.getGameManager().getCurrentRound();
-        boolean isStockRound = isMarketOrAuctionRound(currentRound);
+
+        boolean isStockRound = currentRound instanceof net.sf.rails.game.financial.StockRound;
 
         for (PublicCompany c : gameUIManager.getAllPublicCompanies()) {
             if (c.isClosed())
                 continue;
-            boolean isActive = c.hasFloated() || (c.getPresidentsShare() != null
-                    && c.getPresidentsShare().getOwner() instanceof net.sf.rails.game.Player);
-            if (isStockRound || isActive) {
-                displayList.add(c);
-            } else {
-                inactiveList.add(c);
-            }
+
+            if (!isStockRound && !c.hasFloated() && c.getClass().getName().contains("1817"))
+                continue;
+
+            displayList.add(c);
         }
 
         compNameCaption = new Caption[nc];
-        // compArrowCaption = new Caption[nc]; // Initialize storage
 
-        // Delegate sorting directly to the Engine's authoritative running order to
-        // prevent MVC desync.
-        final java.util.List<PublicCompany> engineOrder = gameUIManager.getGameManager().getCompaniesInRunningOrder();
+        java.util.Collections.sort(displayList, (c1, c2) -> {
+            boolean c1IsPR = "PR".equals(c1.getId());
+            boolean c2IsPR = "PR".equals(c2.getId());
 
-        StringBuilder initOrderLog = new StringBuilder();
-        if (engineOrder != null) {
-            for (PublicCompany comp : engineOrder) {
-                initOrderLog.append(comp.getId()).append(", ");
-            }
-        }
+            int p1 = c1.getCurrentSpace() != null ? c1.getCurrentSpace().getPrice()
+                    : (c1.getStartSpace() != null ? c1.getStartSpace().getPrice() : 0);
+            int p2 = c2.getCurrentSpace() != null ? c2.getCurrentSpace().getPrice()
+                    : (c2.getStartSpace() != null ? c2.getStartSpace().getPrice() : 0);
 
-        java.util.List<PublicCompany> minorsList = new java.util.ArrayList<>();
-        java.util.List<PublicCompany> majorsList = new java.util.ArrayList<>();
-        java.util.List<PublicCompany> unfloatedList = new java.util.ArrayList<>();
+            boolean c1Minor = c1IsPR ? (p1 == 0) : !c1.hasStockPrice();
+            boolean c2Minor = c2IsPR ? (p2 == 0) : !c2.hasStockPrice();
 
-        for (PublicCompany c : displayList) {
-            boolean isEffectivelyActive = c.hasFloated()
-                    || (c.getPresidentsShare() != null && c.getPresidentsShare().getOwner() instanceof Player);
-            if (!isEffectivelyActive) {
-                unfloatedList.add(c);
-            } else if (!c.hasStockPrice()) {
-                minorsList.add(c);
-            } else {
-                majorsList.add(c);
-            }
-        }
-
-        // Minors maintain static creation order
-        java.util.Collections.sort(minorsList, (c1, c2) -> Integer.compare(c1.getPublicNumber(), c2.getPublicNumber()));
-        java.util.Collections.sort(unfloatedList,
-                (c1, c2) -> Integer.compare(c1.getPublicNumber(), c2.getPublicNumber()));
-
-        // Majors strictly follow the engine's authoritative order
-        java.util.Collections.sort(majorsList, (c1, c2) -> {
-            int idx1 = engineOrder != null ? engineOrder.indexOf(c1) : -1;
-            int idx2 = engineOrder != null ? engineOrder.indexOf(c2) : -1;
-
-            if (idx1 >= 0 && idx2 >= 0)
-                return Integer.compare(idx1, idx2);
-            if (idx1 >= 0)
-                return -1;
-            if (idx2 >= 0)
-                return 1;
+            if (c1Minor && !c2Minor) return -1;
+            if (!c1Minor && c2Minor) return 1;
+            if (c1Minor) return Integer.compare(c1.getPublicNumber(), c2.getPublicNumber());
+            if (p1 != p2) return Integer.compare(p2, p1);
             return Integer.compare(c1.getPublicNumber(), c2.getPublicNumber());
         });
-
-        displayList.clear();
-        displayList.addAll(minorsList);
-        displayList.addAll(majorsList);
-        displayList.addAll(unfloatedList);
-
-        // Append Padding (Inactive) Companies to the BOTTOM
-        if (!isStockRound && displayList.size() < 10) {
-            java.util.List<PublicCompany> inactivePool = new java.util.ArrayList<>();
-            for (PublicCompany c : gameUIManager.getAllPublicCompanies()) {
-                if (c.isClosed() || displayList.contains(c))
-                    continue;
-                inactivePool.add(c);
-            }
-            int needed = 10 - displayList.size();
-            for (int k = 0; k < Math.min(needed, inactivePool.size()); k++) {
-                displayList.add(inactivePool.get(k));
-            }
-        }
-
-        // Determine Chunk Boundary
-        PublicCompany lastMinor = null;
-        for (int k = displayList.size() - 1; k >= 0; k--) {
-            PublicCompany pc = displayList.get(k);
-            boolean isPR = "PR".equals(pc.getId());
-            int p = pc.getCurrentSpace() != null ? pc.getCurrentSpace().getPrice()
-                    : (pc.getStartSpace() != null ? pc.getStartSpace().getPrice() : 0);
-            boolean isMin = isPR ? (p == 0) : !pc.hasStockPrice();
-            if (isMin) {
-                lastMinor = pc;
-                break;
-            }
-        }
 
         for (PublicCompany c : displayList) {
             if (c.isClosed())
@@ -4666,7 +4551,7 @@ public class GameStatus extends GridPanel {
             shareRowVisibilityObservers[i] = new RowVisibility(this, y, c.getInGameModel());
             boolean visible = shareRowVisibilityObservers[i].lastValue();
 
-            boolean isMinor = !c.hasStockPrice();
+boolean isMinor = "PR".equals(c.getId()) ? (c.getStartSpace() == null || c.getStartSpace().getPrice() == 0) : !c.hasStockPrice();
             boolean isOperating = (c == operatingComp);
             boolean isSR = isMarketOrAuctionRound(gameUIManager.getGameManager().getCurrentRound());
             boolean hasOwner = c.getPresidentsShare() != null && c.getPresidentsShare().getOwner() instanceof Player;
@@ -4682,9 +4567,8 @@ public class GameStatus extends GridPanel {
             final int B_STD = 1;
             final int B_OP = 2;
             final int B_ZONE = 4;
-            boolean isBottomChunk = (c == lastMinor);
             int tHeight = isOperating ? B_OP : 0;
-            int bHeight = isBottomChunk ? B_ZONE : (isOperating ? B_OP : B_STD);
+            int bHeight = isOperating ? B_OP : B_STD;
 
             javax.swing.border.Border bDet = BorderFactory.createMatteBorder(tHeight, 0, bHeight, 1, Color.BLACK);
             // javax.swing.border.Border bArrow = BorderFactory.createMatteBorder(tHeight,
