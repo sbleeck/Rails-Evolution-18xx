@@ -486,43 +486,130 @@ public class MergerAndAcquisitionRound_1817 extends Round {
 
         int currentShares = comp1817.getShareCount();
         int currentMarkers = comp.getBaseTokens().nbAllTokens();
+        int cost = 0;
 
         if (currentShares == 2) {
             net.sf.rails.common.ReportBuffer.add(this,
                     "--- CONVERSION EVENT: " + comp.getId() + " converts from a 2-share to a 5-share company ---");
             net.sf.rails.common.ReportBuffer.add(this, "Pre-Conversion State:\n" + preReport);
-
-            comp1817.setShareCount(5);
-            log.info("CONVERSION: Upgraded " + comp.getId() + " from 2-share to 5-share. ");
-
-            // 1817 Rule 7.1.1: A 2-share starts with 1 marker and can acquire at most 1
-            // more (Train Station).
-            // It will mathematically never have 8 markers. We unconditionally charge the
-            // $50 fee.
-            mandatoryTokenCost.set(50);
-
+            cost = 50;
         } else if (currentShares == 5) {
-
             net.sf.rails.common.ReportBuffer.add(this,
                     "--- CONVERSION EVENT: " + comp.getId() + " converts from a 5-share to a 10-share company ---");
             net.sf.rails.common.ReportBuffer.add(this, "Pre-Conversion State:\n" + preReport);
-
-            comp1817.setShareCount(10);
-            log.info("CONVERSION: Upgraded " + comp.getId() + " from 5-share to 10-share. ");
-
-            // 1817 Rule 7.1.1: Must buy 2 markers for $100 unless company has 7 or 8
-            // markers
             if (currentMarkers <= 6) {
-                mandatoryTokenCost.set(100);
+                cost = 100;
             } else if (currentMarkers == 7) {
-                mandatoryTokenCost.set(50);
+                cost = 50;
+            }
+        }
+
+        // 1. Record old ownership of normal and short shares
+        java.util.List<net.sf.rails.game.state.Owner> normalOwners = new java.util.ArrayList<>();
+        java.util.List<net.sf.rails.game.state.Owner> shortOwners = new java.util.ArrayList<>();
+        for (net.sf.rails.game.financial.PublicCertificate cert : comp.getCertificates()) {
+            if (!cert.isPresidentShare()) {
+                if (cert instanceof net.sf.rails.game.specific._1817.ShortCertificate) {
+                    net.sf.rails.game.state.Owner owner = cert.getOwner();
+                    if (owner != null && owner != gameManagerRef.getRoot().getBank().getUnavailable() && owner != gameManagerRef.getRoot().getBank().getOSI()) {
+                        shortOwners.add(owner);
+                    }
+                } else {
+                    net.sf.rails.game.state.Owner owner = cert.getOwner();
+                    if (owner != null && owner != comp) {
+                        int shareUnits = cert.getShare() / comp.getShareUnit();
+                        for (int i = 0; i < shareUnits; i++) {
+                            normalOwners.add(owner);
+                        }
+                    }
+                }
+            }
+        }
+
+        // 2. Adjust share counts
+        if (currentShares == 2) {
+            comp1817.setShareCount(5);
+            log.info("CONVERSION: Upgraded " + comp.getId() + " from 2-share to 5-share.");
+        } else if (currentShares == 5) {
+            comp1817.setShareCount(10);
+            log.info("CONVERSION: Upgraded " + comp.getId() + " from 5-share to 10-share.");
+        }
+
+        // 3. Restore ownership using the newly generated certificates
+        java.util.List<net.sf.rails.game.financial.PublicCertificate> availableCerts = new java.util.ArrayList<>();
+        java.util.List<net.sf.rails.game.financial.PublicCertificate> availableShorts = new java.util.ArrayList<>();
+        net.sf.rails.game.financial.BankPortfolio unavailableBank = gameManagerRef.getRoot().getBank().getUnavailable();
+
+        for (net.sf.rails.game.financial.PublicCertificate cert : comp.getCertificates()) {
+            if (!cert.isPresidentShare()) {
+                if (cert instanceof net.sf.rails.game.specific._1817.ShortCertificate) {
+                    if (cert.getOwner() == unavailableBank || cert.getOwner() == gameManagerRef.getRoot().getBank().getOSI()) {
+                        availableShorts.add(cert);
+                    }
+                } else if (cert.getOwner() == comp) {
+                    availableCerts.add(cert);
+                }
+            }
+        }
+
+        int certIdx = 0;
+        for (net.sf.rails.game.state.Owner owner : normalOwners) {
+            if (certIdx < availableCerts.size()) {
+                net.sf.rails.game.financial.PublicCertificate newCert = availableCerts.get(certIdx++);
+                if (owner instanceof net.sf.rails.game.Player) {
+                    newCert.moveTo(((net.sf.rails.game.Player) owner).getPortfolioModel());
+                } else if (owner instanceof net.sf.rails.game.financial.Bank) {
+                    newCert.moveTo(gameManagerRef.getRoot().getBank().getPool());
+                } else if (owner instanceof net.sf.rails.game.PublicCompany) {
+                    newCert.moveTo(((net.sf.rails.game.PublicCompany) owner).getPortfolioModel());
+                }
+            }
+        }
+
+        int shortIdx = 0;
+        for (net.sf.rails.game.state.Owner owner : shortOwners) {
+            if (shortIdx < availableShorts.size()) {
+                net.sf.rails.game.financial.PublicCertificate newShort = availableShorts.get(shortIdx++);
+                if (owner instanceof net.sf.rails.game.Player) {
+                    newShort.moveTo(((net.sf.rails.game.Player) owner).getPortfolioModel());
+                }
+            }
+        }
+
+        // 4. Execute Mandatory Token Purchase Inline
+        if (cost > 0) {
+            int loansTaken = 0;
+            while (comp.getCash() < cost && comp1817.getNumberOfBonds() < comp1817.getShareCount()) {
+                comp1817.setNumberOfBonds(comp1817.getNumberOfBonds() + 1);
+                net.sf.rails.game.financial.Bank bank = gameManagerRef.getRoot().getBank();
+                comp1817.addCashFromBank(100, bank);
+                loansTaken++;
+                
+                net.sf.rails.game.financial.StockMarket market = gameManagerRef.getRoot().getStockMarket();
+                if (market instanceof StockMarket_1817) {
+                    ((StockMarket_1817) market).moveLeftOrDown(comp, 1);
+                }
+            }
+            if (loansTaken > 0) {
+                net.sf.rails.common.ReportBuffer.add(this,
+                        comp.getId() + " automatically takes " + loansTaken + " loan(s) to fund mandatory station markers.");
+            }
+
+            if (comp.getCash() >= cost) {
+                net.sf.rails.game.state.Currency.wire(comp, cost, gameManagerRef.getRoot().getBank());
+                net.sf.rails.common.ReportBuffer.add(this,
+                        comp.getId() + " purchases mandatory station markers for $" + cost + ".");
             }
         }
 
         // Mark as merged/converted this round so it cannot merge again
         mergedThisRound.add(comp.getId());
 
-        // Initiate Post-Merger Phase (same as mergers)
+        // Post-Conversion Report
+        net.sf.rails.common.ReportBuffer.add(this,
+                "Post-Conversion State:\n" + buildCompanyStateReport(comp));
+
+        // Initiate Post-Merger Phase
         calculateValidMergerPairs();
         startPostMergerPhase();
     }
@@ -1192,8 +1279,23 @@ private void updateCurrentPlayer() {
 
             // Check for Conversions (White zone only, > $30)
             if (company.getCurrentSpace() != null && company.getCurrentSpace().getPrice() > 30) {
-                if (comp1817.getShareCount() == 2 || comp1817.getShareCount() == 5) {
-                    possibleActions.add(new net.sf.rails.game.specific._1817.action.ConvertCompany_1817(company));
+                if (comp1817.getShareCount() == 2) {
+                    int availableFunds = comp1817.getCash() + (5 - comp1817.getNumberOfBonds()) * 100;
+                    if (availableFunds >= 50) {
+                        possibleActions.add(new net.sf.rails.game.specific._1817.action.ConvertCompany_1817(company));
+                    } 
+                    //else net.sf.rails.common.ReportBuffer.add(this, company.getId() + " cannot afford conversion markers (" + (availableFunds / 50) + " max affordable, 1 required). Action unavailable.");
+                } else if (comp1817.getShareCount() == 5) {
+                    int currentMarkers = company.getBaseTokens().nbAllTokens();
+                    int cost = 0;
+                    if (currentMarkers <= 6) cost = 100;
+                    else if (currentMarkers == 7) cost = 50;
+                    
+                    int availableFunds = comp1817.getCash() + (10 - comp1817.getNumberOfBonds()) * 100;
+                    if (availableFunds >= cost) {
+                        possibleActions.add(new net.sf.rails.game.specific._1817.action.ConvertCompany_1817(company));
+                    } 
+                    //else if (cost > 0) net.sf.rails.common.ReportBuffer.add(this, company.getId() + " cannot afford conversion markers (" + (availableFunds / 50) + " max affordable, " + (cost / 50) + " required). Action unavailable.");
                 }
             }
 

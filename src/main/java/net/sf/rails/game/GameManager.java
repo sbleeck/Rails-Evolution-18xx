@@ -110,6 +110,8 @@ public class GameManager extends RailsManager implements Configurable, Owner {
     protected GameEnd gameEndWhen = GameEnd.UNDEFINED;
     private int absoluteActionCounter = 0;
 
+    protected transient String sessionStartTimestamp = null;
+
     protected boolean dynamicOperatingOrder = true;
     /*
      * If true, companies can only buy trains from other companies
@@ -1036,19 +1038,19 @@ public class GameManager extends RailsManager implements Configurable, Owner {
         showCompositeORNumber = !"simple".equalsIgnoreCase(Config.get("or.number_format"));
     }
 
-    public void startGame() {
+public void startGame() {
         setGuiParameters();
         getRoot().getCompanyManager().initStartPackets(this);
 
         // ++ START TIME MANAGEMENT ++
-        // This new method will read the settings and populate each player's time bank
         if (isTimeManagementEnabled()) {
             initializePlayerTimeBanks();
         }
         // ++ END TIME MANAGEMENT ++
 
-        clearAutosaves();
-        clearStateLogs();
+        // Initialize session timestamp for autosaves
+        this.sessionStartTimestamp = new java.text.SimpleDateFormat("yyyyMMdd_HHmmss").format(new java.util.Date());
+
         beginStartRound();
         markRoundBoundary();
     }
@@ -2043,25 +2045,34 @@ public class GameManager extends RailsManager implements Configurable, Owner {
      * recoverySave method
      * Uses filePath defined in save.recovery.filepath
      */
-    protected void recoverySave() {
+protected void recoverySave() {
         if (Config.get("save.recovery.active", "yes").equalsIgnoreCase("no"))
             return;
 
-        // Determine directory (default to 'autosave' if not configured)
-        String path = Config.get("save.recovery.filepath");
-        File dir;
-        if (Util.hasValue(path)) {
-            dir = new File(path).getParentFile();
-        } else {
-            dir = new File("autosave");
+        // Ensure session timestamp exists (generates a new session ID for loaded games)
+        if (this.sessionStartTimestamp == null) {
+            this.sessionStartTimestamp = new java.text.SimpleDateFormat("yyyyMMdd_HHmmss").format(new java.util.Date());
         }
-        if (dir == null)
-            dir = new File(".");
-        if (!dir.exists())
-            dir.mkdirs();
 
+        // Determine base directory
+        String path = Config.get("save.recovery.filepath");
+        File baseDir;
+        if (Util.hasValue(path)) {
+            baseDir = new File(path).getParentFile();
+        } else {
+            baseDir = new File("autosave");
+        }
+        if (baseDir == null) baseDir = new File(".");
+
+        // Create game-specific subfolder (e.g., autosave/1817)
+        File dir = new File(baseDir, getGameName());
+        if (!dir.exists()) {
+            dir.mkdirs();
+        }
+
+        // Filename uses the session timestamp to group saves from the exact same play session
         String dateStr = new java.text.SimpleDateFormat("yyyyMMdd_HHmmss").format(new java.util.Date());
-        String filename = String.format("%s_%s_%05d.rails", getGameName(), dateStr, actionCount.value());
+        String filename = String.format("%s_%s_%05d.rails", getGameName(), this.sessionStartTimestamp, actionCount.value());
         File saveFile = new File(dir, filename);
 
         GameSaver gameSaver = new GameSaver(getRoot().getGameData(), executedActions.view());
@@ -2072,14 +2083,16 @@ public class GameManager extends RailsManager implements Configurable, Owner {
             // Save complete game state as JSON alongside the autosave
             saveJsonState(saveFile);
 
-            // Delete old autosave files only for this specific game
-            final String gamePrefix = getGameName() + "_";
+            // Delete old autosave files ONLY for THIS SPECIFIC session within the subfolder
+            final String sessionPrefix = getGameName() + "_" + this.sessionStartTimestamp + "_";
             File[] oldFiles = dir.listFiles(
-                    (d, name) -> name.startsWith(gamePrefix) && name.endsWith(".rails") && !name.equals(filename));
+                    (d, name) -> name.startsWith(sessionPrefix) && 
+                    (name.endsWith(".rails") || name.endsWith(".json")) && 
+                    !name.equals(filename) && 
+                    !name.equals(filename + ".state.json"));
 
             if (oldFiles != null) {
                 for (File f : oldFiles) {
-                    // --- DELETE --- f.delete();
                     f.delete();
                 }
             }
@@ -2098,7 +2111,7 @@ public class GameManager extends RailsManager implements Configurable, Owner {
             }
         }
     }
-
+    
     protected boolean save(GameAction saveAction) {
         GameSaver gameSaver = new GameSaver(getRoot().getGameData(), executedActions.view());
         File file = new File(saveAction.getFilepath());
