@@ -1657,10 +1657,14 @@ public class GameStatus extends GridPanel {
             boolean c1Minor = c1IsPR ? (p1 == 0) : !c1.hasStockPrice();
             boolean c2Minor = c2IsPR ? (p2 == 0) : !c2.hasStockPrice();
 
-            if (c1Minor && !c2Minor) return -1;
-            if (!c1Minor && c2Minor) return 1;
-            if (c1Minor) return Integer.compare(c1.getPublicNumber(), c2.getPublicNumber());
-            if (p1 != p2) return Integer.compare(p2, p1);
+            if (c1Minor && !c2Minor)
+                return -1;
+            if (!c1Minor && c2Minor)
+                return 1;
+            if (c1Minor)
+                return Integer.compare(c1.getPublicNumber(), c2.getPublicNumber());
+            if (p1 != p2)
+                return Integer.compare(p2, p1);
             return Integer.compare(c1.getPublicNumber(), c2.getPublicNumber());
         });
 
@@ -2809,7 +2813,8 @@ public class GameStatus extends GridPanel {
             // Fix: Compare IDs to ensure the horizontal yellow line works
             boolean isOperating = (opCompId != null) && c.getId().equals(opCompId);
 
-boolean isMinor = "PR".equals(c.getId()) ? (c.getStartSpace() == null || c.getStartSpace().getPrice() == 0) : !c.hasStockPrice();
+            boolean isMinor = "PR".equals(c.getId()) ? (c.getStartSpace() == null || c.getStartSpace().getPrice() == 0)
+                    : !c.hasStockPrice();
 
             boolean hasOwner = c.getPresidentsShare() != null && c.getPresidentsShare().getOwner() instanceof Player;
             // Check if shares are available in the IPO
@@ -3009,8 +3014,8 @@ boolean isMinor = "PR".equals(c.getId()) ? (c.getStartSpace() == null || c.getSt
                 parPrice[i].setBackground(bgIpo);
                 parPrice[i].setOpaque(true);
             }
-if ((c.hasStockPrice() || "PR".equals(c.getId())) && currPrice[i] != null) {
-                    currPrice[i].setBackground(bgCurr);
+            if ((c.hasStockPrice() || "PR".equals(c.getId())) && currPrice[i] != null) {
+                currPrice[i].setBackground(bgCurr);
                 currPrice[i].setOpaque(true);
             }
 
@@ -4536,10 +4541,14 @@ if ((c.hasStockPrice() || "PR".equals(c.getId())) && currPrice[i] != null) {
             boolean c1Minor = c1IsPR ? (p1 == 0) : !c1.hasStockPrice();
             boolean c2Minor = c2IsPR ? (p2 == 0) : !c2.hasStockPrice();
 
-            if (c1Minor && !c2Minor) return -1;
-            if (!c1Minor && c2Minor) return 1;
-            if (c1Minor) return Integer.compare(c1.getPublicNumber(), c2.getPublicNumber());
-            if (p1 != p2) return Integer.compare(p2, p1);
+            if (c1Minor && !c2Minor)
+                return -1;
+            if (!c1Minor && c2Minor)
+                return 1;
+            if (c1Minor)
+                return Integer.compare(c1.getPublicNumber(), c2.getPublicNumber());
+            if (p1 != p2)
+                return Integer.compare(p2, p1);
             return Integer.compare(c1.getPublicNumber(), c2.getPublicNumber());
         });
 
@@ -4551,7 +4560,8 @@ if ((c.hasStockPrice() || "PR".equals(c.getId())) && currPrice[i] != null) {
             shareRowVisibilityObservers[i] = new RowVisibility(this, y, c.getInGameModel());
             boolean visible = shareRowVisibilityObservers[i].lastValue();
 
-boolean isMinor = "PR".equals(c.getId()) ? (c.getStartSpace() == null || c.getStartSpace().getPrice() == 0) : !c.hasStockPrice();
+            boolean isMinor = "PR".equals(c.getId()) ? (c.getStartSpace() == null || c.getStartSpace().getPrice() == 0)
+                    : !c.hasStockPrice();
             boolean isOperating = (c == operatingComp);
             boolean isSR = isMarketOrAuctionRound(gameUIManager.getGameManager().getCurrentRound());
             boolean hasOwner = c.getPresidentsShare() != null && c.getPresidentsShare().getOwner() instanceof Player;
@@ -5366,9 +5376,9 @@ boolean isMinor = "PR".equals(c.getId()) ? (c.getStartSpace() == null || c.getSt
 
                 if (target != null) {
                     // This utility scans the 'compSubTrainButtons' (the owned train railcards)
-                    net.sf.rails.ui.swing.elements.RailCard card = findRailCardFor(target);
+                    java.util.List<net.sf.rails.ui.swing.elements.RailCard> cards = findRailCardsFor(pa, target);
+                    for (net.sf.rails.ui.swing.elements.RailCard card : cards) {
 
-                    if (card != null) {
                         card.addPossibleAction(pa);
 
                         // If it's a Discard action or specifically targeting a Train for
@@ -5445,24 +5455,55 @@ boolean isMinor = "PR".equals(c.getId()) ? (c.getStartSpace() == null || c.getSt
     }
 
     /**
-     * Central Registry: Locates the RailCard UI component for any game object.
+     * Central Registry: Locates the RailCard UI components for any game object.
      * Scans: Player Shares, IPO, Pool, Treasury, Trains, and Privates.
+     * Returns a list of all matching cards to support highlighting multiple
+     * identical assets (e.g. duplicate trains).
      */
-    private net.sf.rails.ui.swing.elements.RailCard findRailCardFor(Object target) {
+    private java.util.List<net.sf.rails.ui.swing.elements.RailCard> findRailCardsFor(PossibleAction pa, Object target) {
+        java.util.List<net.sf.rails.ui.swing.elements.RailCard> matches = new java.util.ArrayList<>();
         if (target == null)
-            return null;
+            return matches;
 
         // A. If Target is a TRAIN
         if (target instanceof net.sf.rails.game.Train) {
             net.sf.rails.game.Train targetTrain = (net.sf.rails.game.Train) target;
+            String targetCleanName = targetTrain.getName().replaceAll("_\\d+$", "");
 
             // 1. Scan Company Trains
-            if (compSubTrainButtons != null) {
-                for (int i = 0; i < nc; i++) {
-                    for (int t = 0; t < MAX_TRAIN_SLOTS; t++) {
-                        RailCard card = compSubTrainButtons[i][t];
-                        if (card != null && card.getTrain() == targetTrain)
-                            return card;
+
+            int targetCompanyIndex = -1;
+                // Pass 1a: Attempt to isolate the owning company via the Action's Actor
+                if (pa instanceof GuiTargetedAction) {
+                    net.sf.rails.game.state.Owner actor = ((GuiTargetedAction) pa).getActor();
+                    if (actor instanceof net.sf.rails.game.PublicCompany) {
+                        targetCompanyIndex = ((net.sf.rails.game.PublicCompany) actor).getPublicNumber();
+                    }
+                }
+
+                // Pass 1b: Fallback to exact object reference scan
+                if (targetCompanyIndex == -1) {
+                    for (int i = 0; i < nc; i++) {
+                        for (int t = 0; t < MAX_TRAIN_SLOTS; t++) {
+                            RailCard card = compSubTrainButtons[i][t];
+                            if (card != null && card.getTrain() == targetTrain) {
+                                targetCompanyIndex = i;
+                                break;
+                            }
+                        }
+                        if (targetCompanyIndex != -1) break;
+                    }
+                }
+
+            // Second pass: isolate duplicates to the owning company's row
+            if (targetCompanyIndex != -1) {
+                for (int t = 0; t < MAX_TRAIN_SLOTS; t++) {
+                    RailCard card = compSubTrainButtons[targetCompanyIndex][t];
+                    if (card != null && card.getTrain() != null) {
+                        String cardCleanName = card.getTrain().getName().replaceAll("_\\d+$", "");
+                        if (cardCleanName.equals(targetCleanName)) {
+                            matches.add(card);
+                        }
                     }
                 }
             }
@@ -5472,11 +5513,12 @@ boolean isMinor = "PR".equals(c.getId()) ? (c.getStartSpace() == null || c.getSt
                     if (card != null && card.getTrain() != null) {
                         // Compare type names, as actions often target the generic type in the IPO
                         if (card.getTrain().getType().getName().equals(targetTrain.getType().getName())) {
-                            return card;
+                            matches.add(card);
                         }
                     }
                 }
             }
+            return matches;
         }
 
         // B. If Target is a COMPANY (Public or Private) - usually for Mergers/Exchange
@@ -5502,9 +5544,9 @@ boolean isMinor = "PR".equals(c.getId()) ? (c.getStartSpace() == null || c.getSt
                         if (card != null && card.getCompany() == targetComp) {
                             if (trueOwner != null) {
                                 if (players.getPlayerByPosition(j) == trueOwner)
-                                    return card;
+                                    matches.add(card);
                             } else {
-                                return card; // Fallback for bank/pool
+                                matches.add(card); // Fallback for bank/pool
                             }
                         }
                     }
@@ -5521,9 +5563,9 @@ boolean isMinor = "PR".equals(c.getId()) ? (c.getStartSpace() == null || c.getSt
                                 if (card.getCompany() == targetComp) {
                                     if (trueOwner != null) {
                                         if (players.getPlayerByPosition(j) == trueOwner)
-                                            return card;
+                                            matches.add(card);
                                     } else {
-                                        return card;
+                                        matches.add(card);
                                     }
                                 }
                             }
@@ -5540,18 +5582,15 @@ boolean isMinor = "PR".equals(c.getId()) ? (c.getStartSpace() == null || c.getSt
                             if (c instanceof RailCard) {
                                 RailCard card = (RailCard) c;
                                 if (card.getCompany() == targetComp) {
-                                    log.info("DEBUG-FRC: Found Match in compPrivatesPanel[{}]", i);
-                                    return card;
+                                    matches.add(card);
                                 }
                             }
                         }
                     }
                 }
             }
-            // --- END FIX ---
         }
 
-        return null;
+        return matches;
     }
-
 }

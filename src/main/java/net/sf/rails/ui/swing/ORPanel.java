@@ -407,7 +407,7 @@ public class ORPanel extends GridPanel
 
         if (activePhase == 1 || activePhase == 2) {
             setTileBuildNumbers(true);
-disableRoutesDisplay();
+            disableRoutesDisplay();
         } else if (activePhase == 3) {
             setTileBuildNumbers(false);
             if (orWindow != null && orWindow.getMapPanel() != null)
@@ -510,19 +510,21 @@ disableRoutesDisplay();
         // TOP: The Company Name (ID)
         String companyName = (actor != null) ? actor.getId() : "Game";
 
-// MIDDLE: The Player Name (from our new interface method)
+        // MIDDLE: The Player Name (from our new interface method)
         String playerName = context.getPlayerName();
         // Suppress duplicate player names when the Player is the primary Actor
         if (actor instanceof net.sf.rails.game.Player || companyName.equals(playerName)) {
-            playerName = ""; 
+            playerName = "";
         }
 
         // 2. Determine Colors (Prioritize Action Signature over Actor defaults)
         Color bg = context.getHighlightBackgroundColor();
-        if (bg == null) bg = BG_SPECIAL_HEADER;
-        
+        if (bg == null)
+            bg = BG_SPECIAL_HEADER;
+
         Color fg = context.getHighlightTextColor();
-        if (fg == null) fg = Color.BLACK;
+        if (fg == null)
+            fg = Color.BLACK;
 
         if (actor instanceof PublicCompany && context.getHighlightBackgroundColor() == null) {
             bg = ((PublicCompany) actor).getBgColour();
@@ -541,7 +543,8 @@ disableRoutesDisplay();
             if (playerName == null || playerName.isEmpty()) {
                 lblPlayerInfo.setVisible(false);
             } else {
-                lblPlayerInfo.setText("<html><center><font face='SansSerif' size='5'>" + playerName + "</font></center></html>");
+                lblPlayerInfo.setText(
+                        "<html><center><font face='SansSerif' size='5'>" + playerName + "</font></center></html>");
                 lblPlayerInfo.setBackground(bg);
                 lblPlayerInfo.setForeground(fg);
                 lblPlayerInfo.setBorder(BorderFactory.createMatteBorder(0, 1, 0, 1, Color.DARK_GRAY));
@@ -551,7 +554,6 @@ disableRoutesDisplay();
 
         // BOTTOM: The Action Text
         String actionTitle = context.getGroupLabel();
-
 
         if (actor instanceof PublicCompany) {
             bg = ((PublicCompany) actor).getBgColour();
@@ -1041,7 +1043,7 @@ disableRoutesDisplay();
     public static final int TRAIN_CARD_HEIGHT = 25;
     public static final int REVENUE_BUTTON_ROW_HEIGHT = 25;
     public static final int FOOTER_DONE_HEIGHT = 45;
-    
+
     private double localFontScale = -1.0;
 
     public double getFontScale() {
@@ -1057,11 +1059,13 @@ disableRoutesDisplay();
 
     public void adjustFontScale(double delta) {
         localFontScale = getFontScale() + delta;
-        if (localFontScale < 0.5) localFontScale = 0.5;
-        if (localFontScale > 3.0) localFontScale = 3.0;
+        if (localFontScale < 0.5)
+            localFontScale = 0.5;
+        if (localFontScale > 3.0)
+            localFontScale = 3.0;
         updateScale();
     }
-    
+
     public int scale(int value) {
         return (int) (value * getFontScale());
     }
@@ -1069,63 +1073,78 @@ disableRoutesDisplay();
     public int getSidebarWidth() {
         return scale(SIDEBAR_WIDTH);
     }
-    
+
     public void updateScale() {
         int sw = getSidebarWidth();
-        
+
         this.setPreferredSize(new Dimension(sw, 0));
-        
+
         if (sidebarPanel != null) {
             sidebarPanel.setPreferredSize(new Dimension(sw, scale(SIDEBAR_HEIGHT)));
             sidebarPanel.setMinimumSize(new Dimension(sw, scale(SIDEBAR_HEIGHT)));
             sidebarPanel.setMaximumSize(new Dimension(sw, Short.MAX_VALUE));
         }
-        
+
         if (lblCompanyInfo != null) {
             lblCompanyInfo.setPreferredSize(new Dimension(sw, scale(HEADER_INFO_HEIGHT)));
             lblCompanyInfo.setMaximumSize(new Dimension(sw, scale(HEADER_INFO_HEIGHT)));
         }
-        
+
         if (lblPhaseInstruction != null) {
             lblPhaseInstruction.setPreferredSize(new Dimension(sw, scale(HEADER_PHASE_HEIGHT)));
             lblPhaseInstruction.setMaximumSize(new Dimension(sw, scale(HEADER_PHASE_HEIGHT)));
         }
-        
+
         if (lblPlayerInfo != null) {
             lblPlayerInfo.setPreferredSize(new Dimension(sw, scale(20)));
             lblPlayerInfo.setMaximumSize(new Dimension(sw, scale(20)));
         }
-        
+
         if (cashPanel != null) {
             cashPanel.setPreferredSize(new Dimension(sw, scale(READOUT_PANEL_HEIGHT)));
             cashPanel.setMinimumSize(new Dimension(sw, scale(READOUT_PANEL_HEIGHT)));
             cashPanel.setMaximumSize(new Dimension(sw, scale(READOUT_PANEL_HEIGHT)));
         }
-        
+
         if (loansPanel != null) {
             loansPanel.setPreferredSize(new Dimension(sw, scale(READOUT_PANEL_HEIGHT)));
             loansPanel.setMinimumSize(new Dimension(sw, scale(READOUT_PANEL_HEIGHT)));
             loansPanel.setMaximumSize(new Dimension(sw, scale(READOUT_PANEL_HEIGHT)));
         }
-        
-        if (btnTileConfirm != null) updateBtnSize(btnTileConfirm, sw - scale(20), scale(BTN_HEIGHT));
-        if (btnTokenConfirm != null) updateBtnSize(btnTokenConfirm, sw - scale(20), scale(BTN_HEIGHT));
-        if (btnTrainSkip != null) updateBtnSize(btnTrainSkip, sw - scale(20), scale(BTN_HEIGHT));
-        if (btnDone != null) updateBtnSize(btnDone, sw - scale(10), scale(40));
-        
-        if (btnDone != null) btnDone.setFont(new Font("SansSerif", Font.BOLD, scale(14)));
-        if (btnTileConfirm != null) btnTileConfirm.setFont(new Font("SansSerif", Font.BOLD, scale(12)));
-        if (btnTokenConfirm != null) btnTokenConfirm.setFont(new Font("SansSerif", Font.BOLD, scale(12)));
-        if (btnTrainSkip != null) btnTrainSkip.setFont(new Font("SansSerif", Font.BOLD, scale(12)));
-        if (btnRevPayout != null) btnRevPayout.setFont(new Font("SansSerif", Font.BOLD, scale(12)));
-        if (btnRevWithhold != null) btnRevWithhold.setFont(new Font("SansSerif", Font.BOLD, scale(12)));
-        if (btnRevSplit != null) btnRevSplit.setFont(new Font("SansSerif", Font.BOLD, scale(12)));
-        
-        if (lblCash != null) lblCash.setFont(new Font("SansSerif", Font.BOLD, scale(22)));
-        if (lblLoans != null) lblLoans.setFont(new Font("SansSerif", Font.BOLD, scale(22)));
-        if (lblFixed != null) lblFixed.setFont(new Font("SansSerif", Font.BOLD, scale(18)));
-        if (lblRoute != null) lblRoute.setFont(new Font("SansSerif", Font.BOLD, scale(18)));
-        
+
+        if (btnTileConfirm != null)
+            updateBtnSize(btnTileConfirm, sw - scale(20), scale(BTN_HEIGHT));
+        if (btnTokenConfirm != null)
+            updateBtnSize(btnTokenConfirm, sw - scale(20), scale(BTN_HEIGHT));
+        if (btnTrainSkip != null)
+            updateBtnSize(btnTrainSkip, sw - scale(20), scale(BTN_HEIGHT));
+        if (btnDone != null)
+            updateBtnSize(btnDone, sw - scale(10), scale(40));
+
+        if (btnDone != null)
+            btnDone.setFont(new Font("SansSerif", Font.BOLD, scale(14)));
+        if (btnTileConfirm != null)
+            btnTileConfirm.setFont(new Font("SansSerif", Font.BOLD, scale(12)));
+        if (btnTokenConfirm != null)
+            btnTokenConfirm.setFont(new Font("SansSerif", Font.BOLD, scale(12)));
+        if (btnTrainSkip != null)
+            btnTrainSkip.setFont(new Font("SansSerif", Font.BOLD, scale(12)));
+        if (btnRevPayout != null)
+            btnRevPayout.setFont(new Font("SansSerif", Font.BOLD, scale(12)));
+        if (btnRevWithhold != null)
+            btnRevWithhold.setFont(new Font("SansSerif", Font.BOLD, scale(12)));
+        if (btnRevSplit != null)
+            btnRevSplit.setFont(new Font("SansSerif", Font.BOLD, scale(12)));
+
+        if (lblCash != null)
+            lblCash.setFont(new Font("SansSerif", Font.BOLD, scale(22)));
+        if (lblLoans != null)
+            lblLoans.setFont(new Font("SansSerif", Font.BOLD, scale(22)));
+        if (lblFixed != null)
+            lblFixed.setFont(new Font("SansSerif", Font.BOLD, scale(18)));
+        if (lblRoute != null)
+            lblRoute.setFont(new Font("SansSerif", Font.BOLD, scale(18)));
+
         if (specialNotificationPanel != null) {
             for (Component c : specialNotificationPanel.getComponents()) {
                 if (c instanceof ActionButton) {
@@ -1134,7 +1153,7 @@ disableRoutesDisplay();
                 }
             }
         }
-        
+
         if (specialPanel != null) {
             for (Component c : specialPanel.getComponents()) {
                 if (c instanceof ActionButton) {
@@ -1143,7 +1162,7 @@ disableRoutesDisplay();
                 }
             }
         }
-        
+
         if (specialActionsButtonPanel != null) {
             for (Component c : specialActionsButtonPanel.getComponents()) {
                 if (c instanceof ActionButton) {
@@ -1152,7 +1171,7 @@ disableRoutesDisplay();
                 }
             }
         }
-        
+
         if (trainButtonsPanel != null) {
             for (Component c : trainButtonsPanel.getComponents()) {
                 if (c instanceof ActionButton) {
@@ -1161,7 +1180,7 @@ disableRoutesDisplay();
                 }
             }
         }
-        
+
         if (sidebarPanel != null) {
             sidebarPanel.revalidate();
             sidebarPanel.repaint();
@@ -1170,11 +1189,11 @@ disableRoutesDisplay();
             orWindow.getContentPane().revalidate();
             orWindow.getContentPane().repaint();
         }
-        
+
         this.revalidate();
         this.repaint();
     }
-    
+
     private void updateBtnSize(JComponent btn, int w, int h) {
         if (btn != null) {
             btn.setPreferredSize(new Dimension(w, h));
@@ -1795,12 +1814,16 @@ disableRoutesDisplay();
         if (orComp != null && !orComp.isClosed()) {
             isRevenueValueToBeSet = isSetRevenueStep;
 
-            // Only disable buttons for 1817 to prevent lockouts in other games if a calculation fails
+            // Only disable buttons for 1817 to prevent lockouts in other games if a
+            // calculation fails
             boolean is1817 = orComp.getClass().getSimpleName().contains("1817");
             if (isSetRevenueStep && is1817) {
-                if (btnRevPayout != null) btnRevPayout.setEnabled(false);
-                if (btnRevWithhold != null) btnRevWithhold.setEnabled(false);
-                if (btnRevSplit != null) btnRevSplit.setEnabled(false);
+                if (btnRevPayout != null)
+                    btnRevPayout.setEnabled(false);
+                if (btnRevWithhold != null)
+                    btnRevWithhold.setEnabled(false);
+                if (btnRevSplit != null)
+                    btnRevSplit.setEnabled(false);
             }
             RailsRoot root = orUIManager.getGameUIManager().getRoot();
             if (revenueThread != null)
@@ -1993,7 +2016,8 @@ disableRoutesDisplay();
                 card.setBackground(new Color(255, 235, 235)); // Pinkish for Privates
                 card.setPrivateCompanyTooltip(pc);
                 if (orUIManager != null) {
-                    net.sf.rails.ui.swing.hexmap.HexHighlightMouseListener.addMouseListener(card, orUIManager, pc, false);
+                    net.sf.rails.ui.swing.hexmap.HexHighlightMouseListener.addMouseListener(card, orUIManager, pc,
+                            false);
                 }
                 stack.add(card);
             }
@@ -2007,8 +2031,6 @@ disableRoutesDisplay();
         public void setTrains(String s, int i) {
         }
     }
-
-    
 
     private void addTrainBuyButton(BuyTrain action) {
         ActionButton btn = new ActionButton(RailsIcon.BUY_TRAIN);
@@ -2118,47 +2140,59 @@ disableRoutesDisplay();
     private void updateSidebarData() {
         if (specialModeActive)
             return;
-            
+
         RoundFacade currentRound = null;
-        if (orUIManager != null && orUIManager.getGameUIManager() != null && orUIManager.getGameUIManager().getGameManager() != null) {
+        if (orUIManager != null && orUIManager.getGameUIManager() != null
+                && orUIManager.getGameUIManager().getGameManager() != null) {
             currentRound = orUIManager.getGameUIManager().getGameManager().getCurrentRound();
         }
-        
+
         // Intercept specific Special Rounds to cleanly display the Actor's name
-        if (currentRound != null && (currentRound.getClass().getSimpleName().contains("Formation") || currentRound.getClass().getSimpleName().contains("CoalExchange"))) {
-            if (lblCompanyInfo != null) {
-                String playerName = "";
-                if (currentRound.getCurrentPlayer() != null) {
-                    playerName = currentRound.getCurrentPlayer().getName();
-                }
-                
-                String topText = "<html><center><font face='SansSerif' size='6'><b>" + playerName + "</b></font></center></html>";
-                lblCompanyInfo.setText(topText);
-                
-                Color bg = currentRound.getClass().getSimpleName().contains("CoalExchange") ? new Color(200, 200, 255) : new Color(152, 251, 152);
-                
-                lblCompanyInfo.setBackground(bg);
-                lblCompanyInfo.setForeground(Color.BLACK);
-                lblCompanyInfo.setBorder(BorderFactory.createMatteBorder(1, 1, 0, 1, Color.DARK_GRAY));
-                lblCompanyInfo.setVisible(true);
+        if (currentRound != null && (currentRound.getClass().getSimpleName().contains("Formation")
+                || currentRound.getClass().getSimpleName().contains("CoalExchange"))) {
+            if (orComp != null) {
+                // Valid company context resolved (e.g. discarding trains). Render standard
+                // company sidebar.
+            } else {
+                if (lblCompanyInfo != null) {
+                    String playerName = "";
+                    if (currentRound.getCurrentPlayer() != null) {
+                        playerName = currentRound.getCurrentPlayer().getName();
+                    }
 
-                if (lblPlayerInfo != null) {
-                    lblPlayerInfo.setVisible(false);
+                    String topText = "<html><center><font face='SansSerif' size='6'><b>" + playerName
+                            + "</b></font></center></html>";
+                    lblCompanyInfo.setText(topText);
+
+                    Color bg = currentRound.getClass().getSimpleName().contains("CoalExchange")
+                            ? new Color(200, 200, 255)
+                            : new Color(152, 251, 152);
+
+                    lblCompanyInfo.setBackground(bg);
+                    lblCompanyInfo.setForeground(Color.BLACK);
+                    lblCompanyInfo.setBorder(BorderFactory.createMatteBorder(1, 1, 0, 1, Color.DARK_GRAY));
+                    lblCompanyInfo.setVisible(true);
+
+                    if (lblPlayerInfo != null) {
+                        lblPlayerInfo.setVisible(false);
+                    }
+
+                    String phaseName = currentRound.getClass().getSimpleName().contains("Formation")
+                            ? "Prussian Formation"
+                            : "Coal Exchange";
+                    String bottomText = "<html><center><font face='SansSerif' size='4'><b>" + phaseName
+                            + "</b></font></center></html>";
+                    lblPhaseInstruction.setText(bottomText);
+                    lblPhaseInstruction.setBackground(bg);
+                    lblPhaseInstruction.setForeground(Color.BLACK);
+                    lblPhaseInstruction.setBorder(BorderFactory.createMatteBorder(0, 1, 1, 1, Color.DARK_GRAY));
+                    lblPhaseInstruction.setVisible(true);
                 }
 
-                String phaseName = currentRound.getClass().getSimpleName().contains("Formation") ? "Prussian Formation" : "Coal Exchange";
-                String bottomText = "<html><center><font face='SansSerif' size='4'><b>" + phaseName + "</b></font></center></html>";
-                lblPhaseInstruction.setText(bottomText);
-                lblPhaseInstruction.setBackground(bg);
-                lblPhaseInstruction.setForeground(Color.BLACK);
-                lblPhaseInstruction.setBorder(BorderFactory.createMatteBorder(0, 1, 1, 1, Color.DARK_GRAY));
-                lblPhaseInstruction.setVisible(true);
+                setStandardPanelsVisible(false);
+                colorizeActivePhase(null);
+                return;
             }
-            
-            setStandardPanelsVisible(false);
-            
-            colorizeActivePhase(null);
-            return;
         }
 
         if (orComp == null) {
@@ -2255,12 +2289,12 @@ disableRoutesDisplay();
                 // Fallback
             }
 
-
-// Calculate Interest Cost using the BondsModel_1817 rate
+            // Calculate Interest Cost using the BondsModel_1817 rate
             int interestRate = 0;
             GameUIManager gum = orUIManager.getGameUIManager();
             if (gum != null && gum.getGameManager() instanceof net.sf.rails.game.specific._1817.GameManager_1817) {
-                net.sf.rails.game.model.BondsModel bm = ((net.sf.rails.game.specific._1817.GameManager_1817) gum.getGameManager()).getBondsModel();
+                net.sf.rails.game.model.BondsModel bm = ((net.sf.rails.game.specific._1817.GameManager_1817) gum
+                        .getGameManager()).getBondsModel();
                 if (bm instanceof net.sf.rails.game.specific._1817.BondsModel_1817) {
                     interestRate = ((net.sf.rails.game.specific._1817.BondsModel_1817) bm).getInterestRate();
                 }
@@ -2279,8 +2313,6 @@ disableRoutesDisplay();
             sb.append("</center></html>");
 
             lblLoans.setText(sb.toString());
-
-
 
         }
 
@@ -2430,7 +2462,6 @@ disableRoutesDisplay();
         }
     }
 
-
     private boolean isActionListEmpty(ActionButton btn) {
         return btn.getPossibleActions() == null || btn.getPossibleActions().isEmpty();
     }
@@ -2464,6 +2495,11 @@ disableRoutesDisplay();
             label = action.getButtonLabel();
             if (label == null || label.isEmpty())
                 label = action.toString();
+        } else if (action instanceof DiscardTrain) {
+            bgColor = UITheme.ACTION_DISCARD; // Crimson Red
+            borderColor = Color.BLACK;
+            textColor = Color.WHITE;
+            label = action.getButtonLabel();
         } else if (action instanceof GuiTargetedAction) {
 
             GuiTargetedAction gta = (GuiTargetedAction) action;
@@ -2484,8 +2520,9 @@ disableRoutesDisplay();
             bgColor = UITheme.ACTION_SKIP;
             borderColor = bgColor.darker();
             textColor = Color.WHITE;
-            
-            if (orUIManager != null && orUIManager.getGameUIManager() != null && orUIManager.getGameUIManager().getGameManager() != null) {
+
+            if (orUIManager != null && orUIManager.getGameUIManager() != null
+                    && orUIManager.getGameUIManager().getGameManager() != null) {
                 RoundFacade currentRound = orUIManager.getGameUIManager().getGameManager().getCurrentRound();
                 if (currentRound != null && currentRound.getClass().getSimpleName().contains("Formation")) {
                     bgColor = new Color(152, 251, 152); // PaleGreen
@@ -2646,34 +2683,32 @@ disableRoutesDisplay();
                         .getCurrentRound();
                 if (rf != null) {
                     String rfName = rf.getClass().getSimpleName();
-                   
 
-
-boolean hasOpComp = false;
+                    boolean hasOpComp = false;
                     try {
                         rf.getClass().getMethod("getOperatingCompany");
                         hasOpComp = true;
-                    } catch (Exception e) {}
+                    } catch (Exception e) {
+                    }
 
-boolean isOperatingPhase = rf instanceof net.sf.rails.game.OperatingRound ||
-                                               rfName.contains("Operating") ||
-                                               rfName.contains("Merger") ||
-                                               rfName.contains("Formation") ||
-                                               rfName.contains("CoalExchange") ||
-                                               hasOpComp;
+                    boolean isOperatingPhase = rf instanceof net.sf.rails.game.OperatingRound ||
+                            rfName.contains("Operating") ||
+                            rfName.contains("Merger") ||
+                            rfName.contains("Formation") ||
+                            rfName.contains("CoalExchange") ||
+                            hasOpComp;
 
                     if (!isOperatingPhase) {
                         finish();
                         if (lblCompanyInfo != null) {
-                            String cleanName = rfName.replace("Round", "").replaceAll("([a-z])([A-Z]+)", "$1 $2").trim();
-                            lblCompanyInfo.setText("<html><center><font face='SansSerif' size='5'><b>" + cleanName + " Phase</b></font></center></html>");
+                            String cleanName = rfName.replace("Round", "").replaceAll("([a-z])([A-Z]+)", "$1 $2")
+                                    .trim();
+                            lblCompanyInfo.setText("<html><center><font face='SansSerif' size='5'><b>" + cleanName
+                                    + " Phase</b></font></center></html>");
                         }
                         return; // Force dormancy: prevents lingering actions from being processed
                     }
                     isMaARound = rfName.contains("Merger") || rfName.contains("Formation");
-
-
-
 
                     if (rf instanceof net.sf.rails.game.OperatingRound) {
                         engineActiveComp = ((net.sf.rails.game.OperatingRound) rf).getOperatingCompany();
@@ -2687,17 +2722,19 @@ boolean isOperatingPhase = rf instanceof net.sf.rails.game.OperatingRound ||
                 }
             }
 
-            // THE CONTEXT OVERRIDE: 
-            // If the engine demands a discard, the actor might not match the nominal "Operating Company"
-            // We scan for DiscardTrain actions and forcibly redirect the UI focus to the discarding company.
+            // THE CONTEXT OVERRIDE:
+            // If the engine demands a discard, the actor might not match the nominal
+            // "Operating Company"
+            // We scan for DiscardTrain actions and forcibly redirect the UI focus to the
+            // discarding company.
             if (actions != null) {
                 for (PossibleAction pa : actions) {
                     if (pa instanceof DiscardTrain) {
-                        net.sf.rails.game.Company targetComp = ((DiscardTrain) pa).getCompany();
-                        if (targetComp instanceof PublicCompany) {
-                            engineActiveComp = (PublicCompany) targetComp;
+                        net.sf.rails.game.state.Owner targetActor = ((DiscardTrain) pa).getActor();
+                        if (targetActor instanceof PublicCompany) {
+                            engineActiveComp = (PublicCompany) targetActor;
                             // Once we find a discard context, we lock it in and stop searching
-                            break; 
+                            break;
                         }
                     }
                 }
@@ -2711,26 +2748,24 @@ boolean isOperatingPhase = rf instanceof net.sf.rails.game.OperatingRound ||
                 this.orComp = this.currentOperatingComp;
             }
 
-            
-
-// 3. FILTER & DETECT SPECIAL ACTIONS
+            // 3. FILTER & DETECT SPECIAL ACTIONS
             List<PossibleAction> specialActions = new ArrayList<>();
             GuiTargetedAction contextProvider = null;
             PossibleAction deferredNullAction = null;
-            
+
             // Create a strictly filtered list for all downstream logic
             List<PossibleAction> validOrActions = new ArrayList<>();
 
             for (PossibleAction pa : actions) {
                 String paName = pa.getClass().getSimpleName();
-                
+
                 // Exclude pure bidding/auction actions from ORPanel
-                boolean isStatusWindowExclusive = paName.contains("Bid") || 
-                                                  paName.contains("SettleIPO") || 
-                                                  paName.equals("Short1817");
+                boolean isStatusWindowExclusive = paName.contains("Bid") ||
+                        paName.contains("SettleIPO") ||
+                        paName.equals("Short1817");
 
                 if (isStatusWindowExclusive) {
-                    continue; 
+                    continue;
                 }
 
                 validOrActions.add(pa);
@@ -2758,15 +2793,16 @@ boolean isOperatingPhase = rf instanceof net.sf.rails.game.OperatingRound ||
 
             // THE DORMANCY INTERCEPT (Hardened)
             boolean onlyPassRemains = validOrActions.size() == 1 && deferredNullAction != null;
-      
-            // Rule: The panel must remain active if the user needs to explicitly click 'Done'
+
+            // Rule: The panel must remain active if the user needs to explicitly click
+            // 'Done'
             if (validOrActions.isEmpty() || (specialActions.isEmpty() && !hasStandardActions)) {
                 specialModeActive = false;
-                
+
                 // Leverage the native finish() method to rigorously wipe all panels,
                 // clear actions, and reset the header styling.
                 finish();
-                
+
                 // Hard physical refresh of the container hierarchy
                 if (sidebarPanel != null) {
                     sidebarPanel.revalidate();
@@ -2774,11 +2810,10 @@ boolean isOperatingPhase = rf instanceof net.sf.rails.game.OperatingRound ||
                 }
                 this.revalidate();
                 this.repaint();
-                
+
                 return; // Abort further ORPanel processing
 
             }
-          
 
             // --- 6. STANDARD MODE (OR MIXED) ---
             this.specialModeActive = false;
@@ -2806,7 +2841,7 @@ boolean isOperatingPhase = rf instanceof net.sf.rails.game.OperatingRound ||
                 enableConfirm(hasSelection);
             }
 
-distributeStandardActions(validOrActions);
+            distributeStandardActions(validOrActions);
             updateSidebarData();
             updatePhaseSpecifics();
 
