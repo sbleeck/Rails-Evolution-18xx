@@ -1534,7 +1534,13 @@ currentRoundName = "Game Start";
     // built around the money format, including the Currency class,
     // look completely redundant to me.
     public String format(int amount) {
-        return Bank.format(railsRoot, amount);
+        String formatted = Bank.format(railsRoot, amount);
+        
+        // Strip currency symbols if configured centrally to declutter the UI
+        if ("yes".equalsIgnoreCase(Config.get("ui.hide_currency_symbols"))) {
+            return formatted.replaceAll("[^\\d\\.,-]", "").trim();
+        }
+        return formatted;
     }
 
     /**

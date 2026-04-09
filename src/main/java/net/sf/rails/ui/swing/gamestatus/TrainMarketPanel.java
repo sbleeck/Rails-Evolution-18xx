@@ -36,6 +36,7 @@ public class TrainMarketPanel extends JPanel {
     public final JLabel[] poolTrainInfoLabels;
     public final JLabel[] newTrainQtyLabels;
     public final JLabel[] futureTrainInfoLabels;
+    public static final String FONT_FAMILY_CURRENCY = "Monospaced";
 
     public TrainMarketPanel(ButtonGroup buySellGroup, java.awt.event.ActionListener listener, Font stickyFont) {
         setLayout(new GridBagLayout());
@@ -115,8 +116,18 @@ public class TrainMarketPanel extends JPanel {
             slot.add(cards[i], BorderLayout.NORTH);
 
             labels[i] = new JLabel(" ", SwingConstants.CENTER);
-            labels[i].setFont(new Font("SansSerif", Font.PLAIN, 10));
+            int fontSize = (font != null) ? font.getSize() : 12;
+            labels[i].setFont(new Font(FONT_FAMILY_CURRENCY, Font.BOLD, fontSize));
             labels[i].setForeground(Color.BLACK);
+
+            // Add scaling protection against global UI font overrides
+            final JLabel lbl = labels[i];
+            lbl.addPropertyChangeListener("font", evt -> {
+                Font f = (Font) evt.getNewValue();
+                if (f != null && (!FONT_FAMILY_CURRENCY.equals(f.getFamily()) || f.getStyle() != Font.BOLD)) {
+                    lbl.setFont(new Font(FONT_FAMILY_CURRENCY, Font.BOLD, f.getSize()));
+                }
+            });
             slot.add(labels[i], BorderLayout.CENTER);
 
             parent.add(slot);

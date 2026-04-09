@@ -203,6 +203,25 @@ public class GameStatus extends GridPanel {
 
     private final List<String> selectedPrivateIds = new ArrayList<>();
 
+    public static final String FONT_FAMILY_CURRENCY = "Monospaced";
+    public static final Color COLOR_CURRENCY = new Color(0, 0, 128); // Navy Blue
+
+    protected void applyCurrencyFont(JComponent comp) {
+        Font base = (stickyFont != null) ? stickyFont : comp.getFont();
+        if (base == null)
+            base = new Font("SansSerif", Font.BOLD, 12);
+        comp.setFont(new Font(FONT_FAMILY_CURRENCY, Font.BOLD, base.getSize()));
+        comp.setForeground(COLOR_CURRENCY);
+
+        // Ensure font scales correctly when StatusWindow forces global font updates
+        comp.addPropertyChangeListener("font", evt -> {
+            Font f = (Font) evt.getNewValue();
+            if (f != null && (!FONT_FAMILY_CURRENCY.equals(f.getFamily()) || f.getStyle() != Font.BOLD)) {
+                comp.setFont(new Font(FONT_FAMILY_CURRENCY, Font.BOLD, f.getSize()));
+            }
+        });
+    }
+
     @Override
     public void setFont(Font f) {
         super.setFont(f);
@@ -1935,10 +1954,9 @@ public class GameStatus extends GridPanel {
             return;
         }
 
-// Ensure text visibility persists (Strict Trim Check)
+        // Ensure text visibility persists (Strict Trim Check)
         int pct = ipo.getShare(companies[i]);
         String shareTxt = formatShareText(pct, companies[i], false);
-
 
         boolean hasContent = (shareTxt != null && !shareTxt.trim().isEmpty() && !shareTxt.trim().equals("0"));
 
@@ -2015,7 +2033,7 @@ public class GameStatus extends GridPanel {
             return;
         }
 
-// Ensure text visibility persists
+        // Ensure text visibility persists
         int pct = pool.getShare(companies[i]);
         String shareTxt = formatShareText(pct, companies[i], false);
 
@@ -2077,10 +2095,10 @@ public class GameStatus extends GridPanel {
             return;
         }
 
-// Text Content
+        // Text Content
         int pct = companies[i].getPortfolioModel().getShare(companies[i]);
         String shareTxt = formatShareText(pct, companies[i], false);
-        
+
         boolean hasContent = (shareTxt != null && !shareTxt.isEmpty() && !shareTxt.equals("0"));
 
         treasuryShareCards[i].setVisible(hasContent);
@@ -2192,7 +2210,7 @@ public class GameStatus extends GridPanel {
                 playerFixedIncome[i].setText("");
             }
 
-            playerFixedIncome[i].setForeground(Color.BLACK);
+            playerFixedIncome[i].setForeground(COLOR_CURRENCY);
         }
     }
 
@@ -2559,7 +2577,7 @@ public class GameStatus extends GridPanel {
                 if (lbl != null) {
                     String qtyStr = tct.hasInfiniteQuantity() ? "\u221E" : "(" + count + ")";
                     lbl.setText("<html><center>" + qtyStr + "<br>" +
-                            "<font color='#000080'><b>" + gameUIManager.format(cost) + "</b></font>" +
+                            "<font face='" + FONT_FAMILY_CURRENCY + "' color='#000080'><b>" + gameUIManager.format(cost) + "</b></font>" +
                             "</center></html>");
                     lbl.setVisible(true);
                 }
@@ -2675,7 +2693,7 @@ public class GameStatus extends GridPanel {
                 if (lbl != null) {
                     String qtyStr = tct.hasInfiniteQuantity() ? "\u221E" : "(" + tct.getQuantity() + ")";
                     lbl.setText("<html><center>" + qtyStr + "<br>" +
-                            "<font color='#000080'><b>" + (cost > 0 ? gameUIManager.format(cost) : "") + "</b></font>" +
+                            "<font face='" + FONT_FAMILY_CURRENCY + "' color='#000080'><b>" + (cost > 0 ? gameUIManager.format(cost) : "") + "</b></font>" +
                             "</center></html>");
                     lbl.setVisible(true);
                 }
@@ -2893,9 +2911,9 @@ public class GameStatus extends GridPanel {
                 poolShareCards[i].getCertificates().clear();
                 poolShareCards[i].getCertificates().addAll(pool.getCertificates(c));
 
-int pct = pool.getShare(c);
+                int pct = pool.getShare(c);
                 String shareTxt = formatShareText(pct, c, false);
-                
+
                 if (shareTxt == null)
                     shareTxt = "";
 
@@ -2924,11 +2942,8 @@ int pct = pool.getShare(c);
                     poolPriceLabels[i].setText(gameUIManager.format(c.getCurrentSpace().getPrice()));
                     poolPriceLabels[i].setForeground(new Color(0, 0, 128)); // Navy Blue
 
-                    // Use stickyFont if available (Zoom preserved), otherwise current font
-                    Font baseFont = (stickyFont != null) ? stickyFont : poolPriceLabels[i].getFont();
-                    if (baseFont != null) {
-                        poolPriceLabels[i].setFont(baseFont.deriveFont(Font.BOLD));
-                    }
+                    applyCurrencyFont(poolPriceLabels[i]);
+
                     poolPriceLabels[i].setHorizontalAlignment(SwingConstants.RIGHT);
 
                     // TRANSPARENCY: Force labels to be transparent so they inherit the row color
@@ -2954,7 +2969,7 @@ int pct = pool.getShare(c);
                 ipoShareCards[i].getCertificates().clear();
                 ipoShareCards[i].getCertificates().addAll(ipo.getCertificates(c));
 
-int pct = ipo.getShare(c);
+                int pct = ipo.getShare(c);
                 String shareTxt = formatShareText(pct, c, false);
 
                 if (shareTxt == null)
@@ -2992,12 +3007,8 @@ int pct = ipo.getShare(c);
                     ipoParLabels[i].setText(gameUIManager.format(price));
                     ipoParLabels[i].setForeground(new Color(0, 0, 128)); // Navy Blue
 
-                    // FORMATTING: Right Align + Bigger Font
-                    // Use stickyFont if available (Zoom preserved)
-                    Font baseFont = (stickyFont != null) ? stickyFont : ipoParLabels[i].getFont();
-                    if (baseFont != null) {
-                        ipoParLabels[i].setFont(baseFont.deriveFont(Font.BOLD));
-                    }
+                    applyCurrencyFont(ipoParLabels[i]);
+
                     ipoParLabels[i].setHorizontalAlignment(SwingConstants.RIGHT);
                     // ipoParLabels[i].setPreferredSize(new Dimension(30, 20));
                 } else {
@@ -3016,9 +3027,9 @@ int pct = ipo.getShare(c);
                     osiShareCards[i].getCertificates().clear();
                     osiShareCards[i].getCertificates().addAll(osi.getCertificates(c));
 
-int pct = osi.getShare(c);
+                    int pct = osi.getShare(c);
                     String shareTxt = formatShareText(pct, c, false);
-                                        if (shareTxt == null)
+                    if (shareTxt == null)
                         shareTxt = "";
 
                     String trimmed = shareTxt.trim();
@@ -3232,7 +3243,7 @@ int pct = osi.getShare(c);
                         card.getCertificates().clear();
                         card.getCertificates().addAll(player.getPortfolioModel().getCertificates(c));
 
-int pctHeld = player.getPortfolioModel().getShare(c);
+                        int pctHeld = player.getPortfolioModel().getShare(c);
                         boolean isPresident = player.equals(c.getPresident());
                         String cleanText = formatShareText(pctHeld, c, isPresident);
                         boolean isZero = (pctHeld == 0);
@@ -3242,14 +3253,11 @@ int pctHeld = player.getPortfolioModel().getShare(c);
                         if (!isZero) {
                             card.setOpaque(true);
 
-
                             // TEXT LOGIC: Only show "Owner" for Minors (no stock price).
                             if (!c.hasStockPrice() && pctHeld == 100) {
-                                cleanText = c.getId(); 
+                                cleanText = c.getId();
                                 card.setCompanyDetailsTooltip(c);
                             }
-
-
 
                             // 2. BOLD LOGIC: Only bold the President's share ("P") or Owner
                             boolean isPrez = cleanText.contains("P") || cleanText.equals("Owner");
@@ -3625,9 +3633,11 @@ int pctHeld = player.getPortfolioModel().getShare(c);
     }
 
     protected String formatShareText(int percentage, PublicCompany c, boolean isPresident) {
-        if (percentage == 0) return "";
+        if (percentage == 0)
+            return "";
         String text = percentage + "%";
-        if (isPresident) text += "P";
+        if (isPresident)
+            text += "P";
         return text;
     }
 
@@ -3660,7 +3670,7 @@ int pctHeld = player.getPortfolioModel().getShare(c);
         int pct = osi.getShare(companies[i]);
         String shareTxt = formatShareText(pct, companies[i], false);
 
-  boolean hasContent = (shareTxt != null && !shareTxt.trim().isEmpty() && !shareTxt.trim().equals("0")
+        boolean hasContent = (shareTxt != null && !shareTxt.trim().isEmpty() && !shareTxt.trim().equals("0")
                 && !shareTxt.trim().equals("0%"));
 
         osiShareCards[i].setVisible(hasContent);
@@ -4006,7 +4016,6 @@ int pctHeld = player.getPortfolioModel().getShare(c);
         repaint();
     }
 
-
     // Changed to 'public static' to allow ORPanel to reuse this logic
     public static void configureTrainButton(ClickField btn, String text, boolean isBuyable) {
         // 1. Strict Sizing
@@ -4092,7 +4101,7 @@ int pctHeld = player.getPortfolioModel().getShare(c);
             int cost = representative.getType().getCost();
             if (lbl != null) {
                 lbl.setText("<html><center>(" + count + ")<br>" +
-                        "<font color='#000080'><b>" + gameUIManager.format(cost) + "</b></font>" +
+                        "<font face='" + FONT_FAMILY_CURRENCY + "' color='#000080'><b>" + gameUIManager.format(cost) + "</b></font>" +
                         "</center></html>");
             }
 
@@ -4175,28 +4184,27 @@ int pctHeld = player.getPortfolioModel().getShare(c);
     // A "weaker" background for placeholders (Pale Beige/White)
     private static final Color BG_PLACEHOLDER = new Color(250, 250, 245);
 
-
     // --- START FIX ---
     private void calculateDynamicDimensions() {
         Font f = (stickyFont != null) ? stickyFont : new Font("SansSerif", Font.BOLD, 12);
         FontMetrics fm = getFontMetrics(f);
-        
+
         // Base height is font height plus minimal padding to prevent clipping
         int baseHeight = fm.getHeight() + 4;
-        
-        // Calculate exact string widths for critical headers instead of using the excessively wide 'W'
+
+        // Calculate exact string widths for critical headers instead of using the
+        // excessively wide 'W'
         int wStd = fm.stringWidth("Dividend") + 8;
         int wPlayer = fm.stringWidth("Player W") + 8;
         int wTokens = fm.stringWidth("TOKENS") + 8;
         int wTrain = fm.stringWidth("TRAINS") + 8;
 
-        dimStd = new Dimension((int)(wStd * globalWidthScaler), baseHeight);
-        dimPlayer = new Dimension((int)(wPlayer * globalWidthScaler), baseHeight);
-        dimTokens = new Dimension((int)(wTokens * globalWidthScaler), baseHeight);
-        dimTrain = new Dimension((int)(wTrain * globalWidthScaler), baseHeight);
+        dimStd = new Dimension((int) (wStd * globalWidthScaler), baseHeight);
+        dimPlayer = new Dimension((int) (wPlayer * globalWidthScaler), baseHeight);
+        dimTokens = new Dimension((int) (wTokens * globalWidthScaler), baseHeight);
+        dimTrain = new Dimension((int) (wTrain * globalWidthScaler), baseHeight);
     }
-// --- END FIX ---
-
+    // --- END FIX ---
 
     protected void initFields() {
 
@@ -4281,7 +4289,6 @@ int pctHeld = player.getPortfolioModel().getShare(c);
             poolShareCards = new RailCard[nc];
         if (poolPriceLabels == null || poolPriceLabels.length != nc)
             poolPriceLabels = new javax.swing.JLabel[nc];
-
 
         if (playerSharePanels == null || playerSharePanels.length != nc)
             playerSharePanels = new JPanel[nc][np];
@@ -4469,7 +4476,7 @@ int pctHeld = player.getPortfolioModel().getShare(c);
             f = new Caption(LocalText.getText("TREASURY"));
             f.setBorder(BorderFactory.createMatteBorder(0, 0, 1, 1, Color.GRAY));
 
-f.setPreferredSize(dimStd);
+            f.setPreferredSize(dimStd);
             f.setBackground(BG_HEADER);
             f.setOpaque(true);
             addField(f, certInTreasuryXOffset, 1, 1, 1, 0, true);
@@ -4478,7 +4485,7 @@ f.setPreferredSize(dimStd);
         if (hasOSI) {
             f = new Caption("OSI");
             f.setBorder(BorderFactory.createMatteBorder(0, 0, 1, 4, Color.BLACK));
-f.setPreferredSize(dimStd);
+            f.setPreferredSize(dimStd);
             f.setBackground(BG_HEADER);
             f.setOpaque(true);
             addField(f, certInOSIXOffset, 1, 1, 1, 0, true);
@@ -4489,9 +4496,11 @@ f.setPreferredSize(dimStd);
         f = new Caption(cashHeaderTxt);
         f.setBorder(BorderFactory.createCompoundBorder(BORDER_THIN, BorderFactory.createEmptyBorder(0, 0, 0, 5)));
         ((JLabel) f).setHorizontalAlignment(SwingConstants.RIGHT);
+        applyCurrencyFont(f);
+
         f.setBackground(BG_HEADER);
         f.setOpaque(true);
-f.setPreferredSize(dimStd);
+        f.setPreferredSize(dimStd);
         addField(f, compCashXOffset, 1, 1, 1, 0, true);
 
         // 1. Trains Header
@@ -4499,7 +4508,7 @@ f.setPreferredSize(dimStd);
         f.setBorder(BORDER_THIN);
         f.setBackground(BG_HEADER);
         f.setOpaque(true);
-f.setPreferredSize(dimStd);
+        f.setPreferredSize(dimStd);
         addField(f, compTrainsXOffset, 1, 1, 1, 0, true);
 
         // 2. Dividend Header
@@ -4508,7 +4517,7 @@ f.setPreferredSize(dimStd);
         ((JLabel) f).setHorizontalAlignment(SwingConstants.RIGHT);
         f.setBackground(BG_HEADER);
         f.setOpaque(true);
-f.setPreferredSize(dimStd);
+        f.setPreferredSize(dimStd);
         addField(f, compRevenueXOffset, 1, 1, 1, 0, true);
 
         // 3. Retained Header
@@ -4725,24 +4734,24 @@ f.setPreferredSize(dimStd);
 
             // DELEGATE SIZING TO RAILCARD STATIC CALCULATOR
             // compactMode = false (Standard Share Width)
-Dimension refDim = RailCard.calculateBaseSize(sizingFont, false, globalWidthScaler);
+            Dimension refDim = RailCard.calculateBaseSize(sizingFont, false, globalWidthScaler);
 
-        int masterHeight = refDim.height;
-        int wCard = refDim.width;
+            int masterHeight = refDim.height;
+            int wCard = refDim.width;
 
-        // Accessories (Prices/Dots) still need a calculated width relative to font
-        FontMetrics fm = java.awt.Toolkit.getDefaultToolkit().getFontMetrics(sizingFont);
-        int charWidth = fm.charWidth('0');
-        // int wPrice = (charWidth * 3) + 6;
-        // Adjusted to fit "$123" (Currency symbol + 3 digits)
-        // --- DELETE --- int wPrice = fm.stringWidth("$999") + 10;
-        int wPrice = (int)((fm.stringWidth("$999") + 10) * globalWidthScaler);
+            // Accessories (Prices/Dots) still need a calculated width relative to font
+            FontMetrics fm = java.awt.Toolkit.getDefaultToolkit().getFontMetrics(sizingFont);
+            int charWidth = fm.charWidth('0');
+            // int wPrice = (charWidth * 3) + 6;
+            // Adjusted to fit "$123" (Currency symbol + 3 digits)
+            // --- DELETE --- int wPrice = fm.stringWidth("$999") + 10;
+            int wPrice = (int) ((fm.stringWidth("$999") + 10) * globalWidthScaler);
 
-        int wDot = Math.max(8, masterHeight / 2);
+            int wDot = Math.max(8, masterHeight / 2);
 
-        Dimension dimCard = new Dimension(wCard, masterHeight);
-        Dimension dimPrice = new Dimension(wPrice, masterHeight);
-        Dimension dimDot = new Dimension(wDot, masterHeight);
+            Dimension dimCard = new Dimension(wCard, masterHeight);
+            Dimension dimPrice = new Dimension(wPrice, masterHeight);
+            Dimension dimDot = new Dimension(wDot, masterHeight);
 
             // 4. PLAYER COLUMNS
             for (int j = 0; j < np; j++) {
@@ -4796,8 +4805,9 @@ Dimension refDim = RailCard.calculateBaseSize(sizingFont, false, globalWidthScal
                 poolShareCards[i].setFont(stickyFont);
 
             poolPriceLabels[i] = new Caption("");
-            Font baseFont = (stickyFont != null) ? stickyFont : poolPriceLabels[i].getFont();
-            poolPriceLabels[i].setFont(baseFont.deriveFont(Font.BOLD));
+
+            applyCurrencyFont(poolPriceLabels[i]);
+
             poolPriceLabels[i].setForeground(new Color(0, 0, 128));
             poolPriceLabels[i].setHorizontalAlignment(SwingConstants.RIGHT);
             // TRANSPARENCY: Force labels to be transparent so they inherit the row color
@@ -4817,7 +4827,8 @@ Dimension refDim = RailCard.calculateBaseSize(sizingFont, false, globalWidthScal
                 ipoShareCards[i].setFont(stickyFont);
 
             ipoParLabels[i] = new Caption("");
-            ipoParLabels[i].setFont(baseFont.deriveFont(Font.BOLD));
+            applyCurrencyFont(ipoParLabels[i]);
+
             ipoParLabels[i].setForeground(Color.BLACK);
             ipoParLabels[i].setHorizontalAlignment(SwingConstants.RIGHT);
             ipoParLabels[i].setOpaque(false);
@@ -4859,7 +4870,8 @@ Dimension refDim = RailCard.calculateBaseSize(sizingFont, false, globalWidthScal
                     osiShareCards[i].setFont(stickyFont);
 
                 osiLabels[i] = new Caption("");
-                osiLabels[i].setFont(baseFont.deriveFont(Font.BOLD));
+                applyCurrencyFont(osiLabels[i]);
+
                 osiLabels[i].setForeground(Color.RED);
                 osiLabels[i].setHorizontalAlignment(SwingConstants.RIGHT);
                 osiLabels[i].setOpaque(false);
@@ -4901,7 +4913,8 @@ Dimension refDim = RailCard.calculateBaseSize(sizingFont, false, globalWidthScal
             f.setBorder(BorderFactory.createCompoundBorder(bDet, BorderFactory.createEmptyBorder(0, 0, 0, 5)));
             ((JLabel) f).setHorizontalAlignment(SwingConstants.RIGHT);
 
-f.setPreferredSize(dimStd);
+            applyCurrencyFont(f);
+            f.setPreferredSize(dimStd);
             addField(f, compCashXOffset, y, 1, 1, 0, visible);
 
             f = compCashButton[i] = new ClickField(compCash[i].getText(), CASH_CORRECT_CMD, "", this, buySellGroup);
@@ -4925,7 +4938,8 @@ f.setPreferredSize(dimStd);
 
                 RailCard cf = new RailCard((net.sf.rails.game.Train) null, buySellGroup);
                 cf.addActionListener(this);
-                if (stickyFont != null) cf.setFont(stickyFont);
+                if (stickyFont != null)
+                    cf.setFont(stickyFont);
                 cf.setCompactMode(true);
                 cf.setBackground(BG_CARD_PASSIVE);
                 cf.setVisible(false);
@@ -4959,9 +4973,9 @@ f.setPreferredSize(dimStd);
             f.setOpaque(true);
             f.setBorder(BorderFactory.createCompoundBorder(bDet, BorderFactory.createEmptyBorder(0, 0, 0, 5)));
             ((JLabel) f).setHorizontalAlignment(SwingConstants.RIGHT);
-            if (f.getFont() != null)
-                f.setFont(f.getFont().deriveFont(Font.BOLD));
-f.setPreferredSize(dimStd);
+            applyCurrencyFont(f);
+
+            f.setPreferredSize(dimStd);
             addField(f, compRevenueXOffset, y, 1, 1, 0, visible);
 
             // 3. RETAINED FIELD
@@ -4987,9 +5001,9 @@ f.setPreferredSize(dimStd);
             f.setOpaque(true);
             f.setBorder(BorderFactory.createCompoundBorder(bDet, BorderFactory.createEmptyBorder(0, 0, 0, 5)));
             ((JLabel) f).setHorizontalAlignment(SwingConstants.RIGHT);
-            if (f.getFont() != null)
-                f.setFont(f.getFont().deriveFont(Font.BOLD));
-f.setPreferredSize(dimStd);
+            applyCurrencyFont(f);
+
+            f.setPreferredSize(dimStd);
 
             // Restore Coal Mine tooltip logic for Retained column
             net.sf.rails.game.PrivateCompany coalMine = null;
@@ -5055,6 +5069,8 @@ f.setPreferredSize(dimStd);
         // Cash
         f = new Caption(LocalText.getText("CASH"));
         f.setBorder(BORDER_THIN);
+        applyCurrencyFont(f);
+
         f.setBackground(BG_HEADER);
         f.setOpaque(true);
         addField(f, compNameCol, playerCashYOffset, 1, 1, 0, true);
@@ -5090,15 +5106,15 @@ f.setPreferredSize(dimStd);
                     }
 
                     if (!isDebt) {
-                        this.setForeground(Color.BLACK);
+                        this.setForeground(COLOR_CURRENCY);
                         super.setText(t);
                     }
                 }
             };
 
             f.setBorder(BORDER_THIN);
-            Font currentFont = f.getFont();
-            f.setFont(currentFont.deriveFont(Font.BOLD, currentFont.getSize()));
+            applyCurrencyFont(f);
+
             f.setPreferredSize(dimPlayer);
             gbc.weightx = 1.0;
             addField(f, certPerPlayerXOffset + i, playerCashYOffset, 1, 1, 0, true);
@@ -5148,8 +5164,7 @@ f.setPreferredSize(dimStd);
         }
     }
 
-
-// ... (lines of unchanged context code) ...
+    // ... (lines of unchanged context code) ...
     private void initTrainMarket() {
         int trainY_Header = playerPrivatesYOffset; // We map the top of the new panel to this row
 
@@ -5160,14 +5175,16 @@ f.setPreferredSize(dimStd);
 
         // Span the rest of the grid
         int spanFut = (rightCompCaptionXOffset - colFut);
-        if (spanFut < 1) spanFut = 1;
+        if (spanFut < 1)
+            spanFut = 1;
         int totalSpan = (colFut + spanFut) - colUsed;
 
         // --- START FIX ---
         // 1. Instantiate the extracted panel
         trainMarketPanel = new net.sf.rails.ui.swing.gamestatus.TrainMarketPanel(buySellGroup, this, stickyFont);
 
-        // 2. Map the legacy arrays to the new panel's arrays so population logic doesn't break
+        // 2. Map the legacy arrays to the new panel's arrays so population logic
+        // doesn't break
         this.poolTrainsPanel = trainMarketPanel.poolTrainsPanel;
         this.newTrainsPanel = trainMarketPanel.newTrainsPanel;
         this.futureTrainsPanel = trainMarketPanel.futureTrainsPanel;
@@ -5180,13 +5197,14 @@ f.setPreferredSize(dimStd);
         this.newTrainQtyLabels = trainMarketPanel.newTrainQtyLabels;
         this.futureTrainInfoLabels = trainMarketPanel.futureTrainInfoLabels;
 
-        // 3. Add the single composite panel to the grid spanning both Header and Data rows
+        // 3. Add the single composite panel to the grid spanning both Header and Data
+        // rows
         gbc.anchor = GridBagConstraints.NORTH;
         gbc.fill = GridBagConstraints.BOTH;
         addField(trainMarketPanel, colUsed, trainY_Header, totalSpan, 2, 0, true);
         // --- END FIX ---
     }
-// ... (rest of the method) ...
+    // ... (rest of the method) ...
 
     private void initBankAndTimer() {
         int bankY = playerTimerYOffset;
@@ -5203,6 +5221,7 @@ f.setPreferredSize(dimStd);
         for (int i = 0; i < np; i++) {
             f = playerFixedIncome[i] = new Field("");
             f.setBorder(BORDER_THIN);
+            applyCurrencyFont(f);
             f.setPreferredSize(dimPlayer);
             gbc.weightx = 1.0;
             addField(f, certPerPlayerXOffset + i, playerFixedIncomeYOffset, 1, 1, 0, true);
@@ -5241,8 +5260,8 @@ f.setPreferredSize(dimStd);
             bankCash.setBorder(BORDER_BOX);
             bankCash.setBackground(BG_BANK);
             bankCash.setOpaque(true);
-            Font bankFont = bankCash.getFont();
-            bankCash.setFont(bankFont.deriveFont(Font.BOLD, bankFont.getSize()));
+            applyCurrencyFont(bankCash);
+
             addField(bankCash, bankX, bankY - 4, 1, 1, 0, true);
         }
 
