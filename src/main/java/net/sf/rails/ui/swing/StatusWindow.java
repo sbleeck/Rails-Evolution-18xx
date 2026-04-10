@@ -263,7 +263,6 @@ public class StatusWindow extends JFrame implements ActionListener, ActionPerfor
         actionMenuItem.setPossibleAction(new GameAction(gameUIManager.getRoot(), GameAction.Mode.NEW));
         fileMenu.add(actionMenuItem);
 
-   
         JMenuItem loadJsonItem = new JMenuItem("Load JSON State...");
         loadJsonItem.addActionListener(new ActionListener() {
             @Override
@@ -285,7 +284,6 @@ public class StatusWindow extends JFrame implements ActionListener, ActionPerfor
             }
         });
         fileMenu.add(loadJsonItem);
-        
 
         actionMenuItem = new ActionMenuItem(LocalText.getText("SAVE"));
         actionMenuItem.setActionCommand(SAVE_CMD);
@@ -750,7 +748,7 @@ public class StatusWindow extends JFrame implements ActionListener, ActionPerfor
         }
         PossibleAction executedAction = null;
 
-if (actions != null && !actions.isEmpty()) {
+        if (actions != null && !actions.isEmpty()) {
             executedAction = actions.get(0);
         }
 
@@ -1263,7 +1261,6 @@ if (actions != null && !actions.isEmpty()) {
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         setupHotkeys();
 
-
         final JFrame frame = this;
         final GameUIManager guiMgr = gameUIManager;
         addWindowListener(new WindowAdapter() {
@@ -1358,24 +1355,24 @@ if (actions != null && !actions.isEmpty()) {
         if (gameStatus != null && gameStatusPane != null) {
             // 1. Force the ScrollPane to request the full, un-clipped size of the grid
             Dimension gridRequiredSize = gameStatus.getPreferredSize();
-            
+
             // Add a small 15px buffer to ensure OS window borders don't trigger scrollbars
             gridRequiredSize.width += 30;
             gridRequiredSize.height += 40;
-            
+
             gameStatusPane.setMinimumSize(gridRequiredSize);
             gameStatusPane.setPreferredSize(gridRequiredSize);
         }
-        
+
         // 2. Let the layout manager bubble up the new size constraints
         pane.revalidate();
-        
-        // 3. Lock the OS window bounds. 
-        // This allows the user to expand the window, but physically prevents them 
+
+        // 3. Lock the OS window bounds.
+        // This allows the user to expand the window, but physically prevents them
         // from shrinking it smaller than the required layout size.
         this.setMinimumSize(this.getPreferredSize());
     }
-// --- END FIX ---
+    // --- END FIX ---
 
     private void updateComponentTreeFont(Component comp, Font font) {
         comp.setFont(font);
@@ -1485,8 +1482,9 @@ if (actions != null && !actions.isEmpty()) {
                 net.sf.rails.game.specific._1817.MergerAndAcquisitionRound_1817 mar = (net.sf.rails.game.specific._1817.MergerAndAcquisitionRound_1817) currentRound;
                 net.sf.rails.game.specific._1817.MergerAndAcquisitionRound_1817.MaAStep step = mar.getCurrentStep();
                 if (step == net.sf.rails.game.specific._1817.MergerAndAcquisitionRound_1817.MaAStep.SALES_AUCTION ||
-                    step == net.sf.rails.game.specific._1817.MergerAndAcquisitionRound_1817.MaAStep.SALES_SELECT_BUYER ||
-                    step == net.sf.rails.game.specific._1817.MergerAndAcquisitionRound_1817.MaAStep.SALES_FRIENDLY) {
+                        step == net.sf.rails.game.specific._1817.MergerAndAcquisitionRound_1817.MaAStep.SALES_SELECT_BUYER
+                        ||
+                        step == net.sf.rails.game.specific._1817.MergerAndAcquisitionRound_1817.MaAStep.SALES_FRIENDLY) {
                     if (mar.getActingPlayer() != null) {
                         effectivePlayer = mar.getActingPlayer();
                     }
@@ -1513,8 +1511,9 @@ if (actions != null && !actions.isEmpty()) {
                 net.sf.rails.game.specific._1817.MergerAndAcquisitionRound_1817 mar = (net.sf.rails.game.specific._1817.MergerAndAcquisitionRound_1817) currentRound;
                 net.sf.rails.game.specific._1817.MergerAndAcquisitionRound_1817.MaAStep step = mar.getCurrentStep();
                 if (step == net.sf.rails.game.specific._1817.MergerAndAcquisitionRound_1817.MaAStep.SALES_AUCTION ||
-                    step == net.sf.rails.game.specific._1817.MergerAndAcquisitionRound_1817.MaAStep.SALES_SELECT_BUYER ||
-                    step == net.sf.rails.game.specific._1817.MergerAndAcquisitionRound_1817.MaAStep.SALES_FRIENDLY) {
+                        step == net.sf.rails.game.specific._1817.MergerAndAcquisitionRound_1817.MaAStep.SALES_SELECT_BUYER
+                        ||
+                        step == net.sf.rails.game.specific._1817.MergerAndAcquisitionRound_1817.MaAStep.SALES_FRIENDLY) {
                     if (mar.getOperatingCompany() != null) {
                         highlightRailCard(mar.getOperatingCompany(), null, "Sale");
                     }
@@ -1725,9 +1724,7 @@ if (actions != null && !actions.isEmpty()) {
                     net.sf.rails.game.specific._1817.action.Bid1817IPO bidAction = null;
                     NullAction passAction = null;
 
-
-
-java.util.List<net.sf.rails.game.specific._1817.action.SettleIPO_1817> settleActions = new java.util.ArrayList<>();
+                    java.util.List<net.sf.rails.game.specific._1817.action.SettleIPO_1817> settleActions = new java.util.ArrayList<>();
 
                     if (possibleActions != null && possibleActions.getList() != null) {
                         for (PossibleAction pa : possibleActions.getList()) {
@@ -1801,8 +1798,7 @@ java.util.List<net.sf.rails.game.specific._1817.action.SettleIPO_1817> settleAct
                             centerPanel.add(summaryLabel, java.awt.BorderLayout.SOUTH);
                             settlePanel.add(centerPanel, java.awt.BorderLayout.CENTER);
 
-                           
-JPanel buttonBox = new JPanel(new FlowLayout(FlowLayout.RIGHT, 5, 0));
+                            JPanel buttonBox = new JPanel(new FlowLayout(FlowLayout.RIGHT, 5, 0));
                             buttonBox.setOpaque(false);
 
                             for (final net.sf.rails.game.specific._1817.action.SettleIPO_1817 sa : settleActions) {
@@ -1829,7 +1825,6 @@ JPanel buttonBox = new JPanel(new FlowLayout(FlowLayout.RIGHT, 5, 0));
                             }
 
                             settlePanel.add(buttonBox, java.awt.BorderLayout.EAST);
-
 
                             dynamicButtonPanel.add(settlePanel);
                         } else {
@@ -1864,13 +1859,14 @@ JPanel buttonBox = new JPanel(new FlowLayout(FlowLayout.RIGHT, 5, 0));
                             dynamicButtonPanel.add(auctionBidButton);
 
                             // if (auctionPassButton == null)
-                            //     auctionPassButton = new JButton("Pass");
+                            // auctionPassButton = new JButton("Pass");
 
                             // auctionPassButton.setPreferredSize(new Dimension(70, 28));
                             // auctionPassButton.setForeground(Color.RED);
                             // final NullAction finalPass = passAction;
-                            // for (java.awt.event.ActionListener al : auctionPassButton.getActionListeners())
-                            //     auctionPassButton.removeActionListener(al);
+                            // for (java.awt.event.ActionListener al :
+                            // auctionPassButton.getActionListeners())
+                            // auctionPassButton.removeActionListener(al);
                             // auctionPassButton.addActionListener(e -> process(finalPass));
                             // dynamicButtonPanel.add(auctionPassButton);
                         } else {
@@ -1898,21 +1894,23 @@ JPanel buttonBox = new JPanel(new FlowLayout(FlowLayout.RIGHT, 5, 0));
                     dynamicButtonPanel.setBorder(BorderFactory.createLineBorder(Color.BLUE, 1));
                     dynamicButtonPanel.setLayout(new FlowLayout(FlowLayout.LEFT, 8, 2));
 
-
-
-                  String highBidderName = (maRound.getHighestBiddingPlayer() != null)
+                    String highBidderName = (maRound.getHighestBiddingPlayer() != null)
                             ? maRound.getHighestBiddingPlayer().getName()
                             : "None";
-                            
-                    String companyId = (maRound.getOperatingCompany() != null) ? maRound.getOperatingCompany().getId() : "Company";
+
+                    String companyId = (maRound.getOperatingCompany() != null) ? maRound.getOperatingCompany().getId()
+                            : "Company";
                     String saleType = "friendly sale";
                     if (maRound.getOperatingCompany() != null && maRound.getOperatingCompany().hasStockPrice()) {
                         int price = maRound.getOperatingCompany().getMarketPrice();
-                        if (price == 0) saleType = "liquidation";
-                        else if (price <= 30) saleType = "acquisition";
+                        if (price == 0)
+                            saleType = "liquidation";
+                        else if (price <= 30)
+                            saleType = "acquisition";
                     }
 
-                    JLabel highBidLabel = new JLabel(companyId + " (" + saleType + ") | High: " + highBidderName + " ($" + maRound.getHighestBid() + ")");
+                    JLabel highBidLabel = new JLabel(companyId + " (" + saleType + ") | High: " + highBidderName + " ($"
+                            + maRound.getHighestBid() + ")");
                     highBidLabel.setFont(new Font("SansSerif", Font.BOLD, 13));
                     highBidLabel.setForeground(new Color(0, 102, 204));
                     dynamicButtonPanel.add(highBidLabel);
@@ -1921,20 +1919,11 @@ JPanel buttonBox = new JPanel(new FlowLayout(FlowLayout.RIGHT, 5, 0));
                     sep.setPreferredSize(new Dimension(2, 25));
                     dynamicButtonPanel.add(sep);
 
-                    String actorName = (maRound.getActingPlayer() != null) ? maRound.getActingPlayer().getName() : "Someone";
+                    String actorName = (maRound.getActingPlayer() != null) ? maRound.getActingPlayer().getName()
+                            : "Someone";
                     if (step == net.sf.rails.game.specific._1817.MergerAndAcquisitionRound_1817.MaAStep.SALES_SELECT_BUYER) {
                         actorName = highBidderName;
                     }
-
-
-
-
-
-
-                            
-
-
-
 
                     net.sf.rails.game.specific._1817.action.BidOnCompany_1817 bidAction = null;
                     NullAction passAction = null;
@@ -1986,7 +1975,8 @@ JPanel buttonBox = new JPanel(new FlowLayout(FlowLayout.RIGHT, 5, 0));
                                 ((SpinnerNumberModel) bidSpinner.getModel()).setMinimum(minNextBid);
                                 ((SpinnerNumberModel) bidSpinner.getModel()).setMaximum(maxNextBid);
 
-                                // Always snap to the minimum valid bid when it becomes this player's turn to act
+                                // Always snap to the minimum valid bid when it becomes this player's turn to
+                                // act
                                 bidSpinner.setValue(minNextBid);
 
                                 JLabel bidPrompt = new JLabel(actorName + " bids: $");
@@ -2014,16 +2004,17 @@ JPanel buttonBox = new JPanel(new FlowLayout(FlowLayout.RIGHT, 5, 0));
                             }
 
                             // if (passAction != null) {
-                            //     if (auctionPassButton == null)
-                            //         auctionPassButton = new JButton("Pass");
-                            //     auctionPassButton.setPreferredSize(new Dimension(70, 28));
-                            //     auctionPassButton.setForeground(Color.RED);
+                            // if (auctionPassButton == null)
+                            // auctionPassButton = new JButton("Pass");
+                            // auctionPassButton.setPreferredSize(new Dimension(70, 28));
+                            // auctionPassButton.setForeground(Color.RED);
 
-                            //     final NullAction finalPass = passAction;
-                            //     for (java.awt.event.ActionListener al : auctionPassButton.getActionListeners())
-                            //         auctionPassButton.removeActionListener(al);
-                            //     auctionPassButton.addActionListener(e -> process(finalPass));
-                            //     dynamicButtonPanel.add(auctionPassButton);
+                            // final NullAction finalPass = passAction;
+                            // for (java.awt.event.ActionListener al :
+                            // auctionPassButton.getActionListeners())
+                            // auctionPassButton.removeActionListener(al);
+                            // auctionPassButton.addActionListener(e -> process(finalPass));
+                            // dynamicButtonPanel.add(auctionPassButton);
                             // }
 
                         } else {
@@ -2037,65 +2028,63 @@ JPanel buttonBox = new JPanel(new FlowLayout(FlowLayout.RIGHT, 5, 0));
 
                 } else {
 
+                    boolean hasSpecialActions = false;
+                    java.util.List<PossibleAction> specialActions = new java.util.ArrayList<>();
+                    GuiTargetedAction contextProvider = null;
 
-boolean hasSpecialActions = false;
-                        java.util.List<PossibleAction> specialActions = new java.util.ArrayList<>();
-                        GuiTargetedAction contextProvider = null;
+                    if (possibleActions != null && possibleActions.getList() != null && "1817".equals(gameUIManager.getGameManager().getGameName())) {
+                        for (PossibleAction pa : possibleActions.getList()) {
+                            // Skip Short1817 as it is handled visually on the OSI grid
+                            if (pa.getClass().getSimpleName().equals("Short1817")) {
+                                continue;
+                            }
 
-                        if (possibleActions != null && possibleActions.getList() != null) {
-                            for (PossibleAction pa : possibleActions.getList()) {
-                                // Skip Short1817 as it is handled visually on the OSI grid
-                                if (pa.getClass().getSimpleName().equals("Short1817")) {
-                                    continue;
-                                }
-                                
-                                if (pa instanceof GuiTargetedAction) {
-                                    specialActions.add(pa);
-                                    hasSpecialActions = true;
-                                    if (contextProvider == null)
-                                        contextProvider = (GuiTargetedAction) pa;
-                                }
+                            if (pa instanceof GuiTargetedAction) {
+                                specialActions.add(pa);
+                                hasSpecialActions = true;
+                                if (contextProvider == null)
+                                    contextProvider = (GuiTargetedAction) pa;
                             }
                         }
+                    }
 
-                        if (hasSpecialActions) {
-                            dynamicButtonPanel.setBackground(null);
-                            dynamicButtonPanel.setOpaque(false);
-                            dynamicButtonPanel.setBorder(BorderFactory.createEmptyBorder(0, 10, 0, 0));
-                            dynamicButtonPanel.setLayout(new FlowLayout(FlowLayout.LEFT, 8, 2));
+                    if (hasSpecialActions) {
+                        dynamicButtonPanel.setBackground(null);
+                        dynamicButtonPanel.setOpaque(false);
+                        dynamicButtonPanel.setBorder(BorderFactory.createEmptyBorder(0, 10, 0, 0));
+                        dynamicButtonPanel.setLayout(new FlowLayout(FlowLayout.LEFT, 8, 2));
 
-                            if (contextProvider != null) {
-                                String actorName = (effectivePlayer != null) ? effectivePlayer.getName() : "Player";
-                                JLabel promptLabel = new JLabel("<html><b>" + actorName + "</b>: " + contextProvider.getGroupLabel() + "</html>");
-                                promptLabel.setForeground(new Color(0, 102, 204));
-                                dynamicButtonPanel.add(promptLabel);
+                        if (contextProvider != null) {
+                            String actorName = (effectivePlayer != null) ? effectivePlayer.getName() : "Player";
+                            JLabel promptLabel = new JLabel(
+                                    "<html><b>" + actorName + "</b>: " + contextProvider.getGroupLabel() + "</html>");
+                            promptLabel.setForeground(new Color(0, 102, 204));
+                            dynamicButtonPanel.add(promptLabel);
 
-                                for (PossibleAction spa : specialActions) {
-                                    GuiTargetedAction gta = (GuiTargetedAction) spa;
-                                    ActionButton btn = new ActionButton(null);
-                                    btn.setText(gta.getButtonLabel());
-                                    btn.setPossibleAction(spa);
-                                    btn.addActionListener(this);
-                                    dynamicButtonPanel.add(btn);
-                                }
+                            for (PossibleAction spa : specialActions) {
+                                GuiTargetedAction gta = (GuiTargetedAction) spa;
+                                ActionButton btn = new ActionButton(null);
+                                btn.setText(gta.getButtonLabel());
+                                btn.setPossibleAction(spa);
+                                btn.addActionListener(this);
+                                dynamicButtonPanel.add(btn);
                             }
-                        } else {
-                            dynamicButtonPanel.setBackground(null);
-                            dynamicButtonPanel.setOpaque(false);
-                            dynamicButtonPanel.setBorder(BorderFactory.createEmptyBorder(0, 10, 0, 0));
                         }
-
+                    } else {
+                        dynamicButtonPanel.setBackground(null);
+                        dynamicButtonPanel.setOpaque(false);
+                        dynamicButtonPanel.setBorder(BorderFactory.createEmptyBorder(0, 10, 0, 0));
+                    }
 
                 }
             }
 
             boolean passFound = false;
-boolean blockGlobalPass = false; // NEVER block the global pass button
+            boolean blockGlobalPass = false; // NEVER block the global pass button
 
             List<NullAction> inactiveItems = possibleActions.getType(NullAction.class);
 
             if (inactiveItems != null && !blockGlobalPass) {
-
 
                 // if (inactiveItems != null) {
                 for (NullAction na : inactiveItems) {
@@ -2915,11 +2904,11 @@ boolean blockGlobalPass = false; // NEVER block the global pass button
                         continue;
                     }
 
-                    // HOUSE RULE: Hide "Sell Short" buttons from the sidebar. 
-                // They are now handled by the OSI grid with the Green Border.
-                if (pa.getClass().getName().endsWith("Short1817")) {
-                    continue;
-                }
+                    // HOUSE RULE: Hide "Sell Short" buttons from the sidebar.
+                    // They are now handled by the OSI grid with the Green Border.
+                    if (pa.getClass().getName().endsWith("Short1817")) {
+                        continue;
+                    }
 
                     // --- START FIX: SHOW ACTION OWNER ---
                     String owner = "-";
