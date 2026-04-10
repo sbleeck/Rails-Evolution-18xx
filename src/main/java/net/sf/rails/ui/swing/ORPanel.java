@@ -348,7 +348,7 @@ public class ORPanel extends GridPanel
             }
 
             // --- D. CATCH-ALL (The Safety Net) ---
-            else if (!(pa instanceof SetDividend) &&
+else if (!(pa instanceof SetDividend) &&
                     !(pa instanceof NullAction) &&
                     !(pa instanceof LayTile) &&
                     !(pa instanceof LayToken) &&
@@ -357,7 +357,9 @@ public class ORPanel extends GridPanel
                     !(pa instanceof RepayLoans) &&
                     !(pa instanceof rails.game.action.SpecialORAction) &&
                     !(pa instanceof LayBaseToken) &&
-                    !pa.getClass().getSimpleName().contains("1817")) {
+                    !pa.getClass().getSimpleName().contains("1817") &&
+                    !(pa instanceof rails.game.specific._1835.StartPrussian) &&
+                    !(pa instanceof rails.game.specific._1835.ExchangeForPrussianShare)) {
 
                 labelToAdd = pa.getButtonLabel().toUpperCase();
             }
@@ -2400,7 +2402,7 @@ if (btnRevPayout != null) {
                 lblRoute.setText(format(orComp.getLastRevenue()));
             }
         }
-        
+
 
         if (trainDisplay != null)
             trainDisplay.updateAssets(orComp);
@@ -2801,6 +2803,7 @@ if (btnRevPayout != null) {
             // "Operating Company"
             // We scan for DiscardTrain actions and forcibly redirect the UI focus to the
             // discarding company.
+            boolean isFormationStep = false;
             if (actions != null) {
                 for (PossibleAction pa : actions) {
                     if (pa instanceof DiscardTrain) {
@@ -2811,15 +2814,20 @@ if (btnRevPayout != null) {
                             break;
                         }
                     }
+                    else if (pa instanceof rails.game.specific._1835.StartPrussian || 
+                             pa instanceof rails.game.specific._1835.ExchangeForPrussianShare) {
+                        isFormationStep = true;
+                    }
                 }
             }
 
             // Sync Context
-            if (engineActiveComp != null && !engineActiveComp.isClosed()) {
-                this.orComp = engineActiveComp;
-                this.currentOperatingComp = engineActiveComp;
-            } else if (this.currentOperatingComp != null && !this.currentOperatingComp.isClosed()) {
-                this.orComp = this.currentOperatingComp;
+if (isFormationStep) {
+                engineActiveComp = null;
+                this.orComp = null;
+                this.currentOperatingComp = null;
+            } else if (engineActiveComp != null && !engineActiveComp.isClosed()) {
+                     this.orComp = this.currentOperatingComp;
             }
 
             // 3. FILTER & DETECT SPECIAL ACTIONS
@@ -2847,8 +2855,11 @@ if (btnRevPayout != null) {
                 boolean is1817Special = paName.contains("1817");
                 boolean is1837Special = paName.contains("ExchangeMinor") || paName.contains("DiscardTrain");
 
-                if (is1817Special || is1837Special) {
-                    specialActions.add(pa);
+boolean isPFRSpecial = pa instanceof rails.game.specific._1835.StartPrussian || 
+                                       pa instanceof rails.game.specific._1835.ExchangeForPrussianShare;
+
+                if (is1817Special || is1837Special || isPFRSpecial) {
+                                        specialActions.add(pa);
                 } else if (pa instanceof GuiTargetedAction && !(pa instanceof BuyTrain) && !(pa instanceof SetDividend)
                         && !(pa instanceof LayTile) && !(pa instanceof LayToken)) {
                     specialActions.add(pa);
@@ -2861,6 +2872,11 @@ if (btnRevPayout != null) {
                 }
             }
 
+            // Ensure the decline/pass button appears cleanly in the special panel during Formation
+            if (isFormationStep && deferredNullAction != null) {
+                specialActions.add(deferredNullAction);
+            }
+            
             // Determine phase based ONLY on valid OR actions
             int computedPhase = determineActivePhase(validOrActions);
             boolean hasStandardActions = computedPhase > 0;
