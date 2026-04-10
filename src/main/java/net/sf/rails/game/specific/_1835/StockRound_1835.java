@@ -195,11 +195,15 @@ public class StockRound_1835 extends StockRound {
      * net.sf.rails.game.StockRound#mayPlayerSellShareOfCompany(net.sf.rails.game.
      * PublicCompany)
      */
-    @Override
+@Override
     public boolean mayPlayerSellShareOfCompany(PublicCompany company) {
         if (!super.mayPlayerSellShareOfCompany(company)) {
             return false;
-        } else {
+        } 
+        if (!company.hasOperated() && !company.getId().equals("PR")) {
+            return false;
+        }
+        else {
             /*
              * Player is President and ia allowed to sell his director share if there is
              * enough space in the pool in 1835

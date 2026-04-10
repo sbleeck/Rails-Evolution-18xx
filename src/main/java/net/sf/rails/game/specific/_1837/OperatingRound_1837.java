@@ -95,10 +95,20 @@ public class OperatingRound_1837 extends OperatingRound {
                 // 3. Clean Name: Remove the unique ID suffix (e.g., "3_1" -> "3")
                 String cleanName = train.getName().replaceAll("_\\d+$", "");
 
-                // 4. Set final label: "Discard 3 (100)"
-                action.setLabel("Discard " + cleanName + " (" + priceStr + ")");
-
+String expectedLabel = "Discard " + cleanName + " (" + priceStr + ")";
+            
+            boolean alreadyExists = false;
+            for (PossibleAction pa : possibleActions.getList()) {
+                if (pa instanceof DiscardTrainVoluntarily && expectedLabel.equals(pa.getButtonLabel())) {
+                    alreadyExists = true;
+                    break;
+                }
+            }
+            
+            if (!alreadyExists) {
+                action.setLabel(expectedLabel);
                 possibleActions.add(action);
+            }
             }
         }
 

@@ -256,7 +256,6 @@ public class AIPlayer implements Actor {
         return bestAction;
     }
 
-
     private BuyTrain findCheapestAffordableTrain(List<BuyTrain> trainActions, int totalAvailableCash) {
         return trainActions.stream()
                 .filter(action -> action.getPricePaid() > 0)
@@ -378,28 +377,61 @@ public class AIPlayer implements Actor {
             return handleSetDividend(dividendActions.get(0), operatingCompany, logPrefix);
 
         List<DiscardTrain> discardActions = possibleActions.getType(DiscardTrain.class);
-        if (!discardActions.isEmpty())
-            return handleDiscardTrain(discardActions, logPrefix);
+        if (!discardActions.isEmpty()) {
+            // A discard is voluntary if a NullAction (Pass/Done) is also available
+            boolean isVoluntary = !possibleActions.getType(NullAction.class).isEmpty();
+            boolean canAffordFreshTrain = false;
+
+            if (operatingCompany != null) {
+                List<BuyTrain> buyTrainActions = possibleActions.getType(BuyTrain.class);
+                for (BuyTrain bt : buyTrainActions) {
+                    boolean isFromBank = bt.getFromOwner() == null
+                            || bt.getFromOwner().getId().contains("Bank")
+                            || bt.getFromOwner().getId().contains("IPO");
+
+                    // Note: Use getPricePaid() or getFixedCost() based on availability
+                    int cost = (bt.getPricePaid() > 0) ? bt.getPricePaid() : bt.getFixedCost();
+                    if (isFromBank && cost <= operatingCompany.getCash()) {
+                        canAffordFreshTrain = true;
+                        break;
+                    }
+                }
+            }
+
+            // Forced discards (MUST) always happen.
+            // Voluntary discards (MAY) only happen in 10% of cases AND if a fresh train is
+            // affordable.
+            boolean shouldExecuteDiscard = !isVoluntary || (canAffordFreshTrain && random.nextDouble() < 0.10);
+
+            if (shouldExecuteDiscard) {
+                return handleDiscardTrain(discardActions, logPrefix);
+            } else {
+                aiLog.debug("{}  - AI bypassing voluntary train discard (10% gate or unaffordable).", logPrefix);
+            }
+        }
 
         // --- 4. Score All Possible Actions ---
         PossibleAction bestAction = null;
         double bestOverallScore = Double.NEGATIVE_INFINITY;
 
+        if (!validTileLays.isEmpty() && operatingCompany != null) {
 
-if (!validTileLays.isEmpty() && operatingCompany != null) {
-            
-            // 1. OPTIMIZATION: Sort moves to evaluate high-potential hexes (Cities/Towns) first.
-            // This ensures that if we time out, we likely already checked the best upgrades.
+            // 1. OPTIMIZATION: Sort moves to evaluate high-potential hexes (Cities/Towns)
+            // first.
+            // This ensures that if we time out, we likely already checked the best
+            // upgrades.
             Collections.sort(validTileLays, new Comparator<TileLayOption>() {
                 @Override
                 public int compare(TileLayOption o1, TileLayOption o2) {
                     // Prioritize hexes that actually have tokens (Stations/Towns)
                     boolean h1HasTokens = hasTokensSafe(o1.hex());
                     boolean h2HasTokens = hasTokensSafe(o2.hex());
-                    
-                    if (h1HasTokens && !h2HasTokens) return -1; // o1 first
-                    if (!h1HasTokens && h2HasTokens) return 1;  // o2 first
-                    
+
+                    if (h1HasTokens && !h2HasTokens)
+                        return -1; // o1 first
+                    if (!h1HasTokens && h2HasTokens)
+                        return 1; // o2 first
+
                     // Fallback: Deterministic sort by Hex ID
                     return o1.hex().getId().compareTo(o2.hex().getId());
                 }
@@ -411,7 +443,8 @@ if (!validTileLays.isEmpty() && operatingCompany != null) {
             for (TileLayOption option : validTileLays) {
                 // 2. TIMEOUT CHECK
                 if (System.currentTimeMillis() - startTime > TIME_LIMIT_MS) {
-                    aiLog.warn("AI CRITICAL: Tile search timed out after {}ms. Returning best found so far.", TIME_LIMIT_MS);
+                    aiLog.warn("AI CRITICAL: Tile search timed out after {}ms. Returning best found so far.",
+                            TIME_LIMIT_MS);
                     break; // EXIT LOOP IMMEDIATELY
                 }
 
@@ -423,18 +456,17 @@ if (!validTileLays.isEmpty() && operatingCompany != null) {
                 try {
                     score = expertStrategyService.scoreTileLay(option, context);
                 } finally {
-                    // FORCE RESTORE (With Smart Restore optimization if you applied the previous fix)
+                    // FORCE RESTORE (With Smart Restore optimization if you applied the previous
+                    // fix)
                     restoreTokenState(targetHex, hexSnapshot);
                 }
-                
+
                 if (score > bestOverallScore) {
                     bestOverallScore = score;
                     bestAction = configureTileLayAction(option);
                 }
             }
         }
-
-
 
         if (!validTokenLays.isEmpty() && operatingCompany != null) {
             for (TokenLayOption option : validTokenLays) {
@@ -479,42 +511,95 @@ if (!validTileLays.isEmpty() && operatingCompany != null) {
             }
         }
 
-        if (!aiScorableBuyTrainActions.isEmpty() && operatingCompany != null) {
-            for (BuyTrain trainAction : aiScorableBuyTrainActions) {
-                double score = expertStrategyService.scoreBuyTrain(trainAction, context);
 
-                // AGGRESSIVE TRAIN BUYING RULE:
-                // If a fresh train > 4 is available (permanent trains), buy it immediately.
-                // This forces the "rust" of older trains and secures a permanent fleet.
-                Train train = trainAction.getTrain();
-
-                // FIX: Use getId() instead of getName(), as Owner interface lacks getName()
-                boolean isFromBank = trainAction.getFromOwner() == null
-                        || trainAction.getFromOwner().getId().contains("Bank")
-                        || trainAction.getFromOwner().getId().contains("IPO");
-                String tName = train.getName();
-
-                // Simple check for > 4 (Assuming 1835 names: 2, 2+2, 3, 3+3, 4, 4+4... then 5,
-                // 5+5, 6, etc.)
-                // We exclude anything starting with 2, 3, or 4.
-                boolean isTrainGreaterThan4 = !tName.startsWith("2") && !tName.startsWith("3")
-                        && !tName.startsWith("4");
-
-                if (isFromBank && isTrainGreaterThan4) {
-                    aiLog.info("{}FORCE BUY: Detected Fresh Train > 4 ({}) - Prioritizing!", logPrefix, tName);
-                    score += 50000.0; // Massive boost to ensure purchase
+if (!aiScorableBuyTrainActions.isEmpty() && operatingCompany != null) {
+            boolean hasTrains = !operatingCompany.getPortfolioModel().getTrainList().isEmpty();
+            
+            // 1. Find exactly ONE representative IPO train to simulate (the cheapest affordable one)
+            BuyTrain ipoTrainToSimulate = null;
+            boolean permanentTrainAvailable = false;
+            
+            for (BuyTrain action : aiScorableBuyTrainActions) {
+                boolean isFromBank = action.getFromOwner() == null
+                        || action.getFromOwner().getId().contains("Bank")
+                        || action.getFromOwner().getId().contains("IPO");
+                        
+                if (isFromBank) {
+                    String tName = action.getTrain().getName();
+                    boolean isPermanent = !tName.startsWith("2") && !tName.startsWith("3");
+                    if (isPermanent) permanentTrainAvailable = true;
+                    
+                    int cost = (action.getPricePaid() > 0) ? action.getPricePaid() : action.getFixedCost();
+                    if (cost <= operatingCompany.getCash()) {
+                        if (ipoTrainToSimulate == null || cost < ipoTrainToSimulate.getFixedCost()) {
+                            ipoTrainToSimulate = action;
+                        }
+                    }
                 }
+            }
 
-                aiLog.debug("{}  - Scoring train ({}): Price: {}, Score: {}",
-                        logPrefix, trainAction.getTrain().getId(), trainAction.getPricePaid(), score);
-
-                if (score > bestOverallScore) {
-                    bestOverallScore = score;
-                    bestAction = configureTrainAction(trainAction);
+            // 2. Simulate 1 additional run IF an affordable IPO train exists
+            boolean ipoIncreasesRevenue = false;
+            if (ipoTrainToSimulate != null) {
+                int currentMaxRevenue = evaluator.calculateCurrentMaxRevenue(context);
+                try {
+                    net.sf.rails.algorithms.RevenueAdapter hypoAdapter = net.sf.rails.algorithms.RevenueAdapter.createRevenueAdapter(
+                            gameManager.getRoot(), operatingCompany, gameManager.getCurrentPhase(), false);
+                    
+                    if (hypoAdapter.getNetworkAdapterInternal() != null) {
+                        hypoAdapter.getNetworkAdapterInternal().clearGraphCache();
+                    }
+                    
+                    hypoAdapter.populateFromRails();
+                    hypoAdapter.addTrain(ipoTrainToSimulate.getTrain()); 
+                    hypoAdapter.initRevenueCalculator(true);
+                    
+                    int hypoRevenue = hypoAdapter.calculateRevenue();
+                    if (hypoRevenue > currentMaxRevenue) {
+                        ipoIncreasesRevenue = true;
+                        aiLog.debug("{}SIMULATION: IPO Train {} increases revenue ({} -> {}).", logPrefix, ipoTrainToSimulate.getTrain().getName(), currentMaxRevenue, hypoRevenue);
+                    }
+                } catch (Exception e) {
+                    aiLog.error("{}SIMULATION ERROR for IPO train: {}", logPrefix, e.getMessage());
                 }
+            }
 
+            // 3. Decision Gate
+            boolean shouldEvaluate = !hasTrains || permanentTrainAvailable || ipoIncreasesRevenue || (random.nextDouble() < 0.10);
+
+            if (shouldEvaluate) {
+                for (BuyTrain trainAction : aiScorableBuyTrainActions) {
+                    double score = expertStrategyService.scoreBuyTrain(trainAction, context);
+                    boolean isFromBank = trainAction.getFromOwner() == null
+                            || trainAction.getFromOwner().getId().contains("Bank")
+                            || trainAction.getFromOwner().getId().contains("IPO");
+                    
+                    String tName = trainAction.getTrain().getName();
+                    boolean isPermanent = !tName.startsWith("2") && !tName.startsWith("3");
+
+                    // Priority Logic: Break the swapping cycle
+                    if (isFromBank) {
+                        if (isPermanent) {
+                            score += 50000.0; // Critical phase-push / permanent fleet
+                        } else if (ipoIncreasesRevenue) {
+                            score += 20000.0; // Valid income generator from Bank
+                        }
+                    } else if (hasTrains) {
+                        // Penalize inter-company swaps if we already have trains, stopping the cycle
+                        score -= 10000.0; 
+                    }
+
+                    if (score > bestOverallScore) {
+                        bestOverallScore = score;
+                        bestAction = configureTrainAction(trainAction);
+                    }
+                }
+            } else {
+                aiLog.debug("{}  - AI bypassing optional train purchase.", logPrefix);
             }
         }
+
+
 
         // PRUSSIAN OPENING STRATEGY:
         // If we can form the Prussian (StartPrussian action) and we own M2
@@ -650,22 +735,26 @@ if (!validTileLays.isEmpty() && operatingCompany != null) {
         int revenue = action.getPresetRevenue();
         int allocation = SetDividend.WITHHOLD;
 
-// FIX: Always calculate revenue using the adapter to ensure 'Direct Income' is captured.
-        // This is critical for 1837 Coal Companies. Even if the engine reports 0 (validly),
-        // or a positive number, we need the breakdown of Total vs Treasury (Direct) revenue 
-        // to make the correct Split/Withhold decision and set the action properties correctly.
+        // FIX: Always calculate revenue using the adapter to ensure 'Direct Income' is
+        // captured.
+        // This is critical for 1837 Coal Companies. Even if the engine reports 0
+        // (validly),
+        // or a positive number, we need the breakdown of Total vs Treasury (Direct)
+        // revenue
+        // to make the correct Split/Withhold decision and set the action properties
+        // correctly.
         if (operatingCompany != null) {
             try {
                 // Use fully qualified name to ensure access without adding imports
                 net.sf.rails.algorithms.RevenueAdapter ra = net.sf.rails.algorithms.RevenueAdapter.createRevenueAdapter(
                         gameManager.getRoot(),
                         operatingCompany,
-                        gameManager.getCurrentPhase()
-                );
-                
-                // 'true' enables the complex calculator (Multigraph) required for 1837 Special Revenues
+                        gameManager.getCurrentPhase());
+
+                // 'true' enables the complex calculator (Multigraph) required for 1837 Special
+                // Revenues
                 ra.initRevenueCalculator(true);
-                
+
                 int calculatedRevenue = ra.calculateRevenue();
                 int directRevenue = ra.getSpecialRevenue();
 
@@ -676,14 +765,14 @@ if (!validTileLays.isEmpty() && operatingCompany != null) {
                 // If revenue is 0 (no run possible), directRevenue will correctly be 0.
                 action.setActualRevenue(revenue);
                 action.setActualCompanyTreasuryRevenue(directRevenue);
-                
-                aiLog.info("{}AI Revenue Check: Total={} Direct={} (Preset was {})", logPrefix, revenue, directRevenue, action.getPresetRevenue());
+
+                aiLog.info("{}AI Revenue Check: Total={} Direct={} (Preset was {})", logPrefix, revenue, directRevenue,
+                        action.getPresetRevenue());
 
             } catch (Exception e) {
                 aiLog.error("{}AI Failed to calculate revenue during SetDividend.", logPrefix, e);
             }
         }
-
 
         boolean isMinor = false;
         if (operatingCompany != null && operatingCompany.getParent() instanceof CompanyType) {
@@ -770,20 +859,20 @@ if (!validTileLays.isEmpty() && operatingCompany != null) {
         }
     }
 
-
-
-    // Helper method for the AI sorting logic. 
+    // Helper method for the AI sorting logic.
     // Ensure this is inside the AIPlayer class, but outside any other method.
     private boolean hasTokensSafe(MapHex hex) {
-        if (hex == null || hex.getStops() == null) return false;
+        if (hex == null || hex.getStops() == null)
+            return false;
         for (Stop stop : hex.getStops()) {
-            if (stop.hasTokens()) return true;
+            if (stop.hasTokens())
+                return true;
         }
         return false;
     }
     // ... inside findFallbackAction ...
 
-// ... (lines of unchanged context code) ...
+    // ... (lines of unchanged context code) ...
     private PossibleAction findFallbackAction(List<PossibleAction> actions) {
         // Priority 1: Check for explicit "DONE" Mode (The Fix for AI syncing)
         for (PossibleAction action : actions) {
@@ -810,18 +899,18 @@ if (!validTileLays.isEmpty() && operatingCompany != null) {
                 }
             }
         }
-        
-        // Priority 3: Any valid NullAction that isn't purely "Skip" if we have other options,
+
+        // Priority 3: Any valid NullAction that isn't purely "Skip" if we have other
+        // options,
         // but often Skip/Pass is the only choice left.
         for (PossibleAction action : actions) {
             if (action instanceof NullAction) {
-                action.setAIAction(true); 
+                action.setAIAction(true);
                 return action;
             }
         }
 
-
-// ... (lines of unchanged context code) ...
+        // ... (lines of unchanged context code) ...
 
         if (!actions.isEmpty()) {
             actions.get(0).setAIAction(true);
@@ -829,7 +918,6 @@ if (!validTileLays.isEmpty() && operatingCompany != null) {
         }
         return null;
     }
-
 
     private static class TokenSnapshot {
         public final PublicCompany company;
@@ -843,7 +931,8 @@ if (!validTileLays.isEmpty() && operatingCompany != null) {
 
     private List<TokenSnapshot> captureTokenState(MapHex hex) {
         List<TokenSnapshot> snapshot = new ArrayList<>();
-        if (hex == null || hex.getStops() == null) return snapshot;
+        if (hex == null || hex.getStops() == null)
+            return snapshot;
 
         for (Stop stop : hex.getStops()) {
             if (stop.hasTokens()) {
@@ -859,10 +948,11 @@ if (!validTileLays.isEmpty() && operatingCompany != null) {
     }
 
     private void restoreTokenState(MapHex hex, List<TokenSnapshot> snapshot) {
-        if (hex == null || hex.getCurrentTile() == null) return;
+        if (hex == null || hex.getCurrentTile() == null)
+            return;
 
         // OPTIMIZATION: Capture current state and compare.
-        // If the engine successfully reverted the state (or the hex was empty), 
+        // If the engine successfully reverted the state (or the hex was empty),
         // we skip the expensive remove/add cycle.
         List<TokenSnapshot> currentState = captureTokenState(hex);
         if (!isStateDifferent(snapshot, currentState)) {
@@ -883,8 +973,8 @@ if (!validTileLays.isEmpty() && operatingCompany != null) {
             Station station = hex.getStation(record.stationIndex);
             if (station != null) {
                 Stop targetStop = hex.getRelatedStop(station.getNumber());
-                BaseToken tokenToPlace = record.company.getNextBaseToken(); 
-                
+                BaseToken tokenToPlace = record.company.getNextBaseToken();
+
                 if (tokenToPlace != null && targetStop != null) {
                     tokenToPlace.moveTo(targetStop);
                 }
@@ -893,7 +983,8 @@ if (!validTileLays.isEmpty() && operatingCompany != null) {
     }
 
     private boolean isStateDifferent(List<TokenSnapshot> saved, List<TokenSnapshot> current) {
-        if (saved.size() != current.size()) return true;
+        if (saved.size() != current.size())
+            return true;
 
         // Check if every token in 'saved' exists in 'current'
         // (Order doesn't strictly matter for validity, but exact matching is safer)
@@ -905,7 +996,8 @@ if (!validTileLays.isEmpty() && operatingCompany != null) {
                     break;
                 }
             }
-            if (!found) return true;
+            if (!found)
+                return true;
         }
         return false;
     }

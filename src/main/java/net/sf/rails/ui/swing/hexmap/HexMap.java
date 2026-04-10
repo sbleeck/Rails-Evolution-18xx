@@ -16,6 +16,7 @@ import java.awt.image.BufferedImage;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
+import java.awt.FontMetrics;
 import java.util.Map;
 import java.awt.Component; // --- FIX: ADDED MISSING IMPORT ---
 import java.awt.Font; // Add this missing import
@@ -476,12 +477,15 @@ public abstract class HexMap implements MouseListener, MouseMotionListener {
             String label =
                     letter ? getLetterLabel(index) : hexMap.getNumberLabel(index);
 
-            xCoordinate -= 4.0 * label.length();
-            yCoordinate += 4.0;
-            g2.drawString(label, xCoordinate, yCoordinate);
-
-            // log.debug("Draw Label " + label + " for " + index + " at x = " +
-            // xCoordinate + ", y = " + yCoordinate);
+           // Use FontMetrics for precise centering regardless of scale
+            FontMetrics fm = g2.getFontMetrics();
+            int textWidth = fm.stringWidth(label);
+            
+            // Center horizontally, and offset vertically by ~1/3 ascent for baseline alignment
+            int finalX = xCoordinate - (textWidth / 2);
+            int finalY = yCoordinate + (fm.getAscent() / 3);
+            
+            g2.drawString(label, finalX, finalY);
         }
 
         private String getLetterLabel(int index) {
@@ -512,6 +516,11 @@ public abstract class HexMap implements MouseListener, MouseMotionListener {
                     }
                 }
 
+                // Scale the coordinates font based on zoom, with a hard floor and ceiling
+                Font oldFont = g.getFont();
+                int scaledFontSize = Math.max(9, (int) Math.round(14 * hexMap.getZoomFactor()));
+                g.setFont(new Font("SansSerif", Font.BOLD, scaledFontSize));
+
                 // paint coordinates
                 boolean lettersGoHorizontal = hexMap.mapManager.getMapOrientation().lettersGoHorizontal();
                 int xLeft = (int) hexMap.calcXCoordinates(hexMap.minimum.getCol(), -hexMap.coordinateXMargin);
@@ -534,6 +543,8 @@ public abstract class HexMap implements MouseListener, MouseMotionListener {
                     drawLabel(g, iRow, xRight, yCoordinate,
                             !lettersGoHorizontal);
                 }
+                // Restore original font
+                g.setFont(oldFont);
 
             } catch (NullPointerException ex) {
                 // If we try to paint before something is loaded, just retry

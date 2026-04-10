@@ -940,6 +940,9 @@ public class ORPanel extends GridPanel
     public void resetSidebarState() {
         if (btnDone != null) {
             btnDone.setActionCommand(DONE_CMD);
+if (btnDone.getPossibleActions() != null) {
+                btnDone.getPossibleActions().clear();
+            }
             btnDone.setPossibleAction(null);
             btnDone.setEnabled(false);
         }
@@ -951,13 +954,32 @@ public class ORPanel extends GridPanel
             btnTokenSkip.setEnabled(false);
         if (btnTokenConfirm != null)
             btnTokenConfirm.setEnabled(false);
-        if (btnRevPayout != null)
+        
+if (btnRevPayout != null) {
             btnRevPayout.setEnabled(false);
-        if (btnRevWithhold != null)
+            if (btnRevPayout.getPossibleActions() != null) {
+                btnRevPayout.getPossibleActions().clear();
+            }
+            btnRevPayout.setPossibleAction(null);
+        }
+        if (btnRevWithhold != null) {
             btnRevWithhold.setEnabled(false);
+            if (btnRevWithhold.getPossibleActions() != null) {
+                btnRevWithhold.getPossibleActions().clear();
+            }
+            btnRevWithhold.setPossibleAction(null);
+        }
         if (btnRevSplit != null) {
             btnRevSplit.setEnabled(false);
+            if (btnRevSplit.getPossibleActions() != null) {
+                btnRevSplit.getPossibleActions().clear();
+            }
+            btnRevSplit.setPossibleAction(null);
         }
+
+
+
+
         if (btnTrainSkip != null)
             btnTrainSkip.setEnabled(false);
 
@@ -1307,36 +1329,43 @@ public class ORPanel extends GridPanel
         // 6. Phase 3 (Revenue)
         phase3Panel = createPhasePanel("3. Revenue");
 
-        JPanel revDisplayPanel = new JPanel(new GridLayout(1, 2, 5, 0));
+        JPanel revDisplayPanel = new JPanel(new GridLayout(1, hasDirectCompanyIncomeInOR ? 2 : 1, 5, 0));
         revDisplayPanel.setOpaque(false);
         revDisplayPanel.setMaximumSize(new Dimension(getSidebarWidth() - scale(10), scale(45)));
 
         JPanel divBox = new JPanel();
         divBox.setLayout(new BoxLayout(divBox, BoxLayout.Y_AXIS));
         divBox.setOpaque(false);
-        JLabel lblDivTitle = new JLabel("Route", SwingConstants.CENTER); // Changed
-        lblDivTitle.setAlignmentX(Component.CENTER_ALIGNMENT);
-        lblDivTitle.setFont(new Font("SansSerif", Font.PLAIN, 10));
+        
         lblRoute = new JLabel("0", SwingConstants.CENTER);
         lblRoute.setAlignmentX(Component.CENTER_ALIGNMENT);
         lblRoute.setFont(new Font("SansSerif", Font.BOLD, 18));
-        divBox.add(lblDivTitle);
+        
+        if (hasDirectCompanyIncomeInOR) {
+            JLabel lblDivTitle = new JLabel("Route", SwingConstants.CENTER);
+            lblDivTitle.setAlignmentX(Component.CENTER_ALIGNMENT);
+            lblDivTitle.setFont(new Font("SansSerif", Font.PLAIN, 10));
+            divBox.add(lblDivTitle);
+        } else {
+            divBox.add(Box.createVerticalStrut(10));
+        }
         divBox.add(lblRoute);
-
-        JPanel retBox = new JPanel();
-        retBox.setLayout(new BoxLayout(retBox, BoxLayout.Y_AXIS));
-        retBox.setOpaque(false);
-        JLabel lblRetTitle = new JLabel("Fixed", SwingConstants.CENTER); // Changed
-        lblRetTitle.setAlignmentX(Component.CENTER_ALIGNMENT);
-        lblRetTitle.setFont(new Font("SansSerif", Font.PLAIN, 10));
-        lblFixed = new JLabel("0", SwingConstants.CENTER);
-        lblFixed.setAlignmentX(Component.CENTER_ALIGNMENT);
-        lblFixed.setFont(new Font("SansSerif", Font.BOLD, 18));
-        retBox.add(lblRetTitle);
-        retBox.add(lblFixed);
-
         revDisplayPanel.add(divBox);
-        revDisplayPanel.add(retBox);
+
+        if (hasDirectCompanyIncomeInOR) {
+            JPanel retBox = new JPanel();
+            retBox.setLayout(new BoxLayout(retBox, BoxLayout.Y_AXIS));
+            retBox.setOpaque(false);
+            JLabel lblRetTitle = new JLabel("Fixed", SwingConstants.CENTER);
+            lblRetTitle.setAlignmentX(Component.CENTER_ALIGNMENT);
+            lblRetTitle.setFont(new Font("SansSerif", Font.PLAIN, 10));
+            lblFixed = new JLabel("0", SwingConstants.CENTER);
+            lblFixed.setAlignmentX(Component.CENTER_ALIGNMENT);
+            lblFixed.setFont(new Font("SansSerif", Font.BOLD, 18));
+            retBox.add(lblRetTitle);
+            retBox.add(lblFixed);
+            revDisplayPanel.add(retBox);
+        }
 
         phase3Panel.add(Box.createVerticalStrut(5));
         phase3Panel.add(revDisplayPanel);
@@ -1755,14 +1784,26 @@ public class ORPanel extends GridPanel
                 // Re-enable the Revenue buttons now that calculations are done
                 if (finalRes) {
                     if (btnRevPayout != null && btnRevPayout.getPossibleActions() != null
-                            && !btnRevPayout.getPossibleActions().isEmpty())
-                        btnRevPayout.setEnabled(true);
+                            && !btnRevPayout.getPossibleActions().isEmpty()) {
+                        PossibleAction pa = btnRevPayout.getPossibleActions().get(0);
+                        if (pa instanceof SetDividend && ((SetDividend) pa).getCompany() == orComp) {
+                            btnRevPayout.setEnabled(true);
+                        }
+                    }
                     if (btnRevWithhold != null && btnRevWithhold.getPossibleActions() != null
-                            && !btnRevWithhold.getPossibleActions().isEmpty())
-                        btnRevWithhold.setEnabled(true);
+                            && !btnRevWithhold.getPossibleActions().isEmpty()) {
+                        PossibleAction pa = btnRevWithhold.getPossibleActions().get(0);
+                        if (pa instanceof SetDividend && ((SetDividend) pa).getCompany() == orComp) {
+                            btnRevWithhold.setEnabled(true);
+                        }
+                    }
                     if (btnRevSplit != null && btnRevSplit.getPossibleActions() != null
-                            && !btnRevSplit.getPossibleActions().isEmpty())
-                        btnRevSplit.setEnabled(true);
+                            && !btnRevSplit.getPossibleActions().isEmpty()) {
+                        PossibleAction pa = btnRevSplit.getPossibleActions().get(0);
+                        if (pa instanceof SetDividend && ((SetDividend) pa).getCompany() == orComp) {
+                            btnRevSplit.setEnabled(true);
+                        }
+                    }
                     updateDefaultButton(); // Refresh focus targets
                 }
             }
@@ -2231,6 +2272,19 @@ public class ORPanel extends GridPanel
                 break;
 
         }
+        // Dynamically override instruction if a GuiTargetedAction is active
+        if (specialContainer != null && specialContainer.isVisible() && specialPanel != null && specialPanel.getComponentCount() > 0) {
+            Component firstBtn = specialPanel.getComponent(0);
+            if (firstBtn instanceof ActionButton && !((ActionButton) firstBtn).getPossibleActions().isEmpty()) {
+                PossibleAction pa = ((ActionButton) firstBtn).getPossibleActions().get(0);
+                if (pa instanceof GuiTargetedAction) {
+                    String groupLabel = ((GuiTargetedAction) pa).getGroupLabel();
+                    if (groupLabel != null && !groupLabel.isEmpty()) {
+                        instruction = groupLabel.toUpperCase();
+                    }
+                }
+            }
+        }
 
         if (lblCompanyInfo != null) {
             String playerInfo = (orComp.getPresident() != null) ? orComp.getPresident().getName() : "";
@@ -2327,21 +2381,26 @@ public class ORPanel extends GridPanel
             tokenDisplay.setTokens(available, orComp);
         }
 
-        if (lblRoute != null && lblFixed != null) {
-            int totalRev = orComp.getLastRevenue();
-            int fixedRev = orComp.getLastDirectIncome();
+        if (lblRoute != null) {
+            if (lblFixed != null) {
+                int totalRev = orComp.getLastRevenue();
+                int fixedRev = orComp.getLastDirectIncome();
 
-            // Stale Data Guard
-            if (!orComp.canHaveFixedIncome())
-                fixedRev = 0;
-            if (totalRev == 0 || fixedRev > totalRev)
-                fixedRev = 0;
+                // Stale Data Guard
+                if (!orComp.canHaveFixedIncome())
+                    fixedRev = 0;
+                if (totalRev == 0 || fixedRev > totalRev)
+                    fixedRev = 0;
 
-            int routeRev = totalRev - fixedRev;
+                int routeRev = totalRev - fixedRev;
 
-            lblRoute.setText(format(routeRev));
-            lblFixed.setText(format(fixedRev));
+                lblRoute.setText(format(routeRev));
+                lblFixed.setText(format(fixedRev));
+            } else {
+                lblRoute.setText(format(orComp.getLastRevenue()));
+            }
         }
+        
 
         if (trainDisplay != null)
             trainDisplay.updateAssets(orComp);
@@ -2495,8 +2554,23 @@ public class ORPanel extends GridPanel
             label = action.getButtonLabel();
             if (label == null || label.isEmpty())
                 label = action.toString();
+} else if (action instanceof GuiTargetedAction) {
+            // PRIORITY: If the action defines its own visual signature, use it.
+            GuiTargetedAction gta = (GuiTargetedAction) action;
+            label = gta.getButtonLabel();
+
+            if (gta.getTarget() instanceof Company) {
+                highlightTarget = (Company) gta.getTarget();
+            }
+
+            bgColor = gta.getHighlightBackgroundColor();
+            borderColor = gta.getHighlightBorderColor();
+            textColor = gta.getHighlightTextColor();
+
         } else if (action instanceof DiscardTrain) {
-            bgColor = UITheme.ACTION_DISCARD; // Crimson Red
+            // FALLBACK: Only used if DiscardTrain somehow stops implementing GuiTargetedAction
+            bgColor = UITheme.ACTION_DISCARD;
+
             borderColor = Color.BLACK;
             textColor = Color.WHITE;
             label = action.getButtonLabel();

@@ -30,7 +30,6 @@ public class DiscardTrainVoluntarily extends DiscardTrain {
         return 0;
     }
 
-    // --- START FIX ---
     // Override the interface method used by ORPanel to create the button text.
     // Without this, it falls back to DiscardTrain.getButtonLabel() which generates
     // a fresh string ("Discard X") and ignores the custom label.
@@ -41,8 +40,21 @@ public class DiscardTrainVoluntarily extends DiscardTrain {
         }
         return super.getButtonLabel();
     }
-    // --- END FIX ---
 
+    @Override
+    public java.awt.Color getHighlightBackgroundColor() {
+        return new java.awt.Color(255, 140, 0); // Vibrant Orange
+    }
+
+    @Override
+    public java.awt.Color getHighlightBorderColor() {
+        return java.awt.Color.BLACK;
+    }
+
+    @Override
+    public java.awt.Color getHighlightTextColor() {
+        return java.awt.Color.WHITE;
+    }
     @Override
     public String toString() {
         return customLabel != null ? customLabel : super.toString();

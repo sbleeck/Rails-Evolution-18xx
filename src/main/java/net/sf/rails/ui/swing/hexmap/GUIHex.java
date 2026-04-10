@@ -510,7 +510,11 @@ g.setColor(State.HIGHLIGHT_PURPLE.getColor());
             }
 
             // 2. Draw costs even if the tile is "0", but only if the toggle is ON
-            if (displayMarkings && getHex().getTileCost() > 0) {
+if (displayMarkings && getHex().getTileCost() > 0) {
+                Font oldFont = g.getFont();
+                // Bumped minimum size to 10 for better legibility at extreme small scales
+                int scaledFontSize = Math.max(10, (int) Math.round(12 * dimensions.zoomFactor));
+                g.setFont(new Font("SansSerif", Font.PLAIN, scaledFontSize));
                 FontMetrics fontMetrics = g.getFontMetrics();
                 g.drawString(
                         Bank.format(getHex(), getHex().getTileCost()),
@@ -520,6 +524,7 @@ g.setColor(State.HIGHLIGHT_PURPLE.getColor());
                                         * 3 / 5,
                         dimensions.rectBound.y
                                 + ((fontMetrics.getHeight() + dimensions.rectBound.height) * 9 / 15));
+                g.setFont(oldFont);
             }
 
             if (!isTilePainted())
@@ -530,11 +535,17 @@ g.setColor(State.HIGHLIGHT_PURPLE.getColor());
             if (visibleTile != null && visibleTile.isPrepainted()) {
                 String hexLabel = getHex().getLabel();
                 if (hexLabel != null && !hexLabel.isEmpty()) {
+                    Font oldFontLabel = g.getFont();
+                    int scaledLabelSize = Math.max(10, (int) Math.round(14 * dimensions.zoomFactor));
+                    g.setFont(new Font("SansSerif", Font.BOLD, scaledLabelSize));
+                    
                     FontMetrics fontMetrics = g.getFontMetrics();
                     g.setColor(Color.BLACK);
+                    // Scale the offsets so the text doesn't drift outside the hex
                     g.drawString(hexLabel, 
-                            dimensions.rectBound.x + 15, 
-                            dimensions.rectBound.y + fontMetrics.getHeight() + 5);
+                            dimensions.rectBound.x + (int)(15 * dimensions.zoomFactor), 
+                            dimensions.rectBound.y + fontMetrics.getHeight() + (int)(5 * dimensions.zoomFactor));
+                    g.setFont(oldFontLabel);
                 }
             }
             
@@ -1134,8 +1145,9 @@ private void drawBaseToken(Graphics2D g2, PublicCompany co, HexPoint center, dou
             // Strip remaining HTML tags
             rawText = rawText.replaceAll("<[^>]*>", "");
 
-            // 1. SET FONT: Bold and slightly smaller (16pt) for better fit
-            Font overlayFont = new Font("SansSerif", Font.BOLD, 16);
+// 1. SET FONT: Bold and scaled based on zoomFactor for better fit
+            int scaledFontSize = Math.max(8, (int) Math.round(16 * dimensions.zoomFactor));
+            Font overlayFont = new Font("SansSerif", Font.BOLD, scaledFontSize);
             g.setFont(overlayFont);
             restore = true;
         }
