@@ -61,20 +61,20 @@ public class MapManager extends RailsManager implements Configurable {
         mapOrientation = MapOrientation.create(tag);
 
        
-log.error("########## MAP LOADING DIAGNOSTIC ##########");
+// log.error("########## MAP LOADING DIAGNOSTIC ##########");
         List<Tag> hexTags = tag.getChildren("Hex");
-        log.error("Hex Count in XML: " + hexTags.size());
-        if (!hexTags.isEmpty()) {
-            // Log the name of the first hex to identify the map (e.g., A20 vs A10)
-            log.error("First Hex name: " + hexTags.get(0).getAttributeAsString("name"));
-        }
+        // log.error("Hex Count in XML: " + hexTags.size());
+        // if (!hexTags.isEmpty()) {
+        //     // Log the name of the first hex to identify the map (e.g., A20 vs A10)
+        //     log.error("First Hex name: " + hexTags.get(0).getAttributeAsString("name"));
+        // }
         
         // Use a unique name for the debug tag to avoid variable collision
-        Tag debugImageTag = tag.getChild("Image");
-        if (debugImageTag != null) {
-            log.error("SVG path: " + debugImageTag.getAttributeAsString("file"));
-        }
-        log.error("############################################");
+        // Tag debugImageTag = tag.getChild("Image");
+        // if (debugImageTag != null) {
+        //     log.error("SVG path: " + debugImageTag.getAttributeAsString("file"));
+        // }
+        // log.error("############################################");
 
 
         ImmutableMap.Builder<MapHex.Coordinates, MapHex> hexBuilder = ImmutableMap.builder();

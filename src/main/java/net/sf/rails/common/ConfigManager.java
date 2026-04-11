@@ -80,15 +80,15 @@ public class ConfigManager implements Configurable {
         }
         // --- START: ADD THIS BLOCK BACK ---
         // Set default game variant (overrides config profiles)
-        instance.transientConfig.put("default_game", "1817");
+        instance.transientConfig.put("default_game", "1835");
 
-        // Set default player names (overrides config profiles)
-        instance.transientConfig.put("player.name.1", "Stefan");
-        instance.transientConfig.put("player.name.2", "Rainer");
-        instance.transientConfig.put("player.name.3", "Bjoern");
-        instance.transientConfig.put("player.name.4", "Christian");
-        // Note: 'player.name.5' and 'game.variant.option' from the old code are not in
-        // your properties file.
+        // // Set default player names (overrides config profiles)
+        // instance.transientConfig.put("player.name.1", "Stefan");
+        // instance.transientConfig.put("player.name.2", "Rainer");
+        // instance.transientConfig.put("player.name.3", "Bjoern");
+        // instance.transientConfig.put("player.name.4", "Christian");
+        // // Note: 'player.name.5' and 'game.variant.option' from the old code are not in
+        // // your properties file.
 
         // Inject key default 'ticks' / game options
         // Note: The properties file uses 'true', but the old code used 'yes'.
