@@ -35,9 +35,12 @@ def output = './build/installers'
 
 // --- OS-Specific jpackage Locator ---
 def jpackage() {
-    def jpackageExe
-    def javaHome = System.getenv('JAVA_HOME') ?: System.getProperty('java.home')
-    if (OperatingSystem.current().isWindows()) {
+def jpackageExe
+def javaHome = project.extensions.getByType(JavaToolchainService)
+.launcherFor(java.toolchain).get()
+.metadata.installationPath.asFile.absolutePath
+
+if (OperatingSystem.current().isWindows()) {
         jpackageExe = "${javaHome}/bin/jpackage.exe"
     } else if (OperatingSystem.current().isLinux() || OperatingSystem.current().isMacOsX()) {
         jpackageExe = "${javaHome}/bin/jpackage"
