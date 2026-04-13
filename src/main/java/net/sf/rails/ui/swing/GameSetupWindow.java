@@ -682,6 +682,33 @@ public class GameSetupWindow extends JDialog {
             return;
         }
 
+        // Statistical test block
+        int runs = 10000;
+        int[][] stats = new int[activeCount][activeCount];
+        for (int i = 0; i < runs; i++) {
+            List<PlayerIdentity> testList = new ArrayList<>(originalIdentities);
+            java.util.Collections.shuffle(testList);
+            for (int pos = 0; pos < activeCount; pos++) {
+                PlayerIdentity p = testList.get(pos);
+                int origIndex = originalIdentities.indexOf(p);
+                stats[origIndex][pos]++;
+            }
+        }
+        System.out.println("--- Shuffle Stats (" + runs + " runs) ---");
+        System.out.print(String.format("%-15s", "Player"));
+        for (int i = 0; i < activeCount; i++) {
+            System.out.print(String.format("Pos %d   ", i + 1));
+        }
+        System.out.println();
+        for (int i = 0; i < activeCount; i++) {
+            System.out.print(String.format("%-15s", originalIdentities.get(i).shortName));
+            for (int j = 0; j < activeCount; j++) {
+                System.out.print(String.format("%-7d ", stats[i][j]));
+            }
+            System.out.println();
+        }
+        System.out.println("--------------------------------");
+
         // 2. Pre-calculate the "Destiny" (Final Result)
         List<PlayerIdentity> finalIdentities = new ArrayList<>(originalIdentities);
         java.util.Collections.shuffle(finalIdentities);

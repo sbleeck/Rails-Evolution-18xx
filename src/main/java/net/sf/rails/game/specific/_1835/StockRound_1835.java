@@ -195,29 +195,27 @@ public class StockRound_1835 extends StockRound {
      * net.sf.rails.game.StockRound#mayPlayerSellShareOfCompany(net.sf.rails.game.
      * PublicCompany)
      */
-@Override
+    @Override
     public boolean mayPlayerSellShareOfCompany(PublicCompany company) {
-        if (!super.mayPlayerSellShareOfCompany(company)) {
-            return false;
-        } 
-        if (!company.hasOperated() && !company.getId().equals("PR")) {
-            return false;
-        }
-        else {
-            /*
-             * Player is President and ia allowed to sell his director share if there is
-             * enough space in the pool in 1835
-             * But if he has sold a share in this round he is allowed to sell dump the
-             * presidency...
-             *
-             */
-            if (company.getPresident() == currentPlayer) {
-                if (PlayerShareUtils.poolAllowsShares(company) > 1)
-                    return true;
+        // Block sales for unoperated companies unless it is the floated Prussian Railway
+        if (!company.hasOperated()) {
+            if (!company.getId().equals("PR") || !company.hasFloated()) {
+                return false;
             }
         }
-        return true;
+
+        // Enforce 1835 presidency dump rules: Bank Pool must have space for the exact President's share size
+        if (company.getPresident() == currentPlayer) {
+            int presShareSize = company.getPresidentsShare().getShares();
+            if (PlayerShareUtils.poolAllowsShares(company) < presShareSize) {
+                return false;
+            }
+        }
+
+        // Fallback to standard engine checks for all other conditions
+        return super.mayPlayerSellShareOfCompany(company);
     }
+
 
     protected void setGameSpecificActions() {
 

@@ -36,17 +36,18 @@ def output = './build/installers'
 // --- OS-Specific jpackage Locator ---
 def jpackage() {
     def jpackageExe
+    def javaHome = System.getenv('JAVA_HOME') ?: System.getProperty('java.home')
     if (OperatingSystem.current().isWindows()) {
-        jpackageExe = "${System.getenv('JAVA_HOME')}/bin/jpackage.exe"
+        jpackageExe = "${javaHome}/bin/jpackage.exe"
     } else if (OperatingSystem.current().isLinux() || OperatingSystem.current().isMacOsX()) {
-        jpackageExe = "${System.getenv('JAVA_HOME')}/bin/jpackage"
-    } else {
+        jpackageExe = "${javaHome}/bin/jpackage"
+ } else {
         throw new StopActionException("Unknown operating system: ${OperatingSystem.current()}")
     }
 
     if (!new File(jpackageExe).exists()) {
-        throw new StopActionException('jpackage not found. JDK 14+ is required, and JAVA_HOME must be set.')
-    }
+        throw new StopActionException("jpackage not found at ${jpackageExe}. JDK 14+ is required.")
+     }
     return jpackageExe
 }
 

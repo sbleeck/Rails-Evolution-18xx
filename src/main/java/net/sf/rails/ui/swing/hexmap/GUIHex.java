@@ -998,10 +998,11 @@ private void drawBaseToken(Graphics2D g2, PublicCompany co, HexPoint center, dou
     }
 
     public String getToolTip() {
-        if (upgrade != null)
-            return upgrade.getUpgradeToolTip();
-        else
-            return getDefaultToolTip();
+        return null;
+        // if (upgrade != null)
+        //     return upgrade.getUpgradeToolTip();
+        // else
+        //     return getDefaultToolTip();
     }
 
     private String bonusToolTipText(List<RevenueBonusTemplate> bonuses) {
