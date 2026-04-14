@@ -1,0 +1,1863 @@
+{
+  "gameManager" : {
+    "gameName" : "1835",
+    "absoluteActionCounter" : 772,
+    "startRoundNumber" : 1,
+    "stockRoundNumber" : 10,
+    "absoluteORNumber" : 15,
+    "relativeORNumber" : 1,
+    "currentPlayerId" : "Stefan",
+    "priorityPlayerId" : "Christian"
+  },
+  "phase" : {
+    "currentPhaseName" : "3",
+    "offBoardRevenueStep" : 3
+  },
+  "currentRound" : {
+    "type" : "Other",
+    "id" : "EndOfGameRound",
+    "step" : null,
+    "operatingCompanyId" : null,
+    "numPasses" : 0,
+    "operatingCompanyQueueIds" : [ ]
+  },
+  "mapHexes" : [ {
+    "id" : "A11",
+    "tileId" : "12",
+    "rotation" : 1
+  }, {
+    "id" : "B10",
+    "tileId" : "8",
+    "rotation" : 3
+  }, {
+    "id" : "B12",
+    "tileId" : "58",
+    "rotation" : 0
+  }, {
+    "id" : "B14",
+    "tileId" : "3",
+    "rotation" : 5
+  }, {
+    "id" : "B16",
+    "tileId" : "3",
+    "rotation" : 0
+  }, {
+    "id" : "C9",
+    "tileId" : "8",
+    "rotation" : 2
+  }, {
+    "id" : "C11",
+    "tileId" : "221",
+    "rotation" : 0
+  }, {
+    "id" : "C15",
+    "tileId" : "7",
+    "rotation" : 2
+  }, {
+    "id" : "C19",
+    "tileId" : "7",
+    "rotation" : 4
+  }, {
+    "id" : "D8",
+    "tileId" : "5",
+    "rotation" : 3
+  }, {
+    "id" : "D10",
+    "tileId" : "27",
+    "rotation" : 3
+  }, {
+    "id" : "D12",
+    "tileId" : "24",
+    "rotation" : 5
+  }, {
+    "id" : "D14",
+    "tileId" : "8",
+    "rotation" : 2
+  }, {
+    "id" : "D16",
+    "tileId" : "8",
+    "rotation" : 5
+  }, {
+    "id" : "D18",
+    "tileId" : "7",
+    "rotation" : 4
+  }, {
+    "id" : "D20",
+    "tileId" : "16",
+    "rotation" : 5
+  }, {
+    "id" : "E9",
+    "tileId" : "9",
+    "rotation" : 0
+  }, {
+    "id" : "E13",
+    "tileId" : "9",
+    "rotation" : 2
+  }, {
+    "id" : "E17",
+    "tileId" : "25",
+    "rotation" : 2
+  }, {
+    "id" : "E19",
+    "tileId" : "220",
+    "rotation" : 0
+  }, {
+    "id" : "F6",
+    "tileId" : "58",
+    "rotation" : 4
+  }, {
+    "id" : "F8",
+    "tileId" : "20",
+    "rotation" : 0
+  }, {
+    "id" : "F10",
+    "tileId" : "14",
+    "rotation" : 0
+  }, {
+    "id" : "F14",
+    "tileId" : "63",
+    "rotation" : 0
+  }, {
+    "id" : "F16",
+    "tileId" : "43",
+    "rotation" : 1
+  }, {
+    "id" : "F18",
+    "tileId" : "47",
+    "rotation" : 1
+  }, {
+    "id" : "F20",
+    "tileId" : "19",
+    "rotation" : 5
+  }, {
+    "id" : "G3",
+    "tileId" : "218",
+    "rotation" : 1
+  }, {
+    "id" : "G5",
+    "tileId" : "14",
+    "rotation" : 0
+  }, {
+    "id" : "G7",
+    "tileId" : "8",
+    "rotation" : 1
+  }, {
+    "id" : "G15",
+    "tileId" : "4",
+    "rotation" : 2
+  }, {
+    "id" : "G19",
+    "tileId" : "9",
+    "rotation" : 2
+  }, {
+    "id" : "H2",
+    "tileId" : "216",
+    "rotation" : 0
+  }, {
+    "id" : "H4",
+    "tileId" : "69",
+    "rotation" : 0
+  }, {
+    "id" : "H16",
+    "tileId" : "63",
+    "rotation" : 0
+  }, {
+    "id" : "H18",
+    "tileId" : "8",
+    "rotation" : 5
+  }, {
+    "id" : "H20",
+    "tileId" : "216",
+    "rotation" : 4
+  }, {
+    "id" : "I3",
+    "tileId" : "216",
+    "rotation" : 5
+  }, {
+    "id" : "I5",
+    "tileId" : "7",
+    "rotation" : 0
+  }, {
+    "id" : "I11",
+    "tileId" : "8",
+    "rotation" : 4
+  }, {
+    "id" : "I13",
+    "tileId" : "88",
+    "rotation" : 2
+  }, {
+    "id" : "I15",
+    "tileId" : "4",
+    "rotation" : 1
+  }, {
+    "id" : "I17",
+    "tileId" : "204",
+    "rotation" : 5
+  }, {
+    "id" : "J2",
+    "tileId" : "9",
+    "rotation" : 2
+  }, {
+    "id" : "J6",
+    "tileId" : "217",
+    "rotation" : 2
+  }, {
+    "id" : "J8",
+    "tileId" : "216",
+    "rotation" : 1
+  }, {
+    "id" : "J10",
+    "tileId" : "25",
+    "rotation" : 1
+  }, {
+    "id" : "J12",
+    "tileId" : "9",
+    "rotation" : 0
+  }, {
+    "id" : "K3",
+    "tileId" : "58",
+    "rotation" : 2
+  }, {
+    "id" : "K5",
+    "tileId" : "24",
+    "rotation" : 1
+  }, {
+    "id" : "K7",
+    "tileId" : "28",
+    "rotation" : 1
+  }, {
+    "id" : "K11",
+    "tileId" : "87",
+    "rotation" : 3
+  }, {
+    "id" : "K13",
+    "tileId" : "8",
+    "rotation" : 5
+  }, {
+    "id" : "K15",
+    "tileId" : "9",
+    "rotation" : 0
+  }, {
+    "id" : "L6",
+    "tileId" : "213",
+    "rotation" : 3
+  }, {
+    "id" : "L8",
+    "tileId" : "55",
+    "rotation" : 4
+  }, {
+    "id" : "L10",
+    "tileId" : "46",
+    "rotation" : 1
+  }, {
+    "id" : "L12",
+    "tileId" : "42",
+    "rotation" : 5
+  }, {
+    "id" : "L14",
+    "tileId" : "218",
+    "rotation" : 0
+  }, {
+    "id" : "M7",
+    "tileId" : "1",
+    "rotation" : 2
+  }, {
+    "id" : "M9",
+    "tileId" : "15",
+    "rotation" : 3
+  }, {
+    "id" : "M11",
+    "tileId" : "7",
+    "rotation" : 1
+  }, {
+    "id" : "M13",
+    "tileId" : "20",
+    "rotation" : 2
+  }, {
+    "id" : "M15",
+    "tileId" : "88",
+    "rotation" : 0
+  }, {
+    "id" : "M17",
+    "tileId" : "7",
+    "rotation" : 4
+  }, {
+    "id" : "N10",
+    "tileId" : "56",
+    "rotation" : 4
+  }, {
+    "id" : "N12",
+    "tileId" : "63",
+    "rotation" : 0
+  }, {
+    "id" : "N16",
+    "tileId" : "8",
+    "rotation" : 0
+  }, {
+    "id" : "O13",
+    "tileId" : "8",
+    "rotation" : 2
+  }, {
+    "id" : "O15",
+    "tileId" : "207",
+    "rotation" : 1
+  } ],
+  "bank" : {
+    "cash" : -898,
+    "isBroken" : true,
+    "ipo" : {
+      "certificates" : [ ],
+      "privateCompanies" : [ ]
+    },
+    "pool" : {
+      "certificates" : [ {
+        "companyId" : "PR",
+        "percentage" : 5,
+        "isPresident" : false
+      }, {
+        "companyId" : "PR",
+        "percentage" : 5,
+        "isPresident" : false
+      }, {
+        "companyId" : "PR",
+        "percentage" : 5,
+        "isPresident" : false
+      } ],
+      "privateCompanies" : [ ]
+    },
+    "unavailable" : {
+      "certificates" : [ ],
+      "privateCompanies" : [ ]
+    },
+    "scrapHeap" : {
+      "certificates" : [ {
+        "companyId" : "M1",
+        "percentage" : 100,
+        "isPresident" : true
+      }, {
+        "companyId" : "M2",
+        "percentage" : 100,
+        "isPresident" : true
+      }, {
+        "companyId" : "M3",
+        "percentage" : 100,
+        "isPresident" : true
+      }, {
+        "companyId" : "M4",
+        "percentage" : 100,
+        "isPresident" : true
+      }, {
+        "companyId" : "M5",
+        "percentage" : 100,
+        "isPresident" : true
+      }, {
+        "companyId" : "M6",
+        "percentage" : 100,
+        "isPresident" : true
+      } ],
+      "privateCompanies" : [ {
+        "id" : "BB",
+        "ownerId" : "ScrapHeap",
+        "revenue" : [ 25 ],
+        "closed" : true,
+        "specialProperties" : [ ]
+      }, {
+        "id" : "HB",
+        "ownerId" : "ScrapHeap",
+        "revenue" : [ 30 ],
+        "closed" : true,
+        "specialProperties" : [ ]
+      }, {
+        "id" : "LD",
+        "ownerId" : "ScrapHeap",
+        "revenue" : [ 20 ],
+        "closed" : true,
+        "specialProperties" : [ ]
+      }, {
+        "id" : "NF",
+        "ownerId" : "ScrapHeap",
+        "revenue" : [ 5 ],
+        "closed" : true,
+        "specialProperties" : [ ]
+      }, {
+        "id" : "OBB",
+        "ownerId" : "ScrapHeap",
+        "revenue" : [ 10 ],
+        "closed" : true,
+        "specialProperties" : [ ]
+      }, {
+        "id" : "PfB",
+        "ownerId" : "ScrapHeap",
+        "revenue" : [ 15 ],
+        "closed" : true,
+        "specialProperties" : [ ]
+      } ]
+    },
+    "osi" : {
+      "certificates" : [ ],
+      "privateCompanies" : [ ]
+    }
+  },
+  "map" : {
+    "hexes" : [ {
+      "id" : "A9",
+      "tileId" : "-7",
+      "rotationName" : "SW",
+      "tokens" : [ ]
+    }, {
+      "id" : "A11",
+      "tileId" : "12",
+      "rotationName" : "W",
+      "tokens" : [ ]
+    }, {
+      "id" : "A17",
+      "tileId" : "-800",
+      "rotationName" : "SE",
+      "tokens" : [ ]
+    }, {
+      "id" : "B8",
+      "tileId" : "-7",
+      "rotationName" : "W",
+      "tokens" : [ ]
+    }, {
+      "id" : "B10",
+      "tileId" : "8",
+      "rotationName" : "NE",
+      "tokens" : [ ]
+    }, {
+      "id" : "B12",
+      "tileId" : "58",
+      "rotationName" : "SW",
+      "tokens" : [ ]
+    }, {
+      "id" : "B14",
+      "tileId" : "3",
+      "rotationName" : "SE",
+      "tokens" : [ ]
+    }, {
+      "id" : "B16",
+      "tileId" : "3",
+      "rotationName" : "SW",
+      "tokens" : [ ]
+    }, {
+      "id" : "B18",
+      "tileId" : "0",
+      "rotationName" : "SW",
+      "tokens" : [ ]
+    }, {
+      "id" : "C5",
+      "tileId" : "-801",
+      "rotationName" : "SE",
+      "tokens" : [ ]
+    }, {
+      "id" : "C7",
+      "tileId" : "-802",
+      "rotationName" : "SW",
+      "tokens" : [ ]
+    }, {
+      "id" : "C9",
+      "tileId" : "8",
+      "rotationName" : "NW",
+      "tokens" : [ ]
+    }, {
+      "id" : "C11",
+      "tileId" : "221",
+      "rotationName" : "SW",
+      "tokens" : [ {
+        "companyId" : "MS",
+        "stationIndex" : 1
+      }, {
+        "companyId" : "OL",
+        "stationIndex" : 1
+      }, {
+        "companyId" : "PR",
+        "stationIndex" : 1
+      } ]
+    }, {
+      "id" : "C13",
+      "tileId" : "-804",
+      "rotationName" : "SW",
+      "tokens" : [ {
+        "companyId" : "MS",
+        "stationIndex" : 1
+      } ]
+    }, {
+      "id" : "C15",
+      "tileId" : "7",
+      "rotationName" : "NW",
+      "tokens" : [ ]
+    }, {
+      "id" : "C17",
+      "tileId" : "0",
+      "rotationName" : "SW",
+      "tokens" : [ ]
+    }, {
+      "id" : "C19",
+      "tileId" : "7",
+      "rotationName" : "E",
+      "tokens" : [ ]
+    }, {
+      "id" : "C21",
+      "tileId" : "-901",
+      "rotationName" : "NW",
+      "tokens" : [ ]
+    }, {
+      "id" : "D4",
+      "tileId" : "-8",
+      "rotationName" : "SW",
+      "tokens" : [ ]
+    }, {
+      "id" : "D6",
+      "tileId" : "-805",
+      "rotationName" : "SW",
+      "tokens" : [ {
+        "companyId" : "OL",
+        "stationIndex" : 1
+      } ]
+    }, {
+      "id" : "D8",
+      "tileId" : "5",
+      "rotationName" : "NE",
+      "tokens" : [ ]
+    }, {
+      "id" : "D10",
+      "tileId" : "27",
+      "rotationName" : "NE",
+      "tokens" : [ ]
+    }, {
+      "id" : "D12",
+      "tileId" : "24",
+      "rotationName" : "SE",
+      "tokens" : [ ]
+    }, {
+      "id" : "D14",
+      "tileId" : "8",
+      "rotationName" : "NW",
+      "tokens" : [ ]
+    }, {
+      "id" : "D16",
+      "tileId" : "8",
+      "rotationName" : "SE",
+      "tokens" : [ ]
+    }, {
+      "id" : "D18",
+      "tileId" : "7",
+      "rotationName" : "E",
+      "tokens" : [ ]
+    }, {
+      "id" : "D20",
+      "tileId" : "16",
+      "rotationName" : "SE",
+      "tokens" : [ ]
+    }, {
+      "id" : "E5",
+      "tileId" : "0",
+      "rotationName" : "SW",
+      "tokens" : [ ]
+    }, {
+      "id" : "E7",
+      "tileId" : "0",
+      "rotationName" : "SW",
+      "tokens" : [ ]
+    }, {
+      "id" : "E9",
+      "tileId" : "9",
+      "rotationName" : "SW",
+      "tokens" : [ ]
+    }, {
+      "id" : "E11",
+      "tileId" : "0",
+      "rotationName" : "SW",
+      "tokens" : [ ]
+    }, {
+      "id" : "E13",
+      "tileId" : "9",
+      "rotationName" : "NW",
+      "tokens" : [ ]
+    }, {
+      "id" : "E15",
+      "tileId" : "0",
+      "rotationName" : "SW",
+      "tokens" : [ ]
+    }, {
+      "id" : "E17",
+      "tileId" : "25",
+      "rotationName" : "NW",
+      "tokens" : [ ]
+    }, {
+      "id" : "E19",
+      "tileId" : "220",
+      "rotationName" : "SW",
+      "tokens" : [ {
+        "companyId" : "BA",
+        "stationIndex" : 1
+      }, {
+        "companyId" : "WT",
+        "stationIndex" : 1
+      }, {
+        "companyId" : "PR",
+        "stationIndex" : 1
+      } ]
+    }, {
+      "id" : "E21",
+      "tileId" : "-143",
+      "rotationName" : "NE",
+      "tokens" : [ ]
+    }, {
+      "id" : "F4",
+      "tileId" : "-1",
+      "rotationName" : "SW",
+      "tokens" : [ ]
+    }, {
+      "id" : "F6",
+      "tileId" : "58",
+      "rotationName" : "E",
+      "tokens" : [ ]
+    }, {
+      "id" : "F8",
+      "tileId" : "20",
+      "rotationName" : "SW",
+      "tokens" : [ ]
+    }, {
+      "id" : "F10",
+      "tileId" : "14",
+      "rotationName" : "SW",
+      "tokens" : [ ]
+    }, {
+      "id" : "F12",
+      "tileId" : "-114",
+      "rotationName" : "SW",
+      "tokens" : [ ]
+    }, {
+      "id" : "F14",
+      "tileId" : "63",
+      "rotationName" : "SW",
+      "tokens" : [ {
+        "companyId" : "PR",
+        "stationIndex" : 1
+      } ]
+    }, {
+      "id" : "F16",
+      "tileId" : "43",
+      "rotationName" : "W",
+      "tokens" : [ ]
+    }, {
+      "id" : "F18",
+      "tileId" : "47",
+      "rotationName" : "W",
+      "tokens" : [ ]
+    }, {
+      "id" : "F20",
+      "tileId" : "19",
+      "rotationName" : "SE",
+      "tokens" : [ ]
+    }, {
+      "id" : "G1",
+      "tileId" : "-7",
+      "rotationName" : "SW",
+      "tokens" : [ ]
+    }, {
+      "id" : "G3",
+      "tileId" : "218",
+      "rotationName" : "W",
+      "tokens" : [ ]
+    }, {
+      "id" : "G5",
+      "tileId" : "14",
+      "rotationName" : "SW",
+      "tokens" : [ {
+        "companyId" : "PR",
+        "stationIndex" : 1
+      } ]
+    }, {
+      "id" : "G7",
+      "tileId" : "8",
+      "rotationName" : "W",
+      "tokens" : [ ]
+    }, {
+      "id" : "G9",
+      "tileId" : "0",
+      "rotationName" : "SW",
+      "tokens" : [ ]
+    }, {
+      "id" : "G11",
+      "tileId" : "-1",
+      "rotationName" : "SW",
+      "tokens" : [ ]
+    }, {
+      "id" : "G13",
+      "tileId" : "0",
+      "rotationName" : "SW",
+      "tokens" : [ ]
+    }, {
+      "id" : "G15",
+      "tileId" : "4",
+      "rotationName" : "NW",
+      "tokens" : [ ]
+    }, {
+      "id" : "G17",
+      "tileId" : "0",
+      "rotationName" : "SW",
+      "tokens" : [ ]
+    }, {
+      "id" : "G19",
+      "tileId" : "9",
+      "rotationName" : "NW",
+      "tokens" : [ ]
+    }, {
+      "id" : "G21",
+      "tileId" : "-8",
+      "rotationName" : "NE",
+      "tokens" : [ ]
+    }, {
+      "id" : "H2",
+      "tileId" : "216",
+      "rotationName" : "SW",
+      "tokens" : [ {
+        "companyId" : "HE",
+        "stationIndex" : 1
+      }, {
+        "companyId" : "PR",
+        "stationIndex" : 1
+      } ]
+    }, {
+      "id" : "H4",
+      "tileId" : "69",
+      "rotationName" : "SW",
+      "tokens" : [ ]
+    }, {
+      "id" : "H6",
+      "tileId" : "0",
+      "rotationName" : "SW",
+      "tokens" : [ ]
+    }, {
+      "id" : "H8",
+      "tileId" : "0",
+      "rotationName" : "SW",
+      "tokens" : [ ]
+    }, {
+      "id" : "H10",
+      "tileId" : "-1",
+      "rotationName" : "SW",
+      "tokens" : [ ]
+    }, {
+      "id" : "H12",
+      "tileId" : "0",
+      "rotationName" : "SW",
+      "tokens" : [ ]
+    }, {
+      "id" : "H14",
+      "tileId" : "0",
+      "rotationName" : "SW",
+      "tokens" : [ ]
+    }, {
+      "id" : "H16",
+      "tileId" : "63",
+      "rotationName" : "SW",
+      "tokens" : [ {
+        "companyId" : "SX",
+        "stationIndex" : 1
+      } ]
+    }, {
+      "id" : "H18",
+      "tileId" : "8",
+      "rotationName" : "SE",
+      "tokens" : [ ]
+    }, {
+      "id" : "H20",
+      "tileId" : "216",
+      "rotationName" : "E",
+      "tokens" : [ {
+        "companyId" : "SX",
+        "stationIndex" : 1
+      } ]
+    }, {
+      "id" : "H22",
+      "tileId" : "-901",
+      "rotationName" : "NW",
+      "tokens" : [ ]
+    }, {
+      "id" : "I1",
+      "tileId" : "-143",
+      "rotationName" : "SW",
+      "tokens" : [ ]
+    }, {
+      "id" : "I3",
+      "tileId" : "216",
+      "rotationName" : "SE",
+      "tokens" : [ ]
+    }, {
+      "id" : "I5",
+      "tileId" : "7",
+      "rotationName" : "SW",
+      "tokens" : [ ]
+    }, {
+      "id" : "I7",
+      "tileId" : "0",
+      "rotationName" : "SW",
+      "tokens" : [ ]
+    }, {
+      "id" : "I9",
+      "tileId" : "0",
+      "rotationName" : "SW",
+      "tokens" : [ ]
+    }, {
+      "id" : "I11",
+      "tileId" : "8",
+      "rotationName" : "E",
+      "tokens" : [ ]
+    }, {
+      "id" : "I13",
+      "tileId" : "88",
+      "rotationName" : "NW",
+      "tokens" : [ ]
+    }, {
+      "id" : "I15",
+      "tileId" : "4",
+      "rotationName" : "W",
+      "tokens" : [ ]
+    }, {
+      "id" : "I17",
+      "tileId" : "204",
+      "rotationName" : "SE",
+      "tokens" : [ ]
+    }, {
+      "id" : "I19",
+      "tileId" : "-39",
+      "rotationName" : "NE",
+      "tokens" : [ ]
+    }, {
+      "id" : "J2",
+      "tileId" : "9",
+      "rotationName" : "NW",
+      "tokens" : [ ]
+    }, {
+      "id" : "J4",
+      "tileId" : "-808",
+      "rotationName" : "SE",
+      "tokens" : [ ]
+    }, {
+      "id" : "J6",
+      "tileId" : "217",
+      "rotationName" : "NW",
+      "tokens" : [ ]
+    }, {
+      "id" : "J8",
+      "tileId" : "216",
+      "rotationName" : "W",
+      "tokens" : [ {
+        "companyId" : "HE",
+        "stationIndex" : 1
+      }, {
+        "companyId" : "BY",
+        "stationIndex" : 1
+      } ]
+    }, {
+      "id" : "J10",
+      "tileId" : "25",
+      "rotationName" : "W",
+      "tokens" : [ ]
+    }, {
+      "id" : "J12",
+      "tileId" : "9",
+      "rotationName" : "SW",
+      "tokens" : [ ]
+    }, {
+      "id" : "J14",
+      "tileId" : "0",
+      "rotationName" : "SW",
+      "tokens" : [ ]
+    }, {
+      "id" : "J16",
+      "tileId" : "-41",
+      "rotationName" : "SW",
+      "tokens" : [ ]
+    }, {
+      "id" : "K3",
+      "tileId" : "58",
+      "rotationName" : "NW",
+      "tokens" : [ ]
+    }, {
+      "id" : "K5",
+      "tileId" : "24",
+      "rotationName" : "W",
+      "tokens" : [ ]
+    }, {
+      "id" : "K7",
+      "tileId" : "28",
+      "rotationName" : "W",
+      "tokens" : [ ]
+    }, {
+      "id" : "K9",
+      "tileId" : "0",
+      "rotationName" : "SW",
+      "tokens" : [ ]
+    }, {
+      "id" : "K11",
+      "tileId" : "87",
+      "rotationName" : "NE",
+      "tokens" : [ ]
+    }, {
+      "id" : "K13",
+      "tileId" : "8",
+      "rotationName" : "SE",
+      "tokens" : [ ]
+    }, {
+      "id" : "K15",
+      "tileId" : "9",
+      "rotationName" : "SW",
+      "tokens" : [ ]
+    }, {
+      "id" : "L2",
+      "tileId" : "-1",
+      "rotationName" : "SW",
+      "tokens" : [ ]
+    }, {
+      "id" : "L4",
+      "tileId" : "0",
+      "rotationName" : "SW",
+      "tokens" : [ ]
+    }, {
+      "id" : "L6",
+      "tileId" : "213",
+      "rotationName" : "NE",
+      "tokens" : [ {
+        "companyId" : "BA",
+        "stationIndex" : 2
+      } ]
+    }, {
+      "id" : "L8",
+      "tileId" : "55",
+      "rotationName" : "E",
+      "tokens" : [ ]
+    }, {
+      "id" : "L10",
+      "tileId" : "46",
+      "rotationName" : "W",
+      "tokens" : [ ]
+    }, {
+      "id" : "L12",
+      "tileId" : "42",
+      "rotationName" : "SE",
+      "tokens" : [ ]
+    }, {
+      "id" : "L14",
+      "tileId" : "218",
+      "rotationName" : "SW",
+      "tokens" : [ {
+        "companyId" : "BY",
+        "stationIndex" : 1
+      } ]
+    }, {
+      "id" : "L16",
+      "tileId" : "0",
+      "rotationName" : "SW",
+      "tokens" : [ ]
+    }, {
+      "id" : "M5",
+      "tileId" : "-901",
+      "rotationName" : "E",
+      "tokens" : [ ]
+    }, {
+      "id" : "M7",
+      "tileId" : "1",
+      "rotationName" : "NW",
+      "tokens" : [ ]
+    }, {
+      "id" : "M9",
+      "tileId" : "15",
+      "rotationName" : "NE",
+      "tokens" : [ {
+        "companyId" : "WT",
+        "stationIndex" : 1
+      } ]
+    }, {
+      "id" : "M11",
+      "tileId" : "7",
+      "rotationName" : "W",
+      "tokens" : [ ]
+    }, {
+      "id" : "M13",
+      "tileId" : "20",
+      "rotationName" : "NW",
+      "tokens" : [ ]
+    }, {
+      "id" : "M15",
+      "tileId" : "88",
+      "rotationName" : "SW",
+      "tokens" : [ ]
+    }, {
+      "id" : "M17",
+      "tileId" : "7",
+      "rotationName" : "E",
+      "tokens" : [ ]
+    }, {
+      "id" : "M19",
+      "tileId" : "-3",
+      "rotationName" : "W",
+      "tokens" : [ ]
+    }, {
+      "id" : "N4",
+      "tileId" : "-901",
+      "rotationName" : "SE",
+      "tokens" : [ ]
+    }, {
+      "id" : "N6",
+      "tileId" : "-41",
+      "rotationName" : "SW",
+      "tokens" : [ ]
+    }, {
+      "id" : "N8",
+      "tileId" : "0",
+      "rotationName" : "SW",
+      "tokens" : [ ]
+    }, {
+      "id" : "N10",
+      "tileId" : "56",
+      "rotationName" : "E",
+      "tokens" : [ ]
+    }, {
+      "id" : "N12",
+      "tileId" : "63",
+      "rotationName" : "SW",
+      "tokens" : [ ]
+    }, {
+      "id" : "N14",
+      "tileId" : "0",
+      "rotationName" : "SW",
+      "tokens" : [ ]
+    }, {
+      "id" : "N16",
+      "tileId" : "8",
+      "rotationName" : "SW",
+      "tokens" : [ ]
+    }, {
+      "id" : "N18",
+      "tileId" : "0",
+      "rotationName" : "SW",
+      "tokens" : [ ]
+    }, {
+      "id" : "O5",
+      "tileId" : "-10",
+      "rotationName" : "SW",
+      "tokens" : [ ]
+    }, {
+      "id" : "O7",
+      "tileId" : "0",
+      "rotationName" : "SW",
+      "tokens" : [ ]
+    }, {
+      "id" : "O9",
+      "tileId" : "0",
+      "rotationName" : "SW",
+      "tokens" : [ ]
+    }, {
+      "id" : "O11",
+      "tileId" : "0",
+      "rotationName" : "SW",
+      "tokens" : [ ]
+    }, {
+      "id" : "O13",
+      "tileId" : "8",
+      "rotationName" : "NW",
+      "tokens" : [ ]
+    }, {
+      "id" : "O15",
+      "tileId" : "207",
+      "rotationName" : "W",
+      "tokens" : [ {
+        "companyId" : "BY",
+        "stationIndex" : 1
+      } ]
+    }, {
+      "id" : "O17",
+      "tileId" : "0",
+      "rotationName" : "SW",
+      "tokens" : [ ]
+    }, {
+      "id" : "P6",
+      "tileId" : "-7",
+      "rotationName" : "E",
+      "tokens" : [ ]
+    }, {
+      "id" : "P10",
+      "tileId" : "-3",
+      "rotationName" : "NE",
+      "tokens" : [ ]
+    }, {
+      "id" : "P14",
+      "tileId" : "-7",
+      "rotationName" : "E",
+      "tokens" : [ ]
+    } ]
+  },
+  "trains" : [ {
+    "id" : "2+2_2",
+    "name" : "2+2",
+    "ownerId" : "ScrapHeap",
+    "obsolete" : false
+  }, {
+    "id" : "6+6_3",
+    "name" : "6+6",
+    "ownerId" : "IPO",
+    "obsolete" : false
+  }, {
+    "id" : "2+2_3",
+    "name" : "2+2",
+    "ownerId" : "ScrapHeap",
+    "obsolete" : false
+  }, {
+    "id" : "6+6_2",
+    "name" : "6+6",
+    "ownerId" : "IPO",
+    "obsolete" : false
+  }, {
+    "id" : "2+2_0",
+    "name" : "2+2",
+    "ownerId" : "ScrapHeap",
+    "obsolete" : false
+  }, {
+    "id" : "6+6_1",
+    "name" : "6+6",
+    "ownerId" : "IPO",
+    "obsolete" : false
+  }, {
+    "id" : "2+2_1",
+    "name" : "2+2",
+    "ownerId" : "ScrapHeap",
+    "obsolete" : false
+  }, {
+    "id" : "6+6_0",
+    "name" : "6+6",
+    "ownerId" : "HE",
+    "obsolete" : false
+  }, {
+    "id" : "2_0",
+    "name" : "2",
+    "ownerId" : "ScrapHeap",
+    "obsolete" : false
+  }, {
+    "id" : "2_1",
+    "name" : "2",
+    "ownerId" : "ScrapHeap",
+    "obsolete" : false
+  }, {
+    "id" : "3_0",
+    "name" : "3",
+    "ownerId" : "ScrapHeap",
+    "obsolete" : false
+  }, {
+    "id" : "2_2",
+    "name" : "2",
+    "ownerId" : "ScrapHeap",
+    "obsolete" : false
+  }, {
+    "id" : "3_1",
+    "name" : "3",
+    "ownerId" : "ScrapHeap",
+    "obsolete" : false
+  }, {
+    "id" : "4_0",
+    "name" : "4",
+    "ownerId" : "MS",
+    "obsolete" : false
+  }, {
+    "id" : "2_3",
+    "name" : "2",
+    "ownerId" : "ScrapHeap",
+    "obsolete" : false
+  }, {
+    "id" : "3_2",
+    "name" : "3",
+    "ownerId" : "ScrapHeap",
+    "obsolete" : false
+  }, {
+    "id" : "4_1",
+    "name" : "4",
+    "ownerId" : "BA",
+    "obsolete" : false
+  }, {
+    "id" : "5_0",
+    "name" : "5",
+    "ownerId" : "PR",
+    "obsolete" : false
+  }, {
+    "id" : "2_4",
+    "name" : "2",
+    "ownerId" : "ScrapHeap",
+    "obsolete" : false
+  }, {
+    "id" : "3_3",
+    "name" : "3",
+    "ownerId" : "ScrapHeap",
+    "obsolete" : false
+  }, {
+    "id" : "4_2",
+    "name" : "4",
+    "ownerId" : "BY",
+    "obsolete" : false
+  }, {
+    "id" : "5_1",
+    "name" : "5",
+    "ownerId" : "MS",
+    "obsolete" : false
+  }, {
+    "id" : "6_0",
+    "name" : "6",
+    "ownerId" : "SX",
+    "obsolete" : false
+  }, {
+    "id" : "2_5",
+    "name" : "2",
+    "ownerId" : "ScrapHeap",
+    "obsolete" : false
+  }, {
+    "id" : "6_1",
+    "name" : "6",
+    "ownerId" : "OL",
+    "obsolete" : false
+  }, {
+    "id" : "2_6",
+    "name" : "2",
+    "ownerId" : "ScrapHeap",
+    "obsolete" : false
+  }, {
+    "id" : "2_7",
+    "name" : "2",
+    "ownerId" : "ScrapHeap",
+    "obsolete" : false
+  }, {
+    "id" : "2_8",
+    "name" : "2",
+    "ownerId" : "ScrapHeap",
+    "obsolete" : false
+  }, {
+    "id" : "3+3_2",
+    "name" : "3+3",
+    "ownerId" : "ScrapHeap",
+    "obsolete" : false
+  }, {
+    "id" : "3+3_1",
+    "name" : "3+3",
+    "ownerId" : "ScrapHeap",
+    "obsolete" : false
+  }, {
+    "id" : "3+3_0",
+    "name" : "3+3",
+    "ownerId" : "ScrapHeap",
+    "obsolete" : false
+  }, {
+    "id" : "5+5_0",
+    "name" : "5+5",
+    "ownerId" : "OL",
+    "obsolete" : false
+  }, {
+    "id" : "4+4_0",
+    "name" : "4+4",
+    "ownerId" : "WT",
+    "obsolete" : false
+  } ],
+  "gameOptions" : {
+    "NumberOfPlayers" : "4",
+    "Variant" : "Clemens",
+    "RouteAlgorithm" : "Permissive",
+    "RestrictTrainTradingToPresident" : "yes"
+  },
+  "players" : [ {
+    "id" : "Stefan",
+    "cash" : 2324,
+    "fullName" : "Stefan",
+    "certificates" : [ {
+      "companyId" : "BY",
+      "percentage" : 10,
+      "isPresident" : false
+    }, {
+      "companyId" : "OL",
+      "percentage" : 20,
+      "isPresident" : true
+    }, {
+      "companyId" : "OL",
+      "percentage" : 20,
+      "isPresident" : false
+    }, {
+      "companyId" : "OL",
+      "percentage" : 20,
+      "isPresident" : false
+    }, {
+      "companyId" : "OL",
+      "percentage" : 10,
+      "isPresident" : false
+    }, {
+      "companyId" : "OL",
+      "percentage" : 10,
+      "isPresident" : false
+    }, {
+      "companyId" : "PR",
+      "percentage" : 10,
+      "isPresident" : true
+    }, {
+      "companyId" : "PR",
+      "percentage" : 5,
+      "isPresident" : false
+    }, {
+      "companyId" : "PR",
+      "percentage" : 10,
+      "isPresident" : false
+    }, {
+      "companyId" : "PR",
+      "percentage" : 10,
+      "isPresident" : false
+    }, {
+      "companyId" : "PR",
+      "percentage" : 10,
+      "isPresident" : false
+    }, {
+      "companyId" : "SX",
+      "percentage" : 20,
+      "isPresident" : true
+    }, {
+      "companyId" : "SX",
+      "percentage" : 10,
+      "isPresident" : false
+    }, {
+      "companyId" : "SX",
+      "percentage" : 10,
+      "isPresident" : false
+    }, {
+      "companyId" : "SX",
+      "percentage" : 10,
+      "isPresident" : false
+    }, {
+      "companyId" : "SX",
+      "percentage" : 10,
+      "isPresident" : false
+    } ],
+    "privateCompanyIds" : [ ],
+    "timeBankSeconds" : 540,
+    "soldCompanyIdsThisRound" : [ ]
+  }, {
+    "id" : "Christian",
+    "cash" : 3243,
+    "fullName" : "Christian",
+    "certificates" : [ {
+      "companyId" : "BA",
+      "percentage" : 20,
+      "isPresident" : true
+    }, {
+      "companyId" : "BA",
+      "percentage" : 10,
+      "isPresident" : false
+    }, {
+      "companyId" : "BA",
+      "percentage" : 10,
+      "isPresident" : false
+    }, {
+      "companyId" : "BA",
+      "percentage" : 10,
+      "isPresident" : false
+    }, {
+      "companyId" : "BA",
+      "percentage" : 10,
+      "isPresident" : false
+    }, {
+      "companyId" : "BA",
+      "percentage" : 10,
+      "isPresident" : false
+    }, {
+      "companyId" : "BA",
+      "percentage" : 10,
+      "isPresident" : false
+    }, {
+      "companyId" : "BA",
+      "percentage" : 20,
+      "isPresident" : false
+    }, {
+      "companyId" : "BY",
+      "percentage" : 10,
+      "isPresident" : false
+    }, {
+      "companyId" : "BY",
+      "percentage" : 10,
+      "isPresident" : false
+    }, {
+      "companyId" : "BY",
+      "percentage" : 10,
+      "isPresident" : false
+    }, {
+      "companyId" : "BY",
+      "percentage" : 10,
+      "isPresident" : false
+    }, {
+      "companyId" : "OL",
+      "percentage" : 10,
+      "isPresident" : false
+    }, {
+      "companyId" : "PR",
+      "percentage" : 10,
+      "isPresident" : false
+    }, {
+      "companyId" : "PR",
+      "percentage" : 10,
+      "isPresident" : false
+    }, {
+      "companyId" : "SX",
+      "percentage" : 10,
+      "isPresident" : false
+    } ],
+    "privateCompanyIds" : [ ],
+    "timeBankSeconds" : 360,
+    "soldCompanyIdsThisRound" : [ ]
+  }, {
+    "id" : "Marc",
+    "cash" : 3320,
+    "fullName" : "Marc",
+    "certificates" : [ {
+      "companyId" : "BY",
+      "percentage" : 20,
+      "isPresident" : true
+    }, {
+      "companyId" : "BY",
+      "percentage" : 10,
+      "isPresident" : false
+    }, {
+      "companyId" : "BY",
+      "percentage" : 10,
+      "isPresident" : false
+    }, {
+      "companyId" : "BY",
+      "percentage" : 10,
+      "isPresident" : false
+    }, {
+      "companyId" : "MS",
+      "percentage" : 10,
+      "isPresident" : false
+    }, {
+      "companyId" : "OL",
+      "percentage" : 10,
+      "isPresident" : false
+    }, {
+      "companyId" : "PR",
+      "percentage" : 10,
+      "isPresident" : false
+    }, {
+      "companyId" : "PR",
+      "percentage" : 10,
+      "isPresident" : false
+    }, {
+      "companyId" : "WT",
+      "percentage" : 20,
+      "isPresident" : true
+    }, {
+      "companyId" : "WT",
+      "percentage" : 10,
+      "isPresident" : false
+    }, {
+      "companyId" : "WT",
+      "percentage" : 10,
+      "isPresident" : false
+    }, {
+      "companyId" : "WT",
+      "percentage" : 10,
+      "isPresident" : false
+    }, {
+      "companyId" : "WT",
+      "percentage" : 10,
+      "isPresident" : false
+    }, {
+      "companyId" : "WT",
+      "percentage" : 10,
+      "isPresident" : false
+    }, {
+      "companyId" : "WT",
+      "percentage" : 10,
+      "isPresident" : false
+    }, {
+      "companyId" : "WT",
+      "percentage" : 20,
+      "isPresident" : false
+    } ],
+    "privateCompanyIds" : [ ],
+    "timeBankSeconds" : 480,
+    "soldCompanyIdsThisRound" : [ ]
+  }, {
+    "id" : "Rainer",
+    "cash" : 3320,
+    "fullName" : "Rainer",
+    "certificates" : [ {
+      "companyId" : "HE",
+      "percentage" : 20,
+      "isPresident" : true
+    }, {
+      "companyId" : "HE",
+      "percentage" : 10,
+      "isPresident" : false
+    }, {
+      "companyId" : "HE",
+      "percentage" : 10,
+      "isPresident" : false
+    }, {
+      "companyId" : "HE",
+      "percentage" : 10,
+      "isPresident" : false
+    }, {
+      "companyId" : "HE",
+      "percentage" : 10,
+      "isPresident" : false
+    }, {
+      "companyId" : "HE",
+      "percentage" : 10,
+      "isPresident" : false
+    }, {
+      "companyId" : "HE",
+      "percentage" : 10,
+      "isPresident" : false
+    }, {
+      "companyId" : "HE",
+      "percentage" : 20,
+      "isPresident" : false
+    }, {
+      "companyId" : "MS",
+      "percentage" : 20,
+      "isPresident" : true
+    }, {
+      "companyId" : "MS",
+      "percentage" : 20,
+      "isPresident" : false
+    }, {
+      "companyId" : "MS",
+      "percentage" : 20,
+      "isPresident" : false
+    }, {
+      "companyId" : "MS",
+      "percentage" : 10,
+      "isPresident" : false
+    }, {
+      "companyId" : "MS",
+      "percentage" : 10,
+      "isPresident" : false
+    }, {
+      "companyId" : "MS",
+      "percentage" : 10,
+      "isPresident" : false
+    }, {
+      "companyId" : "SX",
+      "percentage" : 10,
+      "isPresident" : false
+    }, {
+      "companyId" : "SX",
+      "percentage" : 10,
+      "isPresident" : false
+    }, {
+      "companyId" : "SX",
+      "percentage" : 10,
+      "isPresident" : false
+    } ],
+    "privateCompanyIds" : [ ],
+    "timeBankSeconds" : 420,
+    "soldCompanyIdsThisRound" : [ ]
+  } ],
+  "publicCompanies" : [ {
+    "id" : "M1",
+    "cash" : 0,
+    "presidentId" : null,
+    "hasFloated" : false,
+    "closed" : true,
+    "treasuryCertificates" : [ ],
+    "stockPrice" : 0,
+    "stockRow" : 0,
+    "stockCol" : 0,
+    "stockStackIndex" : -1,
+    "totalTokens" : 1,
+    "hasOperated" : false,
+    "bankLoan" : 0,
+    "lastRevenue" : 0,
+    "lastDividend" : 0,
+    "lastRevenueAllocation" : "Split",
+    "lastDirectIncome" : 0,
+    "directIncomeRevenue" : 0
+  }, {
+    "id" : "M2",
+    "cash" : 0,
+    "presidentId" : null,
+    "hasFloated" : false,
+    "closed" : true,
+    "treasuryCertificates" : [ ],
+    "stockPrice" : 0,
+    "stockRow" : 0,
+    "stockCol" : 0,
+    "stockStackIndex" : -1,
+    "totalTokens" : 1,
+    "hasOperated" : false,
+    "bankLoan" : 0,
+    "lastRevenue" : 0,
+    "lastDividend" : 0,
+    "lastRevenueAllocation" : "Split",
+    "lastDirectIncome" : 0,
+    "directIncomeRevenue" : 0
+  }, {
+    "id" : "M3",
+    "cash" : 0,
+    "presidentId" : null,
+    "hasFloated" : false,
+    "closed" : true,
+    "treasuryCertificates" : [ ],
+    "stockPrice" : 0,
+    "stockRow" : 0,
+    "stockCol" : 0,
+    "stockStackIndex" : -1,
+    "totalTokens" : 1,
+    "hasOperated" : false,
+    "bankLoan" : 0,
+    "lastRevenue" : 0,
+    "lastDividend" : 0,
+    "lastRevenueAllocation" : "Split",
+    "lastDirectIncome" : 0,
+    "directIncomeRevenue" : 0
+  }, {
+    "id" : "M4",
+    "cash" : 0,
+    "presidentId" : null,
+    "hasFloated" : false,
+    "closed" : true,
+    "treasuryCertificates" : [ ],
+    "stockPrice" : 0,
+    "stockRow" : 0,
+    "stockCol" : 0,
+    "stockStackIndex" : -1,
+    "totalTokens" : 1,
+    "hasOperated" : false,
+    "bankLoan" : 0,
+    "lastRevenue" : 0,
+    "lastDividend" : 0,
+    "lastRevenueAllocation" : "No train",
+    "lastDirectIncome" : 0,
+    "directIncomeRevenue" : 0
+  }, {
+    "id" : "M5",
+    "cash" : 0,
+    "presidentId" : null,
+    "hasFloated" : false,
+    "closed" : true,
+    "treasuryCertificates" : [ ],
+    "stockPrice" : 0,
+    "stockRow" : 0,
+    "stockCol" : 0,
+    "stockStackIndex" : -1,
+    "totalTokens" : 1,
+    "hasOperated" : false,
+    "bankLoan" : 0,
+    "lastRevenue" : 0,
+    "lastDividend" : 0,
+    "lastRevenueAllocation" : "No train",
+    "lastDirectIncome" : 0,
+    "directIncomeRevenue" : 0
+  }, {
+    "id" : "M6",
+    "cash" : 0,
+    "presidentId" : null,
+    "hasFloated" : false,
+    "closed" : true,
+    "treasuryCertificates" : [ ],
+    "stockPrice" : 0,
+    "stockRow" : 0,
+    "stockCol" : 0,
+    "stockStackIndex" : -1,
+    "totalTokens" : 1,
+    "hasOperated" : false,
+    "bankLoan" : 0,
+    "lastRevenue" : 0,
+    "lastDividend" : 0,
+    "lastRevenueAllocation" : "No train",
+    "lastDirectIncome" : 0,
+    "directIncomeRevenue" : 0
+  }, {
+    "id" : "BY",
+    "cash" : 2,
+    "presidentId" : "Marc",
+    "hasFloated" : true,
+    "closed" : false,
+    "treasuryCertificates" : [ ],
+    "stockPrice" : 418,
+    "stockRow" : 0,
+    "stockCol" : 15,
+    "stockStackIndex" : 0,
+    "totalTokens" : 5,
+    "hasOperated" : true,
+    "bankLoan" : 0,
+    "lastRevenue" : 190,
+    "lastDividend" : 0,
+    "lastRevenueAllocation" : "Pay out",
+    "lastDirectIncome" : 0,
+    "directIncomeRevenue" : 0
+  }, {
+    "id" : "SX",
+    "cash" : 1,
+    "presidentId" : "Stefan",
+    "hasFloated" : true,
+    "closed" : false,
+    "treasuryCertificates" : [ ],
+    "stockPrice" : 318,
+    "stockRow" : 1,
+    "stockCol" : 13,
+    "stockStackIndex" : 0,
+    "totalTokens" : 3,
+    "hasOperated" : true,
+    "bankLoan" : 0,
+    "lastRevenue" : 260,
+    "lastDividend" : 0,
+    "lastRevenueAllocation" : "Pay out",
+    "lastDirectIncome" : 0,
+    "directIncomeRevenue" : 0
+  }, {
+    "id" : "BA",
+    "cash" : 253,
+    "presidentId" : "Christian",
+    "hasFloated" : true,
+    "closed" : false,
+    "treasuryCertificates" : [ ],
+    "stockPrice" : 186,
+    "stockRow" : 0,
+    "stockCol" : 7,
+    "stockStackIndex" : 0,
+    "totalTokens" : 2,
+    "hasOperated" : true,
+    "bankLoan" : 0,
+    "lastRevenue" : 210,
+    "lastDividend" : 0,
+    "lastRevenueAllocation" : "Pay out",
+    "lastDirectIncome" : 0,
+    "directIncomeRevenue" : 0
+  }, {
+    "id" : "WT",
+    "cash" : 176,
+    "presidentId" : "Marc",
+    "hasFloated" : true,
+    "closed" : false,
+    "treasuryCertificates" : [ ],
+    "stockPrice" : 136,
+    "stockRow" : 2,
+    "stockCol" : 6,
+    "stockStackIndex" : 0,
+    "totalTokens" : 2,
+    "hasOperated" : true,
+    "bankLoan" : 0,
+    "lastRevenue" : 260,
+    "lastDividend" : 0,
+    "lastRevenueAllocation" : "Pay out",
+    "lastDirectIncome" : 0,
+    "directIncomeRevenue" : 0
+  }, {
+    "id" : "HE",
+    "cash" : 16,
+    "presidentId" : "Rainer",
+    "hasFloated" : true,
+    "closed" : false,
+    "treasuryCertificates" : [ ],
+    "stockPrice" : 90,
+    "stockRow" : 4,
+    "stockCol" : 3,
+    "stockStackIndex" : 0,
+    "totalTokens" : 2,
+    "hasOperated" : true,
+    "bankLoan" : 0,
+    "lastRevenue" : 360,
+    "lastDividend" : 0,
+    "lastRevenueAllocation" : "Pay out",
+    "lastDirectIncome" : 0,
+    "directIncomeRevenue" : 0
+  }, {
+    "id" : "MS",
+    "cash" : 80,
+    "presidentId" : "Rainer",
+    "hasFloated" : true,
+    "closed" : false,
+    "treasuryCertificates" : [ ],
+    "stockPrice" : 94,
+    "stockRow" : 3,
+    "stockCol" : 3,
+    "stockStackIndex" : 0,
+    "totalTokens" : 2,
+    "hasOperated" : true,
+    "bankLoan" : 0,
+    "lastRevenue" : 440,
+    "lastDividend" : 0,
+    "lastRevenueAllocation" : "Pay out",
+    "lastDirectIncome" : 0,
+    "directIncomeRevenue" : 0
+  }, {
+    "id" : "OL",
+    "cash" : 0,
+    "presidentId" : "Stefan",
+    "hasFloated" : true,
+    "closed" : false,
+    "treasuryCertificates" : [ ],
+    "stockPrice" : 90,
+    "stockRow" : 4,
+    "stockCol" : 3,
+    "stockStackIndex" : 1,
+    "totalTokens" : 2,
+    "hasOperated" : true,
+    "bankLoan" : 0,
+    "lastRevenue" : 540,
+    "lastDividend" : 0,
+    "lastRevenueAllocation" : "Pay out",
+    "lastDirectIncome" : 0,
+    "directIncomeRevenue" : 0
+  }, {
+    "id" : "PR",
+    "cash" : 163,
+    "presidentId" : "Stefan",
+    "hasFloated" : true,
+    "closed" : false,
+    "treasuryCertificates" : [ ],
+    "stockPrice" : 290,
+    "stockRow" : 2,
+    "stockCol" : 13,
+    "stockStackIndex" : 0,
+    "totalTokens" : 7,
+    "hasOperated" : true,
+    "bankLoan" : 0,
+    "lastRevenue" : 250,
+    "lastDividend" : 0,
+    "lastRevenueAllocation" : "Pay out",
+    "lastDirectIncome" : 0,
+    "directIncomeRevenue" : 0
+  } ],
+  "privateCompanies" : [ {
+    "id" : "NF",
+    "ownerId" : "ScrapHeap",
+    "revenue" : [ 5 ],
+    "closed" : true,
+    "specialProperties" : [ ]
+  }, {
+    "id" : "OBB",
+    "ownerId" : "ScrapHeap",
+    "revenue" : [ 10 ],
+    "closed" : true,
+    "specialProperties" : [ ]
+  }, {
+    "id" : "PfB",
+    "ownerId" : "ScrapHeap",
+    "revenue" : [ 15 ],
+    "closed" : true,
+    "specialProperties" : [ ]
+  }, {
+    "id" : "LD",
+    "ownerId" : "ScrapHeap",
+    "revenue" : [ 20 ],
+    "closed" : true,
+    "specialProperties" : [ ]
+  }, {
+    "id" : "BB",
+    "ownerId" : "ScrapHeap",
+    "revenue" : [ 25 ],
+    "closed" : true,
+    "specialProperties" : [ ]
+  }, {
+    "id" : "HB",
+    "ownerId" : "ScrapHeap",
+    "revenue" : [ 30 ],
+    "closed" : true,
+    "specialProperties" : [ ]
+  } ]
+}
