@@ -68,10 +68,13 @@ public class Player extends RailsAbstractItem
         this.fullName.set(name);
     }
 
-    public String getFullName() {
+public String getFullName() {
         String name = this.fullName.value();
-        // Fallback to the short ID if the full name hasn't been explicitly set
-        return (name != null && !name.isEmpty()) ? name : getId(); 
+        if (name == null || name.trim().isEmpty()) {
+            // Attempt to recover from local config (survives reloads without altering save files)
+            name = net.sf.rails.common.Config.get("player.fullname." + getId());
+        }
+        return (name != null && !name.trim().isEmpty()) ? name : getId(); 
     }
     
     private static final Logger log = LoggerFactory.getLogger(Player.class);

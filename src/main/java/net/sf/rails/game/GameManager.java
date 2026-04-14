@@ -2669,7 +2669,12 @@ public class GameManager extends RailsManager implements Configurable, Owner {
                 java.util.List<String> names = new java.util.ArrayList<>();
                 java.util.List<Integer> scores = new java.util.ArrayList<>();
                 for (Player p : getRoot().getPlayerManager().getPlayers()) {
-                    names.add(p.getName());
+
+                    String fullName = p.getFullName();
+                    if (fullName == null || fullName.trim().isEmpty()) {
+                        fullName = p.getName();
+                    }
+                    names.add(fullName);
                     scores.add(p.getWorth());
                 }
 
@@ -2678,7 +2683,7 @@ public class GameManager extends RailsManager implements Configurable, Owner {
                 // https://docs.google.com/spreadsheets/d/1lXyCBjjLLzfeajpdS_PEqI3z4IGDIqj5gRAtiPpyqck/edit?pli=1&gid=0#gid=0
 
                 int dialogResult = javax.swing.JOptionPane.showConfirmDialog(null,
-                        "Do you want to save and upload the final results?",
+                        "Do you want to upload the final results to the server?",
                         "Upload Results",
                         javax.swing.JOptionPane.YES_NO_OPTION,
                         javax.swing.JOptionPane.QUESTION_MESSAGE);

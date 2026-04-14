@@ -224,11 +224,14 @@ public class GameSetupController {
                 GameData gameData = GameData.create(selectedGame, selectedOptions, players);
                 railsRoot = RailsRoot.create(gameData);
 
-                // NEW: Inject the FULL names into the newly created Player objects
+// NEW: Inject the FULL names into the newly created Player objects
                 List<net.sf.rails.game.Player> createdPlayers = railsRoot.getPlayerManager().getPlayers();
                 for (int i = 0; i < createdPlayers.size(); i++) {
-                    if (i < fullNames.size()) {
-                        createdPlayers.get(i).setFullName(fullNames.get(i));
+                    if (i < fullNames.size() && fullNames.get(i) != null && !fullNames.get(i).trim().isEmpty()) {
+                        String fName = fullNames.get(i);
+                        createdPlayers.get(i).setFullName(fName);
+                        // Store locally so it survives save/reload cycles without breaking file formats
+                        Config.set("player.fullname." + createdPlayers.get(i).getName(), fName);
                     }
                 }
             } catch (ConfigurationException e) {
