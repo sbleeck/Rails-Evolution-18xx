@@ -73,10 +73,26 @@ public class WorthChartWindow extends JDialog {
         JPanel contentPanel = new JPanel(new BorderLayout());
 
         // 1. Title
-        JLabel titleLabel = new JLabel("Player Relative Worth Analysis", SwingConstants.CENTER);
+        JPanel topPanel = new JPanel(new BorderLayout());
+        JLabel titleLabel = new JLabel("Player Worth Analysis", SwingConstants.CENTER);
         titleLabel.setFont(new Font("Arial", Font.BOLD, 20));
         titleLabel.setBorder(BorderFactory.createEmptyBorder(10, 0, 10, 0));
-        contentPanel.add(titleLabel, BorderLayout.NORTH);
+        topPanel.add(titleLabel, BorderLayout.NORTH);
+
+        JPanel togglePanel = new JPanel(new FlowLayout(FlowLayout.CENTER));
+        JRadioButton relativeBtn = new JRadioButton("Relative (%)", true);
+        JRadioButton absoluteBtn = new JRadioButton("Absolute ($)", false);
+        ButtonGroup group = new ButtonGroup();
+        group.add(relativeBtn);
+        group.add(absoluteBtn);
+        togglePanel.add(relativeBtn);
+        togglePanel.add(absoluteBtn);
+        topPanel.add(togglePanel, BorderLayout.SOUTH);
+
+        relativeBtn.addActionListener(e -> relativePanel.setRelativeMode(true));
+        absoluteBtn.addActionListener(e -> relativePanel.setRelativeMode(false));
+
+        contentPanel.add(topPanel, BorderLayout.NORTH);
 
         // Pre-compute unified macro groups to aggressively clump "Start" phases 
         // and provide accurate boundary indices for the chart and navigation.
@@ -124,18 +140,22 @@ public class WorthChartWindow extends JDialog {
         navPanel.setBorder(BorderFactory.createEmptyBorder(10, 20, 10, 20));
 
         JPanel buttonPanel = new JPanel(new FlowLayout(FlowLayout.CENTER, 5, 0));
+        
         prevRoundButton = new JButton("<< Round");
         prevButton = new JButton("< Move");
+        JButton playFromHereBtn = new JButton("Play From Here");
         nextButton = new JButton("Move >");
         nextRoundButton = new JButton("Round >>");
 
         prevRoundButton.addActionListener(e -> stepRound(-1));
         prevButton.addActionListener(e -> stepReveal(-1));
+        playFromHereBtn.addActionListener(e -> this.dispose());
         nextButton.addActionListener(e -> stepReveal(1));
         nextRoundButton.addActionListener(e -> stepRound(1));
 
         buttonPanel.add(prevRoundButton);
         buttonPanel.add(prevButton);
+        buttonPanel.add(playFromHereBtn);
         buttonPanel.add(nextButton);
         buttonPanel.add(nextRoundButton);
 
@@ -291,8 +311,9 @@ public class WorthChartWindow extends JDialog {
     }
 
     private String formatSliderLabel(String snapKey) {
-        if (!snapKey.contains(":"))
-            return snapKey;
+if (!snapKey.contains(":")) {
+            return snapKey.matches("\\d+") ? "Move " + snapKey : snapKey;
+        }
         String[] parts = snapKey.split(":");
         String movePart = parts[0].replace("_", " ");
         String macroPart = formatMacroName(parts[1]);
@@ -310,27 +331,13 @@ public class WorthChartWindow extends JDialog {
             roundKey = data.roundKeys.get(currentIdx - 1);
         }
 
-        boolean isTimeAdjRound = "Time Adj".equals(roundKey);
-
-        // --- SORTING LOGIC ---
-        // If we are in the "Time Adj" round, sort by Adjusted Worth to show the TRUE
-        // winner.
-        // Otherwise, sort by the Raw Worth at that moment (the Race).
-        final String currentRoundKey = roundKey;
+       final String currentRoundKey = roundKey;
 
         List<Player> players = new ArrayList<>(data.gameManager.getPlayers());
         players.sort((p1, p2) -> {
-            if (isTimeAdjRound) {
-                // Sort by Adjusted
-                int w1 = p1.getWorth() + Math.min(0, p1.getTimeBankModel().value());
-                int w2 = p2.getWorth() + Math.min(0, p2.getTimeBankModel().value());
-                return Integer.compare(w2, w1);
-            } else {
-                // Sort by Historical Snapshot of Raw Worth
-                Double v1 = data.history.get(currentRoundKey).getOrDefault(p1.getId(), 0.0);
-                Double v2 = data.history.get(currentRoundKey).getOrDefault(p2.getId(), 0.0);
-                return Double.compare(v2, v1);
-            }
+            Double v1 = data.history.get(currentRoundKey).getOrDefault(p1.getId(), 0.0);
+            Double v2 = data.history.get(currentRoundKey).getOrDefault(p2.getId(), 0.0);
+            return Double.compare(v2, v1);
         });
 
         for (Player p : players) {
@@ -342,25 +349,13 @@ public class WorthChartWindow extends JDialog {
             int displayTime = p.getTimeBankModel().value();
             int displayRaw = 0;
 
-            // --- DATA RETRIEVAL ---
-            // Even if roundKey is "Time Adj", we pull assets from "End" (assets don't
-            // change, only worth)
-            String assetKey = isTimeAdjRound ? "End" : roundKey;
-
-            // 1. Worth Snapshot
-            // For "Time Adj", the data.history map already contains the penalized worth!
-            // But we want to show Raw in the Raw column and Adj in the Adj column.
-
-            // Raw Worth is always based on "End" if we are at "Time Adj"
-            if (isTimeAdjRound) {
-                displayRaw = data.history.get("End").getOrDefault(p.getId(), 0.0).intValue();
-            } else {
-                displayRaw = data.history.get(roundKey).getOrDefault(p.getId(), 0.0).intValue();
-            }
+           // 1. Worth Snapshot
+            displayRaw = data.history.get(roundKey).getOrDefault(p.getId(), 0.0).intValue();
 
             // 2. Asset Snapshot
-            if (data.assetHistory != null && data.assetHistory.containsKey(assetKey)) {
-                Map<String, GameManager.PlayerAssetSnapshot> assetSnap = data.assetHistory.get(assetKey);
+            if (data.assetHistory != null && data.assetHistory.containsKey(roundKey)) {
+                Map<String, GameManager.PlayerAssetSnapshot> assetSnap = data.assetHistory.get(roundKey);
+
                 GameManager.PlayerAssetSnapshot pSnap = assetSnap.get(p.getName());
                 if (pSnap != null) {
                     displayCash = pSnap.cash;
@@ -644,23 +639,41 @@ public class WorthChartWindow extends JDialog {
 
         public WorthData(GameManager gm) {
             this.gameManager = gm;
-            // Copy history so we can modify it locally without affecting GM state
-            this.history = new LinkedHashMap<>(gm.getPlayerWorthHistory());
-            this.assetHistory = gm.getPlayerAssetHistory();
+            
+            this.history = new LinkedHashMap<>();
+            this.assetHistory = new LinkedHashMap<>();
 
-            if (this.history.containsKey("End")) {
-                Map<String, Double> endSnapshot = this.history.get("End");
-                Map<String, Double> adjSnapshot = new java.util.HashMap<>(endSnapshot);
+            int lastMove = -1;
+            String lastKey = null;
 
-                // Calculate Adjusted Worth for everyone
-                for (Player p : gm.getPlayers()) {
-                    double raw = endSnapshot.getOrDefault(p.getId(), 0.0);
-                    int time = p.getTimeBankModel().value();
-                    double penalty = Math.min(0, time);
-                    adjSnapshot.put(p.getId(), raw + penalty);
+            for (Map.Entry<String, Map<String, Double>> entry : gm.getPlayerWorthHistory().entrySet()) {
+                String key = entry.getKey();
+                int currentMove = -1;
+
+                if (key.startsWith("Move_")) {
+                    try { currentMove = Integer.parseInt(key.split(":")[0].substring(5)); } catch (Exception e) {}
+                } else if (key.matches("\\d+")) {
+                    try { currentMove = Integer.parseInt(key); } catch (Exception e) {}
                 }
 
-                this.history.put("Time Adj", adjSnapshot);
+                if (currentMove != -1 && currentMove == lastMove) {
+                    if (lastKey != null) {
+                        this.history.remove(lastKey);
+                        if (gm.getPlayerAssetHistory() != null) {
+                            this.assetHistory.remove(lastKey);
+                        }
+                    }
+                }
+
+                this.history.put(key, entry.getValue());
+                if (gm.getPlayerAssetHistory() != null && gm.getPlayerAssetHistory().containsKey(key)) {
+                    this.assetHistory.put(key, gm.getPlayerAssetHistory().get(key));
+                }
+
+                if (currentMove != -1) {
+                    lastMove = currentMove;
+                }
+                lastKey = key;
             }
 
             this.majorCompanies = gm.getAllPublicCompanies().stream()
@@ -707,7 +720,11 @@ public class WorthChartWindow extends JDialog {
         // to previous versions, simply iterating over data.roundKeys which now includes
         // "Time Adj".
         private final WorthData data;
-        private final boolean relativeMode;
+        private boolean relativeMode;
+        public void setRelativeMode(boolean relativeMode) {
+            this.relativeMode = relativeMode;
+            repaint();
+        }
         private final RevealController revealController;
 
         public WorthChartPanel(WorthData data, boolean relativeMode, RevealController rc) {
@@ -1104,7 +1121,7 @@ public class WorthChartWindow extends JDialog {
         if (currentMove == targetMove)
             return;
 
-        log.info("Scrubbing timeline to move {}", targetMove);
+        // log.info("Scrubbing timeline to move {}", targetMove);
         this.setCursor(java.awt.Cursor.getPredefinedCursor(java.awt.Cursor.WAIT_CURSOR));
 
         try {
