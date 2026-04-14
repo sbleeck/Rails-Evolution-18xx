@@ -438,7 +438,35 @@ public class ORWindow extends DockingFrame implements ActionPerformer {
                 }
             }
         });
+// P: Payout Revenue
+        inputMap.put(KeyStroke.getKeyStroke(KeyEvent.VK_P, 0), "payRevenue");
+        actionMap.put("payRevenue", new AbstractAction() {
+            public void actionPerformed(ActionEvent e) {
+                if (orPanel != null && orPanel.activePhase == 3 && orPanel.btnRevPayout != null && orPanel.btnRevPayout.isEnabled()) {
+                    orPanel.btnRevPayout.doClick();
+                }
+            }
+        });
 
+        // W: Withhold Revenue
+        inputMap.put(KeyStroke.getKeyStroke(KeyEvent.VK_W, 0), "withholdRevenue");
+        actionMap.put("withholdRevenue", new AbstractAction() {
+            public void actionPerformed(ActionEvent e) {
+                if (orPanel != null && orPanel.activePhase == 3 && orPanel.btnRevWithhold != null && orPanel.btnRevWithhold.isEnabled()) {
+                    orPanel.btnRevWithhold.doClick();
+                }
+            }
+        });
+
+        // H: Half / Split Revenue
+        inputMap.put(KeyStroke.getKeyStroke(KeyEvent.VK_H, 0), "splitRevenue");
+        actionMap.put("splitRevenue", new AbstractAction() {
+            public void actionPerformed(ActionEvent e) {
+                if (orPanel != null && orPanel.activePhase == 3 && orPanel.btnRevSplit != null && orPanel.btnRevSplit.isEnabled()) {
+                    orPanel.btnRevSplit.doClick();
+                }
+            }
+        });
         
    
      }

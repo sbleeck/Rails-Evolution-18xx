@@ -2578,27 +2578,31 @@ public class StatusWindow extends JFrame implements ActionListener, ActionPerfor
 
     private void showHotkeysDialog() {
 
-        String msg = "<html><h3>Keyboard Shortcuts</h3>" +
-                "<table border='0' cellpadding='4'>" +
-                "<tr><td><b>Key</b></td><td><b>Action</b></td></tr>" +
-                "<tr><td colspan='2'><hr></td></tr>" +
+String msg = "<html><h3>Keyboard Shortcuts</h3>" +
+            "<table border='0' cellpadding='4'>" +
+            "<tr><td><b>Key</b></td><td><b>Action</b></td></tr>" +
+            "<tr><td colspan='2'><hr></td></tr>" +
 
-                "<tr><td colspan='2'><b>Global / Interface</b></td></tr>" +
-                "<tr><td><b>A</b></td><td>AI Move (Executes the AI logic for the current step)</td></tr>" +
-                "<tr><td><b>T</b></td><td>Toggle Timer (Pauses/Resumes the game timer)</td></tr>" +
-                "<tr><td><b>Space</b> or <b>Enter</b></td><td>Done / Confirm (Presses the 'Done' button)</td></tr>" +
-                "<tr><td><b>Cmd/Ctrl + Z</b></td><td>Undo</td></tr>" +
-                "<tr><td><b>Cmd/Ctrl + Y</b></td><td>Redo</td></tr>" +
-                "<tr><td><b>Cmd/Ctrl + +/-</b></td><td>Increase / Decrease Font Size</td></tr>" +
+            "<tr><td colspan='2'><b>Global / Interface</b></td></tr>" +
+            "<tr><td><b>A</b></td><td>AI Move (Executes the AI logic for the current step)</td></tr>" +
+            "<tr><td><b>T</b></td><td>Toggle Timer (Pauses/Resumes the game timer)</td></tr>" +
+            "<tr><td><b>Space</b> or <b>Enter</b></td><td>Done / Confirm (Presses the 'Done' button)</td></tr>" +
+            "<tr><td><b>Cmd/Ctrl + Z</b></td><td>Undo</td></tr>" +
+            "<tr><td><b>Cmd/Ctrl + Y</b></td><td>Redo</td></tr>" +
+            "<tr><td><b>Cmd/Ctrl + +/-</b></td><td>Increase / Decrease Font Size</td></tr>" +
 
-                "<tr><td colspan='2'><br><b>Operating Round (Map & Tiles)</b></td></tr>" +
-                "<tr><td><b>S / D</b></td><td>Cycle available tiles for the selected hex (Previous / Next)</td></tr>" +
-                "<tr><td><b>E</b></td><td>Cycle tile upgrades (if multiple tile types fit the hex)</td></tr>" +
-                "<tr><td><b>R</b></td><td>Rotate the currently selected tile on the map</td></tr>" +
-                "<tr><td><b>L</b></td><td>Buy Train (Auto-selects the cheapest available train from IPO/Pool)</td></tr>"
-                +
-                "<tr><td><b>N</b></td><td>Toggle Tile Numbers (Show/Hide build numbers on the map)</td></tr>" +
-                "</table></html>";
+            "<tr><td colspan='2'><br><b>Operating Round (Map & Tiles)</b></td></tr>" +
+            "<tr><td><b>S / D</b></td><td>Cycle available tiles for the selected hex (Previous / Next)</td></tr>" +
+            "<tr><td><b>E</b></td><td>Cycle tile upgrades (if multiple tile types fit the hex)</td></tr>" +
+            "<tr><td><b>R</b></td><td>Rotate the currently selected tile on the map</td></tr>" +
+            "<tr><td><b>L</b></td><td>Buy Train (Auto-selects the cheapest available train from IPO/Pool)</td></tr>" +
+            "<tr><td><b>Space bar</b></td><td>Toggle Tile Numbers (Show/Hide build numbers on the map)</td></tr>" +
+
+            "<tr><td colspan='2'><br><b>Operating Round (Revenue)</b></td></tr>" +
+            "<tr><td><b>P</b></td><td>Payout Revenue</td></tr>" +
+            "<tr><td><b>H</b></td><td>Half / Split Revenue</td></tr>" +
+            "<tr><td><b>W</b></td><td>Withhold Revenue</td></tr>" +
+            "</table></html>";
         JOptionPane.showMessageDialog(this, msg, "Hotkeys", JOptionPane.INFORMATION_MESSAGE);
     }
 

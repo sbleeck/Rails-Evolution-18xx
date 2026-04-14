@@ -18,13 +18,12 @@ import org.slf4j.LoggerFactory;
 public class GlobalHotkeyManager implements KeyEventDispatcher {
 
     private final GameUIManager gameUIManager;
-private static final Logger log = LoggerFactory.getLogger(GlobalHotkeyManager.class);
+    private static final Logger log = LoggerFactory.getLogger(GlobalHotkeyManager.class);
 
-
-// State tracker to prevent "Machine Gun" auto-repeat (Looping)
+    // State tracker to prevent "Machine Gun" auto-repeat (Looping)
     private boolean isLKeyPressed = false;
-private boolean isEnterKeyPressed = false;
-private boolean isAKeyPressed = false;
+    private boolean isEnterKeyPressed = false;
+    private boolean isAKeyPressed = false;
 
     public GlobalHotkeyManager(GameUIManager gameUIManager) {
         this.gameUIManager = gameUIManager;
@@ -47,21 +46,20 @@ private boolean isAKeyPressed = false;
             return false; // Always let release events propagate
         }
 
-
         if (e.getID() != KeyEvent.KEY_PRESSED) {
             return false;
         }
         // --- SAFETY CHECK: DIALOGS ---
         java.awt.Window activeWindow = KeyboardFocusManager.getCurrentKeyboardFocusManager().getActiveWindow();
         if (activeWindow instanceof javax.swing.JDialog) {
-            return false; 
+            return false;
         }
 
         // --- SAFETY CHECK: TYPING ---
         Component focusOwner = KeyboardFocusManager.getCurrentKeyboardFocusManager().getFocusOwner();
         if (focusOwner instanceof JTextComponent && ((JTextComponent) focusOwner).isEditable()) {
             if (!e.isControlDown() && !e.isMetaDown()) {
-                return false; 
+                return false;
             }
         }
 
@@ -88,7 +86,7 @@ private boolean isAKeyPressed = false;
         }
 
         // 4. AI MOVE (A)
-       if (!isCtrlDown && !e.isAltDown() && keyCode == KeyEvent.VK_A) {
+        if (!isCtrlDown && !e.isAltDown() && keyCode == KeyEvent.VK_A) {
             if (!isAKeyPressed) {
                 isAKeyPressed = true;
                 triggerAI();
@@ -102,19 +100,19 @@ private boolean isAKeyPressed = false;
             return true;
         }
 
-// 6. ENTER ('Smart Confirm' / 'Discard Train')
+        // 6. ENTER ('Smart Confirm' / 'Discard Train')
         if (!isCtrlDown && !e.isAltDown() && !e.isShiftDown() && keyCode == KeyEvent.VK_ENTER) {
-           if (!isEnterKeyPressed) {
+            if (!isEnterKeyPressed) {
                 isEnterKeyPressed = true; // Lock until release
-                // We are in the main window. Intercept and route to smart handler so 'Done' is default.
+                // We are in the main window. Intercept and route to smart handler so 'Done' is
+                // default.
                 triggerEnter();
             }
             return true;
         }
 
-
         // 7. L ('Buy IPO Train') - SINGLE SHOT MODE
-        // We only trigger if the key was previously released. 
+        // We only trigger if the key was previously released.
         // This strictly blocks OS key-repeat events from firing multiple buys.
         if (!isCtrlDown && !e.isAltDown() && keyCode == KeyEvent.VK_L) {
             if (!isLKeyPressed) {
@@ -123,10 +121,6 @@ private boolean isAKeyPressed = false;
             }
             return true; // Consume the event even if locked
         }
-
-
-        
-        
 
         return false;
     }
@@ -138,7 +132,8 @@ private boolean isAKeyPressed = false;
             if (win != null && win.isVisible()) {
                 ORPanel panel = win.getORPanel();
                 if (panel != null) {
-                    // Delegate to the existing logic in ORPanel which finds the correct 'Buy IPO' action
+                    // Delegate to the existing logic in ORPanel which finds the correct 'Buy IPO'
+                    // action
                     // log.info("delegate to processIPOBuy...");
                     panel.processIPOBuy();
                 }
@@ -146,11 +141,10 @@ private boolean isAKeyPressed = false;
         }
     }
 
-
     private void triggerPause() {
-        if (gameUIManager.getStatusWindow() != null 
-            && gameUIManager.getStatusWindow().pauseButton != null 
-            && gameUIManager.getStatusWindow().pauseButton.isEnabled()) {
+        if (gameUIManager.getStatusWindow() != null
+                && gameUIManager.getStatusWindow().pauseButton != null
+                && gameUIManager.getStatusWindow().pauseButton.isEnabled()) {
             gameUIManager.getStatusWindow().pauseButton.doClick();
         }
     }
@@ -161,8 +155,9 @@ private boolean isAKeyPressed = false;
 
     private void triggerEnter() {
         RoundFacade round = gameUIManager.getCurrentRound();
-        
-        // 1. Operating Round: Delegate to ORPanel handler (Scoring algorithm for Discards)
+
+        // 1. Operating Round: Delegate to ORPanel handler (Scoring algorithm for
+        // Discards)
         if (round instanceof OperatingRound) {
             ORWindow orWindow = gameUIManager.orWindow;
             if (orWindow != null && orWindow.isVisible() && orWindow.getORPanel() != null) {
@@ -170,28 +165,29 @@ private boolean isAKeyPressed = false;
                 return;
             }
         }
-        
+
         // 2. Fallback: Status Window Pass/Done Button
-        if (gameUIManager.getStatusWindow() != null && 
-            gameUIManager.getStatusWindow().passButton != null && 
-            gameUIManager.getStatusWindow().passButton.isEnabled()) {
+        if (gameUIManager.getStatusWindow() != null &&
+                gameUIManager.getStatusWindow().passButton != null &&
+                gameUIManager.getStatusWindow().passButton.isEnabled()) {
             gameUIManager.getStatusWindow().passButton.doClick();
         }
     }
 
     private void triggerEscape() {
         RoundFacade round = gameUIManager.getCurrentRound();
-        
+
         // --- CASE 1: OPERATING ROUND (Skip) ---
         if (round instanceof OperatingRound) {
             ORWindow orWindow = gameUIManager.orWindow;
             if (orWindow != null && orWindow.isVisible()) {
                 ORPanel panel = orWindow.getORPanel();
                 if (panel != null) {
-                    
-                // Delegate completely to ORPanel's centralized handler logic.
-                    // This ensures the "Payout/Split/Hold" priority checks in ORPanel are respected.
-                    panel.handleEnterPress(); 
+
+                    // Delegate completely to ORPanel's centralized handler logic.
+                    // This ensures the "Payout/Split/Hold" priority checks in ORPanel are
+                    // respected.
+                    panel.handleEnterPress();
                     return;
 
                 }
@@ -201,18 +197,19 @@ private boolean isAKeyPressed = false;
         // --- CASE 2: AUCTION / START ROUND (Pass) ---
         if (round instanceof StartRound) {
             if (gameUIManager.getStatusWindow() != null) {
-                if (clickIfEnabled(gameUIManager.getStatusWindow().passButton)) return;
+                if (clickIfEnabled(gameUIManager.getStatusWindow().passButton))
+                    return;
             }
         }
 
         // --- CASE 3: STOCK ROUND (Pass) ---
         if (round instanceof StockRound) {
-             if (gameUIManager.getStatusWindow() != null && gameUIManager.getStatusWindow().isVisible()) {
-                 if (clickIfEnabled(gameUIManager.getStatusWindow().passButton)) return;
+            if (gameUIManager.getStatusWindow() != null && gameUIManager.getStatusWindow().isVisible()) {
+                if (clickIfEnabled(gameUIManager.getStatusWindow().passButton))
+                    return;
             }
         }
     }
-
 
     private boolean clickIfEnabled(AbstractButton btn) {
         if (btn != null && btn.isEnabled() && btn.isVisible()) {
@@ -221,7 +218,6 @@ private boolean isAKeyPressed = false;
         }
         return false;
     }
-   
 
     private void triggerUndo() {
         // 1. Priority: Operating Round Local Undo
@@ -236,9 +232,9 @@ private boolean isAKeyPressed = false;
         }
 
         // 2. Fallback: Status Window (Global Undo)
-        if (gameUIManager.getStatusWindow() != null 
-            && gameUIManager.getStatusWindow().undoItem != null 
-            && gameUIManager.getStatusWindow().undoItem.isEnabled()) {
+        if (gameUIManager.getStatusWindow() != null
+                && gameUIManager.getStatusWindow().undoItem != null
+                && gameUIManager.getStatusWindow().undoItem.isEnabled()) {
             gameUIManager.getStatusWindow().undoItem.doClick();
         }
     }
@@ -259,7 +255,7 @@ private boolean isAKeyPressed = false;
         if (sw != null) {
             if (sw.redoItem != null && sw.redoItem.isEnabled()) {
                 sw.redoItem.doClick();
-            } 
+            }
         }
     }
 
