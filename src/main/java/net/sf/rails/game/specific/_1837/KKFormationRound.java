@@ -14,6 +14,27 @@ public class KKFormationRound extends NationalFormationRound {
         super(parent, id);
     }
 
+    @Override
+    public boolean setPossibleActions() {
+        boolean b = super.setPossibleActions();
+        
+        // Workaround for stale client label caching: Add the expected client action so validation passes.
+        boolean hasDone = false;
+        for (rails.game.action.PossibleAction pa : possibleActions.getList()) {
+            if (pa instanceof rails.game.action.NullAction && ((rails.game.action.NullAction) pa).getMode() == rails.game.action.NullAction.Mode.DONE) {
+                hasDone = true;
+                break;
+            }
+        }
+        
+        if (hasDone) {
+            rails.game.action.NullAction passAction = new rails.game.action.NullAction(gameManager.getRoot(), rails.game.action.NullAction.Mode.DONE);
+            passAction.setLabel("Done / Keep Trains");
+            possibleActions.add(passAction);
+        }
+        
+        return b;
+    }
 
     @Override
     public boolean setPossibleActions() {

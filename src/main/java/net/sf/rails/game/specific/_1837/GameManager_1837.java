@@ -264,9 +264,8 @@ log.info("1837_TRACE: Starting CER with ID: " + cerId);
         if (action instanceof rails.game.action.NullAction) {
             rails.game.action.NullAction incoming = (rails.game.action.NullAction) action;
 
-           if (incoming.getMode() == rails.game.action.NullAction.Mode.SKIP ||
-                    incoming.getMode() == rails.game.action.NullAction.Mode.PASS ||
-                    incoming.getMode() == rails.game.action.NullAction.Mode.DONE) {
+            if (incoming.getMode() == rails.game.action.NullAction.Mode.SKIP ||
+                    incoming.getMode() == rails.game.action.NullAction.Mode.PASS) {
 
                 net.sf.rails.game.round.RoundFacade facade = currentRound.value();
 
