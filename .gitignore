@@ -19,41 +19,41 @@
 build/
 /gradle/wrapper/gradle-wrapper.properties
 
-# --- IntelliJ IDEA ---
+# --- IDEs (IntelliJ / Eclipse / VSCode) ---
 .idea/
 *.iws
 *.iml
 *.ipr
 out/
-
-# --- Eclipse ---
 .settings/
 bin/
 .classpath
 .project
+.vscode/
 
 # --- Logs & Runtime Configuration ---
 *.log
+hs_err_pid*
 **/18xx.log
 Rails18xx.ini
 UserGridStyle.ini
 UserTileStyle.ini
 
 # --- Backup & Junk Files ---
-# This handles the .bak and specific file clutter you had before
 *.bak
 *.tmp
 *~
 *.swp
 *.failed
 
-# --- Specific Exclusions from your previous setup ---
+# --- Rails Specific & Custom Exclusions ---
 TileDesigner.exe
 logFile_IS_UNDEFINED
-
+autosave/
+*.rails
+*.time
 
 # --- Exclude Personal & Data Junk ---
-.vscode/
 logs/
 old/
 old_games/
@@ -61,9 +61,4 @@ python/
 *.docx
 *.pdf
 *.txt
-*.rails
-*.time
-gradle.properties
-.classpath
-.classpath
-autosave/*
+*.json
