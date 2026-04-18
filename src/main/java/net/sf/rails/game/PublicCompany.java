@@ -527,7 +527,7 @@ public class PublicCompany extends RailsAbstractItem
      */
     protected String privateToCloseOnFirstTrainName = null;
 
-    protected PrivateCompany privateToCloseOnFirstTrain = null;
+    protected final GenericState<PrivateCompany> privateToCloseOnFirstTrain = new GenericState<>(this, "privateToCloseOnFirstTrain");
 
     /**
      * Must the company own a train
@@ -565,7 +565,7 @@ public class PublicCompany extends RailsAbstractItem
     protected CountingMoneyModel currentLoanValue = null; // init during finishConfig
 
     /* Bonds */
-    protected int numberOfBonds = 0;
+    protected final IntegerState numberOfBonds = IntegerState.create(this, "numberOfBonds", 0);
     protected int priceOfBonds = 0;
     protected int bondsInterest = 0;
 
@@ -585,7 +585,7 @@ public class PublicCompany extends RailsAbstractItem
     private String relatedPublicCompanyName = null;
     private PublicCompany relatedPublicCompany = null;
 
-    private String foundingStartCompany = null;
+    private final StringState foundingStartCompany = StringState.create(this, "foundingStartCompany", null);
 
     /**
      * Introducing the colormodel for companies
@@ -648,7 +648,7 @@ public class PublicCompany extends RailsAbstractItem
 
         relatedPublicCompanyName = tag.getAttributeAsString("relatedCompany", relatedPublicCompanyName);
 
-        foundingStartCompany = tag.getAttributeAsString("foundingCompany", foundingStartCompany);
+        foundingStartCompany.set(tag.getAttributeAsString("foundingCompany", foundingStartCompany.value()));
 
         startSpace = tag.getAttributeAsString("startspace");
         // Set the default price token drop time.
@@ -1060,8 +1060,8 @@ public class PublicCompany extends RailsAbstractItem
         }
 
         if (Util.hasValue(privateToCloseOnFirstTrainName)) {
-            privateToCloseOnFirstTrain = getRoot().getCompanyManager().getPrivateCompany(
-                    privateToCloseOnFirstTrainName);
+            privateToCloseOnFirstTrain.set(getRoot().getCompanyManager().getPrivateCompany(
+                    privateToCloseOnFirstTrainName));
         }
 
         if (currentTrainLimits != null && !currentTrainLimits.isEmpty()) {
@@ -1124,7 +1124,7 @@ public class PublicCompany extends RailsAbstractItem
     }
 
     public void setPrivateToCloseOnFirstTrain(PrivateCompany comp) {
-        privateToCloseOnFirstTrain = comp;
+        privateToCloseOnFirstTrain.set(comp);
     }
 
     /**
@@ -2121,9 +2121,9 @@ public class PublicCompany extends RailsAbstractItem
         // move the train to here
         portfolio.getTrainsModel().addTrain(train);
         // check if a private has to be closed on first train buy
-        if (privateToCloseOnFirstTrain != null
-                && !privateToCloseOnFirstTrain.isClosed()) {
-            privateToCloseOnFirstTrain.setClosed();
+        if (privateToCloseOnFirstTrain.value() != null
+                && !privateToCloseOnFirstTrain.value().isClosed()) {
+            privateToCloseOnFirstTrain.value().setClosed();
         }
     }
 
@@ -2763,8 +2763,7 @@ public class PublicCompany extends RailsAbstractItem
      * @return the foundingStartCompany
      */
     public String getFoundingStartCompany() {
-
-        return foundingStartCompany;
+        return foundingStartCompany.value();
     }
 
     public BaseTokensModel getBaseTokens() {
@@ -2775,7 +2774,7 @@ public class PublicCompany extends RailsAbstractItem
      * @param foundingCompany the foundingStartCompany to set
      */
     public void setStartingMinor(String foundingCompany) {
-        this.foundingStartCompany = foundingCompany;
+        this.foundingStartCompany.set(foundingCompany);
     }
 
     public Model getLastDirectIncomeModel() {
@@ -2935,15 +2934,15 @@ public class PublicCompany extends RailsAbstractItem
 
     /* Stub to indicate that a company has Bonds */
     public boolean hasBonds() {
-        return numberOfBonds > 0;
+        return numberOfBonds.value() > 0;
     }
 
     public int getNumberOfBonds() {
-        return numberOfBonds;
+        return numberOfBonds.value();
     }
 
     public void setNumberOfBonds(int bonds) {
-        this.numberOfBonds = bonds;
+        this.numberOfBonds.set(bonds);
     }
 
     public int getPriceOfBonds() {

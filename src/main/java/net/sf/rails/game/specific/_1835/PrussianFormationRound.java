@@ -780,6 +780,7 @@ private void executeStartPrussian(boolean auto) {
             possibleActions.add(startAction);
             // Allow the user to Decline/Pass the formation offer
             NullAction passAction = new NullAction(getRoot(), NullAction.Mode.PASS);
+            passAction.setButtonLabel("Do NOT start Prussia yet");
             possibleActions.add(passAction);
 
             return true;

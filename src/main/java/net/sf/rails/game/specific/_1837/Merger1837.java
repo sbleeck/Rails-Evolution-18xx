@@ -392,9 +392,10 @@ public static void mergeMinor(GameManager gm, PublicCompany minor, PublicCompany
                     }
                 }
 
+// 1. Prioritize reserved exchange shares which reside in the 'Unavailable' portfolio.
                 if (shareToGive == null) {
                     for (PublicCertificate cert : major.getCertificates()) {
-                        if (!cert.isPresidentShare() && !(cert.getOwner() instanceof Player)) {
+                        if (!cert.isPresidentShare() && cert.getOwner() == unavailable) {
                             shareToGive = cert;
                             break;
                         }

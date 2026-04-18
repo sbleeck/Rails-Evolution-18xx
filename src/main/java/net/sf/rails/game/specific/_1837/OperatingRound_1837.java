@@ -95,38 +95,39 @@ public class OperatingRound_1837 extends OperatingRound {
                 // 3. Clean Name: Remove the unique ID suffix (e.g., "3_1" -> "3")
                 String cleanName = train.getName().replaceAll("_\\d+$", "");
 
-String expectedLabel = "Discard " + cleanName + " (" + priceStr + ")";
-            
-            boolean alreadyExists = false;
-            for (PossibleAction pa : possibleActions.getList()) {
-                if (pa instanceof DiscardTrainVoluntarily && expectedLabel.equals(pa.getButtonLabel())) {
-                    alreadyExists = true;
-                    break;
+                String expectedLabel = "Discard " + cleanName + " (" + priceStr + ")";
+
+                boolean alreadyExists = false;
+                for (PossibleAction pa : possibleActions.getList()) {
+                    if (pa instanceof DiscardTrainVoluntarily && expectedLabel.equals(pa.getButtonLabel())) {
+                        alreadyExists = true;
+                        break;
+                    }
                 }
-            }
-            
-            if (!alreadyExists) {
-                action.setLabel(expectedLabel);
-                possibleActions.add(action);
-            }
+
+                if (!alreadyExists) {
+                    action.setLabel(expectedLabel);
+                    possibleActions.add(action);
+                }
             }
         }
 
-// Modify the existing NullAction (Done) rather than duplicating it
-        boolean foundDone = false;
+        // Add the custom Done action without mutating existing ones to prevent UI
+        // caching bugs across rounds
+        boolean foundKeepTrains = false;
         for (PossibleAction pa : possibleActions.getList()) {
-            if (pa instanceof NullAction && ((NullAction) pa).getMode() == NullAction.Mode.DONE) {
-                ((NullAction) pa).setLabel("Done / Keep Trains");
-                foundDone = true;
+            if (pa instanceof NullAction && "Done / Keep Trains".equals(pa.getButtonLabel())) {
+                foundKeepTrains = true;
                 break;
             }
         }
-        
-        if (!foundDone) {
+
+        if (!foundKeepTrains) {
             NullAction done = new NullAction(getRoot(), NullAction.Mode.DONE);
             done.setLabel("Done / Keep Trains");
             possibleActions.add(done);
         }
+
     }
 
     /**
@@ -715,7 +716,6 @@ String expectedLabel = "Discard " + cleanName + " (" + priceStr + ")";
         PublicCompany major = action.getTargetMajor();
         String minorId = minor.getId();
 
-
         // 1. Formation: Par & Float ONLY (No Flush)
         boolean isFormationTrigger = action.isFormation() || "K1".equals(minorId) || "U1".equals(minorId)
                 || "S1".equals(minorId);
@@ -769,8 +769,6 @@ String expectedLabel = "Discard " + cleanName + " (" + priceStr + ")";
             // STOP! Do not flush shares here. Leave them in Reserve.
             // We will fetch them one-by-one as needed below.
         }
-
-        
 
         Merger1837.mergeMinor(gameManager, minor, major);
         Merger1837.fixDirectorship(gameManager, major);

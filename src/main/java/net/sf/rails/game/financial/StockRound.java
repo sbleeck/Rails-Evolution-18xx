@@ -1226,14 +1226,8 @@ public class StockRound extends Round implements I_MapRenderableRound {
             }
 
 if (!company.isBuyable()) {
-                // JSON State Recovery: If the certificate is physically present in the IPO or Pool, 
-                // the company has been legally released. Restore the lost state flag.
-                if (from == ipo || from == pool) {
-                    company.setBuyable(true);
-                } else {
-                    errMsg = LocalText.getText("NotYetStarted", companyName);
-                    break;
-                }
+                errMsg = LocalText.getText("NotYetStarted", companyName);
+                break;
             }
 
 

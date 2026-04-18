@@ -197,20 +197,17 @@ public class StockRound_1835 extends StockRound {
      */
     @Override
     public boolean mayPlayerSellShareOfCompany(PublicCompany company) {
-        // Block sales for unoperated companies unless it is the floated Prussian Railway
-        if (!company.hasOperated()) {
-            if (!company.getId().equals("PR") || !company.hasFloated()) {
-                return false;
-            }
+
+// 1835 Rule: Cannot sell if not floated (except Prussian) [cite: 468, 470]
+        if (!company.hasFloated() && !company.getId().equals("PR")) {
+            return false;
         }
 
-        // Enforce 1835 presidency dump rules: Bank Pool must have space for the exact President's share size
-        if (company.getPresident() == currentPlayer) {
-            int presShareSize = company.getPresidentsShare().getShares();
-            if (PlayerShareUtils.poolAllowsShares(company) < presShareSize) {
-                return false;
-            }
+        // 1835 Rule: Cannot sell if floated in the CURRENT share round 
+        if (startedThisRound.contains(company)) {
+            return false;
         }
+
 
         // Fallback to standard engine checks for all other conditions
         return super.mayPlayerSellShareOfCompany(company);
@@ -370,13 +367,20 @@ public class StockRound_1835 extends StockRound {
         String idMec = resolveId("Mec"); // Should be MS
         String idOld = resolveId("Old"); // Should be OL
 
-        PublicCompany cBad = companyManager.getPublicCompany(idBad);
-        PublicCompany cPru = companyManager.getPublicCompany(idPru);
-        PublicCompany cWrt = companyManager.getPublicCompany(idWrt);
-        PublicCompany cHes = companyManager.getPublicCompany(idHes);
-        PublicCompany cMec = companyManager.getPublicCompany(idMec);
-        PublicCompany cOld = companyManager.getPublicCompany(idOld);
+        String idBay = resolveId("Bay"); // Should be BY
+String idSax = resolveId("Sax"); // Should be SX
 
+    PublicCompany cBad = companyManager.getPublicCompany(idBad);
+    PublicCompany cPru = companyManager.getPublicCompany(idPru);
+    PublicCompany cWrt = companyManager.getPublicCompany(idWrt);
+    PublicCompany cHes = companyManager.getPublicCompany(idHes);
+    PublicCompany cMec = companyManager.getPublicCompany(idMec);
+    PublicCompany cOld = companyManager.getPublicCompany(idOld);
+    PublicCompany cBay = companyManager.getPublicCompany(idBay);
+    PublicCompany cSax = companyManager.getPublicCompany(idSax);
+
+
+    
         // 2. PRUSSIA RELEASE RULE
         // XML Rule: sold="BA:20" released="PR"
         // Meaning: If Baden Director (20%) is sold, Prussia becomes available.
@@ -404,6 +408,24 @@ public class StockRound_1835 extends StockRound {
                 // but we can return early to prevent further custom logic).
             }
         }
+
+        // 3a. GROUP 1 TO GROUP 2 RELEASE RULE (BA)
+// Block BA if Group 1 (BY, SX) is not 100% sold
+boolean group1Done = isSoldOut(idBay) && isSoldOut(idSax);
+if (!group1Done) {
+if (cBad != null && (!cBad.hasStarted() && !cBad.isBuyable())) {
+log.info("BLOCK: Baden (BA) blocked. Group 1 (BY, SX) not sold out.");
+}
+}
+
+    // 3b. WÜRTTEMBERG (WT) RELEASE RULE
+    // Block WT if BA is not 50% sold
+    if (cWrt != null && cBad != null && !cWrt.hasStarted()) {
+        int badSold = 100 - ipo.getShare(cBad);
+        if (badSold < 50) {
+            log.info("BLOCK: Württemberg (WT) blocked. Baden (BA) sold: {}% < 50%", badSold);
+        }
+    }
 
         // 4. GROUP 3 RELEASE (MS, OL)
         // XML Rule: sold="BA,WT,HE" released="MS"

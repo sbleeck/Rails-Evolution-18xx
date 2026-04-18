@@ -264,8 +264,9 @@ log.info("1837_TRACE: Starting CER with ID: " + cerId);
         if (action instanceof rails.game.action.NullAction) {
             rails.game.action.NullAction incoming = (rails.game.action.NullAction) action;
 
-            if (incoming.getMode() == rails.game.action.NullAction.Mode.SKIP ||
-                    incoming.getMode() == rails.game.action.NullAction.Mode.PASS) {
+           if (incoming.getMode() == rails.game.action.NullAction.Mode.SKIP ||
+                    incoming.getMode() == rails.game.action.NullAction.Mode.PASS ||
+                    incoming.getMode() == rails.game.action.NullAction.Mode.DONE) {
 
                 net.sf.rails.game.round.RoundFacade facade = currentRound.value();
 
@@ -276,8 +277,7 @@ log.info("1837_TRACE: Starting CER with ID: " + cerId);
                         if (valid instanceof rails.game.action.NullAction) {
                             rails.game.action.NullAction validNa = (rails.game.action.NullAction) valid;
 
-                            if (validNa.getMode() == rails.game.action.NullAction.Mode.SKIP ||
-                                    validNa.getMode() == rails.game.action.NullAction.Mode.PASS) {
+                            if (validNa.getMode() == incoming.getMode()) {
 
                                 return super.process(validNa);
                             }
