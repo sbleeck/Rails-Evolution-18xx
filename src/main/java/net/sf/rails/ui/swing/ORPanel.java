@@ -2827,8 +2827,9 @@ if (isFormationStep) {
                 this.orComp = null;
                 this.currentOperatingComp = null;
             } else if (engineActiveComp != null && !engineActiveComp.isClosed()) {
-                     this.orComp = this.currentOperatingComp;
-            }
+this.currentOperatingComp = engineActiveComp;
+                this.orComp = engineActiveComp;
+                        }
 
             // 3. FILTER & DETECT SPECIAL ACTIONS
             List<PossibleAction> specialActions = new ArrayList<>();
