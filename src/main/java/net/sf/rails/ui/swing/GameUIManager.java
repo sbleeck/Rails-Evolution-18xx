@@ -2583,7 +2583,6 @@ currentRoundName = "Game Start";
         // statusWindow.updateStatus, but is good redundancy)
         if (statusWindow != null) {
             statusWindow.setCorrectionMenu();
-            statusWindow.setSpecialMenu();
         }
 
     }

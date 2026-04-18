@@ -2048,6 +2048,8 @@ public class GameManager extends RailsManager implements Configurable, Owner {
      * Uses filePath defined in save.recovery.filepath
      */
     protected void recoverySave() {
+        if (isGameOver()) return;
+
         if (Config.get("save.recovery.active", "yes").equalsIgnoreCase("no"))
             return;
 
@@ -2085,9 +2087,6 @@ public class GameManager extends RailsManager implements Configurable, Owner {
             // Save the new file
             gameSaver.saveGame(saveFile);
 
-            // Save complete game state as JSON alongside the autosave
-            saveJsonState(saveFile);
-
             // Delete old autosave files ONLY for THIS SPECIFIC session within the subfolder
             final String sessionPrefix = getGameName() + "_" + this.sessionStartTimestamp + "_";
             File[] oldFiles = dir.listFiles(
@@ -2122,9 +2121,6 @@ public class GameManager extends RailsManager implements Configurable, Owner {
         File file = new File(saveAction.getFilepath());
         try {
             gameSaver.saveGame(file);
-
-            // Save the complete game state to a sidecar JSON file
-            saveJsonState(file);
 
             // Save UI Window Positions & Scale
             // Save UI Window Positions & Scale, passing the Game Name
@@ -2658,6 +2654,8 @@ public class GameManager extends RailsManager implements Configurable, Owner {
         capturePlayerWorthSnapshot("End");
         captureCompanyPayoutSnapshot("End");
 
+        saveFinishedGame();
+
         String message = LocalText.getText("GameOver");
         ReportBuffer.add(this, message);
 
@@ -2722,6 +2720,25 @@ public class GameManager extends RailsManager implements Configurable, Owner {
             possibleActions.add(new GameAction(getRoot(), GameAction.Mode.REDO));
         }
 
+    }
+
+    protected void saveFinishedGame() {
+        File oldGamesDir = new File("oldgames", getGameName());
+        if (!oldGamesDir.exists()) {
+            oldGamesDir.mkdirs();
+        }
+        if (this.sessionStartTimestamp == null) {
+            this.sessionStartTimestamp = new java.text.SimpleDateFormat("yyyyMMdd_HHmmss").format(new java.util.Date());
+        }
+        String filename = String.format("%s_%s_Final_%05d.rails", getGameName(), this.sessionStartTimestamp, actionCount.value());
+        File saveFile = new File(oldGamesDir, filename);
+        GameSaver gameSaver = new GameSaver(getRoot().getGameData(), executedActions.view());
+        try {
+            gameSaver.saveGame(saveFile);
+            log.info("Saved finished game to {}", saveFile.getAbsolutePath());
+        } catch (IOException e) {
+            log.error("Failed to save finished game", e);
+        }
     }
 
     protected void capturePlayerWorthSnapshot(String roundId) {
@@ -3760,15 +3777,6 @@ public class GameManager extends RailsManager implements Configurable, Owner {
             showMethod.invoke(null, frame, this);
 
         } catch (Exception e) {
-        }
-    }
-
-    private void saveJsonState(File saveFile) {
-        File metaFile = new File(saveFile.getAbsolutePath() + ".state.json");
-        try {
-            net.sf.rails.game.ai.snapshot.JsonStateSerializer.serialize(this, metaFile.getAbsolutePath());
-        } catch (IOException e) {
-            log.error("Failed to write complete state JSON", e);
         }
     }
 

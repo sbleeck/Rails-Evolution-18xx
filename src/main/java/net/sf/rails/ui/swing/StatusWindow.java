@@ -112,7 +112,7 @@ public class StatusWindow extends JFrame implements ActionListener, ActionPerfor
     protected ActionRunner actionRunner = null; // --- ADDED FIELD ---
     protected JPanel pane = new JPanel(new BorderLayout());
     private JMenuBar menuBar;
-    private JMenu fileMenu, optMenu, moveMenu, moderatorMenu, specialMenu, correctionMenu, developerMenu;
+    private JMenu fileMenu, optMenu, moveMenu, moderatorMenu, correctionMenu, developerMenu;
     ActionMenuItem undoItem;
 
     ActionMenuItem redoItem;
@@ -256,36 +256,7 @@ public class StatusWindow extends JFrame implements ActionListener, ActionPerfor
         // Get the cross-platform shortcut key (Cmd on Mac, Ctrl on Windows/Linux)
         int shortcutMask = Toolkit.getDefaultToolkit().getMenuShortcutKeyMaskEx();
 
-        ActionMenuItem actionMenuItem = new ActionMenuItem(NEW_CMD);
-        actionMenuItem.setActionCommand(NEW_CMD);
-        actionMenuItem.addActionListener(this);
-        actionMenuItem.setEnabled(false);
-        actionMenuItem.setPossibleAction(new GameAction(gameUIManager.getRoot(), GameAction.Mode.NEW));
-        fileMenu.add(actionMenuItem);
-
-        JMenuItem loadJsonItem = new JMenuItem("Load JSON State...");
-        loadJsonItem.addActionListener(new ActionListener() {
-            @Override
-            public void actionPerformed(ActionEvent e) {
-                JFileChooser fileChooser = new JFileChooser();
-                fileChooser.setDialogTitle("Select JSON Save File");
-                fileChooser.setCurrentDirectory(new File(Config.get("save.directory", System.getProperty("user.dir"))));
-
-                if (fileChooser.showOpenDialog(StatusWindow.this) == JFileChooser.APPROVE_OPTION) {
-                    File fileToLoad = fileChooser.getSelectedFile();
-                    log.info("User selected JSON file: {}", fileToLoad.getAbsolutePath());
-
-                    new Thread(() -> {
-                        gameUIManager.closeGame();
-                        // Call the standard load method, as your GameLoader now supports .json!
-                        net.sf.rails.util.GameLoader.loadAndStartGame(fileToLoad);
-                    }).start();
-                }
-            }
-        });
-        fileMenu.add(loadJsonItem);
-
-        actionMenuItem = new ActionMenuItem(LocalText.getText("SAVE"));
+        ActionMenuItem actionMenuItem = new ActionMenuItem(LocalText.getText("SAVE"));
         actionMenuItem.setActionCommand(SAVE_CMD);
         actionMenuItem.setMnemonic(KeyEvent.VK_S);
         actionMenuItem.setAccelerator(KeyStroke.getKeyStroke(KeyEvent.VK_S, ActionEvent.ALT_MASK));
@@ -459,11 +430,6 @@ public class StatusWindow extends JFrame implements ActionListener, ActionPerfor
 
         menuBar.add(moveMenu);
 
-        // --- 6. SPECIAL MENU (Dynamic) ---
-        // Initialize specialMenu before using it!
-        specialMenu = new JMenu(LocalText.getText("SPECIAL"));
-        menuBar.add(specialMenu);
-
         // --- 7. INFO MENU ---
         JMenu infoMenu = new JMenu(LocalText.getText("INFO", "Info"));
         infoMenu.setMnemonic(KeyEvent.VK_I);
@@ -545,6 +511,37 @@ public class StatusWindow extends JFrame implements ActionListener, ActionPerfor
             menuItem.addActionListener(this);
             menuItem.setEnabled(true);
             developerMenu.add(menuItem);
+
+            JMenuItem loadJsonItem = new JMenuItem("Load JSON State...");
+            loadJsonItem.addActionListener(new ActionListener() {
+                @Override
+                public void actionPerformed(ActionEvent e) {
+                    JFileChooser fileChooser = new JFileChooser();
+                    fileChooser.setDialogTitle("Select JSON Save File");
+                    fileChooser.setCurrentDirectory(new File(Config.get("save.directory", System.getProperty("user.dir"))));
+
+                    if (fileChooser.showOpenDialog(StatusWindow.this) == JFileChooser.APPROVE_OPTION) {
+                        File fileToLoad = fileChooser.getSelectedFile();
+                        log.info("User selected JSON file: {}", fileToLoad.getAbsolutePath());
+
+                        new Thread(() -> {
+                            gameUIManager.closeGame();
+                            // Call the standard load method, as your GameLoader now supports .json!
+                            net.sf.rails.util.GameLoader.loadAndStartGame(fileToLoad);
+                        }).start();
+                    }
+                }
+            });
+            developerMenu.add(loadJsonItem);
+
+            JMenuItem saveJsonItem = new JMenuItem("Save JSON State...");
+            saveJsonItem.addActionListener(new ActionListener() {
+                @Override
+                public void actionPerformed(ActionEvent e) {
+                    saveJsonState();
+                }
+            });
+            developerMenu.add(saveJsonItem);
 
         }
 
@@ -1532,7 +1529,6 @@ public class StatusWindow extends JFrame implements ActionListener, ActionPerfor
 
             // 4. Rebuild Correction Menu
             setCorrectionMenu();
-            setSpecialMenu(); // Restore the Special Menu population logic
             updateInfoMenu(); // Rebuild the lists
 
             passButton.setEnabled(false);
@@ -2303,54 +2299,6 @@ public class StatusWindow extends JFrame implements ActionListener, ActionPerfor
         // Default implementation does nothing.
     }
 
-    /**
-     * Populates the "Special" menu with UseSpecialProperty and ClosePrivate
-     * actions.
-     * Restores functionality for closing privates (1835) and other special
-     * abilities.
-     */
-    public void setSpecialMenu() {
-        specialMenu.removeAll();
-        boolean hasItems = false;
-
-        if (possibleActions != null) {
-            List<PossibleAction> actions = possibleActions.getList();
-
-            for (PossibleAction pa : actions) {
-                // Check for Special Properties (Generic)
-                if (pa instanceof UseSpecialProperty) {
-                    UseSpecialProperty usp = (UseSpecialProperty) pa;
-                    // Use the text from the special property itself
-                    ActionMenuItem item = new ActionMenuItem(usp.getSpecialProperty().toMenu());
-                    item.setPossibleAction(usp);
-                    item.addActionListener(this);
-                    specialMenu.add(item);
-                    hasItems = true;
-                }
-                // Check for Close Private Actions (Specific to 1835/1837)
-                else if (pa instanceof ClosePrivate) {
-                    ClosePrivate cp = (ClosePrivate) pa;
-                    ActionMenuItem item = new ActionMenuItem(cp.getInfo());
-                    item.setPossibleAction(cp);
-                    item.addActionListener(this);
-                    specialMenu.add(item);
-                    hasItems = true;
-                }
-            }
-        }
-
-        // Enable and highlight if we found items
-        specialMenu.setEnabled(hasItems);
-        if (hasItems) {
-            // Change Yellow to Cyan (Actionable Alert Color)
-            specialMenu.setBackground(SYS_CYAN);
-            specialMenu.setOpaque(true);
-        } else {
-            specialMenu.setBackground(null);
-            specialMenu.setOpaque(false);
-        }
-    }
-
     public void updateActivityPanel(String text) {
         return;
     }
@@ -3010,6 +2958,28 @@ String msg = "<html><h3>Keyboard Shortcuts</h3>" +
 
             buttonPanel.revalidate();
             buttonPanel.repaint();
+        }
+    }
+
+    private void saveJsonState() {
+        JFileChooser fileChooser = new JFileChooser();
+        fileChooser.setDialogTitle("Save JSON State");
+        fileChooser.setCurrentDirectory(new File(Config.get("save.directory", System.getProperty("user.dir"))));
+        if (fileChooser.showSaveDialog(StatusWindow.this) == JFileChooser.APPROVE_OPTION) {
+            File fileToSave = fileChooser.getSelectedFile();
+            if (!fileToSave.getName().endsWith(".json")) {
+                fileToSave = new File(fileToSave.getAbsolutePath() + ".json");
+            }
+            final File finalFile = fileToSave;
+            new Thread(() -> {
+                try {
+                    net.sf.rails.game.ai.snapshot.JsonStateSerializer.serialize(gameUIManager.getGameManager(), finalFile.getAbsolutePath());
+                    log.info("Successfully saved JSON state to {}", finalFile.getAbsolutePath());
+                } catch (Exception ex) {
+                    log.error("Failed to save JSON state", ex);
+                    JOptionPane.showMessageDialog(StatusWindow.this, "Failed to save JSON: " + ex.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
+                }
+            }).start();
         }
     }
 
