@@ -46,22 +46,22 @@ public class TimeOptionsDialog extends JDialog implements ActionListener {
 
     // Constants for Presets (Seconds)
     // 90m Hardcore
-    private static final int HC_START = 240; 
+    private static final int HC_START = 300; 
     private static final int HC_YEL = 30;
     private static final int HC_GRN = 60;
     private static final int HC_BRN = 30;
 
     // 100m Championship (Recommended)
-    private static final int CH_START = 240;
-    private static final int CH_YEL = 35;
-    private static final int CH_GRN = 70;
-    private static final int CH_BRN = 35;
+    private static final int CH_START = 400;
+    private static final int CH_YEL = 40;
+    private static final int CH_GRN = 80;
+    private static final int CH_BRN = 40;
 
     // 120m Standard
-    private static final int ST_START = 300; // 5 mins
-    private static final int ST_YEL = 40;
-    private static final int ST_GRN = 85;
-    private static final int ST_BRN = 40;
+    private static final int ST_START = 500; 
+    private static final int ST_YEL = 50;
+    private static final int ST_GRN = 100;
+    private static final int ST_BRN = 50;
 
     private static final int MINOR_PENALTY_PRESET = 0; 
     private static final int MAJOR_PENALTY_PRESET = 0; 

@@ -753,15 +753,9 @@ public class StatusWindow extends JFrame implements ActionListener, ActionPerfor
         if (command.equals(TOGGLE_PAUSE_CMD)) {
             if (gameUIManager.isTimerPaused()) {
                 gameUIManager.resumeTimer();
-                pauseButton.setText("Pause"); // Replaced LocalText.getText()
-                pauseButton.setRailsIcon(null);
-
             } else {
                 gameUIManager.pauseTimer();
-                pauseButton.setText("Resume"); // Replaced LocalText.getText()
-                pauseButton.setRailsIcon(null);
             }
-
         } else if (command.equals(BUY_CMD)) {
             process(executedAction);
         } else if (command.equals(SELL_CMD)) {
@@ -1254,6 +1248,7 @@ public class StatusWindow extends JFrame implements ActionListener, ActionPerfor
 
         pane.setOpaque(true);
         setContentPane(pane);
+        setGlassPane(new PauseOverlay());
         gameUIManager.setMeVisible(this, true);
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         setupHotkeys();
@@ -1387,26 +1382,30 @@ public class StatusWindow extends JFrame implements ActionListener, ActionPerfor
         String timeText = "00:00:00";
         Color color = Color.BLACK;
 
-        if (gameUIManager.isTimerPaused()) {
-            timeText = "PAUSED";
-            color = SYS_RED;
+
+
+
+        Player p = gameUIManager.getCurrentPlayer();
+        if (p != null) {
+            int val = gameUIManager.getDisplayedTime(p);
+            int absVal = Math.abs(val);
+            timeText = String.format("%s: %s%02d:%02d",
+                    p.getName(),
+                    (val < 0 ? "-" : ""),
+                    absVal / 60,
+                    absVal % 60);
+            if (val < 0)
+                color = SYS_RED;
         } else {
-            Player p = gameUIManager.getCurrentPlayer();
-            if (p != null) {
-                int val = p.getTimeBankModel().value();
-                int absVal = Math.abs(val);
-                timeText = String.format("%s: %s%02d:%02d",
-                        p.getName(),
-                        (val < 0 ? "-" : ""),
-                        absVal / 60,
-                        absVal % 60);
-                if (val < 0)
-                    color = SYS_RED;
-            } else {
-                net.sf.rails.game.GameManager gm = gameUIManager.getGameManager();
-                gm.incrementTotalGameTime();
-                timeText = gm.getFormattedGameTime();
-            }
+            net.sf.rails.game.GameManager gm = gameUIManager.getGameManager();
+            gm.incrementTotalGameTime();
+            timeText = gm.getFormattedGameTime();
+        }
+
+        if (gameUIManager.isTimerPaused()) {
+            getGlassPane().setVisible(true);
+        } else {
+            getGlassPane().setVisible(false);
         }
 
         if (gameTimeLabel != null) {
@@ -1414,6 +1413,21 @@ public class StatusWindow extends JFrame implements ActionListener, ActionPerfor
             gameTimeLabel.setForeground(color);
         }
 
+        if (pauseButton != null) {
+            if (gameUIManager.isTimerPaused()) {
+                if (!"Resume".equals(pauseButton.getText())) {
+                    pauseButton.setText("Resume");
+                    pauseButton.setBackground(Color.YELLOW);
+                    pauseButton.setForeground(Color.BLACK);
+                }
+            } else {
+                if (!"Pause".equals(pauseButton.getText())) {
+                    pauseButton.setText("Pause");
+                    pauseButton.setBackground(UIManager.getColor("Button.background"));
+                    pauseButton.setForeground(Color.BLACK);
+                }
+            }
+        }
     }
 
     private String currentMetadata = "";
@@ -2980,6 +2994,47 @@ String msg = "<html><h3>Keyboard Shortcuts</h3>" +
                     JOptionPane.showMessageDialog(StatusWindow.this, "Failed to save JSON: " + ex.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
                 }
             }).start();
+        }
+    }
+
+    /**
+     * A translucent overlay to display a massive "GAME PAUSED" text across the entire window.
+     */
+    private class PauseOverlay extends JComponent {
+        private static final long serialVersionUID = 1L;
+
+        @Override
+        public boolean contains(int x, int y) {
+            // CRITICAL: Let all mouse clicks pass through so the user can still click "Resume"
+            return false;
+        }
+
+        @Override
+        protected void paintComponent(Graphics g) {
+            super.paintComponent(g);
+            Graphics2D g2d = (Graphics2D) g.create();
+
+            // 1. Semi-transparent dark background to dim the game
+            g2d.setColor(new Color(0, 0, 0, 150));
+            g2d.fillRect(0, 0, getWidth(), getHeight());
+
+            // 2. Setup Font
+            String text = "GAME PAUSED";
+            g2d.setFont(new Font("SansSerif", Font.BOLD, 60));
+            FontMetrics fm = g2d.getFontMetrics();
+
+            int x = (getWidth() - fm.stringWidth(text)) / 2;
+            int y = ((getHeight() - fm.getHeight()) / 2) + fm.getAscent();
+
+            // 3. Draw Shadow
+            g2d.setColor(Color.BLACK);
+            g2d.drawString(text, x + 4, y + 4);
+
+            // 4. Draw Text
+            g2d.setColor(SYS_RED);
+            g2d.drawString(text, x, y);
+
+            g2d.dispose();
         }
     }
 

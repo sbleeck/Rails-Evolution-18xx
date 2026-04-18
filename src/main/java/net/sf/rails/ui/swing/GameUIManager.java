@@ -146,7 +146,6 @@ public class GameUIManager implements DialogOwner {
 
     private boolean isHistoryNavigation = false;
 
-
     // Player order
     // protected PlayerOrderView playerOrderView;
     /**
@@ -169,6 +168,41 @@ public class GameUIManager implements DialogOwner {
 
     private SplashWindow splashWindow = null;
 
+    // LOCAL UI STOPWATCH
+    private long turnStartTimestamp = System.currentTimeMillis();
+    private long accumulatedPauseTime = 0;
+    private long currentPauseStart = 0;
+    private boolean isStopwatchPaused = false;
+
+    public void resetUIStopwatch() {
+        turnStartTimestamp = System.currentTimeMillis();
+        accumulatedPauseTime = 0;
+        currentPauseStart = 0;
+        isStopwatchPaused = false;
+    }
+
+    /**
+     * Calculates the exact ticking visual time for a player without mutating the engine's state.
+     */
+    public int getDisplayedTime(Player p) {
+        if (p == null) return 0;
+        int time = p.getTimeBankModel().value();
+        
+        if (railsRoot != null && railsRoot.getGameManager() != null) {
+            time -= railsRoot.getGameManager().getPendingTimePenalty(p.getName());
+        }
+        
+        // Only deduct active stopwatch time if this is the currently operating player
+        if (p.equals(getCurrentPlayer()) && railsRoot.getGameManager().isTimeManagementEnabled()) {
+            long now = isStopwatchPaused ? currentPauseStart : System.currentTimeMillis();
+            long elapsedMs = now - turnStartTimestamp - accumulatedPauseTime;
+            int elapsedSec = Math.max(0, (int) (elapsedMs / 1000));
+            time -= elapsedSec;
+        }
+        
+        return time;
+    }
+
     public GameUIManager() {
     }
 
@@ -186,7 +220,6 @@ public class GameUIManager implements DialogOwner {
             startRoundWindow = null;
         }
 
-        
         savePrefix = railsRoot.getGameName();
         gameWasLoaded = wasLoaded;
 
@@ -384,7 +417,8 @@ public class GameUIManager implements DialogOwner {
         stockChartWindow.setName("StockChartWindow");
 
         // Ensure the layout manager doesn't force a rectangular grid if we are in 1837
-        if (getGameManager().getRoot().getStockMarket().getStockChartType() == net.sf.rails.game.financial.StockMarket.ChartType.HEXAGONAL) {
+        if (getGameManager().getRoot().getStockMarket()
+                .getStockChartType() == net.sf.rails.game.financial.StockMarket.ChartType.HEXAGONAL) {
             stockChartWindow.setResizable(true);
         }
 
@@ -512,7 +546,6 @@ public class GameUIManager implements DialogOwner {
 
     }
 
-    
     protected boolean processOnServer(PossibleAction action) {
         boolean result;
         int currentActionCount = getGameManager().getCurrentActionCount(); // Get count *before* processing
@@ -542,7 +575,7 @@ public class GameUIManager implements DialogOwner {
 
             String combinedMessage = Util.join(message, " ");
 
-           // Suppress Modals ---
+            // Suppress Modals ---
             if (combinedMessage.contains("Bank is broken") ||
                     combinedMessage.contains("Correction activated") ||
                     combinedMessage.toLowerCase().contains("must raise") ||
@@ -562,15 +595,14 @@ public class GameUIManager implements DialogOwner {
         return false;
     }
 
-
     public void updateUI() {
-    
+
         int actionCount = railsRoot.getGameManager().getPossibleActions().getList().size();
 
         if (actionCount == 0) {
             System.err.println("!!! CRITICAL: UI RECEIVED EMPTY ACTION LIST !!!");
             // Trace who triggered this update if needed
-            // Thread.dumpStack(); 
+            // Thread.dumpStack();
         }
 
         currentRound = railsRoot.getGameManager().getCurrentRound();
@@ -578,7 +610,7 @@ public class GameUIManager implements DialogOwner {
             currentRoundName = currentRound.toString();
             currentRoundType = currentRound.getClass();
         } else {
-currentRoundName = "Game Start";
+            currentRoundName = "Game Start";
             currentRoundType = null;
         }
 
@@ -603,13 +635,13 @@ currentRoundName = "Game Start";
                         startRoundWindow.close();
                         startRoundWindow = null;
                     }
-                } 
+                }
             }
         }
 
- if (currentRound != previousRound && currentRoundType != null) {
+        if (currentRound != previousRound && currentRoundType != null) {
             if (StartRound.class.isAssignableFrom(currentRoundType)) {
-                                startRound = (StartRound) currentRound;
+                startRound = (StartRound) currentRound;
                 if (startRoundWindow == null) {
                     String startRoundWindowClassName = getClassName(GuiDef.ClassName.START_ROUND_WINDOW);
                     try {
@@ -623,8 +655,9 @@ currentRoundName = "Game Start";
                     }
                 }
             } else if (StockRound.class.isAssignableFrom(currentRoundType)) {
-                 statusWindow.getGameStatus().initGameSpecificActions();
-                 if (orUIManager != null) orUIManager.finish();
+                statusWindow.getGameStatus().initGameSpecificActions();
+                if (orUIManager != null)
+                    orUIManager.finish();
             } else if (OperatingRound.class.isAssignableFrom(currentRoundType)) {
                 orUIManager.initOR((OperatingRound) currentRound);
             } else if (SwitchableUIRound.class.isAssignableFrom(currentRoundType)) {
@@ -714,9 +747,9 @@ currentRoundName = "Game Start";
                 log.error("Recovered from StatusWindow crash during updateUI.", e);
             }
         }
-        
+
         if (orUIManager != null) {
-             try {
+            try {
                 orUIManager.updateStatus(myTurn);
             } catch (Exception e) {
                 log.error("Recovered from ORUIManager crash.", e);
@@ -742,8 +775,8 @@ currentRoundName = "Game Start";
 
         previousRound = currentRound;
         if (previousRound != null) {
-             previousRoundType = previousRound.getClass();
-             previousRoundName = previousRound.toString();
+            previousRoundType = previousRound.getClass();
+            previousRoundName = previousRound.toString();
         }
 
     }
@@ -820,67 +853,70 @@ currentRoundName = "Game Start";
     }
 
     // public void discardTrains(DiscardTrain dt) {
-    //     PublicCompany c = dt.getCompany();
-    //     String playerName = dt.getPlayerName();
-    //     String companyDirector = dt.getCompany().getPresident().getId();
-    //     Set<Train> trains = dt.getOwnedTrains();
-    //     int size = trains.size() + (dt.isForced() ? 0 : 1);
-    //     List<String> trainOptions = new ArrayList<>(size);
-    //     String[] options = new String[size];
-    //     String prompt = null;
+    // PublicCompany c = dt.getCompany();
+    // String playerName = dt.getPlayerName();
+    // String companyDirector = dt.getCompany().getPresident().getId();
+    // Set<Train> trains = dt.getOwnedTrains();
+    // int size = trains.size() + (dt.isForced() ? 0 : 1);
+    // List<String> trainOptions = new ArrayList<>(size);
+    // String[] options = new String[size];
+    // String prompt = null;
 
-    //     int j = 0;
-    //     if (!dt.isForced()) {
-    //         trainOptions.add(
-    //                 options[j++] = LocalText.getText("None"));
-    //         prompt = LocalText.getText("MayDiscardTrain", c.getId());
-    //     }
-    //     int offset = j;
-    //     for (int i = 0; i < trains.size(); i++) {
-    //         trainOptions.add(
-    //                 options[j++] = LocalText.getText("N_Train",
-    //                         Iterables.get(trains, i).toText()));
-    //     }
-    //     // Martin Brumm: 18.7.2017
-    //     // Need to Check that the player informed here is the director
-    //     // Underlying problem is that the director might not be the operating player in
-    //     // the
-    //     // moment and theres no quick way to change that behaviour..
-    //     // Only Chance would be to introduce a new Discard Train Round with complete
-    //     // separate
-    //     // Mechanics
+    // int j = 0;
+    // if (!dt.isForced()) {
+    // trainOptions.add(
+    // options[j++] = LocalText.getText("None"));
+    // prompt = LocalText.getText("MayDiscardTrain", c.getId());
+    // }
+    // int offset = j;
+    // for (int i = 0; i < trains.size(); i++) {
+    // trainOptions.add(
+    // options[j++] = LocalText.getText("N_Train",
+    // Iterables.get(trains, i).toText()));
+    // }
+    // // Martin Brumm: 18.7.2017
+    // // Need to Check that the player informed here is the director
+    // // Underlying problem is that the director might not be the operating player
+    // in
+    // // the
+    // // moment and theres no quick way to change that behaviour..
+    // // Only Chance would be to introduce a new Discard Train Round with complete
+    // // separate
+    // // Mechanics
 
-    //     if (prompt == null) {
-    //         if (playerName.equals(companyDirector)) {
-    //             prompt = LocalText.getText(
-    //                     "HAS_TOO_MANY_TRAINS",
-    //                     playerName,
-    //                     c.getId());
-    //         } else {
-    //             prompt = LocalText.getText(
-    //                     "HAS_TOO_MANY_TRAINS",
-    //                     playerName,
-    //                     c.getId());
-    //             prompt += "\n Please contact the director of the " + c.getId() + " : " + companyDirector
-    //                     + " for guidance.";
-    //         }
-    //     }
+    // if (prompt == null) {
+    // if (playerName.equals(companyDirector)) {
+    // prompt = LocalText.getText(
+    // "HAS_TOO_MANY_TRAINS",
+    // playerName,
+    // c.getId());
+    // } else {
+    // prompt = LocalText.getText(
+    // "HAS_TOO_MANY_TRAINS",
+    // playerName,
+    // c.getId());
+    // prompt += "\n Please contact the director of the " + c.getId() + " : " +
+    // companyDirector
+    // + " for guidance.";
+    // }
+    // }
 
-    //     String discardedTrainName = (String) JOptionPane.showInputDialog(orWindow,
-    //             prompt,
-    //             LocalText.getText("WhichTrainToDiscard"),
-    //             JOptionPane.QUESTION_MESSAGE, null,
-    //             options, options[0]);
-    //     if (discardedTrainName != null) {
-    //         int index = trainOptions.indexOf(discardedTrainName);
-    //         // FIXME: Does this work with the new Set defined?
-    //         if (index >= offset) {
-    //             Train discardedTrain = Iterables.get(trains, trainOptions.indexOf(discardedTrainName) - offset);
-    //             dt.setDiscardedTrain(discardedTrain);
-    //         }
+    // String discardedTrainName = (String) JOptionPane.showInputDialog(orWindow,
+    // prompt,
+    // LocalText.getText("WhichTrainToDiscard"),
+    // JOptionPane.QUESTION_MESSAGE, null,
+    // options, options[0]);
+    // if (discardedTrainName != null) {
+    // int index = trainOptions.indexOf(discardedTrainName);
+    // // FIXME: Does this work with the new Set defined?
+    // if (index >= offset) {
+    // Train discardedTrain = Iterables.get(trains,
+    // trainOptions.indexOf(discardedTrainName) - offset);
+    // dt.setDiscardedTrain(discardedTrain);
+    // }
 
-    //         orWindow.process(dt);
-    //     }
+    // orWindow.process(dt);
+    // }
     // }
 
     public void exchangeTokens(ExchangeTokens action) {
@@ -1043,8 +1079,6 @@ currentRoundName = "Game Start";
 
     }
 
-
-    
     protected void autoSave(String newPlayer) {
         lastSavedFilename = savePrefix + "_" + saveDateTimeFormat.format(new Date()) + "_" + newPlayer + "."
                 + saveExtension;
@@ -1335,7 +1369,7 @@ currentRoundName = "Game Start";
      */
     public void updateAllVisuals(RailsRoot historicalRoot) {
         this.railsRoot = historicalRoot;
-        
+
         // 1. Refresh the Status Window
         if (statusWindow != null) {
             statusWindow.updateStatus(true);
@@ -1345,29 +1379,31 @@ currentRoundName = "Game Start";
         if (orWindow != null) {
             // We use a generic approach to find the MapPanel since we are the manager
             MapPanel panel = findMapPanel(orWindow);
-            if (panel != null) panel.updateData();
+            if (panel != null)
+                panel.updateData();
         }
 
         // 3. Refresh the Stock Market
         if (stockChartWindow != null && stockChartWindow.isVisible()) {
             stockChartWindow.repaint();
         }
-        
+
         // 4. Update the "Thinking" alert in the Activity Panel
         updateActivityPanel();
     }
 
     private MapPanel findMapPanel(Container container) {
         for (Component c : container.getComponents()) {
-            if (c instanceof MapPanel) return (MapPanel) c;
+            if (c instanceof MapPanel)
+                return (MapPanel) c;
             if (c instanceof Container) {
                 MapPanel found = findMapPanel((Container) c);
-                if (found != null) return found;
+                if (found != null)
+                    return found;
             }
         }
         return null;
     }
-    
 
     public PossibleAction getLastAction() {
         return lastAction;
@@ -1535,7 +1571,7 @@ currentRoundName = "Game Start";
     // look completely redundant to me.
     public String format(int amount) {
         String formatted = Bank.format(railsRoot, amount);
-        
+
         // Strip currency symbols if configured centrally to declutter the UI
         if ("yes".equalsIgnoreCase(Config.get("ui.hide_currency_symbols"))) {
             return formatted.replaceAll("[^\\d\\.,-]", "").trim();
@@ -1777,10 +1813,12 @@ currentRoundName = "Game Start";
                         } else {
                             return; // No tick between OR turns
                         }
- } else if (currentRound instanceof StockRound || currentRound instanceof StartRound || (currentRound != null && currentRound.getCurrentPlayer() != null)) {
-                        // In SR or IR, or any round reporting a current player, time ticks for that player
+                    } else if (currentRound instanceof StockRound || currentRound instanceof StartRound
+                            || (currentRound != null && currentRound.getCurrentPlayer() != null)) {
+                        // In SR or IR, or any round reporting a current player, time ticks for that
+                        // player
                         playerWhoseTimeTicks = railsRoot.getGameManager().getCurrentPlayer();
-                                        } else {
+                    } else {
                         return; // No tick for other round types for now
                     }
 
@@ -1797,11 +1835,10 @@ currentRoundName = "Game Start";
 
                     // --- Process Time Tick ---
                     if (playerWhoseTimeTicks != null) { // Check again after index validation
-                        IntegerState timeBank = playerWhoseTimeTicks.getTimeBankModel();
-                        int currentTime = timeBank.value();
-                        int newTime = currentTime - 1;
+                        // Fetch the synchronized visual ticking time
+                        int newTime = getDisplayedTime(playerWhoseTimeTicks);
 
-                        timeBank.set(newTime);
+                        // CRITICAL: Do NOT mutate timeBank.set() here. Engine handles the payload.
 
                         final int finalPlayerIndex = playerIndex;
                         final int finalNewTime = newTime;
@@ -1810,14 +1847,11 @@ currentRoundName = "Game Start";
                         SwingUtilities.invokeLater(() -> {
                             if (statusWindow != null && statusWindow.getGameStatus() != null) {
                                 statusWindow.getGameStatus().updatePlayerTime(finalPlayerIndex, finalNewTime);
-                            } else {
                             }
                         });
 
                         // --- Apply Consequence if time ran out ---
                         if (newTime < 0) {
-                            // ... [Consequence logic remains the same] ...
-                            // finalNewTime);
                             if (railsRoot.getGameManager()
                                     .getTimeConsequence() == TimeConsequence.SUBTRACT_FINAL_SCORE) {
                                 finalPlayer.addTimePenalty(1);
@@ -1827,6 +1861,7 @@ currentRoundName = "Game Start";
                             }
                         }
                     }
+
                     // No 'else' needed here, already handled by return statements above
                 } // End actionPerformed
             }); // End ActionListener
@@ -1851,7 +1886,7 @@ currentRoundName = "Game Start";
     /**
      * Starts the game timer for the current player if time management is enabled.
      */
-    public void startTimerForCurrentPlayer() {
+public void startTimerForCurrentPlayer() {
         // *** FIX: Use railsRoot.getGameManager() ***
         if (railsRoot.getGameManager().isTimeManagementEnabled() && gameTimer != null && !gameTimer.isRunning()) {
             isTimerPaused = false; // Ensure not paused
@@ -1864,29 +1899,35 @@ currentRoundName = "Game Start";
         }
     }
 
+   
     /**
-     * Pauses the game timer.
+     * Pauses the game timer unconditionally.
      */
     public void pauseTimer() {
+        isTimerPaused = true;
+        if (!isStopwatchPaused) {
+            currentPauseStart = System.currentTimeMillis();
+            isStopwatchPaused = true;
+        }
         if (gameTimer != null && gameTimer.isRunning()) {
-            isTimerPaused = true;
-
+            gameTimer.stop(); // Truly halt the background UI ticker to save CPU
         }
     }
 
     /**
-     * Resumes the game timer.
+     * Resumes the game timer unconditionally.
      */
     public void resumeTimer() {
-        if (gameTimer != null /* && !gameTimer.isRunning() */) { // Check if running might interfere if just paused
-            isTimerPaused = false;
-            if (!gameTimer.isRunning()) { // Only start if not already running
-                gameTimer.start();
-            }
-
+        isTimerPaused = false;
+        if (isStopwatchPaused) {
+            accumulatedPauseTime += (System.currentTimeMillis() - currentPauseStart);
+            isStopwatchPaused = false;
+        }
+        if (gameTimer != null && !gameTimer.isRunning()) {
+            gameTimer.start(); // Revive the background UI ticker
         }
     }
-
+    
     /**
      * Resets the active player being tracked by the timer.
      * This is called by processAction when a turn change is detected.
@@ -2152,16 +2193,16 @@ currentRoundName = "Game Start";
         boolean result;
         lastAction = action;
 
-
         // Detect Undo/Redo
         if (action instanceof GameAction) {
             GameAction.Mode mode = ((GameAction) action).getMode();
             if (mode == GameAction.Mode.UNDO || mode == GameAction.Mode.REDO || mode == GameAction.Mode.FORCED_UNDO) {
                 isHistoryNavigation = true;
+                resetUIStopwatch();
             } else {
                 isHistoryNavigation = false;
             }
-            
+
             result = previousResult = processOnServer(action);
             if (result) {
                 updateUI();
@@ -2171,8 +2212,6 @@ currentRoundName = "Game Start";
             }
             return result;
         }
-        
-        
 
         // Intercept Train Correction Actions and route to Manager
         if (action instanceof TrainCorrectionAction) {
@@ -2217,6 +2256,18 @@ currentRoundName = "Game Start";
         } else {
             Player oldPlayer = getCurrentPlayer();
             SoundManager.notifyOfActionProcessing(railsRoot, action);
+
+            // Local UI Stopwatch: Embed elapsed time into the action payload
+            long now = System.currentTimeMillis();
+            long elapsedMs = now - turnStartTimestamp - accumulatedPauseTime;
+            int elapsedSec = Math.max(0, (int) (elapsedMs / 1000));
+
+            // Isolate standard game moves from structural engine commands
+            if (!(action instanceof GameAction) && !(action instanceof NullAction
+                    && ((NullAction) action).getMode() == NullAction.Mode.START_GAME)) {
+                action.setExecutionTimeSeconds(elapsedSec);
+            }
+            resetUIStopwatch();
 
             result = previousResult = processOnServer(action);
 
@@ -2630,7 +2681,7 @@ currentRoundName = "Game Start";
         // Include the Stock Chart window which was previously omitted
         if (stockChartWindow != null)
             windowSettings.set(stockChartWindow);
-            
+
         // Include the Config window for completeness
         if (configWindow != null)
             windowSettings.set(configWindow);
@@ -2684,7 +2735,7 @@ currentRoundName = "Game Start";
         if (window == null)
             return;
         Rectangle r = windowSettings.getBounds(window);
-// If window settings are valid, verify they are visible on the current screen.
+        // If window settings are valid, verify they are visible on the current screen.
         if (r.width > 0 && r.height > 0) {
             boolean visible = false;
             // Check if the top-left corner is within any available screen device
@@ -2705,7 +2756,7 @@ currentRoundName = "Game Start";
                 log.info("Window restored to center (was off-screen): {}", window.getName());
             }
         }
-        
+
     }
 
 }

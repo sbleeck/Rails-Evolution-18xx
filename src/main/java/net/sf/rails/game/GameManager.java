@@ -124,41 +124,40 @@ public class GameManager extends RailsManager implements Configurable, Owner {
     private transient int reloadActionIndex = 0;
 
     // Replaced single major increment with Phase-Specific increments
-    protected int timeMgmtYellowIncrement = 35; // Default "Hardcore/Championship" start
-    protected int timeMgmtGreenIncrement = 70; // The "Green Wall" adjustment
-    protected int timeMgmtBrownIncrement = 35; // Late game speed up
+    protected final IntegerState timeMgmtYellowIncrement = IntegerState.create(this, "timeMgmtYellowIncrement", 35);
+    protected final IntegerState timeMgmtGreenIncrement = IntegerState.create(this, "timeMgmtGreenIncrement", 70);
+    protected final IntegerState timeMgmtBrownIncrement = IntegerState.create(this, "timeMgmtBrownIncrement", 35);
 
     public void setTimeMgmtYellowIncrement(int seconds) {
-        this.timeMgmtYellowIncrement = seconds;
+        this.timeMgmtYellowIncrement.set(seconds);
     }
 
     public int getTimeMgmtYellowIncrement() {
-        return this.timeMgmtYellowIncrement;
+        return this.timeMgmtYellowIncrement.value();
     }
 
     public void setTimeMgmtGreenIncrement(int seconds) {
-        this.timeMgmtGreenIncrement = seconds;
+        this.timeMgmtGreenIncrement.set(seconds);
     }
 
     public int getTimeMgmtGreenIncrement() {
-        return this.timeMgmtGreenIncrement;
+        return this.timeMgmtGreenIncrement.value();
     }
 
     public void setTimeMgmtBrownIncrement(int seconds) {
-        this.timeMgmtBrownIncrement = seconds;
+        this.timeMgmtBrownIncrement.set(seconds);
     }
 
     public int getTimeMgmtBrownIncrement() {
-        return this.timeMgmtBrownIncrement;
+        return this.timeMgmtBrownIncrement.value();
     }
 
-    // Deprecated but kept for compatibility (redirects to Yellow/Standard)
     public void setTimeMgmtMajorCoIncrement(int seconds) {
-        this.timeMgmtYellowIncrement = seconds;
+        this.timeMgmtYellowIncrement.set(seconds);
     }
 
     public int getTimeMgmtMajorCoIncrement() {
-        return this.timeMgmtYellowIncrement;
+        return this.timeMgmtYellowIncrement.value();
     }
 
     /**
@@ -381,63 +380,43 @@ public class GameManager extends RailsManager implements Configurable, Owner {
     }
 
     // ++ START TIME MANAGEMENT ++
-    protected boolean timeManagementEnabled = true;
-    protected int timeMgmtStartingSeconds = 300;
-    protected int timeMgmtShareRoundIncrement = 60;
-    protected int timeMgmtMajorCoIncrement = 30;
-    // A standard HashSet (NOT a State object) ensures this memory persists
-    // even when the game state rolls back via Undo.
-    private final Set<String> awardedBonuses = new HashSet<>();
-    // 1. Add Variable and Accessors
-    protected int timeMgmtUndoPenalty = 0; // Minor (Self)
-    protected int timeMgmtMajorUndoPenalty = 30; // Major (Disruption) -- NEW
+    protected final BooleanState timeManagementEnabled = new BooleanState(this, "timeManagementEnabled", true);
+    protected final IntegerState timeMgmtStartingSeconds = IntegerState.create(this, "timeMgmtStartingSeconds", 300);
+    protected final IntegerState timeMgmtShareRoundIncrement = IntegerState.create(this, "timeMgmtShareRoundIncrement",
+            60);
+
+    private final HashSetState<String> awardedBonuses = HashSetState.create(this, "awardedBonuses");
+    private transient Map<String, Integer> pendingTimePenalties = new HashMap<>();
+
+    protected final IntegerState timeMgmtUndoPenalty = IntegerState.create(this, "timeMgmtUndoPenalty", 0);
+    protected final IntegerState timeMgmtMajorUndoPenalty = IntegerState.create(this, "timeMgmtMajorUndoPenalty", 30);
 
     public void setTimeMgmtMajorUndoPenalty(int seconds) {
-        this.timeMgmtMajorUndoPenalty = seconds;
+        this.timeMgmtMajorUndoPenalty.set(seconds);
     }
 
     public int getTimeMgmtMajorUndoPenalty() {
-        return this.timeMgmtMajorUndoPenalty;
+        return this.timeMgmtMajorUndoPenalty.value();
     }
 
     public void setTimeMgmtUndoPenalty(int seconds) {
-        this.timeMgmtUndoPenalty = seconds;
+        this.timeMgmtUndoPenalty.set(seconds);
     }
 
     public int getTimeMgmtUndoPenalty() {
-        return this.timeMgmtUndoPenalty;
+        return this.timeMgmtUndoPenalty.value();
     }
 
+    
     /**
-     * Championship Time Management System ("Reset & Penalize")
-     * * Implements fair time accounting for "Disruptor vs. Victim" scenarios (e.g.,
-     * Player A undoes Player B's turn).
-     *
-     * 1. VICTIM PROTECTION (Time Machine):
-     * Standard `changeStack.undo()` rolls back the entire game state, including all
-     * Player TimeBanks.
-     * - Effect: The innocent victim (Player B) has their clock reset to the exact
-     * moment before the disruption.
-     * - Rationale: Thinking time spent on the invalidated future is "refunded" as
-     * it is now irrelevant.
-     *
-     * 2. DISRUPTOR PENALTY:
-     * The player initiating the UNDO/FORCED_UNDO is identified as the 'Disruptor'.
-     * - Action: After the rollback, `timeMgmtUndoPenalty` is subtracted from the
-     * Disruptor's *restored* time.
-     * - Result: The Disruptor pays for the hesitation/correction, ensuring net time
-     * loss for them.
-     *
-     * 3. ANTI-FARMING (Persistent Registry):
-     * Time bonuses (e.g., +30s per OR turn) are tracked in the `awardedBonuses`
-     * Set.
-     * - Mechanism: This Set is transient/persistent and NOT managed by ChangeStack
-     * (does not roll back).
-     * - Result: If the game state reverts and a player starts their turn a second
-     * time, the registry
-     * detects the duplicate Key (RoundID:Player) and denies the bonus, preventing
-     * infinite time generation.
-     */
+* Exposes the transient penalty for UI rendering calculations.
+*/
+public int getPendingTimePenalty(String playerName) {
+if (pendingTimePenalties != null && pendingTimePenalties.containsKey(playerName)) {
+return pendingTimePenalties.get(playerName);
+}
+return 0;
+}
 
     /**
      * Grants a time bonus to a player, ensuring it is only awarded once per
@@ -445,8 +424,6 @@ public class GameManager extends RailsManager implements Configurable, Owner {
      * Prevents "farming" time by undoing/redoing the start of a turn.
      */
     public void grantTimeBonus(Player player, String roundId, int amount) {
-        if (isReloading())
-            return; // Block bonuses during reload
 
         if (player == null || amount <= 0)
             return;
@@ -456,42 +433,21 @@ public class GameManager extends RailsManager implements Configurable, Owner {
         String key = roundId + ":" + player.getName();
 
         if (awardedBonuses.contains(key)) {
-
+            if (isReloading()) {
+                log.info("RELOAD [Bonus SKIPPED] Player: " + player.getName() + " | Key: " + key
+                        + " already exists. Remaining: " + player.getTimeBankModel().value() + "s");
+            }
             return;
         }
 
         // Grant Bonus & Mark as Awarded
         player.getTimeBankModel().add(amount);
         awardedBonuses.add(key);
-        triggerUITimeFlash(player, amount);
-
-    }
-
-    /**
-     * Safely triggers the player timer's flash effect by accessing the UI chain
-     * using the directly-wired GameUIManager instance. Replaces the unreliable
-     * reflection method.
-     */
-    private void triggerUITimeFlash(Player p, int amount) {
-        if (p == null || gameUIManager == null || gameUIManager.getStatusWindow() == null)
-            return;
-
-        try {
-            // Access GameStatus instance via StatusWindow
-            Object gameStatus = gameUIManager.getStatusWindow().getGameStatus();
-
-            // Method signature: updatePlayerTimeWithFlash(int playerIndex, int newTime, int
-            // amountChanged)
-            java.lang.reflect.Method updateMethod = gameStatus.getClass().getMethod(
-                    "updatePlayerTimeWithFlash", int.class, int.class, int.class);
-
-            // Invoke the method: (PlayerIndex, NewTotalTime, AmountChanged)
-            updateMethod.invoke(gameStatus,
-                    p.getIndex(),
-                    p.getTimeBankModel().value(),
-                    amount);
-        } catch (Exception e) {
+        if (isReloading()) {
+            log.info("RELOAD [Bonus GRANTED] Player: " + player.getName() + " | Granted: " + amount + "s | Reason: "
+                    + roundId + " | Remaining: " + player.getTimeBankModel().value() + "s");
         }
+
     }
 
     // --- PERSISTENT STATE FIELDS ---
@@ -538,15 +494,15 @@ public class GameManager extends RailsManager implements Configurable, Owner {
 
     // --- PUBLIC SETTERS (Using .set() for state) ---
     public void setTimeManagementEnabled(boolean enabled) {
-        this.timeManagementEnabled = enabled;
+        this.timeManagementEnabled.set(enabled);
     }
 
     public void setTimeMgmtStartingSeconds(int seconds) {
-        this.timeMgmtStartingSeconds = seconds;
+        this.timeMgmtStartingSeconds.set(seconds);
     }
 
     public void setTimeMgmtShareRoundIncrement(int seconds) {
-        this.timeMgmtShareRoundIncrement = seconds;
+        this.timeMgmtShareRoundIncrement.set(seconds);
     }
 
     public void setTimeMgmtOperatorName(String name) {
@@ -572,7 +528,7 @@ public class GameManager extends RailsManager implements Configurable, Owner {
 
     // --- PUBLIC GETTERS (Using .value() for state) ---
     public boolean isTimeManagementEnabled() {
-        return this.timeManagementEnabled;
+        return this.timeManagementEnabled.value();
     }
 
     /**
@@ -604,11 +560,11 @@ public class GameManager extends RailsManager implements Configurable, Owner {
     }
 
     public int getTimeMgmtStartingSeconds() {
-        return this.timeMgmtStartingSeconds;
+        return this.timeMgmtStartingSeconds.value();
     }
 
     public int getTimeMgmtShareRoundIncrement() {
-        return this.timeMgmtShareRoundIncrement;
+        return this.timeMgmtShareRoundIncrement.value();
     }
 
     public double getTimeMgmtOperatorMultiplier() {
@@ -633,7 +589,7 @@ public class GameManager extends RailsManager implements Configurable, Owner {
 
     private void initializePlayerTimeBanks() {
         for (Player player : getRoot().getPlayerManager().getPlayers()) {
-            int startTime = this.timeMgmtStartingSeconds;
+            int startTime = getTimeMgmtStartingSeconds();
 
             // Use the safe getters
             String opName = getTimeMgmtOperatorName();
@@ -1042,11 +998,9 @@ public class GameManager extends RailsManager implements Configurable, Owner {
         setGuiParameters();
         getRoot().getCompanyManager().initStartPackets(this);
 
-        // ++ START TIME MANAGEMENT ++
         if (isTimeManagementEnabled()) {
             initializePlayerTimeBanks();
         }
-        // ++ END TIME MANAGEMENT ++
 
         // Initialize session timestamp for autosaves
         this.sessionStartTimestamp = new java.text.SimpleDateFormat("yyyyMMdd_HHmmss").format(new java.util.Date());
@@ -1299,8 +1253,13 @@ public class GameManager extends RailsManager implements Configurable, Owner {
         if (isTimeManagementEnabled()) {
             Player priorityPlayer = getRoot().getPlayerManager().getPriorityPlayer();
             if (priorityPlayer != null) {
-                priorityPlayer.getTimeBankModel().add(this.timeMgmtShareRoundIncrement);
-                triggerUITimeFlash(priorityPlayer, this.timeMgmtShareRoundIncrement);
+
+                if (!isReloading()) {
+                    priorityPlayer.getTimeBankModel().add(getTimeMgmtShareRoundIncrement());
+                    // triggerUITimeFlash(priorityPlayer, this.timeMgmtShareRoundIncrement); // Keep
+                    // commented out if disabled
+                }
+
             }
         }
         sr.start();
@@ -1653,6 +1612,22 @@ public class GameManager extends RailsManager implements Configurable, Owner {
         ChangeStack changeStack = getRoot().getStateManager().getChangeStack();
         boolean startGameAction = false;
 
+        // --- INJECT PENALTY BEFORE LOGGING ---
+        // Pre-load the accumulated penalty into the action so the log matches the final
+        // payload.
+        if (!(action instanceof GameAction)
+                && !(action instanceof NullAction && ((NullAction) action).getMode() == NullAction.Mode.START_GAME)) {
+            if (isTimeManagementEnabled()) {
+                String pName = action.getPlayerName();
+                if (pName != null && pendingTimePenalties != null && pendingTimePenalties.containsKey(pName)) {
+                    int payload = action.getExecutionTimeSeconds();
+                    payload += pendingTimePenalties.get(pName);
+                    action.setExecutionTimeSeconds(payload);
+                    // Do NOT remove from map yet. Wait for successful execution.
+                }
+            }
+        }
+
         // -----------------------------------------------------------
         // 2. STANDARD LOGGING (Only for real moves)
         // -----------------------------------------------------------
@@ -1760,6 +1735,23 @@ public class GameManager extends RailsManager implements Configurable, Owner {
             getCurrentRound().setPossibleActions();
 
             if (result && !(action instanceof GameAction) && !(startGameAction)) {
+
+                if (isTimeManagementEnabled()) {
+                    String pName = action.getPlayerName();
+                    Player p = getRoot().getPlayerManager().getPlayerByName(pName);
+
+                    if (p != null) {
+                        int payload = action.getExecutionTimeSeconds(); // Already includes pre-loaded penalty
+                        if (payload > 0) {
+                            p.getTimeBankModel().add(-payload);
+                        }
+                    }
+                    // Action succeeded, safe to clear the cache
+                    if (pName != null && pendingTimePenalties != null) {
+                        pendingTimePenalties.remove(pName);
+                    }
+                }
+
                 changeStack.close(action);
 
                 // Overwrite timeline: clear future boundaries that are no longer valid
@@ -1949,6 +1941,30 @@ public class GameManager extends RailsManager implements Configurable, Owner {
 
                 // 2. CAPTURE STATE BEFORE UNDO
                 Player playerBefore = getCurrentPlayer();
+                Player initiator = gameAction.getPlayer();
+                int timeSpent = gameAction.getExecutionTimeSeconds();
+
+                // 2.5 CAPTURE PENALTY FROM ALL ABORTED ACTIONS
+                if (pendingTimePenalties == null) {
+                    pendingTimePenalties = new HashMap<>();
+                }
+                if (!executedActions.isEmpty()) {
+                    int targetSize = (index == -1) ? executedActions.size() - 1 : index;
+                    targetSize = Math.max(0, targetSize);
+
+                    // Aggregate penalties for all moves being undone (handles multi-undo and
+                    // bypassed AI moves)
+                    for (int i = executedActions.size() - 1; i >= targetSize; i--) {
+                        PossibleAction abortedAction = executedActions.get(i);
+                        String pName = abortedAction.getPlayerName();
+                        int timeSpentOnAborted = abortedAction.getExecutionTimeSeconds();
+
+                        if (pName != null && timeSpentOnAborted > 0) {
+                            pendingTimePenalties.put(pName,
+                                    pendingTimePenalties.getOrDefault(pName, 0) + timeSpentOnAborted);
+                        }
+                    }
+                }
 
                 // 3. EXECUTE UNDO (Restores state, including Victim's time)
                 if (index == -1) {
@@ -1970,49 +1986,16 @@ public class GameManager extends RailsManager implements Configurable, Owner {
                     gameUIManager.setPlayerTimeAfterUndo(playerAfter.getIndex(), restoredTime);
                 }
 
-                // 5. APPLY "DISRUPTOR vs VICTIM" PENALTY LOGIC
-                if (isTimeManagementEnabled() && !isGamePaused()) {
-                    int penaltyAmount = 0;
-                    String penaltyType = "";
-
-                    Player penaltyTarget = null;
-
-                    // LOGIC:
-                    // If playerBefore == playerAfter: I am undoing my own recent move.
-                    // (Self-Correction)
-                    // If playerBefore != playerAfter: I undid back into the previous player's turn.
-                    // (Disruption)
-
-                    if (playerBefore != null && playerAfter != null) {
-                        if (playerBefore.equals(playerAfter)) {
-                            // Minor Penalty for fixing your own math
-                            penaltyAmount = timeMgmtUndoPenalty;
-                            penaltyType = "Self-Correction";
-                            penaltyTarget = playerAfter;
-                        } else {
-                            // Major Penalty for disrupting the flow / going back a player
-                            // The DISRUPTOR (playerBefore) pays, not the victim (playerAfter)
-                            penaltyAmount = timeMgmtMajorUndoPenalty;
-                            penaltyType = "Disruption";
-                            penaltyTarget = playerBefore;
-                        }
-                    }
-
-                    // Apply and Flash - Check penaltyAmount > 0 to prevent logging 0 penalties
-                    if (penaltyTarget != null && penaltyAmount > 0) {
-
-                        // A. Apply Penalty to the restored time
-                        penaltyTarget.getTimeBankModel().add(-penaltyAmount);
-
-                        // B. FORCE RED FLASH (Uses the final time AFTER penalty)
-                        triggerUITimeFlash(penaltyTarget, -penaltyAmount);
-                    }
-                }
                 result = true;
                 break;
 
             case REDO:
                 if (changeStack.isRedoPossible()) {
+
+                    if (pendingTimePenalties != null && getCurrentPlayer() != null) {
+                        pendingTimePenalties.remove(getCurrentPlayer().getName());
+                    }
+
                     if (index == -1) {
                         changeStack.redo();
                     } else {
@@ -2048,7 +2031,8 @@ public class GameManager extends RailsManager implements Configurable, Owner {
      * Uses filePath defined in save.recovery.filepath
      */
     protected void recoverySave() {
-        if (isGameOver()) return;
+        if (isGameOver())
+            return;
 
         if (Config.get("save.recovery.active", "yes").equalsIgnoreCase("no"))
             return;
@@ -2360,8 +2344,6 @@ public class GameManager extends RailsManager implements Configurable, Owner {
         // FIXME (Rails2.0): CommentItems have to be replaced
         // ReportBuffer.setCommentItems(gameLoader.getComments());
 
-        // 1. Restore the exact times from the sidecar JSON file (if it exists)
-        loadJsonState(new File(filepath));
         // Reload Window Positions & Scale, passing the Game Name
         if (gameUIManager != null) {
             gameUIManager.loadWindowSettings(getGameName());
@@ -2730,7 +2712,8 @@ public class GameManager extends RailsManager implements Configurable, Owner {
         if (this.sessionStartTimestamp == null) {
             this.sessionStartTimestamp = new java.text.SimpleDateFormat("yyyyMMdd_HHmmss").format(new java.util.Date());
         }
-        String filename = String.format("%s_%s_Final_%05d.rails", getGameName(), this.sessionStartTimestamp, actionCount.value());
+        String filename = String.format("%s_%s_Final_%05d.rails", getGameName(), this.sessionStartTimestamp,
+                actionCount.value());
         File saveFile = new File(oldGamesDir, filename);
         GameSaver gameSaver = new GameSaver(getRoot().getGameData(), executedActions.view());
         try {
@@ -3459,7 +3442,6 @@ public class GameManager extends RailsManager implements Configurable, Owner {
         logActionTaken(action);
         logAction(action);
 
-        // --- 1. STRICT VALIDATION CHECK ---
         if (action instanceof NullAction && !possibleActions.contains(NullAction.class)) {
             return true;
         }
@@ -3541,6 +3523,16 @@ public class GameManager extends RailsManager implements Configurable, Owner {
 
         executedActions.add(action);
         updatePayoutTracker(action);
+
+        if (isTimeManagementEnabled() && action.getPlayer() != null) {
+            int timeSpent = action.getExecutionTimeSeconds();
+            if (timeSpent > 0) {
+                action.getPlayer().getTimeBankModel().add(-timeSpent);
+                log.info("RELOAD [Move " + getActionCountModel().value() + "] Player: " + action.getPlayer().getName()
+                        + " | Deducted: " + timeSpent + "s | Remaining: "
+                        + action.getPlayer().getTimeBankModel().value() + "s");
+            }
+        }
 
         // Capture snapshots per move so the timeline slider works when loaded from a
         // save
@@ -4091,6 +4083,8 @@ public class GameManager extends RailsManager implements Configurable, Owner {
                 sb.append("[").append(currentLogPrefix).append("] : ");
                 sb.append(entry);
                 sb.append(action.isAIAction() ? " [AI]" : " [Human]");
+                // Expose the temporal payload directly in the log
+                sb.append(" [").append(action.getExecutionTimeSeconds()).append("s]");
                 if (isReloading()) {
                     sb.append(" [loaded]");
                 }

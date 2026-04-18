@@ -41,7 +41,18 @@ public abstract class PossibleAction implements ChangeAction, Serializable {
 
     protected transient Activity activity;
 
+
     public static final long serialVersionUID = 3L;
+    
+    protected int executionTimeSeconds = 0;
+    
+    public int getExecutionTimeSeconds() {
+        return executionTimeSeconds;
+    }
+
+    public void setExecutionTimeSeconds(int seconds) {
+        this.executionTimeSeconds = seconds;
+    }
 
     private static final Logger log = LoggerFactory.getLogger(PossibleAction.class);
 
@@ -153,6 +164,10 @@ public abstract class PossibleAction implements ChangeAction, Serializable {
         // compared to null, always false
         if (pa == null)
             return false;
+
+        // explicitly ignoring executionTimeSeconds here to isolate the temporal 
+        // payload from structural validation during engine replay/hash checks
+        
         // not identical class, always false
         if (!(this.getClass().equals(pa.getClass())))
             return false;
@@ -249,9 +264,14 @@ public abstract class PossibleAction implements ChangeAction, Serializable {
         return player;
     }
 
-    @Override
+@Override
     public String toString() {
-        return RailsObjects.stringHelper(this).addBaseText().toString();
+
+        String base = RailsObjects.stringHelper(this).addBaseText().toString();
+        if (executionTimeSeconds > 0) {
+            return base + " [" + executionTimeSeconds + "s]";
+        }
+        return base;
     }
 
     // TODO: Rails 2.0 check if the combination above works correctly
