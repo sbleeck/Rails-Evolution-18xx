@@ -22,8 +22,15 @@
 		<Track from="side2" gauge="normal" to="side1"/>
 	</Tile>
 		<Tile colour="fixed" id="-8" name="MF8">
-		<Track from="side3" gauge="normal" to="side5"/>
+		<Track from="side2" gauge="normal" to="side0"/>
 	</Tile>
+
+
+
+
+
+
+
 	<Tile colour="white" id="-10" name="1 city">
 		<Station id="city1" position="302" slots="1" type="City"/>
 	</Tile>
