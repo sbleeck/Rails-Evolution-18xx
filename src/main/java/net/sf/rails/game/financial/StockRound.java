@@ -2373,7 +2373,7 @@ public boolean mayPlayerSellShareOfCompany(PublicCompany company) {
         // are lost during JSON re-hydration. If a company is actively on the stock market 
         // (hasStockPrice), it is functionally started and sellable. We bypass the strict
         // boolean checks to prevent the engine from falsely rejecting the shares.
-        if (!company.hasStockPrice()) {
+if (!company.hasStockPrice() || company.getCurrentSpace() == null) {
             return false;
         }
 
