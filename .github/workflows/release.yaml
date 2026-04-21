@@ -20,13 +20,13 @@ jobs:
         include:
           - os: windows-latest
             task: buildExePackage
-            artifact: build/installers/*.exe
+            artifact: rails-18xx.exe  
           - os: ubuntu-latest
             task: buildDebPackage
             artifact: build/installers/*.deb
           - os: macos-latest
             task: buildpkgPackage
-            artifact: build/installers/*.pkg
+            artifact: rails-18xx.pkg
 
     steps:
       - name: Checkout Code
