@@ -44,9 +44,7 @@ public OperatingRound_1870(GameManager parent, String id) {
 public int getTileLayCost(PublicCompany company, MapHex hex, int baseCost) {
 int cost = super.getTileLayCost(company, hex, baseCost);
 
-    // TODO: Implement Mississippi River Bridge discount logic.
-    // If hex.getName() is a river and company owns 'Brdg', subtract $40.
-    
+
     return cost;
 }
 
