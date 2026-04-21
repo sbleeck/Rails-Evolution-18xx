@@ -47,3 +47,12 @@ jobs:
           name: Rails-18xx-${{ matrix.os }}-installer
           path: ${{ matrix.artifact }}
           if-no-files-found: error
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        if: startsWith(github.ref, 'refs/tags/')
+        with:
+          files: ${{ matrix.artifact }}
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
