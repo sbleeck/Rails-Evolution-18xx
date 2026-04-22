@@ -195,6 +195,11 @@ public class GameStatus extends GridPanel {
     private int[] lastPlayerCash;
     private Integer lastBankCash = null;
 
+// --- START FIX ---
+    private final Map<String, Rectangle> lastCompanyRowBounds = new HashMap<>();
+    private String triggerCompanyId = null;
+// --- END FIX ---
+
     protected ClickField poolTrainsButton;
     protected javax.swing.JLabel gameTimeLabel;
     protected javax.swing.Timer uiRefreshTimer;
@@ -1715,8 +1720,21 @@ public class GameStatus extends GridPanel {
             displayList.add(c);
         }
 
+// --- START FIX ---
+        // Snapshot current positions before recreation
+        lastCompanyRowBounds.clear();
+        for (PublicCompany c : allCompanies) {
+            Rectangle bounds = getCompanyRowBounds(c);
+            if (bounds != null) {
+                lastCompanyRowBounds.put(c.getId(), bounds);
+            }
+        }
+        
+        // Identify the trigger company (the one operating or targeted)
+        triggerCompanyId = opCompId;
+// --- END FIX ---
+
         // 2. Sort
-        compNameCaption = new Caption[nc];
         java.util.Collections.sort(displayList, (c1, c2) -> {
             boolean c1IsPR = "PR".equals(c1.getId());
             boolean c2IsPR = "PR".equals(c2.getId());
@@ -1780,6 +1798,13 @@ public class GameStatus extends GridPanel {
         // Always run the turn logic to update button states (Active/Passive) and attach
         // new actions
         initTurn(currentActor, true);
+
+// --- START FIX ---
+        // After UI is rebuilt, check for position changes and animate
+        if (!lastCompanyRowBounds.isEmpty()) {
+            SwingUtilities.invokeLater(this::checkForRowRearrangement);
+        }
+// --- END FIX ---
         repaint();
     }
 
@@ -5794,6 +5819,107 @@ public class GameStatus extends GridPanel {
         }
     }
 
+    private static class CompanyRowAnimator {
+        public static void animateRowSwaps(JFrame parentFrame, GameStatus grid, 
+                                           Map<PublicCompany, Integer> oldRowIndices, 
+                                           Map<PublicCompany, Integer> newRowIndices, 
+                                           Map<PublicCompany, Rectangle> oldBounds, 
+                                           Map<PublicCompany, java.awt.image.BufferedImage> oldImages, 
+                                           List<PublicCompany> movedCompanies, 
+                                           PublicCompany companyA) {
+            if (parentFrame == null || grid == null || movedCompanies.isEmpty()) return;
+            
+            JLayeredPane layeredPane = parentFrame.getLayeredPane();
+            
+            Map<PublicCompany, Rectangle> newBounds = new HashMap<>();
+            for (PublicCompany c : movedCompanies) {
+                Integer rowY = newRowIndices.get(c);
+                Rectangle bounds = null;
+                for (Component comp : grid.getComponents()) {
+                    if (comp.isVisible() && comp.getWidth() > 0) {
+                        GridBagConstraints c_gbc = grid.gb.getConstraints(comp);
+                        if (c_gbc.gridy == rowY) {
+                            if (bounds == null) bounds = new Rectangle(comp.getBounds());
+                            else bounds.add(comp.getBounds());
+                        }
+                    }
+                }
+                if (bounds != null) {
+                    newBounds.put(c, bounds);
+                }
+            }
+            
+            JComponent animationLayer = new JComponent() {
+                long startTime = System.currentTimeMillis();
+                int durationMs = 1000;
+
+                @Override
+                protected void paintComponent(Graphics g) {
+                    long elapsed = System.currentTimeMillis() - startTime;
+                    float progress = Math.min(1f, (float) elapsed / durationMs);
+                    
+                    float eased = progress < 0.5f ? 2 * progress * progress : -1 + (4 - 2 * progress) * progress;
+
+                    Color bg = grid.getBackground();
+                    if (bg == null || bg.getAlpha() < 255) {
+                        bg = UIManager.getColor("Panel.background");
+                        if (bg == null) bg = Color.LIGHT_GRAY;
+                    }
+                    g.setColor(bg);
+                    
+                    for (PublicCompany c : movedCompanies) {
+                        Rectangle nb = newBounds.get(c);
+                        if (nb != null) {
+                            Point pt = SwingUtilities.convertPoint(grid, nb.getLocation(), this);
+                            g.fillRect(pt.x, pt.y, nb.width, nb.height);
+                        }
+                    }
+
+                    for (PublicCompany c : movedCompanies) {
+                        Rectangle ob = oldBounds.get(c);
+                        Rectangle nb = newBounds.get(c);
+                        java.awt.image.BufferedImage img = oldImages.get(c);
+                        
+                        if (ob != null && nb != null && img != null) {
+                            Point startPt = SwingUtilities.convertPoint(grid, ob.getLocation(), this);
+                            Point endPt = SwingUtilities.convertPoint(grid, nb.getLocation(), this);
+                            
+                            int currentX = (int) (startPt.x + (endPt.x - startPt.x) * eased);
+                            int currentY = (int) (startPt.y + (endPt.y - startPt.y) * eased);
+                            
+                            g.drawImage(img, currentX, currentY, null);
+                            
+                            if (c.equals(companyA)) {
+                                g.setColor(new Color(255, 255, 0, 100)); // semi-transparent yellow
+                                g.fillRect(currentX, currentY, ob.width, ob.height);
+                                g.setColor(Color.ORANGE);
+                                g.drawRect(currentX, currentY, ob.width - 1, ob.height - 1);
+                                g.drawRect(currentX + 1, currentY + 1, ob.width - 3, ob.height - 3);
+                            }
+                        }
+                    }
+                }
+            };
+            
+            animationLayer.setBounds(0, 0, layeredPane.getWidth(), layeredPane.getHeight());
+            layeredPane.add(animationLayer, JLayeredPane.DRAG_LAYER);
+            
+            javax.swing.Timer timer = new javax.swing.Timer(16, null);
+            timer.addActionListener(e -> {
+                animationLayer.repaint();
+                long elapsed = System.currentTimeMillis() - ((Long) animationLayer.getClientProperty("startTime"));
+                if (elapsed >= 1000) {
+                    timer.stop();
+                    layeredPane.remove(animationLayer);
+                    layeredPane.repaint();
+                    grid.repaint();
+                }
+            });
+            animationLayer.putClientProperty("startTime", System.currentTimeMillis());
+            timer.start();
+        }
+    }
+
     private static class OverlaySpinnerAnimator {
         public static void animate(JFrame parentFrame, JComponent target, int startVal, int endVal) {
             if (parentFrame == null || target == null || startVal == endVal || target.getWidth() == 0 || target.getHeight() == 0) return;
@@ -5878,4 +6004,155 @@ public class GameStatus extends GridPanel {
             timer.start();
         }
     }
+
+// --- START FIX ---
+    /**
+     * Calculates the bounding box of an entire company row by unioning 
+     * its name caption and right-most data columns.
+     */
+    private Rectangle getCompanyRowBounds(PublicCompany c) {
+        int i = c.getPublicNumber();
+        if (compNameCaption == null || i >= compNameCaption.length || compNameCaption[i] == null) return null;
+        
+        Rectangle r = compNameCaption[i].getBounds();
+        // Union with the last visible column to get the full row width
+        if (compTokens != null && i < compTokens.length && compTokens[i] != null) {
+            r = r.union(compTokens[i].getBounds());
+        }
+        return r;
+    }
+
+    private void checkForRowRearrangement() {
+        Map<String, Point> startPoints = new HashMap<>();
+        Map<String, Point> endPoints = new HashMap<>();
+        Map<String, java.awt.image.BufferedImage> snapshots = new HashMap<>();
+
+        JLayeredPane lp = parentFrame.getLayeredPane();
+
+        for (PublicCompany c : companies) {
+            if (c.isClosed()) continue;
+            String id = c.getId();
+            Rectangle currentBounds = getCompanyRowBounds(c);
+            
+            if (currentBounds != null && lastCompanyRowBounds.containsKey(id)) {
+                Rectangle oldBounds = lastCompanyRowBounds.get(id);
+                
+                // Only animate if the Y position actually changed
+                if (oldBounds.y != currentBounds.y) {
+                    Point start = SwingUtilities.convertPoint(this, oldBounds.getLocation(), lp);
+                    Point end = SwingUtilities.convertPoint(this, currentBounds.getLocation(), lp);
+                    
+                    startPoints.put(id, start);
+                    endPoints.put(id, end);
+                    
+                    // Capture row image
+                    java.awt.image.BufferedImage img = new java.awt.image.BufferedImage(
+                        currentBounds.width, currentBounds.height, java.awt.image.BufferedImage.TYPE_INT_ARGB);
+                    Graphics2D g2 = img.createGraphics();
+                    
+                    // Shift graphics to capture the specific row area
+                    g2.translate(-currentBounds.x, -currentBounds.y);
+                    this.paint(g2); 
+                    g2.dispose();
+                    snapshots.put(id, img);
+                    
+                    // Temporarily hide the real row components so they don't "ghost" behind the animation
+                    setRowVisible(c, false);
+                }
+            }
+        }
+
+        if (!startPoints.isEmpty()) {
+            new RowRearrangeAnimator(parentFrame, snapshots, startPoints, endPoints, triggerCompanyId).start(() -> {
+                for (PublicCompany c : companies) setRowVisible(c, true);
+                repaint();
+            });
+        }
+        lastCompanyRowBounds.clear();
+    }
+
+    private void setRowVisible(PublicCompany c, boolean visible) {
+        int i = c.getPublicNumber();
+        if (compNameCaption[i] != null) compNameCaption[i].setVisible(visible);
+        if (compTrainsButtonPanel[i] != null) compTrainsButtonPanel[i].setVisible(visible);
+        if (compCash[i] != null) compCash[i].setVisible(visible);
+        if (compRevenue[i] != null) compRevenue[i].setVisible(visible);
+        if (compRetained[i] != null) compRetained[i].setVisible(visible);
+        if (compTokens[i] != null) compTokens[i].setVisible(visible);
+        if (poolPanels[i] != null) poolPanels[i].setVisible(visible);
+        if (ipoPanels[i] != null) ipoPanels[i].setVisible(visible);
+        for (int j = 0; j < np; j++) {
+            if (playerSharePanels[i][j] != null) playerSharePanels[i][j].setVisible(visible);
+        }
+    }
+
+    private static class RowRearrangeAnimator {
+        private final JFrame frame;
+        private final Map<String, java.awt.image.BufferedImage> images;
+        private final Map<String, Point> starts;
+        private final Map<String, Point> ends;
+        private final String triggerId;
+        private final int duration = 1000;
+
+        public RowRearrangeAnimator(JFrame frame, Map<String, java.awt.image.BufferedImage> images, 
+                                   Map<String, Point> starts, Map<String, Point> ends, String triggerId) {
+            this.frame = frame;
+            this.images = images;
+            this.starts = starts;
+            this.ends = ends;
+            this.triggerId = triggerId;
+        }
+
+        public void start(Runnable onComplete) {
+            JLayeredPane lp = frame.getLayeredPane();
+            Map<String, Point> currents = new HashMap<>(starts);
+
+            JComponent glass = new JComponent() {
+                @Override
+                protected void paintComponent(Graphics g) {
+                    Graphics2D g2 = (Graphics2D) g.create();
+                    for (String id : images.keySet()) {
+                        Point p = currents.get(id);
+                        java.awt.image.BufferedImage img = images.get(id);
+                        
+                        if (id.equals(triggerId)) {
+                            // Highlight Trigger: Add a golden glow/border
+                            g2.setColor(new Color(255, 215, 0, 150));
+                            g2.fillRect(p.x - 2, p.y - 2, img.getWidth() + 4, img.getHeight() + 4);
+                        }
+                        g2.drawImage(img, p.x, p.y, null);
+                    }
+                    g2.dispose();
+                }
+            };
+
+            glass.setBounds(0, 0, lp.getWidth(), lp.getHeight());
+            lp.add(glass, JLayeredPane.DRAG_LAYER);
+
+            long startTime = System.currentTimeMillis();
+            javax.swing.Timer timer = new javax.swing.Timer(16, null);
+            timer.addActionListener(e -> {
+                float progress = Math.min(1f, (float) (System.currentTimeMillis() - startTime) / duration);
+                // Sinusoidal ease-in-out for organic movement
+                float ease = (float) (0.5 * (1.0 - Math.cos(progress * Math.PI)));
+
+                for (String id : images.keySet()) {
+                    Point s = starts.get(id);
+                    Point f = ends.get(id);
+                    currents.get(id).x = (int) (s.x + (f.x - s.x) * ease);
+                    currents.get(id).y = (int) (s.y + (f.y - s.y) * ease);
+                }
+                glass.repaint();
+
+                if (progress >= 1f) {
+                    timer.stop();
+                    lp.remove(glass);
+                    lp.repaint();
+                    onComplete.run();
+                }
+            });
+            timer.start();
+        }
+    }
+// --- END FIX ---
 }
