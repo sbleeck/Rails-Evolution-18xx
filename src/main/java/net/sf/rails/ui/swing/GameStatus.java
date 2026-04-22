@@ -24,6 +24,7 @@ import org.slf4j.LoggerFactory;
 import rails.game.action.*;
 import rails.game.correct.CashCorrectionAction;
 import rails.game.correct.TrainCorrectionAction;
+
 import javax.swing.*;
 import java.awt.*;
 import java.awt.event.ActionEvent;
@@ -194,11 +195,6 @@ public class GameStatus extends GridPanel {
     private int[] lastCompCash;
     private int[] lastPlayerCash;
     private Integer lastBankCash = null;
-
-// --- START FIX ---
-    private final Map<String, Rectangle> lastCompanyRowBounds = new HashMap<>();
-    private String triggerCompanyId = null;
-// --- END FIX ---
 
     protected ClickField poolTrainsButton;
     protected javax.swing.JLabel gameTimeLabel;
@@ -530,6 +526,11 @@ public class GameStatus extends GridPanel {
                 nb++;
         }
         np = players.getNumberOfPlayers();
+        
+        lastCompCash = new int[nc];
+        lastPlayerCash = new int[np];
+        for (int i = 0; i < nc; i++) lastCompCash[i] = Integer.MIN_VALUE;
+        for (int i = 0; i < np; i++) lastPlayerCash[i] = Integer.MIN_VALUE;
 
         /* Set game parameters required here */
         hasParPrices = gameUIManager.getGameParameterAsBoolean(GuiDef.Parm.HAS_ANY_PAR_PRICE);
@@ -1149,7 +1150,8 @@ public class GameStatus extends GridPanel {
             if (action instanceof BuyCertificate) {
                 BuyCertificate bc = (BuyCertificate) action;
                 PublicCompany comp = bc.getCompany();
-                if (comp == null) return null;
+                if (comp == null)
+                    return null;
                 int cIdx = comp.getPublicNumber();
 
                 if (actorIndex >= 0 && actorIndex < np) {
@@ -1160,7 +1162,8 @@ public class GameStatus extends GridPanel {
             } else if (action instanceof SellShares) {
                 SellShares ss = (SellShares) action;
                 PublicCompany comp = ss.getCompany();
-                if (comp == null) return null;
+                if (comp == null)
+                    return null;
                 int cIdx = comp.getPublicNumber();
                 return poolPanels[cIdx];
             } else if (action instanceof BuyTrain) {
@@ -1471,7 +1474,7 @@ public class GameStatus extends GridPanel {
                 } else {
                     gameUIManager.getORUIManager().processBuyPrivate((BuyPrivate) action);
                 }
-                return; 
+                return;
             } else if (actions.get(0) instanceof TrainCorrectionAction) {
                 chosenAction = actions.get(0);
             } else if (actions.get(0) instanceof BuyTrain) {
@@ -1518,7 +1521,7 @@ public class GameStatus extends GridPanel {
 
         if (chosenAction != null) {
             JComponent destination = resolveAnimationDestination(chosenAction);
-            
+
             if (destination != null && destination.isVisible() && source != null && parentFrame != null) {
                 final PossibleAction finalAction = chosenAction;
                 new FlightAnimator(parentFrame, source, destination, 200).start(() -> {
@@ -1720,20 +1723,6 @@ public class GameStatus extends GridPanel {
             displayList.add(c);
         }
 
-// --- START FIX ---
-        // Snapshot current positions before recreation
-        lastCompanyRowBounds.clear();
-        for (PublicCompany c : allCompanies) {
-            Rectangle bounds = getCompanyRowBounds(c);
-            if (bounds != null) {
-                lastCompanyRowBounds.put(c.getId(), bounds);
-            }
-        }
-        
-        // Identify the trigger company (the one operating or targeted)
-        triggerCompanyId = opCompId;
-// --- END FIX ---
-
         // 2. Sort
         java.util.Collections.sort(displayList, (c1, c2) -> {
             boolean c1IsPR = "PR".equals(c1.getId());
@@ -1761,30 +1750,93 @@ public class GameStatus extends GridPanel {
         // 3. Build Signature
         java.util.List<String> currentSignature = new java.util.ArrayList<>();
         for (PublicCompany c : displayList) {
-            boolean inIpo = ipoModel.getShare(c) > 0;
-
-            int currentPrice = c.getCurrentSpace() != null ? c.getCurrentSpace().getPrice() : 0;
-            if (currentPrice == 0 && c.getStartSpace() != null)
-                currentPrice = c.getStartSpace().getPrice();
-            // Active if Floated, Owned, or (In IPO and Buyable/Priced)
-            boolean isActive = c.hasFloated() ||
-                    (c.getPresidentsShare() != null && c.getPresidentsShare().getOwner() instanceof Player) ||
-                    (inIpo && currentPrice > 0);
-
-            boolean isOperating = (c == operatingComp);
-
-            // This ensures that transitioning from OR (Operating=True) to SR
-            // (Operating=False)
-            // is detected as a state change, triggering the required UI rebuild.
-            currentSignature.add(c.getId() + ":" + isActive + ":" + isOperating);
+            currentSignature.add(c.getId());
         }
 
         // 4. Compare and Recreate
         // Self-Healing: If component count is 0, the previous render failed/crashed.
         // Force recreation even if signature matches to recover from "Grey Screen".
+
         if (!currentSignature.equals(previousDashboardSignature) || this.getComponentCount() == 0) {
-            previousDashboardSignature = currentSignature;
-            recreate();
+            if (!previousDashboardSignature.isEmpty() && !currentSignature.equals(previousDashboardSignature)
+                    && this.getComponentCount() > 0) {
+                log.info("ANIMATION TRIGGER DETECTED: Logical order swapped.");
+
+                List<String> oldSig = new ArrayList<>(previousDashboardSignature);
+                List<String> newSig = new ArrayList<>(currentSignature);
+
+                // 1. Snapshot MASTER IMAGE of the pristine old state
+                java.awt.image.BufferedImage masterImage = new java.awt.image.BufferedImage(
+                        this.getWidth(), this.getHeight(), java.awt.image.BufferedImage.TYPE_INT_ARGB);
+                Graphics2D masterG2 = masterImage.createGraphics();
+                this.paint(masterG2);
+                masterG2.dispose();
+
+                Map<String, Rectangle> oldBounds = new HashMap<>();
+                Map<String, java.awt.image.BufferedImage> rowImages = new HashMap<>();
+
+                for (PublicCompany c : displayList) {
+                    Rectangle r = getCompanyRowBounds(c);
+                    if (r != null && r.width > 0 && r.height > 0) {
+                        oldBounds.put(c.getId(), r);
+                        int sx = Math.max(0, r.x);
+                        int sy = Math.max(0, r.y);
+                        int sw = Math.min(masterImage.getWidth() - sx, r.width);
+                        int sh = Math.min(masterImage.getHeight() - sy, r.height);
+                        rowImages.put(c.getId(), masterImage.getSubimage(sx, sy, sw, sh));
+                    }
+                }
+
+                // 2. Identify the Primary Mover
+                String primaryMover = null;
+                int maxDist = -1;
+                for (String id : newSig) {
+                    int oldIdx = oldSig.indexOf(id);
+                    int newIdx = newSig.indexOf(id);
+                    if (oldIdx != -1 && newIdx != -1) {
+                        int dist = Math.abs(oldIdx - newIdx);
+                        if (dist > maxDist) {
+                            maxDist = dist;
+                            primaryMover = id;
+                        }
+                    }
+                }
+
+                // 3. ALLOW SWING TO UPDATE NATIVELY
+                // This guarantees fonts, borders, and logic remain perfectly synced
+                previousDashboardSignature = currentSignature;
+                recreate();
+
+                int finalActor = (gameUIManager != null && gameUIManager.getGameManager() != null
+                        && gameUIManager.getGameManager().getCurrentPlayer() != null)
+                                ? gameUIManager.getGameManager().getCurrentPlayer().getIndex()
+                                : this.actorIndex;
+                initTurn(finalActor, true);
+
+                // Force layout recalculation to get final destinations
+                this.validate();
+
+                Map<String, Rectangle> newBounds = new HashMap<>();
+                for (PublicCompany c : displayList) {
+                    Rectangle r = getCompanyRowBounds(c);
+                    if (r != null)
+                        newBounds.put(c.getId(), r);
+                }
+
+                // 4. Block thread and animate on the GlassPane
+                if (primaryMover != null && parentFrame != null) {
+                    new RowRearrangeAnimator(parentFrame, masterImage, rowImages, oldBounds, newBounds, primaryMover)
+                            .start(() -> {
+                                repaint(); // Clean up after curtain drops
+                            });
+                    return;
+                }
+
+            } else {
+                // Standard non-animated refresh
+                previousDashboardSignature = currentSignature;
+                recreate();
+            }
         }
 
         int currentActor = -1;
@@ -1798,13 +1850,6 @@ public class GameStatus extends GridPanel {
         // Always run the turn logic to update button states (Active/Passive) and attach
         // new actions
         initTurn(currentActor, true);
-
-// --- START FIX ---
-        // After UI is rebuilt, check for position changes and animate
-        if (!lastCompanyRowBounds.isEmpty()) {
-            SwingUtilities.invokeLater(this::checkForRowRearrangement);
-        }
-// --- END FIX ---
         repaint();
     }
 
@@ -3695,37 +3740,56 @@ public class GameStatus extends GridPanel {
                 net.sf.rails.ui.swing.ORPanel.forceUpdateForManager(gameUIManager, new java.util.ArrayList<>());
             }
         }
-        repaint();
 
+        // Fire delayed state evaluations for money delta animations
         SwingUtilities.invokeLater(() -> {
-            if (parentFrame == null || !parentFrame.isVisible()) return;
-
+            // Check Companies
             for (int i = 0; i < nc; i++) {
-                if (companies[i] == null || compCash[i] == null || !compCash[i].isVisible()) continue;
-                int currentCash = companies[i].getPurseMoneyModel().value();
-                if (lastCompCash != null && i < lastCompCash.length && lastCompCash[i] != currentCash) {
-                    OverlaySpinnerAnimator.animate(parentFrame, compCash[i], lastCompCash[i], currentCash);
-                    lastCompCash[i] = currentCash;
+                if (companies[i] != null && !companies[i].isClosed() && compCash[i] != null && compCash[i].isShowing()) {
+                    try {
+                        int currentCash = companies[i].getPurseMoneyModel().value();
+                        if (lastCompCash[i] != Integer.MIN_VALUE && lastCompCash[i] != currentCash) {
+                            triggerMoneySpinner(compCash[i], lastCompCash[i], currentCash);
+                        }
+                        lastCompCash[i] = currentCash;
+                    } catch (Exception e) {
+                        log.debug("Error checking company cash delta", e);
+                    }
                 }
             }
+
+            // Check Players
             for (int i = 0; i < np; i++) {
-                Player p = players.getPlayerByPosition(i);
-                if (p == null || playerCash[i] == null || !playerCash[i].isVisible()) continue;
-                int currentCash = p.getWallet().value();
-                if (lastPlayerCash != null && i < lastPlayerCash.length && lastPlayerCash[i] != currentCash) {
-                    OverlaySpinnerAnimator.animate(parentFrame, playerCash[i], lastPlayerCash[i], currentCash);
-                    lastPlayerCash[i] = currentCash;
+                if (playerCash[i] != null && playerCash[i].isShowing()) {
+                    try {
+                        int currentCash = players.getPlayerByPosition(i).getCashValue();
+                        if (lastPlayerCash[i] != Integer.MIN_VALUE && lastPlayerCash[i] != currentCash) {
+                            triggerMoneySpinner(playerCash[i], lastPlayerCash[i], currentCash);
+                        }
+                        lastPlayerCash[i] = currentCash;
+                    } catch (Exception e) {
+                        log.debug("Error checking player cash delta", e);
+                    }
                 }
             }
-            
-            if (bankCash != null && bankCash.isVisible() && bank != null && bank.getPurse() != null) {
-                int currentBankCash = bank.getPurse().value();
-                if (lastBankCash != null && lastBankCash != currentBankCash) {
-                    OverlaySpinnerAnimator.animate(parentFrame, bankCash, lastBankCash, currentBankCash);
+
+            // Check Bank
+            if (bankCash != null && bankCash.isShowing()) {
+                try {
+                    String clean = bankCash.getText().replaceAll("[^0-9-]", "");
+                    if (!clean.isEmpty()) {
+                        int currentCash = Integer.parseInt(clean);
+                        if (lastBankCash != null && lastBankCash != currentCash) {
+                            triggerMoneySpinner(bankCash, lastBankCash, currentCash);
+                        }
+                        lastBankCash = currentCash;
+                    }
+                } catch (Exception e) {
+                    log.debug("Error checking bank cash delta", e);
                 }
-                lastBankCash = currentBankCash;
             }
         });
+        repaint();
     }
 
     protected String formatShareText(int percentage, PublicCompany c, boolean isPresident) {
@@ -4312,27 +4376,6 @@ public class GameStatus extends GridPanel {
             np = players.getNumberOfPlayers();
             companies = gameUIManager.getAllPublicCompanies().toArray(new PublicCompany[0]);
             nc = companies.length;
-        }
-
-        if (lastCompCash == null || lastCompCash.length != nc) {
-            lastCompCash = new int[nc];
-            for (int i = 0; i < nc; i++) {
-                if (companies[i] != null && companies[i].getPurseMoneyModel() != null) {
-                    lastCompCash[i] = companies[i].getPurseMoneyModel().value();
-                }
-            }
-        }
-        if (lastPlayerCash == null || lastPlayerCash.length != np) {
-            lastPlayerCash = new int[np];
-            for (int i = 0; i < np; i++) {
-                Player p = players.getPlayerByPosition(i);
-                if (p != null && p.getWallet() != null) {
-                    lastPlayerCash[i] = p.getWallet().value();
-                }
-            }
-        }
-        if (lastBankCash == null && bank != null && bank.getPurse() != null) {
-            lastBankCash = bank.getPurse().value();
         }
 
         PublicCompany operatingComp = null;
@@ -5120,6 +5163,7 @@ public class GameStatus extends GridPanel {
 
             final int playerIndex = i;
             f = playerCash[i] = new Field(players.getPlayerByPosition(i).getWallet()) {
+
                 @Override
                 public void setText(String t) {
                     boolean isDebt = false;
@@ -5152,6 +5196,7 @@ public class GameStatus extends GridPanel {
                         super.setText(t);
                     }
                 }
+
             };
 
             f.setBorder(BORDER_THIN);
@@ -5296,7 +5341,6 @@ public class GameStatus extends GridPanel {
             f.setBackground(BG_BANK);
             f.setOpaque(true);
             f.setFont(new Font("SansSerif", Font.BOLD, 12));
-            addField(f, bankX - 1, bankY - 4, 1, 1, 0, true);
 
             bankCash = new Field(bank.getPurse());
             bankCash.setBorder(BORDER_BOX);
@@ -5621,27 +5665,28 @@ public class GameStatus extends GridPanel {
             // 1. Scan Company Trains
 
             int targetCompanyIndex = -1;
-                // Pass 1a: Attempt to isolate the owning company via the Action's Actor
-                if (pa instanceof GuiTargetedAction) {
-                    net.sf.rails.game.state.Owner actor = ((GuiTargetedAction) pa).getActor();
-                    if (actor instanceof net.sf.rails.game.PublicCompany) {
-                        targetCompanyIndex = ((net.sf.rails.game.PublicCompany) actor).getPublicNumber();
-                    }
+            // Pass 1a: Attempt to isolate the owning company via the Action's Actor
+            if (pa instanceof GuiTargetedAction) {
+                net.sf.rails.game.state.Owner actor = ((GuiTargetedAction) pa).getActor();
+                if (actor instanceof net.sf.rails.game.PublicCompany) {
+                    targetCompanyIndex = ((net.sf.rails.game.PublicCompany) actor).getPublicNumber();
                 }
+            }
 
-                // Pass 1b: Fallback to exact object reference scan
-                if (targetCompanyIndex == -1) {
-                    for (int i = 0; i < nc; i++) {
-                        for (int t = 0; t < MAX_TRAIN_SLOTS; t++) {
-                            RailCard card = compSubTrainButtons[i][t];
-                            if (card != null && card.getTrain() == targetTrain) {
-                                targetCompanyIndex = i;
-                                break;
-                            }
+            // Pass 1b: Fallback to exact object reference scan
+            if (targetCompanyIndex == -1) {
+                for (int i = 0; i < nc; i++) {
+                    for (int t = 0; t < MAX_TRAIN_SLOTS; t++) {
+                        RailCard card = compSubTrainButtons[i][t];
+                        if (card != null && card.getTrain() == targetTrain) {
+                            targetCompanyIndex = i;
+                            break;
                         }
-                        if (targetCompanyIndex != -1) break;
                     }
+                    if (targetCompanyIndex != -1)
+                        break;
                 }
+            }
 
             // Second pass: isolate duplicates to the owning company's row
             if (targetCompanyIndex != -1) {
@@ -5745,7 +5790,7 @@ public class GameStatus extends GridPanel {
     /**
      * Handles asynchronous GlassPane animations for RailCards.
      */
-    private static class FlightAnimator {   
+    private static class FlightAnimator {
         private final JFrame parentFrame;
         private final JComponent source;
         private final JComponent destination;
@@ -5755,7 +5800,7 @@ public class GameStatus extends GridPanel {
         private Point startPt;
         private Point endPt;
         private Point currentPt;
-        
+
         private javax.swing.Timer timer;
         private long startTime;
         private JLayeredPane layeredPane;
@@ -5770,7 +5815,8 @@ public class GameStatus extends GridPanel {
 
         public void start(Runnable onComplete) {
             // 1. Capture the source image
-            ghostImage = new java.awt.image.BufferedImage(source.getWidth(), source.getHeight(), java.awt.image.BufferedImage.TYPE_INT_ARGB);
+            ghostImage = new java.awt.image.BufferedImage(source.getWidth(), source.getHeight(),
+                    java.awt.image.BufferedImage.TYPE_INT_ARGB);
             Graphics2D g2 = ghostImage.createGraphics();
             source.paint(g2);
             g2.dispose();
@@ -5790,7 +5836,7 @@ public class GameStatus extends GridPanel {
                     }
                 }
             };
-            
+
             animationLayer.setBounds(0, 0, layeredPane.getWidth(), layeredPane.getHeight());
             layeredPane.add(animationLayer, JLayeredPane.DRAG_LAYER);
 
@@ -5819,340 +5865,290 @@ public class GameStatus extends GridPanel {
         }
     }
 
-    private static class CompanyRowAnimator {
-        public static void animateRowSwaps(JFrame parentFrame, GameStatus grid, 
-                                           Map<PublicCompany, Integer> oldRowIndices, 
-                                           Map<PublicCompany, Integer> newRowIndices, 
-                                           Map<PublicCompany, Rectangle> oldBounds, 
-                                           Map<PublicCompany, java.awt.image.BufferedImage> oldImages, 
-                                           List<PublicCompany> movedCompanies, 
-                                           PublicCompany companyA) {
-            if (parentFrame == null || grid == null || movedCompanies.isEmpty()) return;
-            
-            JLayeredPane layeredPane = parentFrame.getLayeredPane();
-            
-            Map<PublicCompany, Rectangle> newBounds = new HashMap<>();
-            for (PublicCompany c : movedCompanies) {
-                Integer rowY = newRowIndices.get(c);
-                Rectangle bounds = null;
-                for (Component comp : grid.getComponents()) {
-                    if (comp.isVisible() && comp.getWidth() > 0) {
-                        GridBagConstraints c_gbc = grid.gb.getConstraints(comp);
-                        if (c_gbc.gridy == rowY) {
-                            if (bounds == null) bounds = new Rectangle(comp.getBounds());
-                            else bounds.add(comp.getBounds());
-                        }
-                    }
-                }
-                if (bounds != null) {
-                    newBounds.put(c, bounds);
-                }
-            }
-            
-            JComponent animationLayer = new JComponent() {
-                long startTime = System.currentTimeMillis();
-                int durationMs = 1000;
-
-                @Override
-                protected void paintComponent(Graphics g) {
-                    long elapsed = System.currentTimeMillis() - startTime;
-                    float progress = Math.min(1f, (float) elapsed / durationMs);
-                    
-                    float eased = progress < 0.5f ? 2 * progress * progress : -1 + (4 - 2 * progress) * progress;
-
-                    Color bg = grid.getBackground();
-                    if (bg == null || bg.getAlpha() < 255) {
-                        bg = UIManager.getColor("Panel.background");
-                        if (bg == null) bg = Color.LIGHT_GRAY;
-                    }
-                    g.setColor(bg);
-                    
-                    for (PublicCompany c : movedCompanies) {
-                        Rectangle nb = newBounds.get(c);
-                        if (nb != null) {
-                            Point pt = SwingUtilities.convertPoint(grid, nb.getLocation(), this);
-                            g.fillRect(pt.x, pt.y, nb.width, nb.height);
-                        }
-                    }
-
-                    for (PublicCompany c : movedCompanies) {
-                        Rectangle ob = oldBounds.get(c);
-                        Rectangle nb = newBounds.get(c);
-                        java.awt.image.BufferedImage img = oldImages.get(c);
-                        
-                        if (ob != null && nb != null && img != null) {
-                            Point startPt = SwingUtilities.convertPoint(grid, ob.getLocation(), this);
-                            Point endPt = SwingUtilities.convertPoint(grid, nb.getLocation(), this);
-                            
-                            int currentX = (int) (startPt.x + (endPt.x - startPt.x) * eased);
-                            int currentY = (int) (startPt.y + (endPt.y - startPt.y) * eased);
-                            
-                            g.drawImage(img, currentX, currentY, null);
-                            
-                            if (c.equals(companyA)) {
-                                g.setColor(new Color(255, 255, 0, 100)); // semi-transparent yellow
-                                g.fillRect(currentX, currentY, ob.width, ob.height);
-                                g.setColor(Color.ORANGE);
-                                g.drawRect(currentX, currentY, ob.width - 1, ob.height - 1);
-                                g.drawRect(currentX + 1, currentY + 1, ob.width - 3, ob.height - 3);
-                            }
-                        }
-                    }
-                }
-            };
-            
-            animationLayer.setBounds(0, 0, layeredPane.getWidth(), layeredPane.getHeight());
-            layeredPane.add(animationLayer, JLayeredPane.DRAG_LAYER);
-            
-            javax.swing.Timer timer = new javax.swing.Timer(16, null);
-            timer.addActionListener(e -> {
-                animationLayer.repaint();
-                long elapsed = System.currentTimeMillis() - ((Long) animationLayer.getClientProperty("startTime"));
-                if (elapsed >= 1000) {
-                    timer.stop();
-                    layeredPane.remove(animationLayer);
-                    layeredPane.repaint();
-                    grid.repaint();
-                }
-            });
-            animationLayer.putClientProperty("startTime", System.currentTimeMillis());
-            timer.start();
-        }
-    }
-
-    private static class OverlaySpinnerAnimator {
-        public static void animate(JFrame parentFrame, JComponent target, int startVal, int endVal) {
-            if (parentFrame == null || target == null || startVal == endVal || target.getWidth() == 0 || target.getHeight() == 0) return;
-
-            JLayeredPane layeredPane = parentFrame.getLayeredPane();
-            Point pt = SwingUtilities.convertPoint(target.getParent(), target.getLocation(), layeredPane);
-
-            int delta = endVal - startVal;
-            boolean isPositive = delta > 0;
-            
-            String targetText = "";
-            if (target instanceof JLabel) {
-                targetText = ((JLabel) target).getText();
-            }
-            String currencyPrefix = (targetText != null && !targetText.isEmpty() && !Character.isDigit(targetText.charAt(0)) && targetText.charAt(0) != '-') 
-                ? targetText.substring(0, 1) : "";
-
-            String deltaText = (isPositive ? "+" : "-") + currencyPrefix + Math.abs(delta);
-
-            Color textColor = isPositive ? new Color(34, 139, 34) : new Color(220, 20, 60); // Forest Green vs Crimson
-            
-            float[] alpha = new float[] { 1.0f };
-
-            JLabel floatingLabel = new JLabel(deltaText) {
-                @Override
-                public void paint(Graphics g) {
-                    Graphics2D g2 = (Graphics2D) g.create();
-                    g2.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, alpha[0]));
-                    super.paint(g2);
-                    g2.dispose();
-                }
-            };
-            
-            if (target instanceof JLabel) {
-                floatingLabel.setHorizontalAlignment(((JLabel) target).getHorizontalAlignment());
-            } else {
-                floatingLabel.setHorizontalAlignment(SwingConstants.CENTER);
-            }
-
-            // Bold font, slightly larger
-            Font baseFont = target.getFont();
-            floatingLabel.setFont(baseFont.deriveFont(Font.BOLD, baseFont.getSize() + 2f));
-            floatingLabel.setForeground(textColor);
-            
-            // Start it at the target bounds
-            floatingLabel.setBounds(pt.x, pt.y, target.getWidth(), target.getHeight());
-
-            layeredPane.add(floatingLabel, JLayeredPane.DRAG_LAYER); // Keep it well above everything
-
-            int durationMs = 1200; // 1.2 seconds to float
-            int frames = 40;
-            int delay = durationMs / frames;
-            int startY = pt.y;
-            int floatDistance = 25;
-
-            javax.swing.Timer timer = new javax.swing.Timer(delay, null);
-            long startTime = System.currentTimeMillis();
-
-            timer.addActionListener(e -> {
-                long elapsed = System.currentTimeMillis() - startTime;
-                float progress = Math.min(1f, (float) elapsed / durationMs);
-
-                // Ease-out calculation for smooth deceleration
-                float ease = 1f - (1f - progress) * (1f - progress);
-                
-                int currentY = startY - (int) (floatDistance * ease);
-                floatingLabel.setLocation(pt.x, currentY);
-
-                // Fade out starting at 40% progress
-                if (progress > 0.4f) {
-                    float fadeProgress = (progress - 0.4f) / 0.6f;
-                    alpha[0] = Math.max(0f, 1f - fadeProgress);
-                    floatingLabel.repaint();
-                }
-
-                if (progress >= 1f) {
-                    timer.stop();
-                    layeredPane.remove(floatingLabel);
-                    layeredPane.repaint();
-                }
-            });
-            timer.start();
-        }
-    }
-
-// --- START FIX ---
-    /**
-     * Calculates the bounding box of an entire company row by unioning 
-     * its name caption and right-most data columns.
-     */
     private Rectangle getCompanyRowBounds(PublicCompany c) {
-        int i = c.getPublicNumber();
-        if (compNameCaption == null || i >= compNameCaption.length || compNameCaption[i] == null) return null;
-        
-        Rectangle r = compNameCaption[i].getBounds();
-        // Union with the last visible column to get the full row width
-        if (compTokens != null && i < compTokens.length && compTokens[i] != null) {
-            r = r.union(compTokens[i].getBounds());
-        }
-        return r;
-    }
 
-    private void checkForRowRearrangement() {
-        Map<String, Point> startPoints = new HashMap<>();
-        Map<String, Point> endPoints = new HashMap<>();
-        Map<String, java.awt.image.BufferedImage> snapshots = new HashMap<>();
+        if (c == null || !companyCertRow.containsKey(c))
+            return null;
+        int y = companyCertRow.get(c);
 
-        JLayeredPane lp = parentFrame.getLayeredPane();
-
-        for (PublicCompany c : companies) {
-            if (c.isClosed()) continue;
-            String id = c.getId();
-            Rectangle currentBounds = getCompanyRowBounds(c);
-            
-            if (currentBounds != null && lastCompanyRowBounds.containsKey(id)) {
-                Rectangle oldBounds = lastCompanyRowBounds.get(id);
-                
-                // Only animate if the Y position actually changed
-                if (oldBounds.y != currentBounds.y) {
-                    Point start = SwingUtilities.convertPoint(this, oldBounds.getLocation(), lp);
-                    Point end = SwingUtilities.convertPoint(this, currentBounds.getLocation(), lp);
-                    
-                    startPoints.put(id, start);
-                    endPoints.put(id, end);
-                    
-                    // Capture row image
-                    java.awt.image.BufferedImage img = new java.awt.image.BufferedImage(
-                        currentBounds.width, currentBounds.height, java.awt.image.BufferedImage.TYPE_INT_ARGB);
-                    Graphics2D g2 = img.createGraphics();
-                    
-                    // Shift graphics to capture the specific row area
-                    g2.translate(-currentBounds.x, -currentBounds.y);
-                    this.paint(g2); 
-                    g2.dispose();
-                    snapshots.put(id, img);
-                    
-                    // Temporarily hide the real row components so they don't "ghost" behind the animation
-                    setRowVisible(c, false);
+        Rectangle bounds = null;
+        // Iterate through all tracked grid cells to guarantee the absolute full width
+        // is captured
+        if (fields != null) {
+            for (int x = 0; x < fields.length; x++) {
+                if (fields[x] != null && y < fields[x].length) {
+                    JComponent comp = fields[x][y];
+                    if (comp != null && comp.isVisible()) {
+                        if (bounds == null) {
+                            bounds = new Rectangle(comp.getBounds());
+                        } else {
+                            bounds = bounds.union(comp.getBounds());
+                        }
+                    }
                 }
             }
         }
-
-        if (!startPoints.isEmpty()) {
-            new RowRearrangeAnimator(parentFrame, snapshots, startPoints, endPoints, triggerCompanyId).start(() -> {
-                for (PublicCompany c : companies) setRowVisible(c, true);
-                repaint();
-            });
-        }
-        lastCompanyRowBounds.clear();
+        return bounds;
     }
 
-    private void setRowVisible(PublicCompany c, boolean visible) {
-        int i = c.getPublicNumber();
-        if (compNameCaption[i] != null) compNameCaption[i].setVisible(visible);
-        if (compTrainsButtonPanel[i] != null) compTrainsButtonPanel[i].setVisible(visible);
-        if (compCash[i] != null) compCash[i].setVisible(visible);
-        if (compRevenue[i] != null) compRevenue[i].setVisible(visible);
-        if (compRetained[i] != null) compRetained[i].setVisible(visible);
-        if (compTokens[i] != null) compTokens[i].setVisible(visible);
-        if (poolPanels[i] != null) poolPanels[i].setVisible(visible);
-        if (ipoPanels[i] != null) ipoPanels[i].setVisible(visible);
-        for (int j = 0; j < np; j++) {
-            if (playerSharePanels[i][j] != null) playerSharePanels[i][j].setVisible(visible);
-        }
-    }
-
-    private static class RowRearrangeAnimator {
+    private class RowRearrangeAnimator {
         private final JFrame frame;
+        // --- START FIX ---
+        private final java.awt.image.BufferedImage masterBackdrop;
         private final Map<String, java.awt.image.BufferedImage> images;
-        private final Map<String, Point> starts;
-        private final Map<String, Point> ends;
-        private final String triggerId;
-        private final int duration = 1000;
+        private final Map<String, Rectangle> startBounds;
+        private final Map<String, Rectangle> endBounds;
+        private final String primaryMoverId;
+        private final int durationMs = 600;
 
-        public RowRearrangeAnimator(JFrame frame, Map<String, java.awt.image.BufferedImage> images, 
-                                   Map<String, Point> starts, Map<String, Point> ends, String triggerId) {
+        public RowRearrangeAnimator(JFrame frame, java.awt.image.BufferedImage masterBackdrop,
+                Map<String, java.awt.image.BufferedImage> images,
+                Map<String, Rectangle> startBounds, Map<String, Rectangle> endBounds,
+                String primaryMoverId) {
             this.frame = frame;
+            this.masterBackdrop = masterBackdrop;
             this.images = images;
-            this.starts = starts;
-            this.ends = ends;
-            this.triggerId = triggerId;
+            this.startBounds = startBounds;
+            this.endBounds = endBounds;
+            this.primaryMoverId = primaryMoverId;
         }
 
         public void start(Runnable onComplete) {
             JLayeredPane lp = frame.getLayeredPane();
-            Map<String, Point> currents = new HashMap<>(starts);
+            Point gsOffset = SwingUtilities.convertPoint(GameStatus.this, 0, 0, lp);
 
-            JComponent glass = new JComponent() {
+            Map<String, Point> starts = new HashMap<>();
+            Map<String, Point> ends = new HashMap<>();
+            List<String> movingIds = new ArrayList<>();
+
+            for (String id : images.keySet()) {
+                Rectangle s = startBounds.get(id);
+                Rectangle e = endBounds.get(id);
+
+                if (s != null && e != null && s.y != e.y) {
+                    movingIds.add(id);
+                    starts.put(id, SwingUtilities.convertPoint(GameStatus.this, s.getLocation(), lp));
+                    ends.put(id, SwingUtilities.convertPoint(GameStatus.this, e.getLocation(), lp));
+                }
+            }
+
+            class AnimationLayer extends JComponent {
+                public float progress = 0f;
+
                 @Override
                 protected void paintComponent(Graphics g) {
                     Graphics2D g2 = (Graphics2D) g.create();
-                    for (String id : images.keySet()) {
-                        Point p = currents.get(id);
-                        java.awt.image.BufferedImage img = images.get(id);
-                        
-                        if (id.equals(triggerId)) {
-                            // Highlight Trigger: Add a golden glow/border
-                            g2.setColor(new Color(255, 215, 0, 150));
-                            g2.fillRect(p.x - 2, p.y - 2, img.getWidth() + 4, img.getHeight() + 4);
+
+                    // 1. The Curtain: Block out the real UI completely to stop native components
+                    // from bleeding through
+                    g2.setColor(GameStatus.this.getParent() != null ? GameStatus.this.getParent().getBackground()
+                            : new Color(238, 238, 238));
+                    g2.fillRect(gsOffset.x, gsOffset.y, GameStatus.this.getWidth(), GameStatus.this.getHeight());
+
+                    // 2. Draw the 100% static, pristine old layout
+                    g2.drawImage(masterBackdrop, gsOffset.x, gsOffset.y, null);
+
+                    // 3. Erase the slots where moving companies used to be
+                    for (String id : movingIds) {
+                        Rectangle s = startBounds.get(id);
+                        if (s != null) {
+                            g2.fillRect(gsOffset.x + s.x, gsOffset.y + s.y, s.width, s.height);
                         }
-                        g2.drawImage(img, p.x, p.y, null);
+                    }
+
+                    float ease = progress < 0.5f ? 2 * progress * progress : -1 + (4 - 2 * progress) * progress;
+
+                    // 4. Draw Displaced Companies underneath
+                    for (String id : movingIds) {
+                        if (id.equals(primaryMoverId))
+                            continue;
+                        Point s = starts.get(id);
+                        Point e = ends.get(id);
+                        if (s == null || e == null)
+                            continue;
+
+                        int curX = (int) Math.round(s.x + (e.x - s.x) * ease);
+                        int curY = (int) Math.round(s.y + (e.y - s.y) * ease);
+                        g2.drawImage(images.get(id), curX, curY, null);
+                    }
+
+                    // 5. Draw Primary Mover explicitly on top
+                    if (primaryMoverId != null && movingIds.contains(primaryMoverId)
+                            && images.containsKey(primaryMoverId)) {
+                        g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+                        g2.setRenderingHint(RenderingHints.KEY_INTERPOLATION,
+                                RenderingHints.VALUE_INTERPOLATION_BILINEAR);
+
+                        Point s = starts.get(primaryMoverId);
+                        Point e = ends.get(primaryMoverId);
+                        if (s != null && e != null) {
+                            int curX = (int) Math.round(s.x + (e.x - s.x) * ease);
+                            int curY = (int) Math.round(s.y + (e.y - s.y) * ease);
+                            java.awt.image.BufferedImage img = images.get(primaryMoverId);
+
+                            double scale = 1.0 + (0.03 * Math.sin(progress * Math.PI));
+                            int newW = (int) Math.round(img.getWidth() * scale);
+                            int newH = (int) Math.round(img.getHeight() * scale);
+                            int offX = curX - (newW - img.getWidth()) / 2;
+                            int offY = curY - (newH - img.getHeight()) / 2;
+
+                            g2.setColor(new Color(0, 0, 0, 60));
+                            g2.fillRoundRect(offX + 3, offY + 3, newW, newH, 8, 8);
+
+                            g2.drawImage(img, offX, offY, newW, newH, null);
+
+                            g2.setColor(new Color(255, 215, 0, (int) (200 * Math.sin(progress * Math.PI))));
+                            g2.setStroke(new BasicStroke(2f));
+                            g2.drawRect(offX, offY, newW, newH);
+                        }
                     }
                     g2.dispose();
                 }
-            };
+            }
 
-            glass.setBounds(0, 0, lp.getWidth(), lp.getHeight());
-            lp.add(glass, JLayeredPane.DRAG_LAYER);
+            AnimationLayer layer = new AnimationLayer();
+            layer.setBounds(0, 0, lp.getWidth(), lp.getHeight());
+            lp.add(layer, JLayeredPane.DRAG_LAYER);
 
             long startTime = System.currentTimeMillis();
             javax.swing.Timer timer = new javax.swing.Timer(16, null);
             timer.addActionListener(e -> {
-                float progress = Math.min(1f, (float) (System.currentTimeMillis() - startTime) / duration);
-                // Sinusoidal ease-in-out for organic movement
-                float ease = (float) (0.5 * (1.0 - Math.cos(progress * Math.PI)));
+                float p = Math.min(1f, (float) (System.currentTimeMillis() - startTime) / durationMs);
+                layer.progress = p;
+                layer.repaint();
 
-                for (String id : images.keySet()) {
-                    Point s = starts.get(id);
-                    Point f = ends.get(id);
-                    currents.get(id).x = (int) (s.x + (f.x - s.x) * ease);
-                    currents.get(id).y = (int) (s.y + (f.y - s.y) * ease);
-                }
-                glass.repaint();
-
-                if (progress >= 1f) {
+                if (p >= 1f) {
                     timer.stop();
-                    lp.remove(glass);
+                    lp.remove(layer);
                     lp.repaint();
-                    onComplete.run();
+                    if (onComplete != null)
+                        onComplete.run();
                 }
             });
             timer.start();
         }
     }
-// --- END FIX ---
+
+    private void triggerMoneySpinner(JComponent target, int oldVal, int newVal) {
+        if (parentFrame == null || !target.isShowing() || oldVal == newVal)
+            return;
+        new MoneySpinnerAnimator(parentFrame, target, oldVal, newVal).start();
+    }
+
+    private class MoneySpinnerAnimator {
+        private final JFrame frame;
+        private final JComponent target;
+        private final int startVal;
+        private final int endVal;
+        private final int delta;
+        private final int durationMs = 1200;
+        private float progress = 0f;
+
+        public MoneySpinnerAnimator(JFrame frame, JComponent target, int startVal, int endVal) {
+            this.frame = frame;
+            this.target = target;
+            this.startVal = startVal;
+            this.endVal = endVal;
+            this.delta = endVal - startVal;
+        }
+
+        public void start() {
+            JLayeredPane lp = frame.getLayeredPane();
+            Point pt = SwingUtilities.convertPoint(target.getParent(), target.getLocation(), lp);
+
+            java.awt.image.BufferedImage bgImage = new java.awt.image.BufferedImage(target.getWidth(),
+                    target.getHeight(), java.awt.image.BufferedImage.TYPE_INT_ARGB);
+            Graphics2D g2d = bgImage.createGraphics();
+            target.paint(g2d);
+            g2d.dispose();
+
+            Color origFg = target.getForeground();
+            target.setForeground(new Color(0, 0, 0, 0));
+
+            JComponent animLayer = new JComponent() {
+                @Override
+                protected void paintComponent(Graphics g) {
+                    Graphics2D g2 = (Graphics2D) g.create();
+                    g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+
+                    double scale = 1.0 + (0.15 * Math.sin(progress * Math.PI));
+                    int w = (int) (target.getWidth() * scale);
+                    int h = (int) (target.getHeight() * scale);
+                    int x = pt.x - (w - target.getWidth()) / 2;
+                    int y = pt.y - (h - target.getHeight()) / 2;
+
+                    g2.setColor(new Color(0, 0, 0, 50));
+                    g2.fillRoundRect(x + 4, y + 4, w, h, 6, 6);
+
+                    g2.drawImage(bgImage, x, y, w, h, null);
+
+                    int currentVal = (int) (startVal + delta * progress);
+                    String text = (currentVal < 0 ? "-$" : "$") + Math.abs(currentVal);
+                    g2.setFont(target.getFont().deriveFont(Font.BOLD, (float) (target.getFont().getSize() * scale)));
+
+                    g2.setColor(target.getBackground());
+                    g2.fillRect(x + 2, y + 2, w - 4, h - 4);
+
+                    g2.setColor(currentVal < 0 ? Color.RED : COLOR_CURRENCY);
+                    FontMetrics fm = g2.getFontMetrics();
+                    int tx = x + (w - fm.stringWidth(text)) / 2;
+                    if (target instanceof JLabel) {
+                        int align = ((JLabel) target).getHorizontalAlignment();
+                        if (align == SwingConstants.RIGHT || align == SwingConstants.TRAILING) {
+                            tx = x + w - fm.stringWidth(text) - (int) (5 * scale);
+                        } else if (align == SwingConstants.LEFT || align == SwingConstants.LEADING) {
+                            tx = x + (int) (5 * scale);
+                        }
+                    }
+                    int ty = y + (h - fm.getHeight()) / 2 + fm.getAscent();
+                    g2.drawString(text, tx, ty);
+
+                   int alpha = (int) (255 * (1 - progress));
+                    if (alpha < 0) alpha = 0;
+                    
+                    // Restore original bubble float parameters (slower, shorter distance)
+                    int bubbleY = (int) (y - (25 * progress));
+                    String bubbleText = (delta > 0 ? "+" : "") + delta;
+                    
+                    g2.setFont(new Font("SansSerif", Font.BOLD, 14));
+                    fm = g2.getFontMetrics();
+                    int bw = fm.stringWidth(bubbleText) + 16;
+                    int bh = fm.getHeight() + 8;
+                    int bx = x + (w - bw) / 2;
+
+                    // Restore the isolating solid background bubble
+                    g2.setColor(delta > 0 ? new Color(34, 139, 34, alpha) : new Color(220, 20, 60, alpha)); // Forest Green vs Crimson
+                    g2.fillRoundRect(bx, bubbleY, bw, bh, 10, 10);
+                    
+                    // Render high-contrast white text centered in the bubble
+                    g2.setColor(new Color(255, 255, 255, alpha));
+                    int textX = bx + (bw - fm.stringWidth(bubbleText)) / 2;
+                    int textY = bubbleY + fm.getAscent() + 4;
+                    g2.drawString(bubbleText, textX, textY);
+                    g2.dispose();
+                }
+            };
+
+            animLayer.setBounds(0, 0, lp.getWidth(), lp.getHeight());
+            lp.add(animLayer, JLayeredPane.DRAG_LAYER);
+
+            long startTime = System.currentTimeMillis();
+            javax.swing.Timer timer = new javax.swing.Timer(16, null);
+            timer.addActionListener(e -> {
+                float p = Math.min(1f, (float) (System.currentTimeMillis() - startTime) / durationMs);
+                progress = 1.0f - (1.0f - p) * (1.0f - p); // ease out
+                animLayer.repaint();
+
+                if (p >= 1f) {
+                    timer.stop();
+                    lp.remove(animLayer);
+                    target.setForeground(origFg);
+                    target.repaint();
+                    lp.repaint();
+                }
+            });
+            timer.start();
+        }
+    }
+
 }
