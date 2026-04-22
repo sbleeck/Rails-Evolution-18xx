@@ -16,16 +16,7 @@
 			<Certificate shares="1" number="8"/>
 		</Shares>
 
-<TileLays>
-			<Number colour="yellow" phase="1" number="2"/>
-			<Number colour="yellow" phase="2" number="2"/>
-			<Number colour="yellow" phase="3" number="2"/>
-			<Number colour="yellow" phase="4" number="2"/>
-			<Number colour="yellow" phase="5" number="2"/>
-			<Number colour="yellow" phase="6" number="2"/>
-			<Number colour="yellow" phase="7" number="2"/>
-			<Number colour="yellow" phase="8" number="2"/>
-		</TileLays>
+
 		
 		<BaseTokens>
 				<LayCost method="sequence" cost="0,40,100"/>

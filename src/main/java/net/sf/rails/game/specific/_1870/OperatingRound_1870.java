@@ -13,6 +13,7 @@ import net.sf.rails.game.PrivateCompany;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import net.sf.rails.game.Tile;
+import net.sf.rails.game.state.Owner;
 import rails.game.action.LayTile;
 import net.sf.rails.common.DisplayBuffer;
 
@@ -22,8 +23,7 @@ public class OperatingRound_1870 extends OperatingRound {
 
     public OperatingRound_1870(GameManager parent, String id) {
         super(parent, id);
-        System.out.println(">>> DEBUG: OperatingRound_1870 CONSTRUCTOR CALLED!");
-    }
+log.error(">>> DEBUG: OperatingRound_1870 CONSTRUCTOR CALLED!");    }
 
     @Override
     public boolean checkAndGenerateDiscardActions(PublicCompany company) {
@@ -61,14 +61,20 @@ public class OperatingRound_1870 extends OperatingRound {
     }
 
     @Override
-    public boolean layTile(LayTile action) {
+public boolean layTile(LayTile action) {
+// --- START FIX ---
+        log.info(">>> DEBUG: layTile intercepted in 1870 class. Hex: {}", 
+                 (action.getChosenHex() != null ? action.getChosenHex().getId() : "null"));
+
         Tile tile = action.getLaidTile();
         MapHex hex = action.getChosenHex();
         int orientation = action.getOrientation();
 
-        System.out.println(">>> DEBUG: layTile intercepted in 1870. Hex=" + 
-                 (hex != null ? hex.getId() : "null") + ", Tile=" + 
-                 (tile != null ? tile.toText() : "null") + ", Orientation=" + orientation);
+
+        log.info(">>> DEBUG: layTile intercepted in 1870. Hex={}, Tile={}, Orientation={}", 
+                 (hex != null ? hex.getId() : "null"), 
+                 (tile != null ? tile.toText() : "null"), 
+                 orientation);
 
         if (tile != null && hex != null) {
             String hexId = hex.getId();
@@ -78,7 +84,7 @@ public class OperatingRound_1870 extends OperatingRound {
             if ("A16".equals(hexId)) {
                 List<String> allowedMemphis = Arrays.asList("5", "6", "57", "15");
                 if (!allowedMemphis.contains(tileName)) {
-                    System.out.println(">>> DEBUG: Blocked by Memphis exception");
+                    log.warn(">>> DEBUG: Blocked by Memphis exception");
                     DisplayBuffer.add(this, "In Memphis (A16), only tiles 5, 6, 57, or 15 are permitted.");
                     return false;
                 }
@@ -87,7 +93,7 @@ public class OperatingRound_1870 extends OperatingRound {
             // 2. St. Louis (E18) Exception
             if ("E18".equals(hexId)) {
                 if (!"5".equals(tileName)) {
-                    System.out.println(">>> DEBUG: Blocked by St. Louis exception");
+                    log.warn(">>> DEBUG: Blocked by St. Louis exception");
                     DisplayBuffer.add(this, "In St. Louis (E18), only tile 5 is permitted.");
                     return false;
                 }
@@ -95,13 +101,31 @@ public class OperatingRound_1870 extends OperatingRound {
 
             // 3. Mississippi River Crossing Block
             PrivateCompany bridge = getRoot().getCompanyManager().getPrivateCompany("Brdg");
-            boolean bridgeBlocks = bridge != null && !bridge.isClosed() && bridge.getOwner() != action.getCompany();
-
-            System.out.println(">>> DEBUG: Bridge blocks? (Not owned/closed): " + bridgeBlocks);
             
+            if (bridge == null) {
+                log.error(">>> ERROR: Bridge company 'Brdg' NOT FOUND in registry. Check XML loading.");
+            }
+
+
+            Owner bridgeOwner = bridge != null ? bridge.getOwner() : null;
+            PublicCompany opCompany = action.getCompany();
+            
+            // Bridge blocks if it's NOT owned by the active company AND NOT owned by the company's president
+            boolean bridgeBlocks = bridge != null && !bridge.isClosed() 
+                                && bridgeOwner != opCompany 
+                                && bridgeOwner != opCompany.getPresident();
+
+
+log.info(">>> DEBUG: Bridge ID found: {}, Status: Blocks={}, Closed={}, Owner={}", 
+                     (bridge != null), bridgeBlocks, 
+                     (bridge != null && bridge.isClosed()), 
+                     (bridgeOwner != null ? bridgeOwner.toString() : "None"));
+
+
             if (bridgeBlocks) {
+                log.info(">>> DEBUG: Calling MississippiRiverValidator for hex {}", hexId);
                 boolean crossing = MississippiRiverValidator.isCrossingRiver(tile, hex, orientation);
-                System.out.println(">>> DEBUG: isCrossingRiver returned: " + crossing);
+                log.info(">>> DEBUG: isCrossingRiver returned: {}", crossing);
                 if (crossing) {
                     DisplayBuffer.add(this, "Cannot bridge the Mississippi River without owning the Bridge Company.");
                     return false;
@@ -109,8 +133,22 @@ public class OperatingRound_1870 extends OperatingRound {
             }
         }
         
-        System.out.println(">>> DEBUG: Passing layTile down to superclass");
+log.error(">>> DEBUG: Passing layTile down to superclass");
+// --- END FIX ---
         return super.layTile(action);
+    }
+
+    @Override
+    protected void initNormalTileLays() {
+        // 1. Let the engine load the defaults from XML (usually 1 per available color)
+        super.initNormalTileLays();
+        
+        // 2. 1870 Rules: A company may lay up to TWO yellow tiles per turn, 
+        // OR upgrade exactly ONE tile. We overwrite the yellow limit to 2.
+        if (tileLaysPerColour.containsKey("yellow")) {
+            tileLaysPerColour.put("yellow", 2);
+            log.info(">>> DEBUG: 1870 rule applied - Yellow tile lays increased to 2.");
+        }
     }
 
 }

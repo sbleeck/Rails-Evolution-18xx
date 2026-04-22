@@ -42,6 +42,8 @@ public class GameManager_1870 extends GameManager {
         ReportBuffer.add(spr, company.getId() + " President may protect the share price.");
     }
 
+
+    
     @Override
     public void nextRound(Round round) {
         // Check if the round that just finished was our custom Share Protection round

@@ -98,6 +98,9 @@ public class GameManager extends RailsManager implements Configurable, Owner {
     }
 
     public GameUIManager getGameUIManager() {
+        if (this.gameUIManager == null) {
+            this.gameUIManager = OpenGamesManager.getInstance().getGame(getRoot().getId());
+        }
         return this.gameUIManager;
     }
 
@@ -2086,8 +2089,8 @@ return 0;
             }
 
             // Automatically persist UI window states during the recovery autosave cycle
-            if (gameUIManager != null) {
-                gameUIManager.saveWindowSettings(getGameName());
+            if (getGameUIManager() != null) {
+                getGameUIManager().saveWindowSettings(getGameName());
             }
 
             recoverySaveWarning = false;
@@ -2108,8 +2111,8 @@ return 0;
 
             // Save UI Window Positions & Scale
             // Save UI Window Positions & Scale, passing the Game Name
-            if (gameUIManager != null) {
-                gameUIManager.saveWindowSettings(getGameName());
+            if (getGameUIManager() != null) {
+                getGameUIManager().saveWindowSettings(getGameName());
             }
 
         } catch (IOException e) {

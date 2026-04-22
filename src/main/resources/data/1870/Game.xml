@@ -1,6 +1,6 @@
 <?xml version="1.0"?>
 <ComponentManager>
-	<Component name="GameManager" class="net.sf.rails.game.GameManager">
+	<Component name="GameManager" class="net.sf.rails.game.specific._1870.GameManager_1870">
 		<Game name="1870"/>
 		<GameParameters>
 			<PlayerShareLimit percentage="60">
@@ -10,7 +10,7 @@
 			<StockRound>
 				<NoSaleInFirstSR/>
 			</StockRound>
-            <OperatingRound>
+			<OperatingRound class="net.sf.rails.game.specific._1870.OperatingRound_1870">
                 <EmergencyTrainBuying mustBuyCheapestTrain="yes" mayBuyFromCompany="no"/>
             </OperatingRound>
 		</GameParameters>
@@ -69,7 +69,7 @@
 		<Phase name="2" realName="1">
 
 <Tiles colour="yellow">
-<Lays companyType="Public" colour="yellow" number="2"/>
+
 </Tiles>
 			<OperatingRounds number="1"/>
 			<Trains tradingAllowed="yes"/>

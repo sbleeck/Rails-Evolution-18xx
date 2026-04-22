@@ -325,4 +325,6 @@ processResources {
         versionFile.text = "buildTimestamp=" + buildTime
         println "Generated version.properties with timestamp: " + buildTime
     }
+
+
 }
