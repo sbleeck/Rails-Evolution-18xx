@@ -191,6 +191,10 @@ public class GameStatus extends GridPanel {
     // Track previous times to detect jumps (penalties/undo)
     private int[] lastPlayerTimes;
 
+    private int[] lastCompCash;
+    private int[] lastPlayerCash;
+    private Integer lastBankCash = null;
+
     protected ClickField poolTrainsButton;
     protected javax.swing.JLabel gameTimeLabel;
     protected javax.swing.Timer uiRefreshTimer;
@@ -3667,6 +3671,36 @@ public class GameStatus extends GridPanel {
             }
         }
         repaint();
+
+        SwingUtilities.invokeLater(() -> {
+            if (parentFrame == null || !parentFrame.isVisible()) return;
+
+            for (int i = 0; i < nc; i++) {
+                if (companies[i] == null || compCash[i] == null || !compCash[i].isVisible()) continue;
+                int currentCash = companies[i].getPurseMoneyModel().value();
+                if (lastCompCash != null && i < lastCompCash.length && lastCompCash[i] != currentCash) {
+                    OverlaySpinnerAnimator.animate(parentFrame, compCash[i], lastCompCash[i], currentCash);
+                    lastCompCash[i] = currentCash;
+                }
+            }
+            for (int i = 0; i < np; i++) {
+                Player p = players.getPlayerByPosition(i);
+                if (p == null || playerCash[i] == null || !playerCash[i].isVisible()) continue;
+                int currentCash = p.getWallet().value();
+                if (lastPlayerCash != null && i < lastPlayerCash.length && lastPlayerCash[i] != currentCash) {
+                    OverlaySpinnerAnimator.animate(parentFrame, playerCash[i], lastPlayerCash[i], currentCash);
+                    lastPlayerCash[i] = currentCash;
+                }
+            }
+            
+            if (bankCash != null && bankCash.isVisible() && bank != null && bank.getPurse() != null) {
+                int currentBankCash = bank.getPurse().value();
+                if (lastBankCash != null && lastBankCash != currentBankCash) {
+                    OverlaySpinnerAnimator.animate(parentFrame, bankCash, lastBankCash, currentBankCash);
+                }
+                lastBankCash = currentBankCash;
+            }
+        });
     }
 
     protected String formatShareText(int percentage, PublicCompany c, boolean isPresident) {
@@ -4253,6 +4287,27 @@ public class GameStatus extends GridPanel {
             np = players.getNumberOfPlayers();
             companies = gameUIManager.getAllPublicCompanies().toArray(new PublicCompany[0]);
             nc = companies.length;
+        }
+
+        if (lastCompCash == null || lastCompCash.length != nc) {
+            lastCompCash = new int[nc];
+            for (int i = 0; i < nc; i++) {
+                if (companies[i] != null && companies[i].getPurseMoneyModel() != null) {
+                    lastCompCash[i] = companies[i].getPurseMoneyModel().value();
+                }
+            }
+        }
+        if (lastPlayerCash == null || lastPlayerCash.length != np) {
+            lastPlayerCash = new int[np];
+            for (int i = 0; i < np; i++) {
+                Player p = players.getPlayerByPosition(i);
+                if (p != null && p.getWallet() != null) {
+                    lastPlayerCash[i] = p.getWallet().value();
+                }
+            }
+        }
+        if (lastBankCash == null && bank != null && bank.getPurse() != null) {
+            lastBankCash = bank.getPurse().value();
         }
 
         PublicCompany operatingComp = null;
@@ -5665,7 +5720,7 @@ public class GameStatus extends GridPanel {
     /**
      * Handles asynchronous GlassPane animations for RailCards.
      */
-    private static class FlightAnimator {
+    private static class FlightAnimator {   
         private final JFrame parentFrame;
         private final JComponent source;
         private final JComponent destination;
@@ -5733,6 +5788,91 @@ public class GameStatus extends GridPanel {
                     if (onComplete != null) {
                         onComplete.run();
                     }
+                }
+            });
+            timer.start();
+        }
+    }
+
+    private static class OverlaySpinnerAnimator {
+        public static void animate(JFrame parentFrame, JComponent target, int startVal, int endVal) {
+            if (parentFrame == null || target == null || startVal == endVal || target.getWidth() == 0 || target.getHeight() == 0) return;
+
+            JLayeredPane layeredPane = parentFrame.getLayeredPane();
+            Point pt = SwingUtilities.convertPoint(target.getParent(), target.getLocation(), layeredPane);
+
+            int delta = endVal - startVal;
+            boolean isPositive = delta > 0;
+            
+            String targetText = "";
+            if (target instanceof JLabel) {
+                targetText = ((JLabel) target).getText();
+            }
+            String currencyPrefix = (targetText != null && !targetText.isEmpty() && !Character.isDigit(targetText.charAt(0)) && targetText.charAt(0) != '-') 
+                ? targetText.substring(0, 1) : "";
+
+            String deltaText = (isPositive ? "+" : "-") + currencyPrefix + Math.abs(delta);
+
+            Color textColor = isPositive ? new Color(34, 139, 34) : new Color(220, 20, 60); // Forest Green vs Crimson
+            
+            float[] alpha = new float[] { 1.0f };
+
+            JLabel floatingLabel = new JLabel(deltaText) {
+                @Override
+                public void paint(Graphics g) {
+                    Graphics2D g2 = (Graphics2D) g.create();
+                    g2.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, alpha[0]));
+                    super.paint(g2);
+                    g2.dispose();
+                }
+            };
+            
+            if (target instanceof JLabel) {
+                floatingLabel.setHorizontalAlignment(((JLabel) target).getHorizontalAlignment());
+            } else {
+                floatingLabel.setHorizontalAlignment(SwingConstants.CENTER);
+            }
+
+            // Bold font, slightly larger
+            Font baseFont = target.getFont();
+            floatingLabel.setFont(baseFont.deriveFont(Font.BOLD, baseFont.getSize() + 2f));
+            floatingLabel.setForeground(textColor);
+            
+            // Start it at the target bounds
+            floatingLabel.setBounds(pt.x, pt.y, target.getWidth(), target.getHeight());
+
+            layeredPane.add(floatingLabel, JLayeredPane.DRAG_LAYER); // Keep it well above everything
+
+            int durationMs = 1200; // 1.2 seconds to float
+            int frames = 40;
+            int delay = durationMs / frames;
+            int startY = pt.y;
+            int floatDistance = 25;
+
+            javax.swing.Timer timer = new javax.swing.Timer(delay, null);
+            long startTime = System.currentTimeMillis();
+
+            timer.addActionListener(e -> {
+                long elapsed = System.currentTimeMillis() - startTime;
+                float progress = Math.min(1f, (float) elapsed / durationMs);
+
+                // Ease-out calculation for smooth deceleration
+                float ease = 1f - (1f - progress) * (1f - progress);
+                
+                int currentY = startY - (int) (floatDistance * ease);
+                floatingLabel.setLocation(pt.x, currentY);
+
+                // Fade out starting at 40% progress
+                if (progress > 0.4f) {
+                    float fadeProgress = (progress - 0.4f) / 0.6f;
+                    alpha[0] = Math.max(0f, 1f - fadeProgress);
+                    floatingLabel.repaint();
+                }
+
+                if (progress >= 1f) {
+                    timer.stop();
+                    layeredPane.remove(floatingLabel);
+                    layeredPane.repaint();
                 }
             });
             timer.start();
