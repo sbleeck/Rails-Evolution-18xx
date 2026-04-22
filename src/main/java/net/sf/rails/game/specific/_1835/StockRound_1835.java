@@ -199,8 +199,8 @@ public class StockRound_1835 extends StockRound {
     public boolean mayPlayerSellShareOfCompany(PublicCompany company) {
 
 // 1835 Rule: Cannot sell if not floated (except Prussian) [cite: 468, 470]
-        if (!company.hasFloated() && !company.getId().equals("PR")) {
-            return false;
+if (!company.hasFloated()) {
+                return false;
         }
 
         // 1835 Rule: Cannot sell if floated in the CURRENT share round 
