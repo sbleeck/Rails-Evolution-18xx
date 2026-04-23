@@ -96,7 +96,10 @@
         <Players min="3" max="5"/>
     </Game>
 
-    <Game name="1826">
+
+
+<!-- fully tested 100% functinoal -->
+    <Game name="1826"> 
         <Description><![CDATA[<html>
             <h3 style="margin-top:0;">1826 - Railroading in France and Belgium</h3>
             <b>Designer:</b> David G.D. Hecht (1996, 2000)<br><br>
@@ -110,6 +113,7 @@
         </html>]]></Description>
         <Players min="2" max="6"/>
     </Game>
+
 
     <Game name="1851">
         <Description><![CDATA[<html>
@@ -137,7 +141,8 @@
     </Game>
 
     <Game name="1862">
-        <Note>Under construction.</Note>
+            <Note>Under construction.</Note>
+
         <Description><![CDATA[<html>
             <h3 style="margin-top:0;">1862</h3>
             <i>Prototype phase. Core mechanics pending implementation.</i>
@@ -178,7 +183,6 @@
     </Game>
 
     <Game name="18AL">
-        <Note>Under construction.</Note>
         <Description><![CDATA[<html>
             <h3 style="margin-top:0;">18AL - The Railroads come to Alabama</h3>
             <b>Designer:</b> Mark Derrick (2000, 2004)<br><br>
@@ -190,7 +194,6 @@
     </Game>
 
     <Game name="18EU">
-        <Note>Under construction.</Note>
         <Description><![CDATA[<html>
             <h3 style="margin-top:0;">18EU - A century of railroading in Europe</h3>
             <b>Designer:</b> David G.D. Hecht (1997-2004)<br>
@@ -204,8 +207,9 @@
         <Players min="2" max="6"/>
     </Game>
 
+
+<!-- fully tested 100% functinoal -->
     <Game name="18GA">
-        <Note>Under construction.</Note>
         <Description><![CDATA[<html>
             <h3 style="margin-top:0;">18GA - The Railroads Come to Georgia</h3>
             <b>Designers:</b> Mark Derrick and John David Galt (2000, 2007)
@@ -214,17 +218,30 @@
     </Game>
 
     <Game name="18Kaas">
-        <Note>Under construction.</Note>
         <Description><![CDATA[<html>
             <h3 style="margin-top:0;">18Kaas (Netherlands)</h3>
             <b>Publisher:</b> ERJO GAMES (1992)<br><br>
             <i>Utilizes the same core restrictions as 1830.</i>
+            still to do:
+            here is a new map and three new tiles:
+The green Bt tile 52 and the brown B+ tile 61 may b y placed o n G 9 only.
+The brown U (Utrecht)-tile 72 may b e placed o n T13 only. Tile 6 3 may not be
+placed on I13.
+Bremen/Hannover (C21 and G21), Engeland (J4 and L.2), and Ruhrgebied (J18 and K19)
+belong t o foreign countries.
+The Ruhrgebied (J18 and K19) has no value by itself, instead it doubles the value of all
+other towns on the route, and it counts as town. Alternate rule: Ruhrgebied (J18 and
+K19) has n o value by itself, instead it inercases the value of all other towns o n the route
+by 20/30, and it counts as town.
+You may not build on G13 (the hex cast of NY) until the green phase.
+Disregard the yellow in F14 (the yellow bordered hex with the small town i n it).
+The yellow preprinted NY-tile on Gll i s different from the NY-tile in 1830 and can be
+upgraded i n two different ways.
         </html>]]></Description>
         <Players min="3" max="6"/>
     </Game>
 
     <Game name="18Lummer">
-        <Note>Under construction.</Note>
         <Description><![CDATA[<html>
             <h3 style="margin-top:0;">18Lummer - Lummerland</h3>
             <b>Designer:</b> Kay-Viktor Stegemann<br><br>
@@ -238,7 +255,6 @@
     </Game>
 
     <Game name="18NL">
-        <Note>Under construction.</Note>
         <Description><![CDATA[<html>
             <h3 style="margin-top:0;">18NL - Niederland (Netherlands)</h3>
             <b>Designer:</b> Helmut Ohley (1999)<br><br>
@@ -248,7 +264,6 @@
     </Game>
 
     <Game name="18Scan">
-        <Note>Under construction.</Note>
         <Description><![CDATA[<html>
             <h3 style="margin-top:0;">18Scan - Railroading under the Northern Lights</h3>
             <b>Designer:</b> David G.D. Hecht (2004-2005)<br>
@@ -263,7 +278,6 @@
     </Game>
 
     <Game name="18TN">
-        <Note>Under construction.</Note>
         <Description><![CDATA[<html>
             <h3 style="margin-top:0;">18TN - The Railroads Come to Tennessee</h3>
             <b>Designer:</b> Mark Derrick (1996, 2006)<br>
@@ -273,7 +287,6 @@
     </Game>
 
     <Game name="18VA">
-        <Note>Under construction.</Note>
         <Description><![CDATA[<html>
             <h3 style="margin-top:0;">18VA</h3>
             <i>Prototype phase. Core mechanics pending implementation.</i>
@@ -282,7 +295,6 @@
     </Game>
 
     <Game name="SOH">
-        <Note>Under construction.</Note>
         <Description><![CDATA[<html>
             <h3 style="margin-top:0;">Steam over Holland</h3>
             <b>Designer:</b> Bart van Dijk (2007)<br>

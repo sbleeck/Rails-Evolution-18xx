@@ -56,6 +56,11 @@ import net.sf.rails.algorithms.NetworkGraph;
 import net.sf.rails.algorithms.RevenueAdapter;
 import net.sf.rails.game.RailsRoot;
 
+import java.io.File;
+import java.io.InputStream;
+import java.nio.file.Files;
+import java.nio.file.StandardCopyOption;
+
 /**
  * This is the Window used for displaying nearly all of the rails.game status.
  * This is also from where the ORWindow and StartRoundWindow are triggered.
@@ -556,6 +561,48 @@ public class StatusWindow extends JFrame implements ActionListener, ActionPerfor
         helpMenu.add(hotkeysItem);
 
         menuBar.add(helpMenu);
+
+        JMenuItem rulesItem = new JMenuItem("Rules");
+        rulesItem.addActionListener(e -> {
+            // Retrieve the specific game name (e.g., "1835")
+            String gameName = gameUIManager.getGameManager().getGameName();
+            // Path relative to the classpath root
+            String resourcePath = "/rules/" + gameName + "/" + gameName + ".pdf";
+
+            try (java.io.InputStream pdfStream = getClass().getResourceAsStream(resourcePath)) {
+                if (pdfStream == null) {
+                    javax.swing.JOptionPane.showMessageDialog(this,
+                            "Rules PDF not found for " + gameName + ".\nExpected in resources at: " + resourcePath,
+                            "Missing Rules",
+                            javax.swing.JOptionPane.WARNING_MESSAGE);
+                    return;
+                }
+
+                // Create a temporary file so the system PDF viewer can access it
+                java.io.File tempFile = java.io.File.createTempFile(gameName + "_rules_", ".pdf");
+                tempFile.deleteOnExit();
+
+                // Copy stream to temp file
+                java.nio.file.Files.copy(pdfStream, tempFile.toPath(), java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+
+                // Open using the Desktop API
+                if (java.awt.Desktop.isDesktopSupported() && java.awt.Desktop.getDesktop().isSupported(java.awt.Desktop.Action.OPEN)) {
+                    java.awt.Desktop.getDesktop().open(tempFile);
+                } else {
+                    javax.swing.JOptionPane.showMessageDialog(this,
+                            "Opening PDFs is not supported on this system configuration.",
+                            "Error",
+                            javax.swing.JOptionPane.ERROR_MESSAGE);
+                }
+
+            } catch (Exception ex) {
+                javax.swing.JOptionPane.showMessageDialog(this,
+                        "An error occurred while opening the rules:\n" + ex.getMessage(),
+                        "Error",
+                        javax.swing.JOptionPane.ERROR_MESSAGE);
+            }
+        });
+        helpMenu.add(rulesItem);
 
         setJMenuBar(menuBar);
 

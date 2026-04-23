@@ -2426,17 +2426,22 @@ public class GameStatus extends GridPanel {
                     PossibleAction action = activePrivateActions.get(pc.getId());
                     // Attach the action to the card so clicking it works!
                     card.addPossibleAction(action);
-                    // The card will check its internal logic and paint itself Cyan
-                    // (COL_HIGHLIGHT_BG).
-                    card.setState(RailCard.State.HIGHLIGHTED);
 
-                    // Force the standard "Special Action" visual style (Cyan + Blue Border)
-                    card.setBackground(java.awt.Color.CYAN);
-                    card.setBorder(BorderFactory.createLineBorder(Color.BLUE, 3));
+                    if (action instanceof BuyPrivate) {
+                        card.setState(RailCard.State.ACTIONABLE);
+                        card.setBackground(BG_CARD_PASSIVE);
+                        card.setForeground(Color.BLACK);
+                        card.setBorder(BorderFactory.createLineBorder(BORDER_COL_BUY, BORDER_THICKNESS));
+                    } else {
+                        // The card will check its internal logic and paint itself Cyan
+                        // (COL_HIGHLIGHT_BG).
+                        card.setState(RailCard.State.HIGHLIGHTED);
 
-                    // if (action instanceof BuyPrivate) {
-                    //     card.setToolTipText("Click to Buy " + pc.getId());
-                    // }
+                        // Force the standard "Special Action" visual style (Blue + Blue Border)
+                        card.setBackground(new Color(30, 144, 255));
+                        card.setForeground(Color.WHITE);
+                        card.setBorder(BorderFactory.createLineBorder(Color.BLUE, 3));
+                    }
                 } else {
                     card.setBackground(BG_CARD_PASSIVE); // Standard Beige
                     card.setState(RailCard.State.PASSIVE);
