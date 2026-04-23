@@ -410,16 +410,15 @@ public class GameManager extends RailsManager implements Configurable, Owner {
         return this.timeMgmtUndoPenalty.value();
     }
 
-    
     /**
-* Exposes the transient penalty for UI rendering calculations.
-*/
-public int getPendingTimePenalty(String playerName) {
-if (pendingTimePenalties != null && pendingTimePenalties.containsKey(playerName)) {
-return pendingTimePenalties.get(playerName);
-}
-return 0;
-}
+     * Exposes the transient penalty for UI rendering calculations.
+     */
+    public int getPendingTimePenalty(String playerName) {
+        if (pendingTimePenalties != null && pendingTimePenalties.containsKey(playerName)) {
+            return pendingTimePenalties.get(playerName);
+        }
+        return 0;
+    }
 
     /**
      * Grants a time bonus to a player, ensuring it is only awarded once per
@@ -1062,9 +1061,13 @@ return 0;
             }
         }
         // Read the global restriction for train trading
-        if (GameOption.getAsBoolean(this, "RestrictTrainTradingToSameOwner")) {
+        String restrictOption = GameOption.getValue(this, "RestrictTrainTradingToSameOwner");
+        if (restrictOption != null) {
+            restrictTrainTradingToSameOwner = GameOption.OPTION_VALUE_YES.equalsIgnoreCase(restrictOption);
+            log.info("Game Option: Train Trading restricted to same-owner companies set to: " + restrictOption);
+        } else {
             restrictTrainTradingToSameOwner = true;
-            log.info("Game Option: Train Trading restricted to same-owner companies.");
+            log.info("NO OPTION!!! Game Option: Train Trading restricted to same-owner companies set to default: " + restrictTrainTradingToSameOwner);
         }
 
     }

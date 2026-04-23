@@ -219,6 +219,9 @@ public class GameSetupWindow extends JDialog {
         this.getContentPane().add(buttonPane, gc);
     }
 
+
+
+
 private GameInfo initGameList() {
         GameInfo selectedGame = null;
         
@@ -273,13 +276,44 @@ private GameInfo initGameList() {
         }
     }
 
-    // FIX: Re-added missing public method used by GameSetupController
+
+
+
+
     public void initOptions(GameInfo selectedGame) {
         // clear all previous options
         optionsPane.removeAll();
         optionComponents.clear();
 
         GameOptionsSet.Builder availableOptions = controller.getAvailableOptions(selectedGame);
+
+        // --- INJECT PROGRAMMATIC OPTION ---
+        if (availableOptions != null) {
+            boolean trainOptionExists = false;
+            boolean privateOptionExists = false;
+
+            for (GameOption opt : availableOptions.getOptions()) {
+                if ("RestrictTrainTradingToSameOwner".equals(opt.getName())) trainOptionExists = true;
+                if ("RestrictPrivateTradingToSameOwner".equals(opt.getName())) privateOptionExists = true;
+            }
+
+            if (!trainOptionExists) {
+                GameOption.Builder optBuilder = GameOption.builder("RestrictTrainTradingToSameOwner");
+                optBuilder.setType(GameOption.OPTION_TYPE_TOGGLE);
+                optBuilder.setDefaultValue(GameOption.OPTION_VALUE_YES);
+                optBuilder.setOrdering(998);
+                availableOptions.withOption(optBuilder.build());
+            }
+
+            if (!privateOptionExists) {
+                GameOption.Builder optBuilder = GameOption.builder("RestrictPrivateTradingToSameOwner");
+                optBuilder.setType(GameOption.OPTION_TYPE_TOGGLE);
+                optBuilder.setDefaultValue(GameOption.OPTION_VALUE_YES);
+                optBuilder.setOrdering(999);
+                availableOptions.withOption(optBuilder.build());
+            }
+        }
+
         if (availableOptions == null || availableOptions.getOptions().isEmpty()) {
             // no options available
             JLabel label = new JLabel(LocalText.getText("NoGameOptions"));
@@ -329,6 +363,12 @@ private GameInfo initGameList() {
             optionButton.setText(LocalText.getText("HIDE_OPTIONS"));
         }
     }
+
+
+
+
+
+
 
     // FIX: Re-added missing public method used by GameSetupController
     public void hideOptions() {

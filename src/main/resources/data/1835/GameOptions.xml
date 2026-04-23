@@ -2,5 +2,4 @@
 <GameOptions>
 	<GameOption name="Variant" values="Standard,Clemens,Snake" default="Clemens"/>
 	<GameOption name="RouteAlgorithm" values="Permissive,Semi-Restrictive,Restrictive" default="Permissive" />
-	<GameOption name="RestrictTrainTradingToPresident" type="toggle" default="yes"/>
 </GameOptions>

@@ -1228,6 +1228,12 @@ protected boolean processGameSpecificDiscard(DiscardTrain action, boolean moreDi
                 break;
             }
             player = (Player) owner;
+            boolean restrictPrivateTrade = GameOption.getAsBoolean(this, "RestrictPrivateTradingToSameOwner");
+            if (restrictPrivateTrade && player != operatingCompany.value().getPresident()) {
+                errMsg = "Private Trading restricted to same-owner only.";
+                break;
+            }
+            
             upperPrice = privateCompany.getUpperPrice();
             lowerPrice = privateCompany.getLowerPrice();
 
@@ -4506,6 +4512,11 @@ if (train != null) {
                     // Allow game-specific logic to restrict selling (e.g. must be President)
                     if (!maySellPrivate(player))
                         continue;
+
+                    boolean restrictPrivateTrade = GameOption.getAsBoolean(this, "RestrictPrivateTradingToSameOwner");
+                    if (restrictPrivateTrade && player != operatingCompany.value().getPresident()) {
+                        continue;
+                    }
 
                     for (PrivateCompany privComp : player.getPortfolioModel().getPrivateCompanies()) {
 
