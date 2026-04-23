@@ -6,7 +6,7 @@
         These games all have a railroad theme. They are collectively known as "18xx"<br>
         games due to the naming scheme used by many games in the genre.<br><br>
         <b>Contributors:</b><br>
-        Erik Vos, Stefan Frey, Freek Dijkstra, Scott Peterson, Adam Badura,<br>
+        Stefan Bleeck, Erik Vos, Stefan Frey, Freek Dijkstra, Scott Peterson, Adam Badura,<br>
         Phil Davies, Bill Rosgen, Martin Brumm, Chris Shaffer, Brett Lentz,<br>
         Jason Klappste, Marc Arndt.<br><br>
         <i>All rights reserved by the respective owners of the original games.</i><br>
@@ -38,7 +38,6 @@
     </Game>
 
     <Game name="1830">
-        <Note>Playable, needs full stress testing.</Note>
         <Description><![CDATA[<html>
             <h3 style="margin-top:0;">1830: The Game of Railroads and Robber Barons</h3>
             <b>Designer:</b> Francis Tresham and Bruce Shelley<br>
@@ -54,7 +53,6 @@
     </Game>
 
     <Game name="1837">
-        <Note>Playable, needs full stress testing.</Note>
         <Description><![CDATA[<html>
             <h3 style="margin-top:0;">1837 (Austria)</h3>
             <b>Designer:</b> Leonhard Orgler (1994)<br><br>
@@ -72,7 +70,6 @@
     </Game>
 
     <Game name="18Chesapeake">
-        <Note>Playable, needs full stress testing.</Note>
         <Description><![CDATA[<html>
             <h3 style="margin-top:0;">18Chesapeake - North East USA</h3>
             <b>Designer:</b> Scott Petersen (2019)<br><br>
@@ -100,7 +97,6 @@
     </Game>
 
     <Game name="1826">
-        <Note>Under construction.</Note>
         <Description><![CDATA[<html>
             <h3 style="margin-top:0;">1826 - Railroading in France and Belgium</h3>
             <b>Designer:</b> David G.D. Hecht (1996, 2000)<br><br>
@@ -116,7 +112,6 @@
     </Game>
 
     <Game name="1851">
-        <Note>Under construction.</Note>
         <Description><![CDATA[<html>
             <h3 style="margin-top:0;">1851 - The Railroads come to Kentucky & Tennessee</h3>
             <b>Designers:</b> Mark Derrick and Chris Lawson<br><br>
@@ -157,13 +152,12 @@
             <b>Designer:</b> Bill Dixon<br>
             <b>Publisher:</b> Mayfair Games, Inc. (1992, 1995)<br><br>
             <b>Limitations:</b><br>
-            All aspects different from 1830 have not been implemented yet.
+            working on it!
         </html>]]></Description>
         <Players min="2" max="6"/>
     </Game>
 
     <Game name="1880">
-        <Note>Under construction.</Note>
         <Description><![CDATA[<html>
             <h3 style="margin-top:0;">1880 - China</h3>
             <b>Designers:</b> Leonhard Orgler and Helmut Ohley<br>
@@ -173,7 +167,6 @@
     </Game>
 
     <Game name="1889">
-        <Note>Under construction.</Note>
         <Description><![CDATA[<html>
             <h3 style="margin-top:0;">1889 - History of Shikoku Railways</h3>
             <b>Designer:</b> Yasutaka Ikeda (2003-2006)<br>

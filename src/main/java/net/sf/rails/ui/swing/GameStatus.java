@@ -2434,9 +2434,9 @@ public class GameStatus extends GridPanel {
                     card.setBackground(java.awt.Color.CYAN);
                     card.setBorder(BorderFactory.createLineBorder(Color.BLUE, 3));
 
-                    if (action instanceof BuyPrivate) {
-                        card.setToolTipText("Click to Buy " + pc.getId());
-                    }
+                    // if (action instanceof BuyPrivate) {
+                    //     card.setToolTipText("Click to Buy " + pc.getId());
+                    // }
                 } else {
                     card.setBackground(BG_CARD_PASSIVE); // Standard Beige
                     card.setState(RailCard.State.PASSIVE);

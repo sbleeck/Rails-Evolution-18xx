@@ -258,10 +258,10 @@ public class ORPanel extends GridPanel
                 phase = 3;
             } else if (pa instanceof BuyTrain && (phase == 0 || phase > 4)) {
                 phase = 4;
-            } else if (pa instanceof TakeLoans || pa instanceof RepayLoans
-                    || pa instanceof rails.game.action.SpecialORAction
-                    || pa.getClass().getSimpleName().contains("1817")) {
-
+            } else if (!(pa instanceof LayTile) && !(pa instanceof LayToken) 
+                    && !(pa instanceof SetDividend) && !(pa instanceof BuyTrain)
+                    && !(pa instanceof NullAction) && !(pa instanceof GameAction)
+                    && !(pa instanceof rails.game.correct.CorrectionModeAction)) {
                 hasSpecialAction = true;
 
             } else if (pa instanceof NullAction) {
@@ -345,23 +345,6 @@ public class ORPanel extends GridPanel
                 if (hasSpecialProp || isExplicitlyExtra || isSpecialType) {
                     labelToAdd = LBL_TOKEN;
                 }
-            }
-
-            // --- D. CATCH-ALL (The Safety Net) ---
-else if (!(pa instanceof SetDividend) &&
-                    !(pa instanceof NullAction) &&
-                    !(pa instanceof LayTile) &&
-                    !(pa instanceof LayToken) &&
-                    !(pa instanceof BuyTrain) &&
-                    !(pa instanceof TakeLoans) &&
-                    !(pa instanceof RepayLoans) &&
-                    !(pa instanceof rails.game.action.SpecialORAction) &&
-                    !(pa instanceof LayBaseToken) &&
-                    !pa.getClass().getSimpleName().contains("1817") &&
-                    !(pa instanceof rails.game.specific._1835.StartPrussian) &&
-                    !(pa instanceof rails.game.specific._1835.ExchangeForPrussianShare)) {
-
-                labelToAdd = pa.getButtonLabel().toUpperCase();
             }
 
             // --- E. ADD BUTTON (Deduplicated) ---
@@ -2608,14 +2591,56 @@ if (btnRevPayout != null) {
             }
         } else if (action instanceof LayBaseToken) {
             highlightTarget = ((LayBaseToken) action).getCompany();
+            } else if (action instanceof BuyPrivate) {
+            BuyPrivate bp = (BuyPrivate) action;
+            highlightTarget = bp.getPrivateCompany();
+            label = "Buy " + highlightTarget.getId();
+            bgColor = new Color(255, 235, 235); // Matches RailCard private company styling
+            borderColor = new Color(200, 150, 150);
+            textColor = Color.BLACK;
         }
 
         // 2. Create Button
         ActionButton btn = createSidebarButton(label, cmd);
 
-        // HTML Formatting to match RailCard text style if needed
+        // 2.5 Extract Dynamic Subtext (Rule explanations from XML)
+        String subText = null;
+        if (action instanceof UseSpecialProperty) {
+            net.sf.rails.game.special.SpecialProperty sp = ((UseSpecialProperty) action).getSpecialProperty();
+            if (sp != null) {
+                try {
+                    java.lang.reflect.Method m = sp.getClass().getMethod("getHelp");
+                    subText = (String) m.invoke(sp);
+                } catch (Exception e) {}
+                if (subText == null || subText.trim().isEmpty()) {
+                    try {
+                        java.lang.reflect.Method m = sp.getClass().getMethod("getInfo");
+                        subText = (String) m.invoke(sp);
+                    } catch (Exception e) {}
+                }
+            }
+        }
+
+        // 2.6 HTML Two-Tier Formatting
+        if (label == null || label.trim().isEmpty()) {
+            label = action.toString();
+        }
+
         if (!label.toLowerCase().startsWith("<html>")) {
-            btn.setText("<html><center>" + label + "</center></html>");
+            StringBuilder html = new StringBuilder();
+            html.append("<html><center><div style='width: 155px; word-wrap: break-word; text-align: center;'>");
+            html.append("<b style='font-size: 12px;'>").append(label).append("</b>");
+
+            if (subText != null && !subText.trim().isEmpty()) {
+                // Inject the XML rule description on a second line. 
+                // Color inherits from the button's dynamic text color to maintain contrast.
+                html.append("<br><span style='font-size: 10px; font-weight: normal;'>");
+                html.append(subText);
+                html.append("</span>");
+            }
+
+            html.append("</div></center></html>");
+            btn.setText(html.toString());
         } else {
             btn.setText(label);
         }
@@ -2626,6 +2651,10 @@ if (btnRevPayout != null) {
         // Allow button to be taller to fit the HTML content
         btn.setMaximumSize(new Dimension(getSidebarWidth() - scale(20), scale(60)));
         bindActionHotkey(btn, action);
+
+        if (highlightTarget != null && highlightTarget.getInfoText() != null && !highlightTarget.getInfoText().isEmpty()) {
+            btn.setToolTipText("<html><div style='width: 250px;'>" + highlightTarget.getInfoText().replaceAll("\\n", "<br>") + "</div></html>");
+        }
 
         // Attach HexHighlightMouseListener based on specific Company type
         if (highlightTarget instanceof PublicCompany) {
@@ -2853,19 +2882,19 @@ this.currentOperatingComp = engineActiveComp;
 
                 validOrActions.add(pa);
 
-                boolean is1817Special = paName.contains("1817");
-                boolean is1837Special = paName.contains("ExchangeMinor") || paName.contains("DiscardTrain");
+                boolean isStandardUIAction = (pa instanceof LayTile) ||
+                                             (pa instanceof LayToken) ||
+                                             (pa instanceof BuyTrain) ||
+                                             (pa instanceof SetDividend) ||
+                                             (pa instanceof NullAction) ||
+                                             (pa instanceof GameAction) ||
+                                             (pa instanceof CorrectionModeAction);
 
-boolean isPFRSpecial = pa instanceof rails.game.specific._1835.StartPrussian || 
-                                       pa instanceof rails.game.specific._1835.ExchangeForPrussianShare;
-
-                if (is1817Special || is1837Special || isPFRSpecial) {
-                                        specialActions.add(pa);
-                } else if (pa instanceof GuiTargetedAction && !(pa instanceof BuyTrain) && !(pa instanceof SetDividend)
-                        && !(pa instanceof LayTile) && !(pa instanceof LayToken)) {
+                if (!isStandardUIAction) {
                     specialActions.add(pa);
-                    if (contextProvider == null)
+                    if (pa instanceof GuiTargetedAction && contextProvider == null) {
                         contextProvider = (GuiTargetedAction) pa;
+                    }
                 } else if (pa instanceof LayBaseToken && ((LayBaseToken) pa).getType() == LayBaseToken.HOME_CITY) {
                     specialActions.add(pa);
                 } else if (pa instanceof NullAction) {

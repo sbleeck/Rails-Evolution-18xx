@@ -544,6 +544,8 @@ public class ORUIManager implements DialogOwner {
                     useSpecialProperty((UseSpecialProperty) actionToProcess);
                 } else if (actionToProcess instanceof ClosePrivate) {
                     gameUIManager.processAction(actionToProcess);
+                } else if (actionToProcess instanceof BuyPrivate) {
+                    processBuyPrivate((BuyPrivate) actionToProcess);
                 } else {
                     orWindow.process(actionToProcess);
                 }
