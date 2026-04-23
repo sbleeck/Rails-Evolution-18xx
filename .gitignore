@@ -57,8 +57,6 @@ autosave/
 logs/
 old/
 old_games/
-python/
 *.docx
-*.pdf
 *.txt
 *.json
