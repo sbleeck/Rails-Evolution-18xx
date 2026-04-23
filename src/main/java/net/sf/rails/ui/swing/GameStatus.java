@@ -6083,7 +6083,7 @@ public class GameStatus extends GridPanel {
                     g2.drawImage(bgImage, x, y, w, h, null);
 
                     int currentVal = (int) (startVal + delta * progress);
-                    String text = (currentVal < 0 ? "-$" : "$") + Math.abs(currentVal);
+                    String text = (currentVal < 0 ? "-$" : " $") + Math.abs(currentVal);
                     g2.setFont(target.getFont().deriveFont(Font.BOLD, (float) (target.getFont().getSize() * scale)));
 
                     g2.setColor(target.getBackground());
