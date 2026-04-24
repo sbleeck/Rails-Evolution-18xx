@@ -1214,8 +1214,12 @@ public class ORUIManager implements DialogOwner {
             for (int i = 0; i < sel.length; i++)
                 if (sel[i])
                     ((ReachDestinations) a).addReachedCompany(((ReachDestinations) a).getPossibleCompanies().get(i));
-        } else if (d instanceof ConfirmationDialog && a instanceof LayTile && !((ConfirmationDialog) d).getAnswer()) {
-            a = null;
+        } else if (d instanceof ConfirmationDialog && a instanceof LayTile) {
+            if (!((ConfirmationDialog) d).getAnswer()) {
+                if (map != null) map.selectHex(null);
+                setLocalStep(LocalSteps.SELECT_HEX);
+            }
+            a = null; // Do not process the incomplete LayTile action directly
         }
         gameUIManager.processAction(a);
     }
