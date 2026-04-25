@@ -435,20 +435,22 @@ public class GameManager extends RailsManager implements Configurable, Owner {
         String key = roundId + ":" + player.getName();
 
         if (awardedBonuses.contains(key)) {
-            if (isReloading()) {
-                log.info("RELOAD [Bonus SKIPPED] Player: " + player.getName() + " | Key: " + key
-                        + " already exists. Remaining: " + player.getTimeBankModel().value() + "s");
-            }
+            // if (isReloading()) {
+            // log.info("RELOAD [Bonus SKIPPED] Player: " + player.getName() + " | Key: " +
+            // key
+            // + " already exists. Remaining: " + player.getTimeBankModel().value() + "s");
+            // }
             return;
         }
 
         // Grant Bonus & Mark as Awarded
         player.getTimeBankModel().add(amount);
         awardedBonuses.add(key);
-        if (isReloading()) {
-            log.info("RELOAD [Bonus GRANTED] Player: " + player.getName() + " | Granted: " + amount + "s | Reason: "
-                    + roundId + " | Remaining: " + player.getTimeBankModel().value() + "s");
-        }
+        // if (isReloading()) {
+        // log.info("RELOAD [Bonus GRANTED] Player: " + player.getName() + " | Granted:
+        // " + amount + "s | Reason: "
+        // + roundId + " | Remaining: " + player.getTimeBankModel().value() + "s");
+        // }
 
     }
 
@@ -1067,7 +1069,8 @@ public class GameManager extends RailsManager implements Configurable, Owner {
             log.info("Game Option: Train Trading restricted to same-owner companies set to: " + restrictOption);
         } else {
             restrictTrainTradingToSameOwner = true;
-            log.info("NO OPTION!!! Game Option: Train Trading restricted to same-owner companies set to default: " + restrictTrainTradingToSameOwner);
+            log.info("NO OPTION!!! Game Option: Train Trading restricted to same-owner companies set to default: "
+                    + restrictTrainTradingToSameOwner);
         }
 
     }
@@ -1629,7 +1632,6 @@ public class GameManager extends RailsManager implements Configurable, Owner {
                     int payload = action.getExecutionTimeSeconds();
                     payload += pendingTimePenalties.get(pName);
                     action.setExecutionTimeSeconds(payload);
-                    // Do NOT remove from map yet. Wait for successful execution.
                 }
             }
         }
@@ -1706,6 +1708,9 @@ public class GameManager extends RailsManager implements Configurable, Owner {
                     this.absoluteActionCounter++;
 
                     if (action.hasActed()) {
+                        if (action.getAbsoluteTimestamp() == 0) {
+                            action.setAbsoluteTimestamp(System.currentTimeMillis());
+                        }
                         executedActions.add(action);
                     }
                     updatePayoutTracker(action);
@@ -1747,7 +1752,8 @@ public class GameManager extends RailsManager implements Configurable, Owner {
                     Player p = getRoot().getPlayerManager().getPlayerByName(pName);
 
                     if (p != null) {
-                        int payload = action.getExecutionTimeSeconds(); // Already includes pre-loaded penalty
+                        int payload = action.getExecutionTimeSeconds(); // Already includes pre-loaded penalty //
+                                                                        // penalty
                         if (payload > 0) {
                             p.getTimeBankModel().add(-payload);
                         }
@@ -1949,7 +1955,6 @@ public class GameManager extends RailsManager implements Configurable, Owner {
                 Player playerBefore = getCurrentPlayer();
                 Player initiator = gameAction.getPlayer();
                 int timeSpent = gameAction.getExecutionTimeSeconds();
-
                 // 2.5 CAPTURE PENALTY FROM ALL ABORTED ACTIONS
                 if (pendingTimePenalties == null) {
                     pendingTimePenalties = new HashMap<>();
@@ -1964,7 +1969,6 @@ public class GameManager extends RailsManager implements Configurable, Owner {
                         PossibleAction abortedAction = executedActions.get(i);
                         String pName = abortedAction.getPlayerName();
                         int timeSpentOnAborted = abortedAction.getExecutionTimeSeconds();
-
                         if (pName != null && timeSpentOnAborted > 0) {
                             pendingTimePenalties.put(pName,
                                     pendingTimePenalties.getOrDefault(pName, 0) + timeSpentOnAborted);
@@ -3179,6 +3183,33 @@ public class GameManager extends RailsManager implements Configurable, Owner {
         }
 
         return new ArrayList<>(operatingCompanies.values());
+    }
+
+    /**
+     * Defines the UI display order for companies.
+     * Defaults to the engine's strict running order (which resolves price ties
+     * using market columns/stack position).
+     * Can be overridden by game-specific managers (e.g., 1835 for 'PR').
+     */
+    public List<PublicCompany> getCompaniesInDisplayOrder(List<PublicCompany> companies) {
+        List<PublicCompany> runningOrder = getCompaniesInRunningOrder();
+        List<PublicCompany> displayOrder = new ArrayList<>();
+
+        // Retain only the companies requested for display, keeping the running order.
+        for (PublicCompany c : runningOrder) {
+            if (companies.contains(c)) {
+                displayOrder.add(c);
+            }
+        }
+
+        // Add any companies that were missing from running order (fail-safe)
+        for (PublicCompany c : companies) {
+            if (!displayOrder.contains(c)) {
+                displayOrder.add(c);
+            }
+        }
+
+        return displayOrder;
     }
 
     public int getCompanyReleaseStep() {

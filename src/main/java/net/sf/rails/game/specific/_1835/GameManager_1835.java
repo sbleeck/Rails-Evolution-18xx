@@ -62,6 +62,39 @@ public class GameManager_1835 extends GameManager {
 
 
     @Override
+    public List<PublicCompany> getCompaniesInDisplayOrder(List<PublicCompany> companies) {
+        // 1835 has idiosyncratic display rules (e.g., PR displays before floating, Minors top)
+        // We replicate the classic UI sort logic here, but resolve ties with the engine's running order.
+        List<PublicCompany> sortedList = new java.util.ArrayList<>(companies);
+        final List<PublicCompany> runningOrder = getCompaniesInRunningOrder();
+        
+        java.util.Collections.sort(sortedList, (c1, c2) -> {
+            boolean c1IsPR = "PR".equals(c1.getId());
+            boolean c2IsPR = "PR".equals(c2.getId());
+
+            int p1 = c1.getCurrentSpace() != null ? c1.getCurrentSpace().getPrice()
+                    : (c1.getStartSpace() != null ? c1.getStartSpace().getPrice() : 0);
+            int p2 = c2.getCurrentSpace() != null ? c2.getCurrentSpace().getPrice()
+                    : (c2.getStartSpace() != null ? c2.getStartSpace().getPrice() : 0);
+
+            boolean c1Minor = c1IsPR ? (p1 == 0) : !c1.hasStockPrice();
+            boolean c2Minor = c2IsPR ? (p2 == 0) : !c2.hasStockPrice();
+
+            if (c1Minor && !c2Minor) return -1;
+            if (!c1Minor && c2Minor) return 1;
+            if (c1Minor) return Integer.compare(c1.getPublicNumber(), c2.getPublicNumber());
+            
+            if (p1 != p2) return Integer.compare(p2, p1);
+            
+            // Resolve ties by referencing the authoritative running order
+            int idx1 = runningOrder.indexOf(c1);
+            int idx2 = runningOrder.indexOf(c2);
+            return Integer.compare(idx1, idx2);
+        });
+        return sortedList;
+    }
+
+    @Override
     protected boolean runIfStartPacketIsNotCompletelySold() {
         if (GameOption.getAsBoolean(this, "Clemens")
                 || GameOption.getAsBoolean(this, "MinorsRequireFloatedBY")) {

@@ -119,6 +119,7 @@ public class StockRound_1835 extends StockRound {
                 }
             }
         }
+        prunePrematureActions();
     }
 
     @Override
@@ -198,21 +199,21 @@ public class StockRound_1835 extends StockRound {
     @Override
     public boolean mayPlayerSellShareOfCompany(PublicCompany company) {
 
-// 1835 Rule: Cannot sell if not floated (except Prussian) [cite: 468, 470]
-if (!company.hasFloated()) {
-                return false;
-        }
-
-        // 1835 Rule: Cannot sell if floated in the CURRENT share round 
-        if (startedThisRound.contains(company)) {
+        // 1835 Rule: Cannot sell if not floated (except Prussian) [cite: 468, 470]
+        if (!company.hasFloated()) {
             return false;
         }
-
+        // 1835 Rule: Cannot sell if floated in the CURRENT share round
+        Boolean wasUnfloated = unfloatedAtStartOfRound.get(company.getId());
+        if (wasUnfloated != null && wasUnfloated && company.hasFloated()) {
+            if (!company.getId().equals("PR")) {
+                return false;
+            }
+        }
 
         // Fallback to standard engine checks for all other conditions
         return super.mayPlayerSellShareOfCompany(company);
     }
-
 
     protected void setGameSpecificActions() {
 
@@ -342,17 +343,20 @@ if (!company.hasFloated()) {
     // ... (lines of unchanged context code) ...
     // Cache for resolved IDs to avoid repeated lookups
     private Map<String, String> resolvedIds = new HashMap<>();
+    // Custom tracker to catch companies that float during this round
+    private final net.sf.rails.game.state.HashMapState<String, Boolean> unfloatedAtStartOfRound = net.sf.rails.game.state.HashMapState
+            .create(this, "unfloatedAtStartOfRound");
 
     @Override
     public void start() {
         super.start();
 
-        // // Debug: Print all actual Company IDs to the log to confirm our abbreviations
-        // StringBuilder sb = new StringBuilder("Loaded Company IDs: ");
-        // for (PublicCompany c : companyManager.getAllPublicCompanies()) {
-        //     sb.append(c.getId()).append(" ");
-        // }
-        // log.info(sb.toString());
+        unfloatedAtStartOfRound.clear();
+        for (PublicCompany c : companyManager.getAllPublicCompanies()) {
+            if (!c.hasFloated()) {
+                unfloatedAtStartOfRound.put(c.getId(), true);
+            }
+        }
     }
 
     @Override
@@ -368,19 +372,17 @@ if (!company.hasFloated()) {
         String idOld = resolveId("Old"); // Should be OL
 
         String idBay = resolveId("Bay"); // Should be BY
-String idSax = resolveId("Sax"); // Should be SX
+        String idSax = resolveId("Sax"); // Should be SX
 
-    PublicCompany cBad = companyManager.getPublicCompany(idBad);
-    PublicCompany cPru = companyManager.getPublicCompany(idPru);
-    PublicCompany cWrt = companyManager.getPublicCompany(idWrt);
-    PublicCompany cHes = companyManager.getPublicCompany(idHes);
-    PublicCompany cMec = companyManager.getPublicCompany(idMec);
-    PublicCompany cOld = companyManager.getPublicCompany(idOld);
-    PublicCompany cBay = companyManager.getPublicCompany(idBay);
-    PublicCompany cSax = companyManager.getPublicCompany(idSax);
+        PublicCompany cBad = companyManager.getPublicCompany(idBad);
+        PublicCompany cPru = companyManager.getPublicCompany(idPru);
+        PublicCompany cWrt = companyManager.getPublicCompany(idWrt);
+        PublicCompany cHes = companyManager.getPublicCompany(idHes);
+        PublicCompany cMec = companyManager.getPublicCompany(idMec);
+        PublicCompany cOld = companyManager.getPublicCompany(idOld);
+        PublicCompany cBay = companyManager.getPublicCompany(idBay);
+        PublicCompany cSax = companyManager.getPublicCompany(idSax);
 
-
-    
         // 2. PRUSSIA RELEASE RULE
         // XML Rule: sold="BA:20" released="PR"
         // Meaning: If Baden Director (20%) is sold, Prussia becomes available.
@@ -410,22 +412,22 @@ String idSax = resolveId("Sax"); // Should be SX
         }
 
         // 3a. GROUP 1 TO GROUP 2 RELEASE RULE (BA)
-// Block BA if Group 1 (BY, SX) is not 100% sold
-boolean group1Done = isSoldOut(idBay) && isSoldOut(idSax);
-if (!group1Done) {
-if (cBad != null && (!cBad.hasStarted() && !cBad.isBuyable())) {
-log.info("BLOCK: Baden (BA) blocked. Group 1 (BY, SX) not sold out.");
-}
-}
-
-    // 3b. WÜRTTEMBERG (WT) RELEASE RULE
-    // Block WT if BA is not 50% sold
-    if (cWrt != null && cBad != null && !cWrt.hasStarted()) {
-        int badSold = 100 - ipo.getShare(cBad);
-        if (badSold < 50) {
-            log.info("BLOCK: Württemberg (WT) blocked. Baden (BA) sold: {}% < 50%", badSold);
+        // Block BA if Group 1 (BY, SX) is not 100% sold
+        boolean group1Done = isSoldOut(idBay) && isSoldOut(idSax);
+        if (!group1Done) {
+            if (cBad != null && (!cBad.hasStarted() && !cBad.isBuyable())) {
+                log.info("BLOCK: Baden (BA) blocked. Group 1 (BY, SX) not sold out.");
+            }
         }
-    }
+
+        // 3b. WÜRTTEMBERG (WT) RELEASE RULE
+        // Block WT if BA is not 50% sold
+        if (cWrt != null && cBad != null && !cWrt.hasStarted()) {
+            int badSold = 100 - ipo.getShare(cBad);
+            if (badSold < 50) {
+                log.info("BLOCK: Württemberg (WT) blocked. Baden (BA) sold: {}% < 50%", badSold);
+            }
+        }
 
         // 4. GROUP 3 RELEASE (MS, OL)
         // XML Rule: sold="BA,WT,HE" released="MS"
@@ -490,7 +492,53 @@ log.info("BLOCK: Baden (BA) blocked. Group 1 (BY, SX) not sold out.");
         return target;
     }
 
+    private int getSoldPercentage(String canonicalId) {
+        PublicCompany c = companyManager.getPublicCompany(canonicalId);
+        if (c == null)
+            return 0;
 
-    
+        net.sf.rails.game.financial.Bank bank = getRoot().getBank();
+        int inIpo = bank.getIpo().getPortfolioModel().getShare(c);
+        int inUnavailable = bank.getUnavailable().getPortfolioModel().getShare(c);
+
+        // True percentage in the hands of players/pool
+        return 100 - inIpo - inUnavailable;
+    }
+
+    private void prunePrematureActions() {
+        if (possibleActions == null || possibleActions.isEmpty())
+            return;
+
+        boolean group1Done = (getSoldPercentage("BY") == 100) && (getSoldPercentage("SX") == 100);
+        boolean group2Done = (getSoldPercentage("BA") == 100) && (getSoldPercentage("WT") == 100)
+                && (getSoldPercentage("HE") == 100);
+
+        boolean baFloatReady = getSoldPercentage("BA") >= 50;
+        boolean wtFloatReady = getSoldPercentage("WT") >= 50;
+        boolean msReady = getSoldPercentage("MS") >= 60;
+
+        
+        List actionsList = new ArrayList<>(possibleActions.getList());
+for (Object obj : actionsList) {
+if (obj instanceof BuyCertificate) {
+BuyCertificate buyAction = (BuyCertificate) obj;
+String id = buyAction.getCompany().getId();
+
+            if (!buyAction.getCompany().getType().getId().equalsIgnoreCase("Major")) continue;
+
+            boolean remove = false;
+
+            if (id.equals("BA") && !group1Done) remove = true;
+            if (id.equals("WT") && (!group1Done || !baFloatReady)) remove = true;
+            if (id.equals("HE") && (!group1Done || !wtFloatReady)) remove = true;
+            if (id.equals("MS") && !group2Done) remove = true;
+            if (id.equals("OL") && (!group2Done || !msReady)) remove = true;
+
+            if (remove) {
+                possibleActions.remove((PossibleAction) obj);
+            }
+        }
+    }
+    }
 
 }
