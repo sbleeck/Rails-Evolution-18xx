@@ -107,9 +107,8 @@ public class LinearRoundTracker extends JComponent {
 
             if (!isOperatingType) {
                 // Stock Round: Predict Order
-                List<PublicCompany> minorsList = new ArrayList<>();
-                List<PublicCompany> majorsList = new ArrayList<>();
-                List<PublicCompany> unfloatedList = new ArrayList<>();
+
+                List<PublicCompany> activeList = new ArrayList<>();
 
                 for (PublicCompany c : companies) {
                     if (c.isClosed())
@@ -119,34 +118,14 @@ public class LinearRoundTracker extends JComponent {
                             && c.getPresidentsShare().getOwner() instanceof net.sf.rails.game.Player);
 
                     if (isEffectivelyActive) {
-                        if (!c.hasFloated()) {
-                            unfloatedList.add(c);
-                        } else if (!c.hasStockPrice()) {
-                            minorsList.add(c);
-                        } else {
-                            majorsList.add(c);
-                        }
+                        activeList.add(c);
                     }
                 }
 
-                Collections.sort(minorsList, (c1, c2) -> Integer.compare(c1.getPublicNumber(), c2.getPublicNumber()));
-                Collections.sort(unfloatedList,
-                        (c1, c2) -> Integer.compare(c1.getPublicNumber(), c2.getPublicNumber()));
+                // Delegate sorting to the single source of truth in the GameManager
+                activeList = gameUIManager.getGameManager().getCompaniesInDisplayOrder(activeList);
+                cachedTimeline.addAll(activeList);
 
-                Collections.sort(majorsList, (c1, c2) -> {
-                    int p1 = c1.getCurrentSpace() != null ? c1.getCurrentSpace().getPrice()
-                            : (c1.getStartSpace() != null ? c1.getStartSpace().getPrice() : 0);
-                    int p2 = c2.getCurrentSpace() != null ? c2.getCurrentSpace().getPrice()
-                            : (c2.getStartSpace() != null ? c2.getStartSpace().getPrice() : 0);
-
-                    if (p1 != p2)
-                        return Integer.compare(p2, p1);
-                    return Integer.compare(c1.getPublicNumber(), c2.getPublicNumber());
-                });
-
-                cachedTimeline.addAll(minorsList);
-                cachedTimeline.addAll(majorsList);
-                cachedTimeline.addAll(unfloatedList);
             }
 
             // Generic fallback for activeComp if reflection failed but GUI actions exist

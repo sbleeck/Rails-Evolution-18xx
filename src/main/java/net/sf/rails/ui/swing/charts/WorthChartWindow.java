@@ -80,17 +80,34 @@ public class WorthChartWindow extends JDialog {
         topPanel.add(titleLabel, BorderLayout.NORTH);
 
         JPanel togglePanel = new JPanel(new FlowLayout(FlowLayout.CENTER));
-        JRadioButton relativeBtn = new JRadioButton("Relative (%)", true);
-        JRadioButton absoluteBtn = new JRadioButton("Absolute ($)", false);
+        
+        // Y-Axis toggle
+        JRadioButton relativeBtn = new JRadioButton("Relative (%)", false);
+        JRadioButton absoluteBtn = new JRadioButton("Absolute ($)", true);
         ButtonGroup group = new ButtonGroup();
         group.add(relativeBtn);
         group.add(absoluteBtn);
+        togglePanel.add(new JLabel("Y-Axis: "));
         togglePanel.add(relativeBtn);
         togglePanel.add(absoluteBtn);
+
+        // X-Axis toggle
+        JRadioButton xActionsBtn = new JRadioButton("Actions", true);
+        JRadioButton xTimeBtn = new JRadioButton("Real Time", false);
+        ButtonGroup xGroup = new ButtonGroup();
+        xGroup.add(xActionsBtn);
+        xGroup.add(xTimeBtn);
+        togglePanel.add(Box.createHorizontalStrut(20));
+        togglePanel.add(new JLabel("X-Axis: "));
+        togglePanel.add(xActionsBtn);
+        togglePanel.add(xTimeBtn);
+
         topPanel.add(togglePanel, BorderLayout.SOUTH);
 
         relativeBtn.addActionListener(e -> relativePanel.setRelativeMode(true));
         absoluteBtn.addActionListener(e -> relativePanel.setRelativeMode(false));
+        xActionsBtn.addActionListener(e -> relativePanel.setTimeMode(false));
+        xTimeBtn.addActionListener(e -> relativePanel.setTimeMode(true));
 
         contentPanel.add(topPanel, BorderLayout.NORTH);
 
@@ -114,7 +131,7 @@ public class WorthChartWindow extends JDialog {
         splitPane.setResizeWeight(0.95); // Initially give all space to Chart
 
         // Top: Chart
-        relativePanel = new WorthChartPanel(data, true, revealController);
+relativePanel = new WorthChartPanel(data, false, revealController);
         relativePanel.setPreferredSize(new Dimension(1000, 250));
 
         relativePanel.addMouseListener(new java.awt.event.MouseAdapter() {
@@ -626,6 +643,7 @@ if (!snapKey.contains(":")) {
         public final double absoluteMax;
         public final GameManager gameManager;
         public final Map<String, Color> colorMap = new java.util.HashMap<>();
+        public final List<Long> timestamps;
 
         private final Color[] PALETTE = {
                 new Color(31, 119, 180), // Blau
@@ -699,6 +717,41 @@ if (!snapKey.contains(":")) {
             this.absoluteMin = min;
             this.absoluteMax = max + (max * 0.1);
 
+            this.timestamps = new ArrayList<>();
+            List<rails.game.action.PossibleAction> actionsList = null;
+            try {
+                java.lang.reflect.Field field = GameManager.class.getDeclaredField("executedActions");
+                field.setAccessible(true);
+                Object stateObj = field.get(gm);
+                java.lang.reflect.Method viewMethod = stateObj.getClass().getMethod("view");
+                actionsList = (List<rails.game.action.PossibleAction>) viewMethod.invoke(stateObj);
+            } catch (Exception e) {
+                log.warn("Could not retrieve executed actions for timestamps.", e);
+            }
+
+            long lastTs = 0;
+            for (String key : this.roundKeys) {
+                long currentTs = lastTs;
+                int moveNum = -1;
+                if (key.startsWith("Move_")) {
+                    try { moveNum = Integer.parseInt(key.split(":")[0].substring(5)); } catch (Exception e) {}
+                } else if (key.matches("\\d+")) {
+                    try { moveNum = Integer.parseInt(key); } catch (Exception e) {}
+                }
+
+                if (actionsList != null && moveNum > 0 && moveNum <= actionsList.size()) {
+                    int idx = moveNum - 1; 
+                    rails.game.action.PossibleAction act = actionsList.get(idx);
+                    if (act != null && act.getAbsoluteTimestamp() > 0) {
+                        currentTs = act.getAbsoluteTimestamp();
+                    }
+                }
+                
+                if (currentTs == 0 && lastTs > 0) currentTs = lastTs; 
+                if (currentTs > lastTs) lastTs = currentTs;
+                this.timestamps.add(currentTs);
+            }
+
             int pIdx = 0;
             for (String p : playerNames) {
                 Color c = PALETTE[pIdx % PALETTE.length];
@@ -721,8 +774,13 @@ if (!snapKey.contains(":")) {
         // "Time Adj".
         private final WorthData data;
         private boolean relativeMode;
+        private boolean timeMode = false;
         public void setRelativeMode(boolean relativeMode) {
             this.relativeMode = relativeMode;
+            repaint();
+        }
+        public void setTimeMode(boolean timeMode) {
+            this.timeMode = timeMode;
             repaint();
         }
         private final RevealController revealController;
@@ -787,20 +845,20 @@ if (!snapKey.contains(":")) {
             if (range <= 0)
                 range = 100;
 
-            double xStep = (double) chartW / Math.max(1, data.roundKeys.size() - 1);
+           
+ double xStep = (double) chartW / Math.max(1, data.roundKeys.size() - 1);
 
-            // 1. Background Bands and Macro-Round Labels
+            long minTime = data.timestamps.isEmpty() ? 0 : data.timestamps.get(0);
+            long maxTime = data.timestamps.isEmpty() ? 1 : data.timestamps.get(data.timestamps.size() - 1);
+            long timeRange = maxTime - minTime;
+            if (timeRange <= 0) timeRange = 1;
+
+            boolean actualTimeMode = timeMode && (timeRange > 1000) && (maxTime > 0);
+
             class RoundBand {
-                String name;
-                String originalMacro;
-                int startIdx;
-                int endIdx;
-
+                String name; String originalMacro; int startIdx; int endIdx;
                 RoundBand(String n, String orig, int s, int e) {
-                    name = n;
-                    originalMacro = orig;
-                    startIdx = s;
-                    endIdx = e;
+                    name = n; originalMacro = orig; startIdx = s; endIdx = e;
                 }
             }
             
@@ -824,83 +882,115 @@ if (!snapKey.contains(":")) {
                 boundaryIndices.add(band.endIdx);
             }
 
-            int globalMaxOrCycle = -1;
-            int globalMaxSubRound = 1;
-            for (String key : data.roundKeys) {
-                String macro = key.contains(":") ? key.split(":")[1] : key;
-                if (macro.startsWith("OR_")) {
-                    try {
-                        String[] parts = macro.substring(3).split("\\.");
-                        int cycle = Integer.parseInt(parts[0]);
-                        int sub = parts.length > 1 ? Integer.parseInt(parts[1]) : 1;
-                        if (cycle > globalMaxOrCycle)
-                            globalMaxOrCycle = cycle;
-                        if (sub > globalMaxSubRound)
-                            globalMaxSubRound = sub;
-                    } catch (Exception ex) {
+            if (actualTimeMode) {
+                g2d.setColor(new Color(250, 250, 250));
+                g2d.fillRect(padLeft, padTop, chartW, chartH);
+
+  long[] niceIntervals = {
+                    60 * 1000L,          // 1 min
+                    5 * 60 * 1000L,      // 5 min
+                    10 * 60 * 1000L,     // 10 min
+                    30 * 60 * 1000L,     // 30 min
+                    60 * 60 * 1000L,     // 1 hour
+                    2 * 60 * 60 * 1000L, // 2 hours
+                    6 * 60 * 60 * 1000L, // 6 hours
+                    12 * 60 * 60 * 1000L,// 12 hours
+                    24 * 60 * 60 * 1000L // 1 day
+                };
+                
+                long tickInterval = Math.max(1, timeRange / 15);
+                for (long interval : niceIntervals) {
+                    if (timeRange / interval <= 20) {
+                        tickInterval = interval;
+                        break;
                     }
                 }
-            }
 
-            for (RoundBand band : bands) {
-                int startX = (int) (padLeft + band.startIdx * xStep);
-                int endX = (int) (padLeft + band.endIdx * xStep);
-                if (band.endIdx == data.roundKeys.size() - 1)
-                    endX = w - padRight;
+                long startTick = (minTime / tickInterval) * tickInterval;
+                java.text.SimpleDateFormat sdf = new java.text.SimpleDateFormat(tickInterval >= 24 * 60 * 60 * 1000L ? "MMM dd" : "HH:mm");
 
-                Color bgColor = Color.WHITE;
-                if (band.originalMacro.startsWith("OR_")) {
-                    try {
-                        String[] parts = band.originalMacro.substring(3).split("\\.");
-                        String orCycleStr = parts[0];
-                        int currentOrCycle = Integer.parseInt(orCycleStr);
+                for (long t = startTick; t <= maxTime; t += tickInterval) {
+                    if (t < minTime) continue;
+                    int x = (int) (padLeft + ((double) (t - minTime) / timeRange) * chartW);
 
-                        int maxSubRound = 1;
-                        String targetMacroPrefix = "OR_" + orCycleStr + ".";
-                        for (String key : data.roundKeys) {
-                            String macro = key.contains(":") ? key.split(":")[1] : key;
-                            if (macro.startsWith(targetMacroPrefix)) {
-                                try {
-                                    int sub = Integer.parseInt(macro.substring(targetMacroPrefix.length()));
-                                    if (sub > maxSubRound)
-                                        maxSubRound = sub;
-                                } catch (Exception ex) {
+                    g2d.setColor(new Color(220, 220, 220));
+                    g2d.drawLine(x, padTop, x, h - padBottom);
+
+                    g2d.setColor(Color.BLACK);
+                    String timeStr = sdf.format(new java.util.Date(t));
+                    int strW = g2d.getFontMetrics().stringWidth(timeStr);
+                    if (x + strW / 2 > w) continue;
+
+                    g2d.drawString(timeStr, x - strW / 2, h - padBottom + 20);
+                    g2d.drawLine(x, h - padBottom, x, h - padBottom + 5);
+                }
+            } else {
+                int globalMaxOrCycle = -1;
+                int globalMaxSubRound = 1;
+                for (String key : data.roundKeys) {
+                    String macro = key.contains(":") ? key.split(":")[1] : key;
+                    if (macro.startsWith("OR_")) {
+                        try {
+                            String[] parts = macro.substring(3).split("\\.");
+                            int cycle = Integer.parseInt(parts[0]);
+                            int sub = parts.length > 1 ? Integer.parseInt(parts[1]) : 1;
+                            if (cycle > globalMaxOrCycle) globalMaxOrCycle = cycle;
+                            if (sub > globalMaxSubRound) globalMaxSubRound = sub;
+                        } catch (Exception ex) {}
+                    }
+                }
+
+                for (RoundBand band : bands) {
+                    int startX = (int) (padLeft + band.startIdx * xStep);
+                    int endX = (int) (padLeft + band.endIdx * xStep);
+                    if (band.endIdx == data.roundKeys.size() - 1) endX = w - padRight;
+
+                    Color bgColor = Color.WHITE;
+                    if (band.originalMacro.startsWith("OR_")) {
+                        try {
+                            String[] parts = band.originalMacro.substring(3).split("\\.");
+                            int currentOrCycle = Integer.parseInt(parts[0]);
+                            int maxSubRound = 1;
+                            String targetMacroPrefix = "OR_" + parts[0] + ".";
+                            for (String key : data.roundKeys) {
+                                String macro = key.contains(":") ? key.split(":")[1] : key;
+                                if (macro.startsWith(targetMacroPrefix)) {
+                                    try {
+                                        maxSubRound = Math.max(maxSubRound, Integer.parseInt(macro.substring(targetMacroPrefix.length())));
+                                    } catch (Exception ex) {}
                                 }
                             }
-                        }
-                        if (currentOrCycle == globalMaxOrCycle) {
-                            maxSubRound = Math.max(maxSubRound, globalMaxSubRound);
-                        }
+                            if (currentOrCycle == globalMaxOrCycle) maxSubRound = Math.max(maxSubRound, globalMaxSubRound);
 
-                        if (maxSubRound == 1)
-                            bgColor = new Color(255, 255, 230); // Light Yellow
-                        else if (maxSubRound == 2)
-                            bgColor = new Color(235, 255, 235); // Light Green
-                        else if (maxSubRound == 3)
-                            bgColor = new Color(245, 235, 220); // Light Brown
-                        else
-                            bgColor = new Color(230, 230, 230); // Light Gray
-                    } catch (Exception e) {
+                            if (maxSubRound == 1) bgColor = new Color(255, 255, 230);
+                            else if (maxSubRound == 2) bgColor = new Color(235, 255, 235);
+                            else if (maxSubRound == 3) bgColor = new Color(245, 235, 220);
+                            else bgColor = new Color(230, 230, 230);
+                        } catch (Exception e) { bgColor = new Color(245, 245, 245); }
+                    } else if (band.originalMacro.startsWith("SR_")) {
                         bgColor = new Color(245, 245, 245);
+                    } else if (band.originalMacro.contains("M&A") || band.originalMacro.contains("Merger")) {
+                        bgColor = new Color(230, 240, 255);
                     }
-                } else if (band.originalMacro.startsWith("SR_")) {
-                    bgColor = new Color(245, 245, 245); // Light Grey
-                } else if (band.originalMacro.contains("M&A") || band.originalMacro.contains("Merger")) {
-                    bgColor = new Color(230, 240, 255); // Light Blue for M&A
+
+                    g2d.setColor(bgColor);
+                    g2d.fillRect(startX, padTop, endX - startX, chartH);
+
+                    g2d.setColor(Color.BLACK);
+                    int strW = g2d.getFontMetrics().stringWidth(band.name);
+                    int textX = Math.max(padLeft, Math.min(startX + (endX - startX) / 2 - strW / 2, w - padRight - strW));
+                    g2d.drawString(band.name, textX, h - padBottom + 20);
+                    g2d.drawLine(startX, h - padBottom, startX, h - padBottom + 5);
                 }
-
-                g2d.setColor(bgColor);
-                g2d.fillRect(startX, padTop, endX - startX, chartH);
-
-                g2d.setColor(Color.BLACK);
-                int strW = g2d.getFontMetrics().stringWidth(band.name);
-                int textX = startX + (endX - startX) / 2 - strW / 2;
-                textX = Math.max(padLeft, Math.min(textX, w - padRight - strW)); // Prevent clipping
-                g2d.drawString(band.name, textX, h - padBottom + 20);
-
-                g2d.setColor(Color.BLACK);
-                g2d.drawLine(startX, h - padBottom, startX, h - padBottom + 5);
+                
+                if (timeMode) {
+                    g2d.setColor(Color.RED);
+                    g2d.setFont(new Font("Arial", Font.BOLD, 14));
+                    g2d.drawString("Real Time not available for old save files.", padLeft + 10, padTop + 20);
+                    g2d.setFont(new Font("SansSerif", Font.PLAIN, 10));
+                }
             }
+
 
             // Grid
             for (int i = 0; i <= 10; i++) {
@@ -936,7 +1026,13 @@ if (!snapKey.contains(":")) {
                                 roundMax = v;
                         plotVal = (roundMax > 0) ? (val / roundMax) * 100.0 : 0;
                     }
-                    double x = padLeft + (i * xStep);
+                    double x;
+                    if (actualTimeMode) {
+                        long currentTs = data.timestamps.get(i);
+                        x = padLeft + ((double)(currentTs - minTime) / timeRange) * chartW;
+                    } else {
+                        x = padLeft + (i * xStep);
+                    }
                     double y = padTop + chartH - ((plotVal - minVal) / range * chartH);
                     if (firstPoint) {
                         path.moveTo(x, y);

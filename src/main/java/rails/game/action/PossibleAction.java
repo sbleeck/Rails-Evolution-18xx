@@ -44,7 +44,8 @@ public abstract class PossibleAction implements ChangeAction, Serializable {
 
     public static final long serialVersionUID = 3L;
     
-    protected int executionTimeSeconds = 0;
+protected int executionTimeSeconds = 0;
+    protected long absoluteTimestamp = 0L;
     
     public int getExecutionTimeSeconds() {
         return executionTimeSeconds;
@@ -52,6 +53,14 @@ public abstract class PossibleAction implements ChangeAction, Serializable {
 
     public void setExecutionTimeSeconds(int seconds) {
         this.executionTimeSeconds = seconds;
+    }
+
+    public long getAbsoluteTimestamp() {
+        return absoluteTimestamp;
+    }
+
+    public void setAbsoluteTimestamp(long timestamp) {
+        this.absoluteTimestamp = timestamp;
     }
 
     private static final Logger log = LoggerFactory.getLogger(PossibleAction.class);
@@ -268,7 +277,7 @@ public abstract class PossibleAction implements ChangeAction, Serializable {
     public String toString() {
 
         String base = RailsObjects.stringHelper(this).addBaseText().toString();
-        if (executionTimeSeconds > 0) {
+if (executionTimeSeconds > 0) {
             return base + " [" + executionTimeSeconds + "s]";
         }
         return base;

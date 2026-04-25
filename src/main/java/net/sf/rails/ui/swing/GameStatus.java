@@ -1723,29 +1723,8 @@ public class GameStatus extends GridPanel {
             displayList.add(c);
         }
 
-        // 2. Sort
-        java.util.Collections.sort(displayList, (c1, c2) -> {
-            boolean c1IsPR = "PR".equals(c1.getId());
-            boolean c2IsPR = "PR".equals(c2.getId());
-
-            int p1 = c1.getCurrentSpace() != null ? c1.getCurrentSpace().getPrice()
-                    : (c1.getStartSpace() != null ? c1.getStartSpace().getPrice() : 0);
-            int p2 = c2.getCurrentSpace() != null ? c2.getCurrentSpace().getPrice()
-                    : (c2.getStartSpace() != null ? c2.getStartSpace().getPrice() : 0);
-
-            boolean c1Minor = c1IsPR ? (p1 == 0) : !c1.hasStockPrice();
-            boolean c2Minor = c2IsPR ? (p2 == 0) : !c2.hasStockPrice();
-
-            if (c1Minor && !c2Minor)
-                return -1;
-            if (!c1Minor && c2Minor)
-                return 1;
-            if (c1Minor)
-                return Integer.compare(c1.getPublicNumber(), c2.getPublicNumber());
-            if (p1 != p2)
-                return Integer.compare(p2, p1);
-            return Integer.compare(c1.getPublicNumber(), c2.getPublicNumber());
-        });
+      // 2. Sort
+        displayList = gameUIManager.getGameManager().getCompaniesInDisplayOrder(displayList);
 
         // 3. Build Signature
         java.util.List<String> currentSignature = new java.util.ArrayList<>();
@@ -4725,28 +4704,7 @@ public class GameStatus extends GridPanel {
 
         compNameCaption = new Caption[nc];
 
-        java.util.Collections.sort(displayList, (c1, c2) -> {
-            boolean c1IsPR = "PR".equals(c1.getId());
-            boolean c2IsPR = "PR".equals(c2.getId());
-
-            int p1 = c1.getCurrentSpace() != null ? c1.getCurrentSpace().getPrice()
-                    : (c1.getStartSpace() != null ? c1.getStartSpace().getPrice() : 0);
-            int p2 = c2.getCurrentSpace() != null ? c2.getCurrentSpace().getPrice()
-                    : (c2.getStartSpace() != null ? c2.getStartSpace().getPrice() : 0);
-
-            boolean c1Minor = c1IsPR ? (p1 == 0) : !c1.hasStockPrice();
-            boolean c2Minor = c2IsPR ? (p2 == 0) : !c2.hasStockPrice();
-
-            if (c1Minor && !c2Minor)
-                return -1;
-            if (!c1Minor && c2Minor)
-                return 1;
-            if (c1Minor)
-                return Integer.compare(c1.getPublicNumber(), c2.getPublicNumber());
-            if (p1 != p2)
-                return Integer.compare(p2, p1);
-            return Integer.compare(c1.getPublicNumber(), c2.getPublicNumber());
-        });
+       displayList = gameUIManager.getGameManager().getCompaniesInDisplayOrder(displayList);
 
         for (PublicCompany c : displayList) {
             if (c.isClosed())
@@ -6088,7 +6046,8 @@ public class GameStatus extends GridPanel {
                     g2.drawImage(bgImage, x, y, w, h, null);
 
                     int currentVal = (int) (startVal + delta * progress);
-                    String text = (currentVal < 0 ? "-$" : " $") + Math.abs(currentVal);
+                    String text = gameUIManager.format(currentVal);
+                    if (currentVal >= 0) text = " " + text;
                     g2.setFont(target.getFont().deriveFont(Font.BOLD, (float) (target.getFont().getSize() * scale)));
 
                     g2.setColor(target.getBackground());
@@ -6113,7 +6072,7 @@ public class GameStatus extends GridPanel {
                     
                     // Restore original bubble float parameters (slower, shorter distance)
                     int bubbleY = (int) (y - (25 * progress));
-                    String bubbleText = (delta > 0 ? "+" : "") + delta;
+                    String bubbleText = (delta > 0 ? "+" : "-") + gameUIManager.format(Math.abs(delta));
                     
                     g2.setFont(new Font("SansSerif", Font.BOLD, 14));
                     fm = g2.getFontMetrics();
