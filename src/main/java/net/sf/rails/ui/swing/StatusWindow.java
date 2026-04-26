@@ -55,6 +55,9 @@ import net.sf.rails.algorithms.NetworkAdapter;
 import net.sf.rails.algorithms.NetworkGraph;
 import net.sf.rails.algorithms.RevenueAdapter;
 import net.sf.rails.game.RailsRoot;
+import net.sf.rails.game.specific._1870.action.RedeemShare_1870;
+import net.sf.rails.game.specific._1870.action.ReissueShares_1870;
+import net.sf.rails.game.specific._1870.StockRound_1870;
 
 import java.io.File;
 import java.io.InputStream;
@@ -523,7 +526,8 @@ public class StatusWindow extends JFrame implements ActionListener, ActionPerfor
                 public void actionPerformed(ActionEvent e) {
                     JFileChooser fileChooser = new JFileChooser();
                     fileChooser.setDialogTitle("Select JSON Save File");
-                    fileChooser.setCurrentDirectory(new File(Config.get("save.directory", System.getProperty("user.dir"))));
+                    fileChooser.setCurrentDirectory(
+                            new File(Config.get("save.directory", System.getProperty("user.dir"))));
 
                     if (fileChooser.showOpenDialog(StatusWindow.this) == JFileChooser.APPROVE_OPTION) {
                         File fileToLoad = fileChooser.getSelectedFile();
@@ -583,10 +587,12 @@ public class StatusWindow extends JFrame implements ActionListener, ActionPerfor
                 tempFile.deleteOnExit();
 
                 // Copy stream to temp file
-                java.nio.file.Files.copy(pdfStream, tempFile.toPath(), java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+                java.nio.file.Files.copy(pdfStream, tempFile.toPath(),
+                        java.nio.file.StandardCopyOption.REPLACE_EXISTING);
 
                 // Open using the Desktop API
-                if (java.awt.Desktop.isDesktopSupported() && java.awt.Desktop.getDesktop().isSupported(java.awt.Desktop.Action.OPEN)) {
+                if (java.awt.Desktop.isDesktopSupported()
+                        && java.awt.Desktop.getDesktop().isSupported(java.awt.Desktop.Action.OPEN)) {
                     java.awt.Desktop.getDesktop().open(tempFile);
                 } else {
                     javax.swing.JOptionPane.showMessageDialog(this,
@@ -971,6 +977,44 @@ public class StatusWindow extends JFrame implements ActionListener, ActionPerfor
             return false;
         }
 
+        
+        // 1870 Ambiguity Check: If a President clicks a certificate in the pool, 
+        // determine if they are buying for themselves (Player) or for the company (Redemption).
+        if (executedAction instanceof BuyCertificate && "1870".equals(gameUIManager.getGameManager().getGameName())) {
+            BuyCertificate buy = (BuyCertificate) executedAction;
+
+            net.sf.rails.game.specific._1870.action.RedeemShare_1870 redeemAction = null;
+            if (possibleActions != null) {
+                for (PossibleAction pa : possibleActions.getList()) {
+                    if (pa instanceof RedeemShare_1870) {
+                        RedeemShare_1870 r = (RedeemShare_1870) pa;
+                        if (r.getCompany().equals(buy.getCompany())) {
+                            redeemAction = r;
+                            break;
+                        }
+                    }
+                }
+            }
+
+            if (redeemAction != null) {
+                String[] options = { "Player (" + buy.getPlayer().getName() + ")",
+                        "Company (" + buy.getCompany().getId() + ")" };
+                int choice = JOptionPane.showOptionDialog(this,
+                        "Who is acquiring this " + (buy.getNumberBought() * 10) + "% share?",
+                        "1870: Select Actor",
+                        JOptionPane.DEFAULT_OPTION,
+                        JOptionPane.QUESTION_MESSAGE,
+                        null,
+                        options,
+                        options[0]);
+
+                if (choice == 1) {
+                    executedAction = redeemAction;
+                } else if (choice == JOptionPane.CLOSED_OPTION) {
+                    return false; // Cancel action
+                }
+            }
+        }
         return gameUIManager.processAction(executedAction);
     }
 
@@ -1428,9 +1472,6 @@ public class StatusWindow extends JFrame implements ActionListener, ActionPerfor
 
         String timeText = "00:00:00";
         Color color = Color.BLACK;
-
-
-
 
         Player p = gameUIManager.getCurrentPlayer();
         if (p != null) {
@@ -1934,9 +1975,34 @@ public class StatusWindow extends JFrame implements ActionListener, ActionPerfor
 
                     dynamicButtonPanel.revalidate();
                     dynamicButtonPanel.repaint();
+                } else if (currentRound instanceof net.sf.rails.game.specific._1870.StockRound_1870) {
 
-                    } else if (currentRound instanceof net.sf.rails.game.specific._1870.ShareProtectionRound_1870) {
-                    
+                    // 1870 Special: Show Redeem and Reissue buttons in the dynamic panel (1817
+                    // style)
+                    dynamicButtonPanel.setBackground(new Color(230, 240, 255));
+                    dynamicButtonPanel.setOpaque(true);
+                    dynamicButtonPanel.setBorder(BorderFactory.createLineBorder(SYS_BLUE, 1));
+                    dynamicButtonPanel.setLayout(new FlowLayout(FlowLayout.LEFT, 8, 2));
+
+                    if (possibleActions != null && possibleActions.getList() != null) {
+                        for (PossibleAction pa : possibleActions.getList()) {
+                            if (pa instanceof net.sf.rails.game.specific._1870.action.RedeemShare_1870
+                                    || pa instanceof net.sf.rails.game.specific._1870.action.ReissueShares_1870 
+                                    || pa instanceof net.sf.rails.game.specific._1870.action.ExchangeMKT_1870) {
+                                ActionButton btn = new ActionButton(null);
+                                btn.setText(pa.getButtonLabel());
+                                btn.setPossibleAction(pa);
+                                btn.addActionListener(this);
+                                styleStatusButton(btn, SYS_BLUE);
+                                dynamicButtonPanel.add(btn);
+                            }
+                        }
+                    }
+                    dynamicButtonPanel.revalidate();
+                    dynamicButtonPanel.repaint();
+
+                } else if (currentRound instanceof net.sf.rails.game.specific._1870.ShareProtectionRound_1870) {
+
                     dynamicButtonPanel.setBackground(new Color(255, 240, 230)); // Warning Orange Tint
                     dynamicButtonPanel.setOpaque(true);
                     dynamicButtonPanel.setBorder(BorderFactory.createLineBorder(new Color(204, 102, 0), 2));
@@ -1949,7 +2015,8 @@ public class StatusWindow extends JFrame implements ActionListener, ActionPerfor
                         for (rails.game.action.PossibleAction pa : possibleActions.getList()) {
                             if (pa instanceof rails.game.action.BuyCertificate) {
                                 buyAction = (rails.game.action.BuyCertificate) pa;
-                            } else if (pa instanceof rails.game.action.NullAction && ((rails.game.action.NullAction) pa).getMode() == rails.game.action.NullAction.Mode.PASS) {
+                            } else if (pa instanceof rails.game.action.NullAction && ((rails.game.action.NullAction) pa)
+                                    .getMode() == rails.game.action.NullAction.Mode.PASS) {
                                 passAction = (rails.game.action.NullAction) pa;
                             }
                         }
@@ -1962,7 +2029,8 @@ public class StatusWindow extends JFrame implements ActionListener, ActionPerfor
                         int totalCost = buyAction.getPrice() * numShares;
                         String compName = buyAction.getCompany().getId();
 
-                        JLabel promptLabel = new JLabel("<html><b>SHARE PROTECTION:</b> " + actorName + ", protect " + numShares + " share(s) of " + compName + " for $" + totalCost + "?</html>");
+                        JLabel promptLabel = new JLabel("<html><b>SHARE PROTECTION:</b> " + actorName + ", protect "
+                                + numShares + " share(s) of " + compName + " for $" + totalCost + "?</html>");
                         promptLabel.setFont(new Font("SansSerif", Font.BOLD, 14));
                         promptLabel.setForeground(new Color(204, 51, 0));
                         dynamicButtonPanel.add(promptLabel);
@@ -1983,15 +2051,17 @@ public class StatusWindow extends JFrame implements ActionListener, ActionPerfor
                         noButton.setBorder(BorderFactory.createRaisedBevelBorder());
                         final rails.game.action.PossibleAction finalPass = passAction;
                         noButton.addActionListener(e -> {
-                            if (finalPass != null) process(finalPass);
+                            if (finalPass != null)
+                                process(finalPass);
                         });
                         dynamicButtonPanel.add(noButton);
 
                     } else {
-                         JLabel waitingLabel = new JLabel("<html><b>SHARE PROTECTION:</b> Waiting for " + actorName + " to decide...</html>");
-                         waitingLabel.setFont(new Font("SansSerif", Font.BOLD, 14));
-                         waitingLabel.setForeground(new Color(204, 51, 0));
-                         dynamicButtonPanel.add(waitingLabel);
+                        JLabel waitingLabel = new JLabel(
+                                "<html><b>SHARE PROTECTION:</b> Waiting for " + actorName + " to decide...</html>");
+                        waitingLabel.setFont(new Font("SansSerif", Font.BOLD, 14));
+                        waitingLabel.setForeground(new Color(204, 51, 0));
+                        dynamicButtonPanel.add(waitingLabel);
                     }
 
                     dynamicButtonPanel.revalidate();
@@ -2151,7 +2221,8 @@ public class StatusWindow extends JFrame implements ActionListener, ActionPerfor
                     java.util.List<PossibleAction> specialActions = new java.util.ArrayList<>();
                     GuiTargetedAction contextProvider = null;
 
-                    if (possibleActions != null && possibleActions.getList() != null && "1817".equals(gameUIManager.getGameManager().getGameName())) {
+                    if (possibleActions != null && possibleActions.getList() != null
+                            && "1817".equals(gameUIManager.getGameManager().getGameName())) {
                         for (PossibleAction pa : possibleActions.getList()) {
                             // Skip Short1817 as it is handled visually on the OSI grid
                             if (pa.getClass().getSimpleName().equals("Short1817")) {
@@ -2649,31 +2720,32 @@ public class StatusWindow extends JFrame implements ActionListener, ActionPerfor
 
     private void showHotkeysDialog() {
 
-String msg = "<html><h3>Keyboard Shortcuts</h3>" +
-            "<table border='0' cellpadding='4'>" +
-            "<tr><td><b>Key</b></td><td><b>Action</b></td></tr>" +
-            "<tr><td colspan='2'><hr></td></tr>" +
+        String msg = "<html><h3>Keyboard Shortcuts</h3>" +
+                "<table border='0' cellpadding='4'>" +
+                "<tr><td><b>Key</b></td><td><b>Action</b></td></tr>" +
+                "<tr><td colspan='2'><hr></td></tr>" +
 
-            "<tr><td colspan='2'><b>Global / Interface</b></td></tr>" +
-            "<tr><td><b>A</b></td><td>AI Move (Executes the AI logic for the current step)</td></tr>" +
-            "<tr><td><b>T</b></td><td>Toggle Timer (Pauses/Resumes the game timer)</td></tr>" +
-            "<tr><td><b>Space</b> or <b>Enter</b></td><td>Done / Confirm (Presses the 'Done' button)</td></tr>" +
-            "<tr><td><b>Cmd/Ctrl + Z</b></td><td>Undo</td></tr>" +
-            "<tr><td><b>Cmd/Ctrl + Y</b></td><td>Redo</td></tr>" +
-            "<tr><td><b>Cmd/Ctrl + +/-</b></td><td>Increase / Decrease Font Size</td></tr>" +
+                "<tr><td colspan='2'><b>Global / Interface</b></td></tr>" +
+                "<tr><td><b>A</b></td><td>AI Move (Executes the AI logic for the current step)</td></tr>" +
+                "<tr><td><b>T</b></td><td>Toggle Timer (Pauses/Resumes the game timer)</td></tr>" +
+                "<tr><td><b>Space</b> or <b>Enter</b></td><td>Done / Confirm (Presses the 'Done' button)</td></tr>" +
+                "<tr><td><b>Cmd/Ctrl + Z</b></td><td>Undo</td></tr>" +
+                "<tr><td><b>Cmd/Ctrl + Y</b></td><td>Redo</td></tr>" +
+                "<tr><td><b>Cmd/Ctrl + +/-</b></td><td>Increase / Decrease Font Size</td></tr>" +
 
-            "<tr><td colspan='2'><br><b>Operating Round (Map & Tiles)</b></td></tr>" +
-            "<tr><td><b>S / D</b></td><td>Cycle available tiles for the selected hex (Previous / Next)</td></tr>" +
-            "<tr><td><b>E</b></td><td>Cycle tile upgrades (if multiple tile types fit the hex)</td></tr>" +
-            "<tr><td><b>R</b></td><td>Rotate the currently selected tile on the map</td></tr>" +
-            "<tr><td><b>L</b></td><td>Buy Train (Auto-selects the cheapest available train from IPO/Pool)</td></tr>" +
-            "<tr><td><b>Space bar</b></td><td>Toggle Tile Numbers (Show/Hide build numbers on the map)</td></tr>" +
+                "<tr><td colspan='2'><br><b>Operating Round (Map & Tiles)</b></td></tr>" +
+                "<tr><td><b>S / D</b></td><td>Cycle available tiles for the selected hex (Previous / Next)</td></tr>" +
+                "<tr><td><b>E</b></td><td>Cycle tile upgrades (if multiple tile types fit the hex)</td></tr>" +
+                "<tr><td><b>R</b></td><td>Rotate the currently selected tile on the map</td></tr>" +
+                "<tr><td><b>L</b></td><td>Buy Train (Auto-selects the cheapest available train from IPO/Pool)</td></tr>"
+                +
+                "<tr><td><b>Space bar</b></td><td>Toggle Tile Numbers (Show/Hide build numbers on the map)</td></tr>" +
 
-            "<tr><td colspan='2'><br><b>Operating Round (Revenue)</b></td></tr>" +
-            "<tr><td><b>P</b></td><td>Payout Revenue</td></tr>" +
-            "<tr><td><b>H</b></td><td>Half / Split Revenue</td></tr>" +
-            "<tr><td><b>W</b></td><td>Withhold Revenue</td></tr>" +
-            "</table></html>";
+                "<tr><td colspan='2'><br><b>Operating Round (Revenue)</b></td></tr>" +
+                "<tr><td><b>P</b></td><td>Payout Revenue</td></tr>" +
+                "<tr><td><b>H</b></td><td>Half / Split Revenue</td></tr>" +
+                "<tr><td><b>W</b></td><td>Withhold Revenue</td></tr>" +
+                "</table></html>";
         JOptionPane.showMessageDialog(this, msg, "Hotkeys", JOptionPane.INFORMATION_MESSAGE);
     }
 
@@ -3096,25 +3168,29 @@ String msg = "<html><h3>Keyboard Shortcuts</h3>" +
             final File finalFile = fileToSave;
             new Thread(() -> {
                 try {
-                    net.sf.rails.game.ai.snapshot.JsonStateSerializer.serialize(gameUIManager.getGameManager(), finalFile.getAbsolutePath());
+                    net.sf.rails.game.ai.snapshot.JsonStateSerializer.serialize(gameUIManager.getGameManager(),
+                            finalFile.getAbsolutePath());
                     log.info("Successfully saved JSON state to {}", finalFile.getAbsolutePath());
                 } catch (Exception ex) {
                     log.error("Failed to save JSON state", ex);
-                    JOptionPane.showMessageDialog(StatusWindow.this, "Failed to save JSON: " + ex.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
+                    JOptionPane.showMessageDialog(StatusWindow.this, "Failed to save JSON: " + ex.getMessage(), "Error",
+                            JOptionPane.ERROR_MESSAGE);
                 }
             }).start();
         }
     }
 
     /**
-     * A translucent overlay to display a massive "GAME PAUSED" text across the entire window.
+     * A translucent overlay to display a massive "GAME PAUSED" text across the
+     * entire window.
      */
     private class PauseOverlay extends JComponent {
         private static final long serialVersionUID = 1L;
 
         @Override
         public boolean contains(int x, int y) {
-            // CRITICAL: Let all mouse clicks pass through so the user can still click "Resume"
+            // CRITICAL: Let all mouse clicks pass through so the user can still click
+            // "Resume"
             return false;
         }
 

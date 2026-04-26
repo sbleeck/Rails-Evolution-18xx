@@ -1355,6 +1355,22 @@ public class ORUIManager implements DialogOwner {
 
         // 5. Force Repaint to show changes
         map.repaintAll(new Rectangle(map.getSize()));
+
+        // 6. 1870 Connection Run: Permanent Planning Highlight
+        if (currentComp instanceof net.sf.rails.game.specific._1870.PublicCompany_1870) {
+            net.sf.rails.game.specific._1870.PublicCompany_1870 comp1870 = 
+                (net.sf.rails.game.specific._1870.PublicCompany_1870) currentComp;
+            
+            if (comp1870.getDestinationHex() != null && !comp1870.hasConnected()) {
+                GUIHex destGuiHex = map.getHex(comp1870.getDestinationHex());
+                // We pass 'false' for the hover-specific aggressive logic, 
+                // keeping this as a persistent planning border.
+                if (destGuiHex != null) {
+                    destGuiHex.setDestinationHighlight(true);
+                }
+            }
+        }
+        
     }
 
     public void processBuyTrain(BuyTrain action) {

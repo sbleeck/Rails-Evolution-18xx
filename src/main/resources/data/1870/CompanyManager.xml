@@ -6,7 +6,7 @@
 		<Tradeable toCompany="yes" lowerPriceFactor="0.5" upperPriceFactor="2.0"/>
 	</CompanyType>
 	
-	<CompanyType name="Public" class="net.sf.rails.game.PublicCompany">
+<CompanyType name="Public" class="net.sf.rails.game.specific._1870.PublicCompany_1870">
 		<CanBuyPrivates/>
 		<IPOPaysOut/>
 		<Float percentage="60"/>
@@ -48,13 +48,13 @@
 		<Info key="ComesWithCertificate" parm="KATY,10"></Info>
 	</Company>
 
-	<Company name="KATY" type="Public" tokens="4" fgColour="FFFFFF"
+	<Company name="KATY" type="Public" tokens="4" fgColour="000000"
 		bgColour="00FF00" longname="Missouri-Kansas-Texas Railroad">
 		<Home hex="B11" ></Home>
 		<Destination hex="N1" />
 	</Company>
 
-	<Company name="MP" type="Public" tokens="4" fgColour="FFFFFF"
+	<Company name="MP" type="Public" tokens="4" fgColour="000000"
 		bgColour="FF0000" longname="Missouri Pacific Railroad">
 		<Home hex="C18" />
 		<Destination hex="J5" />
@@ -66,19 +66,19 @@
 		<Destination hex="N1" />
 	</Company>
 	
-	<Company name="SP" type="Public" tokens="4" fgColour="FF8000"
+	<Company name="SP" type="Public" tokens="4" fgColour="FF0000"
 		bgColour="000000" longname="Southern Pacific Railroad">
 		<Home hex="N1" />
 		<Destination hex="N17" />
 	</Company>
 	
-	<Company name="GMO" type="Public" tokens="3" fgColour="FFFFFF"
+	<Company name="GMO" type="Public" tokens="3" fgColour="000000"
 		bgColour="ff0040" longname="Gulf, Mobile &amp; Ohio Railroad">
 		<Home hex="M20" />
 		<Destination hex="C18" />
 	</Company>
 	
-	<Company name="SLSF" type="Public" tokens="4" fgColour="FFFFFF"
+	<Company name="SLSF" type="Public" tokens="4" fgColour="0000FF"
 		bgColour="d04000" longname="St. Louis-San Francisco Railway"
              description="President's Certificate of the SLSF. Pays $20 revenue. Allows the SLSF to float immediately at 20% (instead of 60%). Closes when the SLSF buys its first train, exchanging for the President's Certificate.">
 		<Home hex="E12" />
@@ -86,13 +86,13 @@
 		<Destination hex="M22" />
 	</Company>
 	
-	<Company name="TP" type="Public" tokens="3" fgColour="FFFFFF"
+	<Company name="TP" type="Public" tokens="3" fgColour="00FF00"
 		bgColour="000000" longname="Texas &amp; Pacific Railway">
 		<Home hex="J5" />
 		<Destination hex="N17" />
 	</Company>
 	
-	<Company name="FW" type="Public" tokens="3" fgColour="FF0000"
+	<Company name="FW" type="Public" tokens="3" fgColour="00FFFF"
 		bgColour="000000" longname="Fort Worth &amp; Denver City Railway">
 		<Home hex="J3"></Home>
 		<Destination hex="A2" />

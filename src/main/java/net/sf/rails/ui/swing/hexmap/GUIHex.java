@@ -12,6 +12,7 @@ import java.awt.geom.GeneralPath;
 import java.awt.geom.Line2D;
 import java.awt.geom.Point2D;
 import java.awt.geom.Rectangle2D;
+import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -124,6 +125,9 @@ public class GUIHex implements Observer {
         HIGHLIGHT_PURPLE(0.8, new Color(128, 0, 128)),
         // Dashed Purple Highlight (Portfolio Owner) - Opaque purple
         HIGHLIGHT_PORTFOLIO(0.8, new Color(128, 0, 128)),
+
+        // Thick Gold/Amber highlight for the connection run destination
+        HIGHLIGHT_DESTINATION(0.8, new Color(255, 191, 0)),
 
         INVALIDS(0.9, Color.pink);
 
@@ -466,6 +470,11 @@ public class GUIHex implements Observer {
                         dashPattern, 0.0f));
                 g.setColor(state.getColor());
                 g.draw(innerHex);
+            } else if (state == State.HIGHLIGHT_DESTINATION) {
+                // Destination: Thick solid Gold/Amber border
+                g.setStroke(new BasicStroke(strokeWidth + 4.0f));
+                g.setColor(State.HIGHLIGHT_DESTINATION.getColor());
+                g.draw(innerHex);
             } else if (state == State.HIGHLIGHT_PURPLE || is1817AuctionSelection) {
                 // Active company: Solid white halo first, then solid purple
                 g.setStroke(new BasicStroke(strokeWidth + 3.0f));
@@ -647,7 +656,7 @@ drawHome(g, company, p, homeCity);
         if (activeOwnerLabel != null) {
             drawString(g, activeOwnerLabel, 0, 0);
         }
-
+drawDestinationMilestones(g);
     }
 
     public void setCustomOverlayText(String text) {
@@ -1262,4 +1271,86 @@ private void drawBaseToken(Graphics2D g2, PublicCompany co, HexPoint center, dou
         hexMap.repaintTokens(getBounds());
     }
 
+    /**
+     * Toggles the destination highlight state.
+     */
+    public void setDestinationHighlight(boolean active) {
+        if (active) {
+            setState(State.HIGHLIGHT_DESTINATION);
+            hexMap.repaintMarks(getMarksDirtyBounds());
+        } else {
+            if (getState() == State.HIGHLIGHT_DESTINATION) {
+                setState(State.NORMAL);
+            }
+        }
+    }
+
+ private void drawDestinationMilestones(Graphics2D g2) {
+
+
+        if (hexMap == null || hexMap.getMapManager() == null || hexMap.getMapManager().getRoot() == null) return;
+        
+        java.util.List<PublicCompany> destinationMarkers = new java.util.ArrayList<>();
+        net.sf.rails.game.CompanyManager cm = hexMap.getMapManager().getRoot().getCompanyManager();
+        if (cm != null) {
+            for (PublicCompany comp : cm.getAllPublicCompanies()) {
+                if (comp.getDestinationHex() != null && comp.getDestinationHex().equals(getHex())) {
+                    destinationMarkers.add(comp);
+                }
+            }
+        }
+
+        if (destinationMarkers.isEmpty()) return;
+
+        java.awt.Font originalFont = g2.getFont();
+        g2.setFont(new java.awt.Font("SansSerif", java.awt.Font.BOLD, 10));
+        java.awt.FontMetrics fm = g2.getFontMetrics();
+
+        int size = 16; 
+        int gap = 2;   
+        
+        int startX = (int) dimensions.rectBound.getX() + 10;
+        int startY = (int) dimensions.rectBound.getY() + 10;
+
+        for (int i = 0; i < destinationMarkers.size(); i++) {
+            PublicCompany comp = destinationMarkers.get(i);
+            boolean connected = comp.hasReachedDestination();
+            
+            int x = startX + (i * (size + gap));
+            int y = startY;
+
+            // 1. Draw Background
+            java.awt.Color bg = comp.getBgColour();
+            if (connected) {
+                bg = new java.awt.Color(bg.getRed(), bg.getGreen(), bg.getBlue(), 100);
+            }
+            g2.setColor(bg);
+            g2.fillRect(x, y, size, size);
+
+            // 2. Draw Border
+            g2.setColor(java.awt.Color.BLACK);
+            g2.setStroke(new java.awt.BasicStroke(1.0f));
+            g2.drawRect(x, y, size, size);
+
+            // 3. Draw Company ID
+            java.awt.Color fg = comp.getFgColour();
+            if (connected) {
+                fg = new java.awt.Color(fg.getRed(), fg.getGreen(), fg.getBlue(), 100);
+            }
+            g2.setColor(fg);
+            String id = comp.getId().substring(0, Math.min(comp.getId().length(), 3));
+            int tx = x + (size - fm.stringWidth(id)) / 2;
+            int ty = y + ((size - fm.getHeight()) / 2) + fm.getAscent();
+            g2.drawString(id, tx, ty);
+
+            // 4. Overlay Checkmark if connected
+            if (connected) {
+                g2.setColor(new java.awt.Color(0, 150, 0)); 
+                g2.setStroke(new java.awt.BasicStroke(2.0f));
+                g2.drawLine(x + 2, y + size/2, x + size/2, y + size - 2);
+                g2.drawLine(x + size/2, y + size - 2, x + size - 2, y + 2);
+            }
+        }
+        g2.setFont(originalFont);
+    }
 }

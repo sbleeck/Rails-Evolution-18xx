@@ -1197,7 +1197,22 @@ public void setOwnerHighlight(List<GUIHex> guiHexes, String label) {
 
 
 
+private GUIHex currentDestinationHex = null;
 
+    public void setDestinationHighlight(GUIHex hex, boolean active) {
+        if (currentDestinationHex != null) {
+            currentDestinationHex.setDestinationHighlight(false);
+            currentDestinationHex = null;
+        }
+
+        if (active && hex != null) {
+            hex.setDestinationHighlight(true);
+            currentDestinationHex = hex;
+        }
+
+        Rectangle r = new Rectangle(getSize());
+        repaintAll(r); 
+    }
 
 
 

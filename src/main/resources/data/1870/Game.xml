@@ -4,17 +4,18 @@
 		<Game name="1870"/>
 		
 		<GameParameters>
+			<Parameter name="CanAnyCompanyHoldOwnShares" value="yes"/>
 			<PlayerShareLimit percentage="60">
 				<PriceProtection/>
 			</PlayerShareLimit>
 			<BankPoolLimit percentage="50"/>
 
-<StockRound class="net.sf.rails.game.specific._1870.StockRound_1870">
+			<StockRound class="net.sf.rails.game.specific._1870.StockRound_1870">
 				<NoSaleInFirstSR/>
 			</StockRound>
 			
 			<OperatingRound class="net.sf.rails.game.specific._1870.OperatingRound_1870">
-                <EmergencyTrainBuying mustBuyCheapestTrain="yes" mayBuyFromCompany="no"/>
+                <EmergencyTrainBuying mustBuyCheapestTrain="yes" mayBuyFromCompany="yes"/>
             </OperatingRound>
 
 		</GameParameters>

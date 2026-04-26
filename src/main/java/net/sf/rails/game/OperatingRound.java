@@ -110,7 +110,7 @@ public class OperatingRound extends Round implements Observer {
     protected transient PossibleAction selectedAction;
 
     protected final GenericState<PossibleAction> savedAction = new GenericState<>(this, "savedAction");
- protected final GenericState<String> pendingTrainName = new GenericState<>(this, "pendingTrainName");
+    protected final GenericState<String> pendingTrainName = new GenericState<>(this, "pendingTrainName");
 
     protected GameDef.OrStep[] steps = new GameDef.OrStep[] {
             GameDef.OrStep.INITIAL, GameDef.OrStep.LAY_TRACK,
@@ -222,7 +222,6 @@ public class OperatingRound extends Round implements Observer {
     // File: OperatingRound.java (~ Line 172)
     // [REPLACE the entire 'resume' method with this]
 
-
     @Override
     public void resume() {
 
@@ -233,21 +232,21 @@ public class OperatingRound extends Round implements Observer {
         if (this.currentSpecialTokenLays != null)
             this.currentSpecialTokenLays.clear();
 
-
-// Fix for Double-Execution: Retrieve the saved action
+        // Fix for Double-Execution: Retrieve the saved action
         PossibleAction actionToProcess = savedAction.value();
         // DO NOT clear savedAction yet; validation inside buyTrain relies on it.
 
-// 1. Check for a pending train by ID string
+        // 1. Check for a pending train by ID string
         String targetName = pendingTrainName.value();
-        log.info("LIFECYCLE: resume() invoked. pendingTrainName retrieved as: [{}]", targetName != null ? targetName : "NULL");
+        log.info("LIFECYCLE: resume() invoked. pendingTrainName retrieved as: [{}]",
+                targetName != null ? targetName : "NULL");
 
         if (targetName != null) {
-            
+
             // Re-generate current valid actions
             possibleActions.clear();
             setBuyableTrains();
-            
+
             boolean found = false;
             for (PossibleAction pa : possibleActions.getList()) {
                 if (pa instanceof BuyTrain) {
@@ -259,16 +258,17 @@ public class OperatingRound extends Round implements Observer {
                     }
                 }
             }
-            if (!found) log.error("Auto-purchase failed: Train {} not found in pool.", targetName);
+            if (!found)
+                log.error("Auto-purchase failed: Train {} not found in pool.", targetName);
 
         } else if (savedAction.value() instanceof RepayLoans) {
             executeRepayLoans((RepayLoans) savedAction.value());
         } else {
-            setPossibleActions(); 
+            setPossibleActions();
         }
 
         // 2. Clear states and signal UI refresh
-        savedAction.set(null); 
+        savedAction.set(null);
         pendingTrainName.set(null);
         wasInterrupted.set(true); // <--- UNCOMMENTED: Trigger UI sync
 
@@ -276,7 +276,6 @@ public class OperatingRound extends Round implements Observer {
         guiHints.setVisibilityHint(GuiDef.Panel.STATUS, true);
         guiHints.setActivePanel(GuiDef.Panel.MAP);
     }
-
 
     protected void finishOR() {
 
@@ -395,8 +394,8 @@ public class OperatingRound extends Round implements Observer {
         } else if (selectedAction instanceof DiscardTrain) {
 
             executeDiscardTrain((DiscardTrain) action);
-            
-            // Return true to signal the action is complete. 
+
+            // Return true to signal the action is complete.
             // The engine will refresh and re-check the train limit automatically.
             return true;
 
@@ -576,7 +575,7 @@ public class OperatingRound extends Round implements Observer {
 
         }
 
-ReportBuffer.add(this, " ");
+        ReportBuffer.add(this, " ");
         Player president = operatingCompany.value().getPresident();
         String presId = (president != null) ? president.getId() : "None";
         ReportBuffer.add(this, LocalText.getText("CompanyOperates",
@@ -585,7 +584,6 @@ ReportBuffer.add(this, " ");
         if (president != null) {
             playerManager.setCurrentPlayer(president);
         }
-
 
         if (noMapMode && !operatingCompany.value().hasLaidHomeBaseTokens()) {
             // Lay base token in noMapMode
@@ -639,7 +637,7 @@ ReportBuffer.add(this, " ");
      * =======================================
      */
 
-protected boolean setNextOperatingCompany(boolean initial) {
+    protected boolean setNextOperatingCompany(boolean initial) {
 
         while (true) {
             if (initial || operatingCompany == null || operatingCompany.value() == null) {
@@ -655,7 +653,7 @@ protected boolean setNextOperatingCompany(boolean initial) {
                 setOperatingCompany(operatingCompanies.get(index));
             }
 
-if (operatingCompany.value().isClosed()
+            if (operatingCompany.value().isClosed()
                     || operatingCompany.value().isHibernating()
                     || operatingCompany.value().getPresident() == null)
                 continue;
@@ -664,7 +662,6 @@ if (operatingCompany.value().isClosed()
         }
     }
 
-    
     /**
      * Insert a newly formed company that is allowed to operate
      * into the current list of operating companies at the proper spot:
@@ -984,88 +981,88 @@ if (operatingCompany.value().isClosed()
         return true; // <--- The normal "Done" ALREADY returns true!
     }
 
-
     // In OperatingRound.java
 
-public boolean discardTrain(DiscardTrain action) {
-    
-    // 1. Setup Context
-    PublicCompany currentOp = operatingCompany.value();
-    Player currentPlayer = playerManager.getCurrentPlayer();
-    
-    PublicCompany actionComp = action.getCompany();
-    Player actionPlayer = (actionComp != null) ? actionComp.getPresident() : null;
+    public boolean discardTrain(DiscardTrain action) {
 
-    if (actionComp != null) {
-        log.info("Portfolio Inspection [{}]: {}", actionComp.getId(),
-                actionComp.getPortfolioModel().getTrainList());
-    }
+        // 1. Setup Context
+        PublicCompany currentOp = operatingCompany.value();
+        Player currentPlayer = playerManager.getCurrentPlayer();
 
-    // 2. The "Dirty Fix" (Make available to all games)
-    // Ensures the engine validates the action even if the map wasn't updated yet.
-    if (excessTrainCompanies == null) {
-        excessTrainCompanies = new HashMap<>();
-    }
-    if (actionPlayer != null) {
-        List<PublicCompany> comps = excessTrainCompanies.get(actionPlayer);
-        if (comps == null) {
-            comps = new ArrayList<>();
-            excessTrainCompanies.put(actionPlayer, comps);
+        PublicCompany actionComp = action.getCompany();
+        Player actionPlayer = (actionComp != null) ? actionComp.getPresident() : null;
+
+        if (actionComp != null) {
+            log.info("Portfolio Inspection [{}]: {}", actionComp.getId(),
+                    actionComp.getPortfolioModel().getTrainList());
         }
-        if (!comps.contains(actionComp)) {
-            comps.add(actionComp);
+
+        // 2. The "Dirty Fix" (Make available to all games)
+        // Ensures the engine validates the action even if the map wasn't updated yet.
+        if (excessTrainCompanies == null) {
+            excessTrainCompanies = new HashMap<>();
         }
-    }
-
-    // 3. Context Swap (Handle Interjections)
-    boolean isInterjection = (actionComp != null && currentOp != null && actionComp != currentOp);
-
-    if (isInterjection) {
-        operatingCompany.set(actionComp);
         if (actionPlayer != null) {
-            playerManager.setCurrentPlayer(actionPlayer);
+            List<PublicCompany> comps = excessTrainCompanies.get(actionPlayer);
+            if (comps == null) {
+                comps = new ArrayList<>();
+                excessTrainCompanies.put(actionPlayer, comps);
+            }
+            if (!comps.contains(actionComp)) {
+                comps.add(actionComp);
+            }
         }
-    }
 
-    // 4. Execute Action (With Safety Wrapper)
-    boolean processed = false;
-    try {
-        processed = action.process(this);
-    } catch (Exception e) {
-        log.error(">>> FORENSIC ERROR: Exception during action.process()", e);
-    }
+        // 3. Context Swap (Handle Interjections)
+        boolean isInterjection = (actionComp != null && currentOp != null && actionComp != currentOp);
 
-    // 5. Restore Context
-    if (isInterjection) {
-        operatingCompany.set(currentOp);
-        if (currentPlayer != null) {
-            playerManager.setCurrentPlayer(currentPlayer);
+        if (isInterjection) {
+            operatingCompany.set(actionComp);
+            if (actionPlayer != null) {
+                playerManager.setCurrentPlayer(actionPlayer);
+            }
         }
-    }
 
-    if (!processed) {
-        return false;
-    }
+        // 4. Execute Action (With Safety Wrapper)
+        boolean processed = false;
+        try {
+            processed = action.process(this);
+        } catch (Exception e) {
+            log.error(">>> FORENSIC ERROR: Exception during action.process()", e);
+        }
 
-    // 6. Check for remaining discards
-    boolean moreDiscards = checkForExcessTrains();
+        // 5. Restore Context
+        if (isInterjection) {
+            operatingCompany.set(currentOp);
+            if (currentPlayer != null) {
+                playerManager.setCurrentPlayer(currentPlayer);
+            }
+        }
 
-    // --- HOOK: Allow Subclasses to intervene (e.g., 1835 Prussian Formation) ---
-    // If the hook returns TRUE, it means the subclass handled the flow, so we return.
-    if (processGameSpecificDiscard(action, moreDiscards)) {
-        return true;
-    }
+        if (!processed) {
+            return false;
+        }
 
-    // 7. Standard Post-Discard Logic (Now improved for all games)
-    if (!moreDiscards) {
-        newPhaseChecks();
-        
-        // If phase change caused an interrupt (e.g. limit drop), pause here.
-        if (gameManager.getInterruptedRound() != null) {
+        // 6. Check for remaining discards
+        boolean moreDiscards = checkForExcessTrains();
+
+        // --- HOOK: Allow Subclasses to intervene (e.g., 1835 Prussian Formation) ---
+        // If the hook returns TRUE, it means the subclass handled the flow, so we
+        // return.
+        if (processGameSpecificDiscard(action, moreDiscards)) {
             return true;
         }
 
-boolean companySwitched = handleClosedOperatingCompany();
+        // 7. Standard Post-Discard Logic (Now improved for all games)
+        if (!moreDiscards) {
+            newPhaseChecks();
+
+            // If phase change caused an interrupt (e.g. limit drop), pause here.
+            if (gameManager.getInterruptedRound() != null) {
+                return true;
+            }
+
+            boolean companySwitched = handleClosedOperatingCompany();
             if (!companySwitched) {
                 playerManager.setCurrentPlayer(operatingCompany.value().getPresident());
 
@@ -1073,45 +1070,44 @@ boolean companySwitched = handleClosedOperatingCompany();
                 // This broke Voluntary Discards (1837) where a player discards TO buy a train.
                 // We must ensure we stay in the BUY_TRAIN step.
                 stepObject.set(GameDef.OrStep.BUY_TRAIN);
-                
+
                 // Original problematic code for reference:
                 // if (trainsBoughtThisTurn.isEmpty()) {
-                //    setStep(GameDef.OrStep.INITIAL);
+                // setStep(GameDef.OrStep.INITIAL);
                 // } else {
-                //    stepObject.set(GameDef.OrStep.BUY_TRAIN);
+                // stepObject.set(GameDef.OrStep.BUY_TRAIN);
                 // }
             }
         } else {
-             // If more discards are needed, ensure we stay/enter the correct step
-             setStep(GameDef.OrStep.DISCARD_TRAINS);
+            // If more discards are needed, ensure we stay/enter the correct step
+            setStep(GameDef.OrStep.DISCARD_TRAINS);
         }
 
-    return true;
-}
+        return true;
+    }
 
-/**
- * Hook for subclasses (like 1835) to handle cases where the operating company 
- * closes immediately after an action (e.g., Discard triggers Formation).
- * * @return true if the company was switched and the step was reset.
- */
-protected boolean handleClosedOperatingCompany() {
-    return false; // Standard games do not switch companies inside discardTrain
-}
+    /**
+     * Hook for subclasses (like 1835) to handle cases where the operating company
+     * closes immediately after an action (e.g., Discard triggers Formation).
+     * * @return true if the company was switched and the step was reset.
+     */
+    protected boolean handleClosedOperatingCompany() {
+        return false; // Standard games do not switch companies inside discardTrain
+    }
 
+    /**
+     * Hook for subclasses to add specific logic after a discard.
+     * 
+     * @return true if the subclass handled the flow and no further processing is
+     *         needed.
+     */
+    protected boolean processGameSpecificDiscard(DiscardTrain action, boolean moreDiscards) {
+        return false; // Default: do nothing, proceed to standard logic
+    }
 
-/**
- * Hook for subclasses to add specific logic after a discard.
- * @return true if the subclass handled the flow and no further processing is needed.
- */
-protected boolean processGameSpecificDiscard(DiscardTrain action, boolean moreDiscards) {
-    return false; // Default: do nothing, proceed to standard logic
-}
-
-
-// ... (lines of unchanged context code) ...
+    // ... (lines of unchanged context code) ...
 
     public boolean checkForExcessTrains() {
-        // System.out.println(">>> DEBUG: checkForExcessTrains() STARTED");
         excessTrainCompanies = new HashMap<>();
         Player player;
 
@@ -1119,12 +1115,9 @@ protected boolean processGameSpecificDiscard(DiscardTrain action, boolean moreDi
             int numTrains = comp.getPortfolioModel().getNumberOfTrains();
             int trainLimit = comp.getCurrentTrainLimit();
 
-            // System.out.println(">>> DEBUG: Checking " + comp.getId() + ": Trains=" + numTrains + " Limit=" + trainLimit);
-
             if (numTrains > trainLimit) {
                 player = comp.getPresident();
                 if (player == null) {
-                    // System.out.println(">>> DEBUG: " + comp.getId() + " has excess but no President!");
                     continue;
                 }
 
@@ -1132,22 +1125,19 @@ protected boolean processGameSpecificDiscard(DiscardTrain action, boolean moreDi
                     excessTrainCompanies.put(player, new ArrayList<>(2));
                 }
                 excessTrainCompanies.get(player).add(comp);
-                // System.out.println(">>> DEBUG: EXCESS FOUND for " + comp.getId());
             }
         }
 
         boolean result = !excessTrainCompanies.isEmpty();
-        // System.out.println(">>> DEBUG: checkForExcessTrains() RESULT: " + result);
         return result;
     }
 
-
     protected void setTrainsToDiscard() {
 
-                // System.out.println(">>> DEBUG: setTrainsToDiscard() STARTED");
-// 1. CRITICAL: Refresh the excess map immediately.
+        // 1. CRITICAL: Refresh the excess map immediately.
         // The logs showed this method running with stale data (SB=4) after a discard.
-        // By calling this first, we ensure 'excessTrainCompanies' reflects the current state (SB=3).
+        // By calling this first, we ensure 'excessTrainCompanies' reflects the current
+        // state (SB=3).
         if (!checkForExcessTrains()) {
             possibleActions.clear();
             // If the map is empty, we stop generating discard buttons entirely.
@@ -1156,7 +1146,6 @@ protected boolean processGameSpecificDiscard(DiscardTrain action, boolean moreDi
 
         // 2. Clear previous buttons (standard cleanup)
         possibleActions.clear();
-
 
         // 1. Lock the turn
         doneAllowed.set(false);
@@ -1173,18 +1162,17 @@ protected boolean processGameSpecificDiscard(DiscardTrain action, boolean moreDi
                 List<PublicCompany> comps = excessTrainCompanies.get(player);
 
                 for (PublicCompany comp : comps) {
-                    if (comp.getPortfolioModel().getNumberOfTrains() == 0) continue;
+                    if (comp.getPortfolioModel().getNumberOfTrains() == 0)
+                        continue;
 
-                    generateGroupedDiscardActions(comp); 
-                    
+                    generateGroupedDiscardActions(comp);
+
                     return;
                 }
             }
         }
     }
 
-
-    
     /*
      * =======================================
      * 3.3. PRIVATES (BUYING, SELLING, CLOSING)
@@ -1233,7 +1221,7 @@ protected boolean processGameSpecificDiscard(DiscardTrain action, boolean moreDi
                 errMsg = "Private Trading restricted to same-owner only.";
                 break;
             }
-            
+
             upperPrice = privateCompany.getUpperPrice();
             lowerPrice = privateCompany.getLowerPrice();
 
@@ -1493,7 +1481,7 @@ protected boolean processGameSpecificDiscard(DiscardTrain action, boolean moreDi
                 // Start a share selling round
                 int cashToBeRaisedByPresident = remainder - presCash;
 
-savedAction.set(action);
+                savedAction.set(action);
                 gameManager.startShareSellingRound(
                         operatingCompany.value().getPresident(),
                         cashToBeRaisedByPresident, operatingCompany.value(),
@@ -1704,12 +1692,12 @@ savedAction.set(action);
         // performance impact.
         int potentialRevenue = ra.calculateRevenue();
 
-// 1. Get the special revenue (calculated by RunToCoalMineModifier)
+        // 1. Get the special revenue (calculated by RunToCoalMineModifier)
         int specialRevenue = ra.getSpecialRevenue();
 
-        // log.info("OR_TRACE: Revenue for " + company.getId() 
-        //         + " | Base=" + potentialRevenue 
-        //         + " | Special=" + specialRevenue);
+        // log.info("OR_TRACE: Revenue for " + company.getId()
+        // + " | Base=" + potentialRevenue
+        // + " | Special=" + specialRevenue);
 
         // 2. Add it to the total (This was commented out in your file!)
         potentialRevenue += specialRevenue;
@@ -1728,9 +1716,7 @@ savedAction.set(action);
         return Bank.format(this, total);
     }
 
-
-
-/*
+    /*
      * Extracted method, to be overridden for any extra cost.
      * Examples: SOH (river bridge), 1846 (generic lay cost), 1861 (second tile)
      */
@@ -1738,7 +1724,7 @@ savedAction.set(action);
 
         SpecialTileLay stl = action.getSpecialProperty();
         int cost = 0;
-        
+
         // 1. Calculate Standard Cost (Base Rails Logic)
         if (stl == null || !stl.isFree()) {
             cost = action.getChosenHex().getTileCost();
@@ -1748,7 +1734,8 @@ savedAction.set(action);
         }
 
         // 2. Apply Game-Specific Overrides (e.g. 1837 Mountain Railway Waiver)
-        // We pass the calculated standard cost to the hook. If the hook returns 0, it overrides the cost.
+        // We pass the calculated standard cost to the hook. If the hook returns 0, it
+        // overrides the cost.
         cost = getTileLayCost(action.getCompany(), action.getChosenHex(), cost);
 
         return cost;
@@ -2086,17 +2073,19 @@ savedAction.set(action);
 
     /**
      * Calculates the cost for a specific company to lay a tile on a hex.
-     * @param company The acting company.
-     * @param hex The target hex.
-     * @param standardCost The standard terrain/action cost calculated by the Rails engine.
+     * 
+     * @param company      The acting company.
+     * @param hex          The target hex.
+     * @param standardCost The standard terrain/action cost calculated by the Rails
+     *                     engine.
      * @return The final cost (possibly adjusted by private company ownership, etc).
      */
     public int getTileLayCost(PublicCompany company, MapHex hex, int standardCost) {
-        // Default behavior: The cost is exactly what the map says (mountains, rivers, etc.)
+        // Default behavior: The cost is exactly what the map says (mountains, rivers,
+        // etc.)
         return standardCost;
     }
 
-    
     protected boolean gameSpecificTileLayAllowed(PublicCompany company,
             MapHex hex, int orientation) {
         return !hex.isBlockedByPrivateCompany();
@@ -3146,9 +3135,10 @@ savedAction.set(action);
             // Relax validation: If we are resuming a saved action (e.g. returning from
             // emergency share selling), we allow the purchase even if the step logic
             // (like PFR triggers) has shifted the state temporarily.
-if (getStep() != GameDef.OrStep.BUY_TRAIN && pendingTrainName.value() == null && savedAction.value() == null) {
+            if (getStep() != GameDef.OrStep.BUY_TRAIN && pendingTrainName.value() == null
+                    && savedAction.value() == null) {
 
-            errMsg = LocalText.getText("WrongActionNoTrainBuyingCost");
+                errMsg = LocalText.getText("WrongActionNoTrainBuyingCost");
                 break;
             }
 
@@ -3210,7 +3200,7 @@ if (getStep() != GameDef.OrStep.BUY_TRAIN && pendingTrainName.value() == null &&
 
                 if (willBankruptcyOccur(company, cashToRaise)) {
                     // DisplayBuffer.add(this, LocalText.getText("YouMustRaiseCashButCannot",
-                    //         Bank.format(this, cashToRaise)));
+                    // Bank.format(this, cashToRaise)));
                     if (GameDef.getParmAsBoolean(this, GameDef.Parm.EMERGENCY_COMPANY_BANKRUPTCY)) {
                         company.setBankrupt();
                         gameManager.registerCompanyBankruptcy(company);
@@ -3425,12 +3415,13 @@ if (getStep() != GameDef.OrStep.BUY_TRAIN && pendingTrainName.value() == null &&
 
             if (train != null) {
                 pendingTrainName.set(train.getName()); // Save ID as persistent string
-                log.info("LIFECYCLE: pendingTrainName SET to [{}] for company [{}]", pendingTrainName.value(), company.getId());
+                log.info("LIFECYCLE: pendingTrainName SET to [{}] for company [{}]", pendingTrainName.value(),
+                        company.getId());
             } else {
                 log.warn("LIFECYCLE: WARNING - train was null during emergency trigger!");
             }
 
-if (train != null) {
+            if (train != null) {
                 pendingTrainName.set(train.getName()); // Save ID as persistent string
             }
 
@@ -4106,7 +4097,6 @@ if (train != null) {
         }
     }
 
-
     /**
      * Creates a human-readable button label for a specific train purchase.
      * 
@@ -4181,7 +4171,6 @@ if (train != null) {
         MapHex hex = action.getChosenHex();
         int orientation = action.getOrientation();
 
-  
         while (true) {
             if (!companyName.equals(operatingCompany.value().getId())) {
                 errMsg = LocalText.getText("WrongCompany", companyName, operatingCompany.value().getId());
@@ -4211,7 +4200,6 @@ if (train != null) {
                 errMsg = LocalText.getText("TileMayNotBeLaidInHex", tile.toText(), hex.getId());
                 break;
             }
-
 
             List<Tile> allowedTiles = action.getTiles();
             if (allowedTiles != null && !allowedTiles.isEmpty() && !allowedTiles.contains(tile)) {
@@ -4252,7 +4240,7 @@ if (train != null) {
             if (cost > 0) {
                 costText = Currency.toBank(operatingCompany.value(), cost);
             }
-// Capture the old tile before the upgrade overwrites it
+            // Capture the old tile before the upgrade overwrites it
             Tile oldTile = hex.getCurrentTile();
 
             operatingCompany.value().layTile(hex, tile, orientation, cost);
@@ -4264,7 +4252,6 @@ if (train != null) {
             }
             // Register the new tile to decrement its count
             tile.add(hex);
-            
 
             try {
                 int newPresetRevenue = calculateCurrentPotentialRevenue(operatingCompany.value());
@@ -4450,10 +4437,11 @@ if (train != null) {
             // This is the DONE/SKIP logic block for BUY_TRAIN
             if (hasBuyActions) {
                 // 'SKIP' (Done Buying) button.
-                // JSON State Recovery / Logic Fix: Ensure SKIP is not offered if purchase is mandatory.
- boolean mustBuy = !operatingCompany.value().hasTrains() && 
-                                 operatingCompany.value().mustOwnATrain();
-                                                 if (!mustBuy) {
+                // JSON State Recovery / Logic Fix: Ensure SKIP is not offered if purchase is
+                // mandatory.
+                boolean mustBuy = !operatingCompany.value().hasTrains() &&
+                        operatingCompany.value().mustOwnATrain();
+                if (!mustBuy) {
                     possibleActions.add(new NullAction(getRoot(), NullAction.Mode.SKIP));
                 }
             } else {
@@ -4857,10 +4845,9 @@ if (train != null) {
         // Forced Buy Condition: No trains AND company rules require ownership.
         boolean mustBuyTrain = !hasTrains && company.mustOwnATrain();
 
-// Check Phase Restrictions (e.g. "One train per turn")
+        // Check Phase Restrictions (e.g. "One train per turn")
         boolean canBuyMoreTrains = Phase.getCurrent(this).canBuyMoreTrainsPerTurn();
         boolean alreadyBought = !trainsBoughtThisTurn.isEmpty();
-
 
         // If we already bought a train, and the phase says "Only 1", and we aren't
         // forced to buy another...
@@ -5019,17 +5006,19 @@ if (train != null) {
     }
 
     /**
-     * Resets transient flags and safety sets the operating company to the first available one.
-     * This is primarily used during load to ensure a valid state before processing actions.
+     * Resets transient flags and safety sets the operating company to the first
+     * available one.
+     * This is primarily used during load to ensure a valid state before processing
+     * actions.
      */
-    public void resetTransientStateOnLoad() {  // CHANGED from protected to public
+    public void resetTransientStateOnLoad() { // CHANGED from protected to public
         // 1. Reset Flags
         if (this.doneAllowed != null) {
             this.doneAllowed.set(false);
         }
 
         // 2. SAFE RESET: Set to the first available company.
-if (operatingCompanies != null && !operatingCompanies.isEmpty()) {
+        if (operatingCompanies != null && !operatingCompanies.isEmpty()) {
             boolean found = false;
             for (PublicCompany comp : operatingCompanies.view()) {
                 if (!comp.isClosed() && comp.getPresident() != null) {
@@ -5038,7 +5027,8 @@ if (operatingCompanies != null && !operatingCompanies.isEmpty()) {
                     break;
                 }
             }
-            if (!found) this.operatingCompany.set(operatingCompanies.get(0));
+            if (!found)
+                this.operatingCompany.set(operatingCompanies.get(0));
         }
 
         // 3. Reset Step to ensure initTurn() runs when the real move starts
@@ -5071,18 +5061,10 @@ if (operatingCompanies != null && !operatingCompanies.isEmpty()) {
         return 0;
     }
 
-
-
-     
-     // (Reminder of the correct helper in OperatingRound.java)
+    // (Reminder of the correct helper in OperatingRound.java)
     public boolean checkAndGenerateDiscardActions(PublicCompany company) {
-       // use the master function in Round.java
+        // use the master function in Round.java
         return enforceTrainLimit(company);
     }
-     
-
-
-
-
 
 }

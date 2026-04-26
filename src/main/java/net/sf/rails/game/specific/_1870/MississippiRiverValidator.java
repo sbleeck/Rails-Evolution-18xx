@@ -71,9 +71,7 @@ public class MississippiRiverValidator {
         }
 
         String hexId = hex.getId();
-        System.out.println(">>> DEBUG: Hex " + hexId + " is a river. Evaluating topology. West=" + 
-                           topo.westBank + ", East=" + topo.eastBank + ", Orientation=" + orientation);
-
+       
         // 1. Handle Special City Exceptions (Memphis K16 and St. Louis C18)
         // These override normal edge-to-edge checks because the city itself is the barrier limit
         if ("K16".equals(hexId) || "C18".equals(hexId)) {
@@ -86,7 +84,6 @@ public class MississippiRiverValidator {
                     if (tp instanceof HexSide) {
                         int absSide = (tp.getTrackPointNumber() + orientation) % 6;
                         if (!allowedSides.contains(absSide)) {
-                            System.out.println(">>> DEBUG: Special city crossing detected on hex " + hexId + " at side " + absSide);
                             return true;
                         }
                     }
@@ -103,7 +100,6 @@ public class MississippiRiverValidator {
                 int tileEast = (absEast - orientation + 6) % 6;
 
                 if (tileConnectsSides(tile, tileWest, tileEast)) {
-                    System.out.println(">>> DEBUG: CROSSING DETECTED: MapWest:" + absWest + " to MapEast:" + absEast);
                     return true;
                 }
             }
@@ -124,11 +120,9 @@ public class MississippiRiverValidator {
                             int absSide = (relativeSide + orientation) % 6;
 
                             if (topo.stationBank == StationBank.EAST && topo.westBank.contains(absSide)) {
-                                System.out.println(">>> DEBUG: CROSSING DETECTED: East Station to West Edge (" + absSide + ")");
                                 return true;
                             }
                             if (topo.stationBank == StationBank.WEST && topo.eastBank.contains(absSide)) {
-                                System.out.println(">>> DEBUG: CROSSING DETECTED: West Station to East Edge (" + absSide + ")");
                                 return true;
                             }
                         }
@@ -137,7 +131,6 @@ public class MississippiRiverValidator {
             }
         }
         
-        System.out.println(">>> DEBUG: isCrossingRiver evaluated all combinations. RETURNED FALSE.");
         return false;
     }
 // --- END FIX ---

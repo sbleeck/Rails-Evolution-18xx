@@ -149,6 +149,8 @@ public class GameStatus extends GridPanel {
     // Universal Revenue Split Columns
     protected Field[] compRetained;
     protected int compRetainedXOffset, compRetainedYOffset;
+    protected JPanel[] compDest;
+    protected int compDestXOffset, compDestYOffset;
     protected Field[] compTrains;
     protected int compTrainsXOffset, compTrainsYOffset;
     protected JPanel[] compTokens;
@@ -537,6 +539,15 @@ public class GameStatus extends GridPanel {
         compCanBuyPrivates = gameUIManager.getGameParameterAsBoolean(GuiDef.Parm.CAN_ANY_COMPANY_BUY_PRIVATES);
         compCanHoldOwnShares = gameUIManager.getGameParameterAsBoolean(GuiDef.Parm.CAN_ANY_COMPANY_HOLD_OWN_SHARES);
         boolean is1817 = "1817".equals(gameUIManager.getGameManager().getGameName());
+       
+        boolean is1870 = "1870".equals(gameUIManager.getGameManager().getGameName());
+        
+        // 1870 Rule: Companies hold redeemed shares in their treasury.
+        // We force this to true to ensure the Shares column is generated alongside Cash.
+        if (is1870) {
+            compCanHoldOwnShares = true;
+        }
+       
         hasCompanyLoans = gameUIManager.getGameParameterAsBoolean(GuiDef.Parm.HAS_ANY_COMPANY_LOANS) || is1817;
 
         hasRights = gameUIManager.getGameParameterAsBoolean(GuiDef.Parm.HAS_ANY_RIGHTS);
@@ -1717,6 +1728,12 @@ public class GameStatus extends GridPanel {
             originalOrder.put(c, orderIndex++);
             if (c.isClosed())
                 continue;
+
+            // 1870 Rule: MKT Railroad is hidden until started by the exchange of the MKT private.
+            if ("MKT".equals(c.getId()) && !c.hasFloated()) {
+                continue;
+            }
+            
             if (!isStockRound && !c.hasFloated() && c.getClass().getName().contains("1817"))
                 continue;
 
@@ -1739,7 +1756,6 @@ public class GameStatus extends GridPanel {
         if (!currentSignature.equals(previousDashboardSignature) || this.getComponentCount() == 0) {
             if (!previousDashboardSignature.isEmpty() && !currentSignature.equals(previousDashboardSignature)
                     && this.getComponentCount() > 0) {
-                log.info("ANIMATION TRIGGER DETECTED: Logical order swapped.");
 
                 List<String> oldSig = new ArrayList<>(previousDashboardSignature);
                 List<String> newSig = new ArrayList<>(currentSignature);
@@ -2540,6 +2556,143 @@ public class GameStatus extends GridPanel {
         panel.repaint();
     }
 
+
+// --- START FIX ---
+    private void updateCompanyDestinationDisplay(int compIndex, PublicCompany company, JPanel panel) {
+        if (panel == null)
+            return;
+
+        panel.removeAll();
+
+        if (!company.hasFloated() || company.getDestinationHex() == null) {
+            panel.revalidate();
+            panel.repaint();
+            return;
+        }
+
+        String destId = company.getDestinationHex().getId();
+        boolean connected = company.hasReachedDestination();
+
+        panel.setLayout(new GridBagLayout());
+        GridBagConstraints gbc = new GridBagConstraints();
+        gbc.anchor = GridBagConstraints.CENTER;
+
+        JLabel iconLabel = new JLabel() {
+            @Override
+            public void setFont(Font f) {
+                super.setFont(f);
+                if (f != null) {
+                    FontMetrics fm = getFontMetrics(f);
+                    // Increased base size for the hex icon
+                    int iconSize = Math.max(24, fm.getAscent() + 12);
+                    setIcon(new DestinationHexIcon(destId, connected, iconSize));
+                }
+            }
+        };
+
+        iconLabel.setFont(panel.getFont());
+
+        if (connected) {
+            iconLabel.setToolTipText("<html><b>Connected!</b><br>Destination reached.</html>");
+        } else {
+            iconLabel.setToolTipText("<html><b>Destination: " + destId + "</b><br>Connect for rewards.</html>");
+        }
+
+        iconLabel.addMouseListener(new java.awt.event.MouseAdapter() {
+            @Override
+            public void mouseEntered(java.awt.event.MouseEvent e) {
+                if (gameUIManager != null && gameUIManager.getORUIManager() != null && gameUIManager.getORUIManager().getMap() != null) {
+                    net.sf.rails.ui.swing.hexmap.HexMap hexMap = gameUIManager.getORUIManager().getMap();
+                    net.sf.rails.ui.swing.hexmap.GUIHex guiHex = hexMap.getHex(company.getDestinationHex());
+                    if (guiHex != null) {
+                        hexMap.setDestinationHighlight(guiHex, true);
+                    }
+                }
+            }
+
+            @Override
+            public void mouseExited(java.awt.event.MouseEvent e) {
+                if (gameUIManager != null && gameUIManager.getORUIManager() != null && gameUIManager.getORUIManager().getMap() != null) {
+                    net.sf.rails.ui.swing.hexmap.HexMap hexMap = gameUIManager.getORUIManager().getMap();
+                    net.sf.rails.ui.swing.hexmap.GUIHex guiHex = hexMap.getHex(company.getDestinationHex());
+                    if (guiHex != null) {
+                        hexMap.setDestinationHighlight(guiHex, false);
+                    }
+                }
+            }
+        });
+
+        panel.add(iconLabel, gbc);
+        panel.revalidate();
+        panel.repaint();
+    }
+
+    private static class DestinationHexIcon implements Icon {
+        private final String text;
+        private final boolean connected;
+        private final int size;
+
+        public DestinationHexIcon(String text, boolean connected, int size) {
+            this.text = text;
+            this.connected = connected;
+            this.size = size;
+        }
+
+        @Override
+        public void paintIcon(Component c, Graphics g, int x, int y) {
+            Graphics2D g2 = (Graphics2D) g.create();
+            g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+
+            int width = (int) (size * 1.15); 
+            int height = size;
+
+            int[] xPoints = {
+                x + width/4, x + width*3/4, x + width, x + width*3/4, x + width/4, x
+            };
+            int[] yPoints = {
+                y, y, y + height/2, y + height, y + height, y + height/2
+            };
+            Polygon hex = new Polygon(xPoints, yPoints, 6);
+
+            if (connected) {
+                g2.setColor(new Color(34, 139, 34)); // Solid Forest Green
+                g2.fillPolygon(hex);
+                
+                g2.setColor(Color.WHITE);
+                g2.setFont(new Font("Dialog", Font.BOLD, (int)(size * 0.8)));
+                FontMetrics fm = g2.getFontMetrics();
+                String mark = "\u2713"; 
+                int tx = x + (width - fm.stringWidth(mark)) / 2;
+                int ty = y + ((height - fm.getHeight()) / 2) + fm.getAscent();
+                g2.drawString(mark, tx, ty);
+            } else {
+                // Added Golden/Yellow background
+                g2.setColor(new Color(255, 215, 0)); 
+                g2.fillPolygon(hex);
+
+                g2.setColor(Color.BLACK);
+                g2.setStroke(new BasicStroke(1.5f));
+                g2.drawPolygon(hex);
+                
+                g2.setColor(Color.BLACK);
+                // Reduced font scale to 45% of height to ensure it fits inside the borders
+                g2.setFont(c.getFont().deriveFont(Font.BOLD, size * 0.45f));
+                FontMetrics fm = g2.getFontMetrics();
+                int tx = x + (width - fm.stringWidth(text)) / 2;
+                int ty = y + ((height - fm.getHeight()) / 2) + fm.getAscent(); 
+                g2.drawString(text, tx, ty);
+            }
+            g2.dispose();
+        }
+
+        @Override
+        public int getIconWidth() { return (int) (size * 1.15); }
+
+        @Override
+        public int getIconHeight() { return size; }
+    }
+// --- END FIX ---
+
     private void updateCompanyPrivates(int i, PublicCompany c) {
         if (compPrivatesPanel == null || compPrivatesPanel[i] == null)
             return;
@@ -3148,10 +3301,10 @@ public class GameStatus extends GridPanel {
             if (compCanHoldOwnShares) {
                 setTreasuryCertButton(i, false);
                 if (certInTreasury[i] != null) {
-                    certInTreasury[i].setBackground(bgIpo);
+                    certInTreasury[i].setBackground(bgDet);
                     certInTreasury[i].setOpaque(true);
                     if (treasuryPanels[i] != null) {
-                        treasuryPanels[i].setBackground(bgIpo);
+                        treasuryPanels[i].setBackground(bgDet);
                     }
 
                 }
@@ -3161,6 +3314,10 @@ public class GameStatus extends GridPanel {
             if (compCash[i] != null) {
                 compCash[i].setBackground(bgDet);
                 compCash[i].setOpaque(true);
+            }
+            if (compCashButton[i] != null) {
+                compCashButton[i].setBackground(bgDet);
+                compCashButton[i].setOpaque(true);
             }
             if (compRevenue[i] != null) {
                 compRevenue[i].setBackground(bgDet);
@@ -3193,9 +3350,18 @@ public class GameStatus extends GridPanel {
                 compCash[i].setBackground(bgRow);
                 compCash[i].setOpaque(true);
             }
+            if (compCashButton[i] != null) {
+                compCashButton[i].setBackground(bgRow);
+                compCashButton[i].setOpaque(true);
+            }
             if (compRevenue[i] != null) {
                 compRevenue[i].setBackground(bgRow);
                 compRevenue[i].setOpaque(true);
+            }
+
+            if (compDest[i] != null) {
+                compDest[i].setBackground(bgRow);
+                updateCompanyDestinationDisplay(i, c, compDest[i]); 
             }
 
             if (compTokens[i] != null) {
@@ -4397,6 +4563,9 @@ public class GameStatus extends GridPanel {
         if (compTokens == null || compTokens.length != nc)
             compTokens = new JPanel[nc];
 
+        if (compDest == null || compDest.length != nc)
+            compDest = new JPanel[nc];
+
         if (compCanBuyPrivates) {
             if (compPrivatesPanel == null || compPrivatesPanel.length != nc)
                 compPrivatesPanel = new JPanel[nc];
@@ -4466,6 +4635,7 @@ public class GameStatus extends GridPanel {
 
         compRevenueXOffset = col++;
         compRetainedXOffset = col++;
+        compDestXOffset = col++;
         compTokensXOffset = col++;
 
         if (compCanBuyPrivates)
@@ -4656,6 +4826,14 @@ public class GameStatus extends GridPanel {
         f.setOpaque(true);
         f.setPreferredSize(dimStd);
         addField(f, compRetainedXOffset, 1, 1, 1, 0, true);
+
+        // 3b. Destination Header
+        f = new Caption("Dest.");
+        f.setBorder(BORDER_THIN);
+        f.setBackground(BG_HEADER);
+        f.setOpaque(true);
+        f.setPreferredSize(dimTokens); // Reuse tokens dimension
+        addField(f, compDestXOffset, 1, 1, 1, 0, true);
 
         // 4. Markers Header
         f = new Caption(LocalText.getText("TOKENS"));
@@ -4902,7 +5080,7 @@ public class GameStatus extends GridPanel {
                         treasuryShareCards[i], null, dimCard, null, getBorder.apply(true, false));
                 treasuryPanels[i]
                         .setBackground(isOperating ? BG_OPERATING
-                                : (isMinor || !isActive ? BG_INACTIVE : BG_SPOTLIGHT_INACTIVE));
+                                : (isMinor || !isActive ? BG_INACTIVE : BG_MAUVE));
                 treasuryPanels[i].setOpaque(true);
 
                 addField(treasuryPanels[i], certInTreasuryXOffset, y, 1, 1, 0, visible);
@@ -5074,6 +5252,15 @@ public class GameStatus extends GridPanel {
             }
             addField(f, compRetainedXOffset, y, 1, 1, 0, visible);
 
+            // 3b. DESTINATION PANEL
+            compDest[i] = new JPanel(new FlowLayout(FlowLayout.CENTER, 2, 0));
+            compDest[i].setOpaque(true);
+            compDest[i].setBackground(isOperating ? BG_OPERATING : (!isActive ? BG_INACTIVE : BG_MAUVE));
+            compDest[i].setBorder(bDet);
+            compDest[i].setPreferredSize(dimTokens);
+            updateCompanyDestinationDisplay(i, c, compDest[i]);
+            addField(compDest[i], compDestXOffset, y, 1, 1, 0, visible);
+            
             // 4. MARKERS/TOKENS PANEL (Now 5th column)
             compTokens[i] = new JPanel(new FlowLayout(FlowLayout.CENTER, 2, 0));
             compTokens[i].setOpaque(true);

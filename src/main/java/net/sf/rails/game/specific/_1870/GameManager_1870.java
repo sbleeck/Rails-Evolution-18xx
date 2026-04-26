@@ -53,13 +53,15 @@ public class GameManager_1870 extends GameManager {
             getRoot().getRevenueManager()
                     .addDynamicModifier(new net.sf.rails.game.specific._1870.CattleModifier_1870());
             getRoot().getRevenueManager().addDynamicModifier(new net.sf.rails.game.specific._1870.GulfModifier_1870());
-            log.info(">>> GulfModifier_1870 dynamically registered via GameManager.");
+            getRoot().getRevenueManager().addDynamicModifier(new net.sf.rails.game.specific._1870.DestinationModifier_1870());
+            
         }
     }
 
     @Override
     public void nextRound(net.sf.rails.game.Round round) {
-        if (round instanceof net.sf.rails.game.specific._1870.ShareProtectionRound_1870) {
+        if (round instanceof net.sf.rails.game.specific._1870.ShareProtectionRound_1870 ||
+                round instanceof net.sf.rails.game.specific._1870.ConnectionRunRound_1870) {
             net.sf.rails.game.Round interrupted = (net.sf.rails.game.Round) getInterruptedRound();
             if (interrupted != null) {
                 setInterruptedRound(null);
@@ -70,4 +72,24 @@ public class GameManager_1870 extends GameManager {
         }
         super.nextRound(round);
     }
+
+
+
+    public void startConnectionRunRound(Round currentRound, PublicCompany company) {
+
+        setInterruptedRound(currentRound);
+
+        String roundName = "ConnectionRunRound_" + company.getId() + "_" + System.nanoTime();
+
+        ConnectionRunRound_1870 crr = (ConnectionRunRound_1870) createRound(ConnectionRunRound_1870.class, roundName);
+
+        crr.setConnectionCompany(company);
+
+        setRound(crr);
+        crr.start();
+
+        net.sf.rails.common.ReportBuffer.add(crr,
+                "=> INTERRUPT: " + company.getId() + " performs its immediate Connection Run.");
+    }
+
 }
