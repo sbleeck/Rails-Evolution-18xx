@@ -318,6 +318,12 @@ public class GameManager extends RailsManager implements Configurable, Owner {
     protected final GenericState<LinkedHashMap<String, Map<String, PlayerAssetSnapshot>>> playerAssetHistory = new GenericState<>(
             this, "playerAssetHistory");
 
+            protected final GenericState<LinkedHashMap<String, Map<String, Integer>>> playerTimeHistory = new GenericState<>(
+            this, "playerTimeHistory");
+
+    public LinkedHashMap<String, Map<String, Integer>> getPlayerTimeHistory() {
+        return playerTimeHistory.value();
+    }
     /**
      * Stores cumulative company payouts snapshots.
      * Key: RoundID. Value: Map<CompanyID, CumulativePayout>.
@@ -2786,6 +2792,21 @@ public class GameManager extends RailsManager implements Configurable, Owner {
         }
         newAssetHistory.put(roundId, roundAssets);
         playerAssetHistory.set(newAssetHistory);
+
+        LinkedHashMap<String, Map<String, Integer>> tHistory = playerTimeHistory.value();
+        LinkedHashMap<String, Map<String, Integer>> newTHistory;
+        if (tHistory == null) {
+            newTHistory = new LinkedHashMap<>();
+        } else {
+            newTHistory = new LinkedHashMap<>(tHistory);
+        }
+
+        Map<String, Integer> roundTime = new HashMap<>();
+        for (Player p : players) {
+            roundTime.put(p.getName(), p.getTimeBankModel().value());
+        }
+        newTHistory.put(roundId, roundTime);
+        playerTimeHistory.set(newTHistory);
 
     }
 

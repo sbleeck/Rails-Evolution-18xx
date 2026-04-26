@@ -119,6 +119,13 @@ Iterable<PublicCertificate> poolCerts = pool.getCertificates(company);
             // Deduct funds from President and wire to Bank
             String costText = Currency.wire(president, totalCost, bank);
             
+
+            // Trigger the player order change in the parent Stock Round
+            net.sf.rails.game.Round interrupted = (net.sf.rails.game.Round) getRoot().getGameManager().getInterruptedRound();
+            if (interrupted instanceof StockRound_1870) {
+                ((StockRound_1870) interrupted).setNextPlayerAfterProtection(president);
+            }
+
             // By bypassing stockMarket.sell(), we have successfully protected the price from dropping.
             finishRound();
             return true;

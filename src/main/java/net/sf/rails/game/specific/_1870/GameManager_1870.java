@@ -42,7 +42,17 @@ public class GameManager_1870 extends GameManager {
         ReportBuffer.add(spr, company.getId() + " President may protect the share price.");
     }
 
-
+@Override
+    protected void setGuiParameters() {
+        super.setGuiParameters();
+        
+        // Dynamically register the Cattle Company modifier for revenue calculation
+        if (getRoot().getRevenueManager() != null) {
+            getRoot().getRevenueManager().addDynamicModifier(new net.sf.rails.game.specific._1870.CattleModifier_1870());
+            getRoot().getRevenueManager().addDynamicModifier(new net.sf.rails.game.specific._1870.GulfModifier_1870());
+            log.info(">>> GulfModifier_1870 dynamically registered via GameManager.");
+        }
+    }
     
     @Override
     public void nextRound(Round round) {

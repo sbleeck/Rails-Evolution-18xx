@@ -1935,6 +1935,68 @@ public class StatusWindow extends JFrame implements ActionListener, ActionPerfor
                     dynamicButtonPanel.revalidate();
                     dynamicButtonPanel.repaint();
 
+                    } else if (currentRound instanceof net.sf.rails.game.specific._1870.ShareProtectionRound_1870) {
+                    
+                    dynamicButtonPanel.setBackground(new Color(255, 240, 230)); // Warning Orange Tint
+                    dynamicButtonPanel.setOpaque(true);
+                    dynamicButtonPanel.setBorder(BorderFactory.createLineBorder(new Color(204, 102, 0), 2));
+                    dynamicButtonPanel.setLayout(new FlowLayout(FlowLayout.LEFT, 15, 5));
+
+                    rails.game.action.BuyCertificate buyAction = null;
+                    rails.game.action.NullAction passAction = null;
+
+                    if (possibleActions != null && possibleActions.getList() != null) {
+                        for (rails.game.action.PossibleAction pa : possibleActions.getList()) {
+                            if (pa instanceof rails.game.action.BuyCertificate) {
+                                buyAction = (rails.game.action.BuyCertificate) pa;
+                            } else if (pa instanceof rails.game.action.NullAction && ((rails.game.action.NullAction) pa).getMode() == rails.game.action.NullAction.Mode.PASS) {
+                                passAction = (rails.game.action.NullAction) pa;
+                            }
+                        }
+                    }
+
+                    String actorName = (effectivePlayer != null) ? effectivePlayer.getName() : "President";
+
+                    if (myTurn && buyAction != null) {
+                        int numShares = buyAction.getNumberBought();
+                        int totalCost = buyAction.getPrice() * numShares;
+                        String compName = buyAction.getCompany().getId();
+
+                        JLabel promptLabel = new JLabel("<html><b>SHARE PROTECTION:</b> " + actorName + ", protect " + numShares + " share(s) of " + compName + " for $" + totalCost + "?</html>");
+                        promptLabel.setFont(new Font("SansSerif", Font.BOLD, 14));
+                        promptLabel.setForeground(new Color(204, 51, 0));
+                        dynamicButtonPanel.add(promptLabel);
+
+                        JButton yesButton = new JButton("Yes (Catch)");
+                        yesButton.setBackground(new Color(34, 139, 34)); // Green
+                        yesButton.setForeground(Color.WHITE);
+                        yesButton.setOpaque(true);
+                        yesButton.setBorder(BorderFactory.createRaisedBevelBorder());
+                        final rails.game.action.PossibleAction finalBuy = buyAction;
+                        yesButton.addActionListener(e -> process(finalBuy));
+                        dynamicButtonPanel.add(yesButton);
+
+                        JButton noButton = new JButton("No (Let it drop)");
+                        noButton.setBackground(new Color(255, 69, 0)); // Red
+                        noButton.setForeground(Color.WHITE);
+                        noButton.setOpaque(true);
+                        noButton.setBorder(BorderFactory.createRaisedBevelBorder());
+                        final rails.game.action.PossibleAction finalPass = passAction;
+                        noButton.addActionListener(e -> {
+                            if (finalPass != null) process(finalPass);
+                        });
+                        dynamicButtonPanel.add(noButton);
+
+                    } else {
+                         JLabel waitingLabel = new JLabel("<html><b>SHARE PROTECTION:</b> Waiting for " + actorName + " to decide...</html>");
+                         waitingLabel.setFont(new Font("SansSerif", Font.BOLD, 14));
+                         waitingLabel.setForeground(new Color(204, 51, 0));
+                         dynamicButtonPanel.add(waitingLabel);
+                    }
+
+                    dynamicButtonPanel.revalidate();
+                    dynamicButtonPanel.repaint();
+
                 } else if (currentRound instanceof net.sf.rails.game.specific._1817.MergerAndAcquisitionRound_1817
                         && (((net.sf.rails.game.specific._1817.MergerAndAcquisitionRound_1817) currentRound)
                                 .getCurrentStep() == net.sf.rails.game.specific._1817.MergerAndAcquisitionRound_1817.MaAStep.SALES_AUCTION

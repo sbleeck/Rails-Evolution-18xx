@@ -42,7 +42,7 @@
 			<Reach base="stops" countTowns="yes"/>
 			<Score towns="yes"/>
 		</Defaults>
-		<TrainType name="2" majorStops="2" cost="100" quantity="99" />
+		<TrainType name="2" majorStops="2" cost="100" quantity="-1" />
 		<TrainType name="2+" majorStops="2" cost="100" quantity="4" />
 		<TrainType name="3" majorStops="3" cost="250" quantity="12">
 			<NewPhase phaseName="3"/>

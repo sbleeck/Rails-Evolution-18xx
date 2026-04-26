@@ -2,17 +2,21 @@
 <ComponentManager>
 	<Component name="GameManager" class="net.sf.rails.game.specific._1870.GameManager_1870">
 		<Game name="1870"/>
+		
 		<GameParameters>
 			<PlayerShareLimit percentage="60">
 				<PriceProtection/>
 			</PlayerShareLimit>
 			<BankPoolLimit percentage="50"/>
-			<StockRound>
+
+<StockRound class="net.sf.rails.game.specific._1870.StockRound_1870">
 				<NoSaleInFirstSR/>
 			</StockRound>
+			
 			<OperatingRound class="net.sf.rails.game.specific._1870.OperatingRound_1870">
                 <EmergencyTrainBuying mustBuyCheapestTrain="yes" mayBuyFromCompany="no"/>
             </OperatingRound>
+
 		</GameParameters>
 		<EndOfGame>
 			<Bankruptcy/>
