@@ -167,6 +167,17 @@ public class OperatingRound_1870 extends OperatingRound {
     public boolean buyTrain(rails.game.action.BuyTrain action) {
         boolean success = super.buyTrain(action);
         
+        if (success) {
+            if ("KATY".equals(action.getCompany().getId())) {
+                PrivateCompany mkt = getRoot().getCompanyManager().getPrivateCompany("MKT");
+                // If MKT is not closed yet, this is KATY's first train purchase
+                if (mkt != null && !mkt.isClosed()) {
+                    mkt.close();
+                    net.sf.rails.common.ReportBuffer.add(this, "The MKT private company closes as " + action.getCompany().getId() + " purchases its first train.");
+                }
+            }
+        }
+
         return success;
     }
 
@@ -191,6 +202,20 @@ public class OperatingRound_1870 extends OperatingRound {
     public boolean setPossibleActions() {
         boolean result = super.setPossibleActions();
 
+// 1870 Rule: MKT cannot be bought by a public company.
+        rails.game.action.PossibleAction actionToRemove = null;
+        for (rails.game.action.PossibleAction action : possibleActions.getList()) {
+            if (action instanceof BuyPrivate) {
+                if ("MKT".equals(((BuyPrivate) action).getPrivateCompany().getId())) {
+                    actionToRemove = action;
+                    break;
+                }
+            }
+        }
+        if (actionToRemove != null) {
+            possibleActions.remove(actionToRemove);
+        }
+        
         Phase phase = Phase.getCurrent(this);
         if (phase != null && "1".equals(phase.toText())) {
             PublicCompany company = getOperatingCompany();

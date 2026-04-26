@@ -5,16 +5,16 @@ import net.sf.rails.game.PublicCompany;
 
 public class ReissueShares_1870 extends PossibleAction {
     private static final long serialVersionUID = 1L;
-    private final PublicCompany company;
+    private final String companyId;
 
     public ReissueShares_1870(PublicCompany company) {
         super(company.getRoot());
-        this.company = company;
-        setButtonLabel("Reissue " + company.getId());
+        this.companyId = company.getId();
+        setButtonLabel("Reissue " + companyId);
     }
 
-    public PublicCompany getCompany() {
-        return company;
+    public String getCompanyId() {
+        return companyId;
     }
 
     @Override
@@ -22,11 +22,11 @@ public class ReissueShares_1870 extends PossibleAction {
         if (this == obj) return true;
         if (obj == null || getClass() != obj.getClass()) return false;
         ReissueShares_1870 other = (ReissueShares_1870) obj;
-        return company.equals(other.company);
+        return companyId.equals(other.companyId);
     }
 
     @Override
     public int hashCode() {
-        return company.hashCode();
+        return companyId.hashCode();
     }
 }

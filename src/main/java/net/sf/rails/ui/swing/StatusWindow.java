@@ -988,7 +988,7 @@ public class StatusWindow extends JFrame implements ActionListener, ActionPerfor
                 for (PossibleAction pa : possibleActions.getList()) {
                     if (pa instanceof RedeemShare_1870) {
                         RedeemShare_1870 r = (RedeemShare_1870) pa;
-                        if (r.getCompany().equals(buy.getCompany())) {
+                        if (r.getCompanyId().equals(buy.getCompany().getId())) {
                             redeemAction = r;
                             break;
                         }

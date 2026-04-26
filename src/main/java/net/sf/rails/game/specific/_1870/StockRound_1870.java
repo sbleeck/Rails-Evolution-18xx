@@ -120,77 +120,79 @@ public class StockRound_1870 extends StockRound {
     public boolean setPossibleActions() {
         boolean result = super.setPossibleActions();
 
-        // Use our overridden method, with a fallback to the GameManager source of truth
-        Player currentPlayer = getCurrentPlayer();
-        if (currentPlayer == null) {
-            currentPlayer = gameManager.getCurrentPlayer();
-        }
-
-        // Fix: Use iterator to remove BuyPrivate actions without removeType() method.
-        java.util.List<rails.game.action.PossibleAction> list = possibleActions.getList();
-        java.util.Iterator<rails.game.action.PossibleAction> it = list.iterator();
+        // 1. 1870 Rule: Companies do not buy privates in Stock Rounds
+        java.util.Iterator<rails.game.action.PossibleAction> it = possibleActions.getList().iterator();
         while (it.hasNext()) {
             if (it.next() instanceof rails.game.action.BuyPrivate) {
                 it.remove();
             }
         }
 
-        // Check for MKT Exchange: Player owns MKT private and MKT public isn't floated.
+        Player currentPlayer = getCurrentPlayer();
+        if (currentPlayer == null)
+            return result;
+
+        boolean addedCustomAction = false;
+
+        // 2. MKT Exchange Check
         for (net.sf.rails.game.PrivateCompany priv : currentPlayer.getPortfolioModel().getPrivateCompanies()) {
             if ("MKT".equals(priv.getId())) {
                 PublicCompany mktPub = getRoot().getCompanyManager().getPublicCompany("MKT");
                 if (mktPub != null && !mktPub.hasFloated()) {
-                    possibleActions.add(new ExchangeMKT_1870(priv));
+                    net.sf.rails.game.specific._1870.action.ExchangeMKT_1870 mktAct = new net.sf.rails.game.specific._1870.action.ExchangeMKT_1870(
+                            priv);
+                    if (!possibleActions.getList().contains(mktAct)) {
+                        possibleActions.add(mktAct);
+                        addedCustomAction = true;
+                    }
                 }
             }
         }
 
+        // 3. Share Redemption & Reissue Logic
         for (PublicCompany company : getRoot().getCompanyManager().getAllPublicCompanies()) {
-
             if (company.isClosed() || company.getPresident() != currentPlayer) {
                 continue;
             }
 
-            // 1. Reissue Checks: IPO empty, has shares in treasury, once per round.
-            // We use getShare() == 0 to ensure absolutely no percentage remains in the IPO.
-            if (!reissuedThisRound.value().contains(company.getId() + ",")
-                    && ipo.getShare(company) == 0
-                    && company.getPortfolioModel().getShare(company) > 0) {
+            // A company may not both redeem and reissue shares in the same Stock Round.
+            boolean actedThisRound = reissuedThisRound.value().contains(company.getId() + ",")
+                    || redeemedThisRound.value().contains(company.getId() + ",");
 
-                possibleActions.add(new net.sf.rails.game.specific._1870.action.ReissueShares_1870(company));
-            }
+            if (!actedThisRound && company.hasOperated()) {
+                // Reissue
+                if (ipo.getShare(company) <= 0 && company.getPortfolioModel().getShare(company) > 0) {
+                    net.sf.rails.game.specific._1870.action.ReissueShares_1870 rei = new net.sf.rails.game.specific._1870.action.ReissueShares_1870(
+                            company);
+                    if (!possibleActions.getList().contains(rei)) {
+                        possibleActions.add(rei);
+                        addedCustomAction = true;
+                    }
+                }
 
-            // 1. Reissue Checks: IPO empty, has shares in treasury, once per round.
-            if (!reissuedThisRound.value().contains(company.getId() + ",") && ipo.getShares(company) == 0
-                    && company.getPortfolioModel().getShares(company) > 0) {
-                possibleActions.add(new net.sf.rails.game.specific._1870.action.ReissueShares_1870(company));
-            }
-
-            // 2. Redeem Checks: Has operated, max 4 shares in treasury (leaves 6 in
-            // market/player), once per round.
-            // 2. Redeem Checks: Has operated, max 4 shares in treasury (leaves 6 in
-            // market/player), once per round.
-            if (company.hasOperated() && !redeemedThisRound.value().contains(company.getId() + ",")
-                    && company.getPortfolioModel().getShares(company) < 4) {
-                int marketPrice = company.getCurrentSpace().getPrice() / company.getShareUnitsForSharePrice();
-
-                if (company.getCash() >= marketPrice) {
-                    // 1870 Rule: Redemption is allowed if there is at least one share in the Bank
-                    // Pool.
-                    if (pool.getShares(company) > 0) {
-                        possibleActions.add(new net.sf.rails.game.specific._1870.action.RedeemShare_1870(company));
+                // Redeem
+                if (company.getPortfolioModel().getShares(company) < 4) {
+                    int marketPrice = company.getCurrentSpace().getPrice() / company.getShareUnitsForSharePrice();
+                    if (company.getCash() >= marketPrice && pool.getShares(company) > 0) {
+                        net.sf.rails.game.specific._1870.action.RedeemShare_1870 red = new net.sf.rails.game.specific._1870.action.RedeemShare_1870(
+                                company);
+                        if (!possibleActions.getList().contains(red)) {
+                            possibleActions.add(red);
+                            addedCustomAction = true;
+                        }
                     }
                 }
             }
-
         }
-        return result;
+
+        return result || addedCustomAction;
     }
 
     @Override
     public boolean process(rails.game.action.PossibleAction action) {
         if (action instanceof net.sf.rails.game.specific._1870.action.ReissueShares_1870) {
-            PublicCompany company = ((net.sf.rails.game.specific._1870.action.ReissueShares_1870) action).getCompany();
+            String companyId = ((net.sf.rails.game.specific._1870.action.ReissueShares_1870) action).getCompanyId();
+            PublicCompany company = getRoot().getCompanyManager().getPublicCompany(companyId);
             reissuedThisRound.set(reissuedThisRound.value() + company.getId() + ",");
 
             int sharesToReissue = company.getPortfolioModel().getShares(company);
@@ -214,7 +216,8 @@ public class StockRound_1870 extends StockRound {
             return true;
 
         } else if (action instanceof net.sf.rails.game.specific._1870.action.RedeemShare_1870) {
-            PublicCompany company = ((net.sf.rails.game.specific._1870.action.RedeemShare_1870) action).getCompany();
+            String companyId = ((net.sf.rails.game.specific._1870.action.RedeemShare_1870) action).getCompanyId();
+            PublicCompany company = getRoot().getCompanyManager().getPublicCompany(companyId);
             redeemedThisRound.set(redeemedThisRound.value() + company.getId() + ",");
 
             int marketPrice = company.getCurrentSpace().getPrice() / company.getShareUnitsForSharePrice();
@@ -247,7 +250,8 @@ public class StockRound_1870 extends StockRound {
 
             return true;
         } else if (action instanceof ExchangeMKT_1870) {
-            net.sf.rails.game.PrivateCompany mktPriv = ((ExchangeMKT_1870) action).getMktPrivate();
+            String mktPrivateId = ((ExchangeMKT_1870) action).getMktPrivateId();
+            net.sf.rails.game.PrivateCompany mktPriv = getRoot().getCompanyManager().getPrivateCompany(mktPrivateId);
             PublicCompany mktPub = getRoot().getCompanyManager().getPublicCompany("MKT");
 
             // 1. Close Private

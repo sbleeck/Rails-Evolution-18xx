@@ -14,6 +14,7 @@ import rails.game.action.BuyCertificate;
 import rails.game.action.NullAction;
 import rails.game.action.PossibleAction;
 
+
 public class ShareProtectionRound_1870 extends Round {
 
     private final StringState protectedCompanyId = StringState.create(this, "protectedCompanyId");
