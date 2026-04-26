@@ -6,6 +6,7 @@ import net.sf.rails.game.PublicCompany;
 import net.sf.rails.game.state.Owner;
 import net.sf.rails.game.financial.StockRound;
 import net.sf.rails.game.state.StringState;
+import net.sf.rails.common.ReportBuffer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -27,23 +28,36 @@ public class StockRound_1870 extends StockRound {
         Player nextPlayer = players.get(nextIndex);
         
         jumpedToPlayer.set(nextPlayer.getName());
-        log.info(">>> StockRound_1870: Priority jumps to {} following share protection by {}.", 
-                 nextPlayer.getName(), protectingPresident.getName());
     }
 
-    @Override
+    public void processPassedProtection(PublicCompany company, int sharesSold) {
+        // President declined the protection. Proceed with the normal price drop.
+        // We pass 'null' for the seller because the transaction is already complete, we just need the drop.
+        super.adjustSharePrice(company, null, sharesSold, false);
+    }
+
+@Override
     public void resume() {
-        super.resume();
-        
-        // Apply the turn order jump if a successful protection occurred
+        // Apply the turn order jump BEFORE calling super.resume() 
         if (jumpedToPlayer.value() != null && !jumpedToPlayer.value().isEmpty()) {
             Player targetPlayer = playerManager.getPlayerByName(jumpedToPlayer.value());
             if (targetPlayer != null) {
+                // Advance the engine's internal pointer
                 setCurrentPlayer(targetPlayer);
-                log.info(">>> StockRound_1870: Turn order jump applied. Active player is now {}", targetPlayer.getName());
+                
+                // Wipe the seller's turn state so the new player starts completely fresh
+                hasActed.set(false);
+                companyBoughtThisTurnWrapper.set(null);
+                hasSoldThisTurnBeforeBuying.set(false);
+                sellPrices.clear();
+                numPasses.set(0);
+                
+                ReportBuffer.add(this, "=> TURN JUMP: Play resumes with " + targetPlayer.getName() + " (player to the left of the catcher).");
             }
             jumpedToPlayer.set(null); 
         }
+        
+        super.resume();
     }
 
     @Override
@@ -52,7 +66,6 @@ public class StockRound_1870 extends StockRound {
         boolean canProtect = false;
         
         if (president != null && seller != president && !president.hasSoldThisRound(company)) {
-            // Check affordability and certificate limits
             int price = company.getCurrentSpace().getPrice() / company.getShareUnitsForSharePrice();
             int totalCost = sharesSold * price;
             
@@ -67,12 +80,12 @@ public class StockRound_1870 extends StockRound {
         }
         
         if (canProtect) {
-            log.info(">>> Intercepting price drop. Triggering Share Protection for {}", company.getId());
             if (getRoot().getGameManager() instanceof GameManager_1870) {
-                ((GameManager_1870) getRoot().getGameManager()).startShareProtectionRound(this, company, sharesSold);
+                // Trigger the interrupt and explicitly pass the seller
+                ((GameManager_1870) getRoot().getGameManager()).startShareProtectionRound(this, company, (Player)seller, sharesSold);
             }
-            // Bypass super.adjustSharePrice() to prevent the token from dropping.
         } else {
+            // Normal fallback (No president, president selling, or failed cash/cert checks)
             super.adjustSharePrice(company, seller, sharesSold, soldBefore);
         }
     }

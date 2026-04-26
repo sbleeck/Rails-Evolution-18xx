@@ -16,62 +16,58 @@ public class GameManager_1870 extends GameManager {
 
     /**
      * Triggers the 1870-specific Share Protection interaction.
-     * When a player sells shares, the President of that company may immediately 
+     * When a player sells shares, the President of that company may immediately
      * buy them from the pool to protect the share price from dropping.
      * * @param currentRound The currently active StockRound.
-     * @param company The company whose shares were just sold.
+     * 
+     * @param company    The company whose shares were just sold.
      * @param sharesSold The number of shares that were sold.
      */
-    public void startShareProtectionRound(Round currentRound, PublicCompany company, int sharesSold) {
-        
-        // Suspend the current stock round
+    public void startShareProtectionRound(Round currentRound, PublicCompany company, net.sf.rails.game.Player seller,
+            int sharesSold) {
+
         setInterruptedRound(currentRound);
 
         String roundName = "ShareProtectionRound_in_" + currentRound.getId() + "_" + System.nanoTime();
 
-        // Create the special interrupt round (Requires ShareProtectionRound_1870.java to be implemented)
-        ShareProtectionRound_1870 spr = (ShareProtectionRound_1870) createRound(ShareProtectionRound_1870.class, roundName);
-        
-        // Pass the required context to the new round
-        spr.setProtectionContext(company, sharesSold);
-        
+        ShareProtectionRound_1870 spr = (ShareProtectionRound_1870) createRound(ShareProtectionRound_1870.class,
+                roundName);
+
+        // Pass the required context to the new round, now including the seller
+        spr.setProtectionContext(company, seller, sharesSold);
+
         setRound(spr);
         spr.start();
 
-        // Force UI to acknowledge the round switch
-        ReportBuffer.add(spr, company.getId() + " President may protect the share price.");
+        net.sf.rails.common.ReportBuffer.add(spr,
+                "=> INTERRUPT: " + seller.getName() + " sold " + sharesSold + " share(s) of " + company.getId()
+                        + ". President " + company.getPresident().getName() + " may protect the price.");
     }
 
-@Override
+    @Override
     protected void setGuiParameters() {
         super.setGuiParameters();
-        
+
         // Dynamically register the Cattle Company modifier for revenue calculation
         if (getRoot().getRevenueManager() != null) {
-            getRoot().getRevenueManager().addDynamicModifier(new net.sf.rails.game.specific._1870.CattleModifier_1870());
+            getRoot().getRevenueManager()
+                    .addDynamicModifier(new net.sf.rails.game.specific._1870.CattleModifier_1870());
             getRoot().getRevenueManager().addDynamicModifier(new net.sf.rails.game.specific._1870.GulfModifier_1870());
             log.info(">>> GulfModifier_1870 dynamically registered via GameManager.");
         }
     }
-    
-    @Override
-    public void nextRound(Round round) {
-        // Check if the round that just finished was our custom Share Protection round
-        boolean isSPR = (round != null && round.getClass().getSimpleName().equals("ShareProtectionRound_1870"));
 
-        if (isSPR) {
-            // The price protection interrupt has finished.
-            // Resume the interrupted stock round exactly where it left off.
-            Round interrupted = (Round) getInterruptedRound();
+    @Override
+    public void nextRound(net.sf.rails.game.Round round) {
+        if (round instanceof net.sf.rails.game.specific._1870.ShareProtectionRound_1870) {
+            net.sf.rails.game.Round interrupted = (net.sf.rails.game.Round) getInterruptedRound();
             if (interrupted != null) {
                 setInterruptedRound(null);
-                super.nextRound(interrupted);
-            } else {
-                super.nextRound(round);
+                setRound(interrupted);
+                interrupted.resume();
+                return;
             }
-        } else {
-            // Normal round transition (OR -> SR, etc.)
-            super.nextRound(round);
         }
+        super.nextRound(round);
     }
 }

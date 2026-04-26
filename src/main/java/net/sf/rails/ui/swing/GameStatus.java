@@ -185,7 +185,7 @@ public class GameStatus extends GridPanel {
     protected javax.swing.JLabel specialActionLabel;
 
     private final int MAX_TRAIN_SLOTS = 4; // Max trains to display per company
-    private final int MAX_FUTURE_SLOTS = 6; // Max future trains to display
+    private final int MAX_FUTURE_SLOTS = 100; // Max future trains to display
 
     protected net.sf.rails.ui.swing.elements.BondsHeatbarPanel bondsHeatbarPanel;
 
@@ -2758,7 +2758,7 @@ public class GameStatus extends GridPanel {
             // Render Future Trains
             int futSlot = 0;
             for (net.sf.rails.game.TrainCardType tct : displayFuture) {
-                if (futSlot >= MAX_FUTURE_SLOTS)
+                if (futSlot >= MAX_FUTURE_SLOTS || futureTrainButtons == null || futSlot >= futureTrainButtons.length)
                     break;
 
                 String tctName = tct.getId().replaceAll("_\\d+$", "");
@@ -2791,10 +2791,10 @@ public class GameStatus extends GridPanel {
             }
 
             // Clear unused future slots
-            for (; futSlot < MAX_FUTURE_SLOTS; futSlot++) {
+            for (; futSlot < MAX_FUTURE_SLOTS && futureTrainButtons != null && futSlot < futureTrainButtons.length; futSlot++) {
                 if (futureTrainButtons[futSlot] != null)
                     futureTrainButtons[futSlot].setVisible(false);
-                if (futureTrainInfoLabels[futSlot] != null)
+                if (futureTrainInfoLabels != null && futureTrainInfoLabels[futSlot] != null)
                     futureTrainInfoLabels[futSlot].setVisible(false);
             }
 

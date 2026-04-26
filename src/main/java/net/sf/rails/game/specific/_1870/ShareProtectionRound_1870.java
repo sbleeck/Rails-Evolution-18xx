@@ -1,3 +1,4 @@
+// --- START FIX ---
 package net.sf.rails.game.specific._1870;
 
 import net.sf.rails.common.ReportBuffer;
@@ -13,102 +14,58 @@ import rails.game.action.BuyCertificate;
 import rails.game.action.NullAction;
 import rails.game.action.PossibleAction;
 
-import java.util.List;
-
-/**
- * Handles the 1870-specific Share Price Protection rule.
- * When a player sells shares, the stock round is interrupted, and the President 
- * of that company is given the opportunity to buy those shares directly from the 
- * pool to prevent the stock price from dropping.
- */
 public class ShareProtectionRound_1870 extends Round {
 
-    // Persistent state required for save/load to remember what company is being protected
-    private final StringState protectedCompanyName = StringState.create(this, "protectedCompanyName");
+    private final StringState protectedCompanyId = StringState.create(this, "protectedCompanyId");
+    private final StringState sellerName = StringState.create(this, "sellerName");
     private final IntegerState sharesSold = IntegerState.create(this, "sharesSold");
 
     public ShareProtectionRound_1870(GameManager gameManager, String id) {
         super(gameManager, id);
     }
 
-    /**
-     * Initializes the context for the interruption.
-     */
-    public void setProtectionContext(PublicCompany company, int sold) {
-        this.protectedCompanyName.set(company.getId());
+    public void setProtectionContext(PublicCompany company, Player seller, int sold) {
+        this.protectedCompanyId.set(company.getId());
+        this.sellerName.set(seller.getName());
         this.sharesSold.set(sold);
     }
 
     @Override
     public boolean setPossibleActions() {
-        PublicCompany company = companyManager.getPublicCompany(protectedCompanyName.value());
-        if (company == null) return false;
-
-        Player president = company.getPresident();
+        boolean result = super.setPossibleActions();
+        PublicCompany company = getRoot().getCompanyManager().getPublicCompany(protectedCompanyId.value());
         
-        // If the company has no president (e.g., dumped into receivership) or president bankrupt
-        if (president == null || president.isBankrupt()) {
-            possibleActions.add(new NullAction(getRoot(), NullAction.Mode.PASS));
-            return true;
+        if (company != null) {
+            Player president = company.getPresident();
+            if (president != null) {
+                int price = company.getCurrentSpace().getPrice() / company.getShareUnitsForSharePrice();
+                // Buy from Bank Pool: (Company, Size per cert, From Owner, Price, Quantity)
+                BuyCertificate buy = new BuyCertificate(company, company.getShareUnit(), pool.getParent(), price, sharesSold.value());
+                possibleActions.add(buy);
+            }
         }
-
-        // Shift the active UI turn to the President
-        playerManager.setCurrentPlayer(president);
-
-        int price = company.getCurrentSpace().getPrice() / company.getShareUnitsForSharePrice();
-        int totalCost = sharesSold.value() * price;
-
-        boolean canAfford = president.getCashValue() >= totalCost;
         
-        // In 1870, share protection allows bypassing the 60% per-company hold limit, 
-        // but it still MUST respect the player's absolute total certificate limit.
-        float currentCerts = president.getPortfolioModel().getCertificateCount();
-        int certLimit = gameManager.getPlayerCertificateLimit(president);
-        boolean certLimitOk = (currentCerts + sharesSold.value()) <= certLimit;
-
-        if (canAfford && certLimitOk) {
-            // Present a BuyCertificate action specifically matching the shares sold
-            possibleActions.add(new BuyCertificate(
-                    company, 
-                    sharesSold.value() * company.getShareUnit(), 
-                    pool.getParent(),
-                    price, 
-                    sharesSold.value()
-            ));
-        }
-
-        // The President can always decline to protect
+        // Action 2: Pass (Let it drop)
         possibleActions.add(new NullAction(getRoot(), NullAction.Mode.PASS));
-        
-        return true;
+        return result;
     }
 
     @Override
     public boolean process(PossibleAction action) {
-        PublicCompany company = companyManager.getPublicCompany(protectedCompanyName.value());
+        PublicCompany company = getRoot().getCompanyManager().getPublicCompany(protectedCompanyId.value());
         Player president = company.getPresident();
+        Round interrupted = (Round) getRoot().getGameManager().getInterruptedRound();
+        StockRound_1870 sr = (interrupted instanceof StockRound_1870) ? (StockRound_1870) interrupted : null;
 
-        if (action instanceof NullAction) {
-            ReportBuffer.add(this, president.getId() + " declines to protect the share price of " + company.getId());
-            
-            // The protection failed. Trigger the deferred price drop here.
-            // Note: The sell() method below will need to interface with StockMarket_1870 
-            // to correctly calculate the "ledge" stopping logic.
-            stockMarket.sell(company, null, sharesSold.value());
-            
-            finishRound();
-            return true;
-        } 
-        else if (action instanceof BuyCertificate) {
+        if (action instanceof BuyCertificate) {
             BuyCertificate buyAction = (BuyCertificate) action;
             int totalCost = buyAction.getNumberBought() * buyAction.getPrice();
             
-            ReportBuffer.add(this, president.getId() + " protects the share price of " + company.getId() + 
-                                   " by buying " + sharesSold.value() + " shares for " + bank.getCurrency().format(totalCost));
+            ReportBuffer.add(this, "=> SHARE CATCH: " + president.getName() + " protects the share price of " + company.getId() + " by buying the " + sharesSold.value() + " sold share(s) for " + getRoot().getBank().getCurrency().format(totalCost) + ".");
+            ReportBuffer.add(this, "=> " + company.getId() + " share price remains at " + getRoot().getBank().getCurrency().format(buyAction.getPrice()) + ".");
             
-            // Transfer the shares out of the Bank Pool to the President
             int count = sharesSold.value();
-Iterable<PublicCertificate> poolCerts = pool.getCertificates(company);
+            Iterable<PublicCertificate> poolCerts = pool.getCertificates(company);
             for (PublicCertificate cert : poolCerts) {
                 if (count > 0 && !cert.isPresidentShare()) {
                     cert.moveTo(president);
@@ -116,22 +73,27 @@ Iterable<PublicCertificate> poolCerts = pool.getCertificates(company);
                 }
             }
             
-            // Deduct funds from President and wire to Bank
-            String costText = Currency.wire(president, totalCost, bank);
+            Currency.wire(president, totalCost, getRoot().getBank());
             
-
-            // Trigger the player order change in the parent Stock Round
-            net.sf.rails.game.Round interrupted = (net.sf.rails.game.Round) getRoot().getGameManager().getInterruptedRound();
-            if (interrupted instanceof StockRound_1870) {
-                ((StockRound_1870) interrupted).setNextPlayerAfterProtection(president);
+            if (sr != null) {
+                sr.setNextPlayerAfterProtection(president);
             }
-
-            // By bypassing stockMarket.sell(), we have successfully protected the price from dropping.
+            
+            finishRound();
+            return true;
+            
+        } else if (action instanceof NullAction && ((NullAction) action).getMode() == NullAction.Mode.PASS) {
+            ReportBuffer.add(this, "=> DECLINED: " + president.getName() + " declines to protect " + company.getId() + ".");
+            ReportBuffer.add(this, "=> The share price of " + company.getId() + " drops normally.");
+            
+            if (sr != null) {
+                sr.processPassedProtection(company, sharesSold.value());
+            }
+            
             finishRound();
             return true;
         }
-        
-        return false;
+        return super.process(action);
     }
 
     @Override
@@ -139,8 +101,8 @@ Iterable<PublicCertificate> poolCerts = pool.getCertificates(company);
         return "Share Protection";
     }
 
-        public void start() {
+    public void start() {
         setPossibleActions();
     }
-
 }
+// --- END FIX ---
