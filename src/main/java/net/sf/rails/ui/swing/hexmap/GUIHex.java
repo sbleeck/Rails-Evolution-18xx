@@ -707,77 +707,129 @@ drawDestinationMilestones(g);
                 drawBorder(g, dimensions.points.get(startPoint), dimensions.points.get(startPoint.next()));
             }
         }
-        // The Mississippi River uses a custom validator, not standard XML riverSides.
-        try {
-            Class<?> validatorClass = Class.forName("net.sf.rails.game.specific._1870.MississippiRiverValidator");
-            java.lang.reflect.Field riverHexesField = validatorClass.getDeclaredField("RIVER_HEXES");
-            riverHexesField.setAccessible(true);
+
+
+
+// The Mississippi River uses a custom validator.
+try {
+Class<?> validatorClass = Class.forName("net.sf.rails.game.specific._1870.MississippiRiverValidator");
+java.lang.reflect.Field riverHexesField = validatorClass.getDeclaredField("RIVER_HEXES");
+riverHexesField.setAccessible(true);
+@SuppressWarnings("unchecked")
+Map<String, Object> riverHexes = (Map<String, Object>) riverHexesField.get(null);
+
+        Object topology = riverHexes.get(getHex().getId());
+        if (topology != null) {
+            java.lang.reflect.Field westBankField = topology.getClass().getDeclaredField("westBank");
+            westBankField.setAccessible(true);
             @SuppressWarnings("unchecked")
-            Map<String, Object> riverHexes = (Map<String, Object>) riverHexesField.get(null);
-            
-            Object topology = riverHexes.get(getHex().getId());
-            if (topology != null) {
-                java.lang.reflect.Field westBankField = topology.getClass().getDeclaredField("westBank");
-                westBankField.setAccessible(true);
-                @SuppressWarnings("unchecked")
-                Set<Integer> west = (Set<Integer>) westBankField.get(topology);
+            Set<Integer> west = (Set<Integer>) westBankField.get(topology);
 
-                java.lang.reflect.Field eastBankField = topology.getClass().getDeclaredField("eastBank");
-                eastBankField.setAccessible(true);
-                @SuppressWarnings("unchecked")
-                Set<Integer> east = (Set<Integer>) eastBankField.get(topology);
+            java.lang.reflect.Field eastBankField = topology.getClass().getDeclaredField("eastBank");
+            eastBankField.setAccessible(true);
+            @SuppressWarnings("unchecked")
+            Set<Integer> east = (Set<Integer>) eastBankField.get(topology);
 
-                if (west != null && !west.isEmpty() && east != null && !east.isEmpty()) {
-                    double wx = 0, wy = 0, ex = 0, ey = 0;
-                    for (Integer w : west) {
-                        Point2D p = getSidePoint2D(HexSide.get(w));
-                        wx += p.getX(); wy += p.getY();
+            if (west != null && east != null) {
+                char[] bank = new char[6];
+                for(int i=0; i<6; i++) {
+                    if(west.contains(i)) bank[i] = 'W';
+                    else if(east.contains(i)) bank[i] = 'E';
+                    else bank[i] = 'U';
+                }
+
+                List<Point2D> riverPoints = new ArrayList<>();
+                
+                // Algorithm: Find transitions between banks to guarantee perfect edge matching
+                for(int i=0; i<6; i++) {
+                    if (bank[i] == 'U') {
+                        riverPoints.add(getSidePoint2D(HexSide.get(i))); // Flows through unassigned side
+                    } else {
+                        int next = (i + 1) % 6;
+                        if (bank[next] != 'U' && bank[i] != bank[next]) {
+                            // Transition from W to E (or E to W) occurs exactly at the vertex between them
+                            riverPoints.add(dimensions.points.get(HexSide.get(next)).get2D());
+                        }
                     }
-                    for (Integer e : east) {
-                        Point2D p = getSidePoint2D(HexSide.get(e));
-                        ex += p.getX(); ey += p.getY();
-                    }
-                    
-                    // Average the banks to find the true entry/exit points
-                    Point2D p1 = new Point2D.Double(wx / west.size(), wy / west.size());
-                    Point2D p2 = new Point2D.Double(ex / east.size(), ey / east.size());
+                }
+
+                if (riverPoints.size() >= 2) {
+                    Point2D p1 = riverPoints.get(0);
+                    Point2D p2 = riverPoints.get(1);
                     Point2D center = getCenterPoint2D();
+
+                    // Create an organic "snaking" curve by offsetting the control point
+                    double dx = p2.getX() - p1.getX();
+                    double dy = p2.getY() - p1.getY();
+                    double len = Math.sqrt(dx*dx + dy*dy);
+                    double nx = -dy / len;
+                    double ny = dx / len;
+                    
+                    // Alternate curve direction to weave naturally
+                    int curveDirection = (getHex().getCoordinates().getRow() % 2 == 0) ? 1 : -1;
+                    double offset = 18.0 * dimensions.zoomFactor * curveDirection;
+                    Point2D control = new Point2D.Double(center.getX() + nx * offset, center.getY() + ny * offset);
+
+                    Shape riverShape = new java.awt.geom.QuadCurve2D.Double(
+                        p1.getX(), p1.getY(), control.getX(), control.getY(), p2.getX(), p2.getY()
+                    );
 
                     Color oldColor = g.getColor();
                     Stroke oldStroke = g.getStroke();
                     
-                    g.setColor(new Color(64, 164, 223, 180)); // Translucent river blue
-                    g.setStroke(new BasicStroke(10.0f * (float)dimensions.zoomFactor, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
+                    // 1. Draw wide, translucent water base
+                    g.setColor(new Color(64, 164, 223, 160)); 
+                    g.setStroke(new BasicStroke(16.0f * (float)dimensions.zoomFactor, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
+                    g.draw(riverShape);
                     
-                    // Quadratic curve using hex center as the control point
-                    g.draw(new java.awt.geom.QuadCurve2D.Double(p1.getX(), p1.getY(), center.getX(), center.getY(), p2.getX(), p2.getY()));
+                    // 2. Overlay dynamic dashed ripples
+                    g.setColor(new Color(20, 100, 180, 200));
+                    float dash = 12.0f * (float)dimensions.zoomFactor;
+                    float gap = 20.0f * (float)dimensions.zoomFactor;
+                    g.setStroke(new BasicStroke(2.0f * (float)dimensions.zoomFactor, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND, 0, new float[]{dash, gap}, 0));
+                    g.draw(riverShape);
                     
                     g.setColor(oldColor);
                     g.setStroke(oldStroke);
                 }
             }
-        } catch (Exception e) {
-            // Not 1870 or validator inaccessible, fallback to standard rivers if any
-            net.sf.rails.game.HexSidesSet rivers = getHex().getRiverSides();
-           if (rivers != null) {
-                java.util.Iterator<HexSide> it = rivers.iterator();
+        }
+    } catch (Exception e) {
+        // Fallback for non-1870 maps
+        net.sf.rails.game.HexSidesSet rivers = getHex().getRiverSides();
+        if (rivers != null) {
+            java.util.Iterator<HexSide> it = rivers.iterator();
+            if (it.hasNext()) {
+                Point2D p1 = getSidePoint2D(it.next());
                 if (it.hasNext()) {
-                    Point2D p1 = getSidePoint2D(it.next());
-                    if (it.hasNext()) {
-                        Point2D p2 = getSidePoint2D(it.next());
-                        Point2D center = getCenterPoint2D();
-
-                        Color oldColor = g.getColor();
-                        Stroke oldStroke = g.getStroke();
-                        g.setColor(new Color(64, 164, 223, 180));
-                        g.setStroke(new BasicStroke(10.0f * (float)dimensions.zoomFactor, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
-                        g.draw(new java.awt.geom.QuadCurve2D.Double(p1.getX(), p1.getY(), center.getX(), center.getY(), p2.getX(), p2.getY()));
-                        g.setColor(oldColor);
-                        g.setStroke(oldStroke);
-                    }
+                    Point2D p2 = getSidePoint2D(it.next());
+                    Point2D center = getCenterPoint2D();
+                    
+                    Shape riverShape = new java.awt.geom.QuadCurve2D.Double(p1.getX(), p1.getY(), center.getX(), center.getY(), p2.getX(), p2.getY());
+                    
+                    Color oldColor = g.getColor();
+                    Stroke oldStroke = g.getStroke();
+                    g.setColor(new Color(64, 164, 223, 160));
+                    g.setStroke(new BasicStroke(16.0f * (float)dimensions.zoomFactor, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
+                    g.draw(riverShape);
+                    
+                    g.setColor(new Color(20, 100, 180, 200));
+                    float dash = 12.0f * (float)dimensions.zoomFactor;
+                    float gap = 20.0f * (float)dimensions.zoomFactor;
+                    g.setStroke(new BasicStroke(2.0f * (float)dimensions.zoomFactor, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND, 0, new float[]{dash, gap}, 0));
+                    g.draw(riverShape);
+                    
+                    g.setColor(oldColor);
+                    g.setStroke(oldStroke);
                 }
             }
         }
+    }
+
+
+
+      
+      
         if (riverSides != null) {
             for (HexSide startPoint : riverSides) {
                 drawRiver(g, dimensions.points.get(startPoint), dimensions.points.get(startPoint.next()));

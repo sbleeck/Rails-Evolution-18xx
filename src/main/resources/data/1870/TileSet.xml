@@ -12,8 +12,10 @@
 	<Tile id="-10"><!-- 1 city -->
 		<Upgrade id="5,6,57"/>
 	</Tile>
-	<Tile id="-902"/>
-	<Tile id="-903"/>
+	<Tile id="-90218701"/>
+	<Tile id="-90218702"/>
+	<Tile id="-9031870"/>
+	<Tile id="-90318701"/>
 	
 	<!-- Yellow -->
 	<Tile id="1" quantity="1" />
