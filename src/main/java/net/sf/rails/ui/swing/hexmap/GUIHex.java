@@ -711,123 +711,122 @@ drawDestinationMilestones(g);
 
 
 // The Mississippi River uses a custom validator.
-try {
-Class<?> validatorClass = Class.forName("net.sf.rails.game.specific._1870.MississippiRiverValidator");
-java.lang.reflect.Field riverHexesField = validatorClass.getDeclaredField("RIVER_HEXES");
-riverHexesField.setAccessible(true);
-@SuppressWarnings("unchecked")
-Map<String, Object> riverHexes = (Map<String, Object>) riverHexesField.get(null);
-
-        Object topology = riverHexes.get(getHex().getId());
-        if (topology != null) {
-            java.lang.reflect.Field westBankField = topology.getClass().getDeclaredField("westBank");
-            westBankField.setAccessible(true);
+        try {
+            Class<?> validatorClass = Class.forName("net.sf.rails.game.specific._1870.MississippiRiverValidator");
+            java.lang.reflect.Field riverHexesField = validatorClass.getDeclaredField("RIVER_HEXES");
+            riverHexesField.setAccessible(true);
             @SuppressWarnings("unchecked")
-            Set<Integer> west = (Set<Integer>) westBankField.get(topology);
-
-            java.lang.reflect.Field eastBankField = topology.getClass().getDeclaredField("eastBank");
-            eastBankField.setAccessible(true);
-            @SuppressWarnings("unchecked")
-            Set<Integer> east = (Set<Integer>) eastBankField.get(topology);
-
-            if (west != null && east != null) {
-                char[] bank = new char[6];
-                for(int i=0; i<6; i++) {
-                    if(west.contains(i)) bank[i] = 'W';
-                    else if(east.contains(i)) bank[i] = 'E';
-                    else bank[i] = 'U';
-                }
-
-                List<Point2D> riverPoints = new ArrayList<>();
+            Map<String, Object> riverHexes = (Map<String, Object>) riverHexesField.get(null);
+            
+            if (riverHexes.containsKey(getHex().getId())) {
+                List<Integer> flowEdges = new ArrayList<>();
+                String currentId = getHex().getId();
+                char rowChar = currentId.charAt(0);
+                int col = Integer.parseInt(currentId.substring(1));
+                int row = rowChar - 'A';
                 
-                // Algorithm: Find transitions between banks to guarantee perfect edge matching
-                for(int i=0; i<6; i++) {
-                    if (bank[i] == 'U') {
-                        riverPoints.add(getSidePoint2D(HexSide.get(i))); // Flows through unassigned side
-                    } else {
-                        int next = (i + 1) % 6;
-                        if (bank[next] != 'U' && bank[i] != bank[next]) {
-                            // Transition from W to E (or E to W) occurs exactly at the vertex between them
-                            riverPoints.add(dimensions.points.get(HexSide.get(next)).get2D());
-                        }
+                // Logic: Check all 6 standard 18xx grid neighbors. 
+                // If the neighbor is also a river hex, the river must cross that edge midpoint!
+                for (int i = 0; i < 6; i++) {
+                    int r = row;
+                    int c = col;
+                    switch(i) {
+                        case 0: r++; c--; break; // SW
+                        case 1: c-=2; break;     // W
+                        case 2: r--; c--; break; // NW
+                        case 3: r--; c++; break; // NE
+                        case 4: c+=2; break;     // E
+                        case 5: r++; c++; break; // SE
+                    }
+                    String neighborId = "" + (char)('A' + r) + c;
+                    if (riverHexes.containsKey(neighborId)) {
+                        flowEdges.add(i);
                     }
                 }
+                
+                // If it's an end-cap (like A16), it enters from off-map (opposite side)
+                if (flowEdges.size() == 1) {
+                    flowEdges.add((flowEdges.get(0) + 3) % 6);
+                }
 
-                if (riverPoints.size() >= 2) {
-                    Point2D p1 = riverPoints.get(0);
-                    Point2D p2 = riverPoints.get(1);
-                    Point2D center = getCenterPoint2D();
+                List<Shape> shapes = new ArrayList<>();
+                Point2D center = getCenterPoint2D();
+                
+                if (flowEdges.size() == 2) {
+                    Point2D p1 = getSidePoint2D(HexSide.get(flowEdges.get(0)));
+                    Point2D p2 = getSidePoint2D(HexSide.get(flowEdges.get(1)));
+                    // The center control point perfectly dictates the 0, 60, or -60 degree turns
+                    shapes.add(new java.awt.geom.QuadCurve2D.Double(p1.getX(), p1.getY(), center.getX(), center.getY(), p2.getX(), p2.getY()));
+                } else if (flowEdges.size() == 3) {
+                    // Logic for branching rivers (e.g. at J15): Find the 'trunk' incoming edge
+                    int trunk = 0;
+                    for (int i=0; i<3; i++) {
+                        int e1 = flowEdges.get(i);
+                        int e2 = flowEdges.get((i+1)%3);
+                        int e3 = flowEdges.get((i+2)%3);
+                        int d1 = Math.min(Math.abs(e1-e2), 6-Math.abs(e1-e2));
+                        int d2 = Math.min(Math.abs(e1-e3), 6-Math.abs(e1-e3));
+                        if (d1 + d2 >= 4) { trunk = i; }
+                    }
+                    Point2D pTrunk = getSidePoint2D(HexSide.get(flowEdges.get(trunk)));
+                    Point2D pB1 = getSidePoint2D(HexSide.get(flowEdges.get((trunk+1)%3)));
+                    Point2D pB2 = getSidePoint2D(HexSide.get(flowEdges.get((trunk+2)%3)));
+                    shapes.add(new java.awt.geom.QuadCurve2D.Double(pTrunk.getX(), pTrunk.getY(), center.getX(), center.getY(), pB1.getX(), pB1.getY()));
+                    shapes.add(new java.awt.geom.QuadCurve2D.Double(pTrunk.getX(), pTrunk.getY(), center.getX(), center.getY(), pB2.getX(), pB2.getY()));
+                }
 
-                    // Create an organic "snaking" curve by offsetting the control point
-                    double dx = p2.getX() - p1.getX();
-                    double dy = p2.getY() - p1.getY();
-                    double len = Math.sqrt(dx*dx + dy*dy);
-                    double nx = -dy / len;
-                    double ny = dx / len;
-                    
-                    // Alternate curve direction to weave naturally
-                    int curveDirection = (getHex().getCoordinates().getRow() % 2 == 0) ? 1 : -1;
-                    double offset = 18.0 * dimensions.zoomFactor * curveDirection;
-                    Point2D control = new Point2D.Double(center.getX() + nx * offset, center.getY() + ny * offset);
-
-                    Shape riverShape = new java.awt.geom.QuadCurve2D.Double(
-                        p1.getX(), p1.getY(), control.getX(), control.getY(), p2.getX(), p2.getY()
-                    );
-
+                if (!shapes.isEmpty()) {
                     Color oldColor = g.getColor();
                     Stroke oldStroke = g.getStroke();
                     
-                    // 1. Draw wide, translucent water base
                     g.setColor(new Color(64, 164, 223, 160)); 
                     g.setStroke(new BasicStroke(16.0f * (float)dimensions.zoomFactor, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
-                    g.draw(riverShape);
+                    for(Shape s : shapes) g.draw(s);
                     
-                    // 2. Overlay dynamic dashed ripples
                     g.setColor(new Color(20, 100, 180, 200));
                     float dash = 12.0f * (float)dimensions.zoomFactor;
                     float gap = 20.0f * (float)dimensions.zoomFactor;
                     g.setStroke(new BasicStroke(2.0f * (float)dimensions.zoomFactor, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND, 0, new float[]{dash, gap}, 0));
-                    g.draw(riverShape);
+                    for(Shape s : shapes) g.draw(s);
                     
                     g.setColor(oldColor);
                     g.setStroke(oldStroke);
                 }
             }
-        }
-    } catch (Exception e) {
-        // Fallback for non-1870 maps
-        net.sf.rails.game.HexSidesSet rivers = getHex().getRiverSides();
-        if (rivers != null) {
-            java.util.Iterator<HexSide> it = rivers.iterator();
-            if (it.hasNext()) {
-                Point2D p1 = getSidePoint2D(it.next());
+        } catch (Exception e) {
+            // Fallback for non-1870 maps
+            net.sf.rails.game.HexSidesSet rivers = getHex().getRiverSides();
+            if (rivers != null) {
+                java.util.Iterator<HexSide> it = rivers.iterator();
                 if (it.hasNext()) {
-                    Point2D p2 = getSidePoint2D(it.next());
-                    Point2D center = getCenterPoint2D();
-                    
-                    Shape riverShape = new java.awt.geom.QuadCurve2D.Double(p1.getX(), p1.getY(), center.getX(), center.getY(), p2.getX(), p2.getY());
-                    
-                    Color oldColor = g.getColor();
-                    Stroke oldStroke = g.getStroke();
-                    g.setColor(new Color(64, 164, 223, 160));
-                    g.setStroke(new BasicStroke(16.0f * (float)dimensions.zoomFactor, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
-                    g.draw(riverShape);
-                    
-                    g.setColor(new Color(20, 100, 180, 200));
-                    float dash = 12.0f * (float)dimensions.zoomFactor;
-                    float gap = 20.0f * (float)dimensions.zoomFactor;
-                    g.setStroke(new BasicStroke(2.0f * (float)dimensions.zoomFactor, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND, 0, new float[]{dash, gap}, 0));
-                    g.draw(riverShape);
-                    
-                    g.setColor(oldColor);
-                    g.setStroke(oldStroke);
+                    Point2D p1 = getSidePoint2D(it.next());
+                    if (it.hasNext()) {
+                        Point2D p2 = getSidePoint2D(it.next());
+                        Point2D center = getCenterPoint2D();
+                        
+                        Shape riverShape = new java.awt.geom.QuadCurve2D.Double(p1.getX(), p1.getY(), center.getX(), center.getY(), p2.getX(), p2.getY());
+                        
+                        Color oldColor = g.getColor();
+                        Stroke oldStroke = g.getStroke();
+                        g.setColor(new Color(64, 164, 223, 160));
+                        g.setStroke(new BasicStroke(16.0f * (float)dimensions.zoomFactor, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
+                        g.draw(riverShape);
+                        
+                        g.setColor(new Color(20, 100, 180, 200));
+                        float dash = 12.0f * (float)dimensions.zoomFactor;
+                        float gap = 20.0f * (float)dimensions.zoomFactor;
+                        g.setStroke(new BasicStroke(2.0f * (float)dimensions.zoomFactor, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND, 0, new float[]{dash, gap}, 0));
+                        g.draw(riverShape);
+                        
+                        g.setColor(oldColor);
+                        g.setStroke(oldStroke);
+                    }
                 }
             }
         }
-    }
 
 
-
+        
       
       
         if (riverSides != null) {

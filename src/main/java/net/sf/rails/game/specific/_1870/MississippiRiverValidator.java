@@ -47,14 +47,11 @@ public class MississippiRiverValidator {
         // G18, H17, I16, J15, K14
         addTopology(Arrays.asList("G18", "H17", "I16", "J15", "K14"), Set.of(2, 3), Set.of(5, 0), StationBank.NONE);
 
-        // K16 (Memphis - IC Home) - East Bank. Special validation applies.
-        addTopology(Arrays.asList("K16"), Set.of(1, 2), Set.of(0, 3, 4, 5), StationBank.EAST);
-
         // N15
         addTopology(Arrays.asList("N15"), Set.of(0, 1, 2), Set.of(4), StationBank.NONE);
 
         // N17
-        addTopology(Arrays.asList("N17"), Set.of(1), Set.of(3, 4, 5), StationBank.NONE);
+        addTopology(Arrays.asList("O16"), Set.of(1), Set.of(3, 4, 5), StationBank.NONE);
     }
 
     private static void addTopology(List<String> hexes, Set<Integer> west, Set<Integer> east, StationBank stationBank) {
