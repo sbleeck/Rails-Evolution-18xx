@@ -518,8 +518,10 @@ public abstract class HexMap implements MouseListener, MouseMotionListener {
 
                 // Scale the coordinates font based on zoom, with a hard floor and ceiling
                 Font oldFont = g.getFont();
-                int scaledFontSize = Math.max(9, (int) Math.round(14 * hexMap.getZoomFactor()));
-                g.setFont(new Font("SansSerif", Font.BOLD, scaledFontSize));
+                int scaledFontSize = Math.max(8, (int) Math.round(11 * hexMap.getZoomFactor()));
+                g.setFont(new Font("SansSerif", Font.PLAIN, scaledFontSize));
+                Color oldColor = g.getColor();
+                g.setColor(Color.BLACK);
 
                 // paint coordinates
                 boolean lettersGoHorizontal = hexMap.mapManager.getMapOrientation().lettersGoHorizontal();
@@ -545,6 +547,7 @@ public abstract class HexMap implements MouseListener, MouseMotionListener {
                 }
                 // Restore original font
                 g.setFont(oldFont);
+                g.setColor(oldColor);
 
             } catch (NullPointerException ex) {
                 // If we try to paint before something is loaded, just retry
@@ -743,34 +746,24 @@ private boolean displayHexNames = false;
 
     public void setupBars() {
        for (MapHex hex : hex2gui.keySet()) {
-            // Display impassables and rivers with same colour for now,
-            // as there are no games in Rails where both apply.
-            // (The difference is that rivers are not impassable).
-            // --- DELETE --- HexSidesSet sides = hex.getImpassableSides().union(hex.getRiverSides());
             HexSidesSet impassable = hex.getImpassableSides();
-            HexSidesSet rivers = hex.getRiverSides();
-            HexSidesSet sides = null;
-
-            if (impassable != null && rivers != null) {
-                sides = impassable.union(rivers);
-            } else if (impassable != null) {
-                sides = impassable;
-            } else if (rivers != null) {
-                sides = rivers;
-            }
-
-            if (sides != null) {
-                for (HexSide side : sides) {
+            if (impassable != null) {
+                for (HexSide side : impassable) {
                     if (side.getTrackPointNumber() < 3) {
                         hex2gui.get(hex).addBar(side);
                     }
                 }
             }
 
-            // --- DELETE --- sides = hex.getBorderSides();
-            // --- DELETE --- for (HexSide side:sides) {
-            // --- DELETE ---     hex2gui.get(hex).addBorder(side);
-            // --- DELETE --- }
+            HexSidesSet rivers = hex.getRiverSides();
+            if (rivers != null) {
+                for (HexSide side : rivers) {
+                    if (side.getTrackPointNumber() < 3) {
+                        hex2gui.get(hex).addRiver(side);
+                    }
+                }
+            }
+
             HexSidesSet borderSides = hex.getBorderSides();
             if (borderSides != null) {
                 for (HexSide side : borderSides) {

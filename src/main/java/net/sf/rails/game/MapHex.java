@@ -351,11 +351,15 @@ public class MapHex extends RailsModel implements RailsOwner, Configurable, Seri
 
         // We need completely new objects, not just references to the Tile's
         // stations.
-        for (Station station : currentTile.value().getStations()) {
-            Stop stop = Stop.create(this, station);
-            stop.initStopParameters(station);
-            stops.put(station, stop);
-            historicalStops.put(stop.getNumber(), stop);
+       if (currentTile.value() != null) {
+            for (Station station : currentTile.value().getStations()) {
+                Stop stop = Stop.create(this, station);
+                stop.initStopParameters(station);
+                stops.put(station, stop);
+                historicalStops.put(stop.getNumber(), stop);
+            }
+        } else {
+            log.warn("Hex {} has a null current tile (preprintedTileId={}). Stations cannot be initialized.", getId(), preprintedTileId);
         }
 
         // Deprecated but retained for backwards compatibility:

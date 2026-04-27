@@ -3198,7 +3198,7 @@ public class GameManager extends RailsManager implements Configurable, Owner {
                                 * space.getRow()
                         + space.getStackPosition(company);
             } else {
-                key = ++minorNo;
+              key = 2000000000 + (++minorNo);
             }
             operatingCompanies.put(key, company);
         }

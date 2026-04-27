@@ -71,38 +71,7 @@ public class StockRound_1870 extends StockRound {
         super.resume();
     }
 
-    @Override
-    protected void adjustSharePrice(PublicCompany company, Owner seller, int sharesSold, boolean soldBefore) {
-        Player president = company.getPresident();
-        boolean canProtect = false;
-
-        if (president != null && seller != president && !president.hasSoldThisRound(company)) {
-            int price = company.getCurrentSpace().getPrice() / company.getShareUnitsForSharePrice();
-            int totalCost = sharesSold * price;
-
-            boolean canAfford = president.getCashValue() >= totalCost;
-            float currentCerts = president.getPortfolioModel().getCertificateCount();
-            int certLimit = getRoot().getGameManager().getPlayerCertificateLimit(president);
-            boolean certLimitOk = (currentCerts + sharesSold) <= certLimit;
-
-            if (canAfford && certLimitOk) {
-                canProtect = true;
-            }
-        }
-
-        if (canProtect) {
-            if (getRoot().getGameManager() instanceof GameManager_1870) {
-                // Trigger the interrupt and explicitly pass the seller
-                ((GameManager_1870) getRoot().getGameManager()).startShareProtectionRound(this, company,
-                        (Player) seller, sharesSold);
-            }
-        } else {
-            // Normal fallback (No president, president selling, or failed cash/cert checks)
-            super.adjustSharePrice(company, seller, sharesSold, soldBefore);
-        }
-    }
-
-    @Override
+@Override
     public Player getCurrentPlayer() {
         // 1870 Rule: If we jumped to a specific player after Price Protection, return
         // them.
@@ -113,24 +82,42 @@ public class StockRound_1870 extends StockRound {
                     return p;
             }
         }
-        return super.getCurrentPlayer();
+        
+// --- START FIX ---
+        Player p = super.getCurrentPlayer();
+        if (p == null) {
+            // Fallback: If the round doesn't have a current player set, 
+            // ask the playerManager for the active player.
+            p = playerManager.getCurrentPlayer();
+        }
+        return p;
+// --- END FIX ---
     }
+
 
     @Override
     public boolean setPossibleActions() {
         boolean result = super.setPossibleActions();
 
+        // --- START FIX ---
         // 1. 1870 Rule: Companies do not buy privates in Stock Rounds
-        java.util.Iterator<rails.game.action.PossibleAction> it = possibleActions.getList().iterator();
-        while (it.hasNext()) {
-            if (it.next() instanceof rails.game.action.BuyPrivate) {
-                it.remove();
+        // We collect in a separate list to avoid ConcurrentModificationException or ImmutableList crashes
+        java.util.List<rails.game.action.PossibleAction> actionsToRemove = new java.util.ArrayList<>();
+        for (rails.game.action.PossibleAction action : possibleActions.getList()) {
+            if (action instanceof rails.game.action.BuyPrivate) {
+                actionsToRemove.add(action);
             }
+        }
+        if (!actionsToRemove.isEmpty()) {
+            log.info("Removing BuyPrivate actions from Stock Round per 1870 rules.");
+            possibleActions.removeAll(actionsToRemove);
         }
 
         Player currentPlayer = getCurrentPlayer();
-        if (currentPlayer == null)
+        if (currentPlayer == null) {
+            log.info("setPossibleActions: No current player found.");
             return result;
+        }
 
         boolean addedCustomAction = false;
 
@@ -139,8 +126,7 @@ public class StockRound_1870 extends StockRound {
             if ("MKT".equals(priv.getId())) {
                 PublicCompany mktPub = getRoot().getCompanyManager().getPublicCompany("MKT");
                 if (mktPub != null && !mktPub.hasFloated()) {
-                    net.sf.rails.game.specific._1870.action.ExchangeMKT_1870 mktAct = new net.sf.rails.game.specific._1870.action.ExchangeMKT_1870(
-                            priv);
+                    net.sf.rails.game.specific._1870.action.ExchangeMKT_1870 mktAct = new net.sf.rails.game.specific._1870.action.ExchangeMKT_1870(priv);
                     if (!possibleActions.getList().contains(mktAct)) {
                         possibleActions.add(mktAct);
                         addedCustomAction = true;
@@ -150,37 +136,66 @@ public class StockRound_1870 extends StockRound {
         }
 
         // 3. Share Redemption & Reissue Logic
+        log.info("Starting 1870 President Action evaluation for " + currentPlayer.getName());
         for (PublicCompany company : getRoot().getCompanyManager().getAllPublicCompanies()) {
-            if (company.isClosed() || company.getPresident() != currentPlayer) {
+            if (company.isClosed()) continue;
+            
+            if (company.getPresident() != currentPlayer) {
+                // This is a common place where it "skips" if ownership just changed
                 continue;
             }
 
-            // A company may not both redeem and reissue shares in the same Stock Round.
-            boolean actedThisRound = reissuedThisRound.value().contains(company.getId() + ",")
-                    || redeemedThisRound.value().contains(company.getId() + ",");
 
+            // Gatekeeper A: One action per round limit
+            boolean reissued = reissuedThisRound.value().contains(company.getId() + ",");
+            boolean redeemed = redeemedThisRound.value().contains(company.getId() + ",");
+            boolean actedThisRound = reissued || redeemed;
+            
+            
+            // Gatekeeper B: Must have operated at least once
             if (!actedThisRound && company.hasOperated()) {
-                // Reissue
-                if (ipo.getShare(company) <= 0 && company.getPortfolioModel().getShare(company) > 0) {
-                    net.sf.rails.game.specific._1870.action.ReissueShares_1870 rei = new net.sf.rails.game.specific._1870.action.ReissueShares_1870(
-                            company);
+                
+                // --- REISSUE EVALUATION ---
+                int sharesInTreasury = company.getPortfolioModel().getShares(company);
+                int sharesInIpo = ipo.getShares(company);
+                
+                if (sharesInIpo <= 0 && sharesInTreasury > 0) {
+                    net.sf.rails.game.specific._1870.action.ReissueShares_1870 rei = new net.sf.rails.game.specific._1870.action.ReissueShares_1870(company);
                     if (!possibleActions.getList().contains(rei)) {
                         possibleActions.add(rei);
                         addedCustomAction = true;
                     }
                 }
 
-                // Redeem
-                if (company.getPortfolioModel().getShares(company) < 4) {
-                    int marketPrice = company.getCurrentSpace().getPrice() / company.getShareUnitsForSharePrice();
-                    if (company.getCash() >= marketPrice && pool.getShares(company) > 0) {
-                        net.sf.rails.game.specific._1870.action.RedeemShare_1870 red = new net.sf.rails.game.specific._1870.action.RedeemShare_1870(
-                                company);
+                // --- REDEEM EVALUATION ---
+                int marketPrice = company.getCurrentSpace().getPrice() / company.getShareUnitsForSharePrice();
+                boolean hasCash = company.getCash() >= marketPrice;
+                int poolShares = pool.getShares(company);
+                
+                
+                if (sharesInTreasury < 4 && hasCash) {
+                    // Check players for non-president shares
+                    boolean playersHoldRedeemable = false;
+                    for (Player p : playerManager.getPlayers()) {
+                        for (net.sf.rails.game.financial.PublicCertificate cert : p.getPortfolioModel().getCertificates(company)) {
+                            if (!cert.isPresidentShare()) {
+                                playersHoldRedeemable = true;
+                                break;
+                            }
+                        }
+                        if (playersHoldRedeemable) break;
+                    }
+                    
+                    
+                    if (poolShares > 0 || playersHoldRedeemable) {
+                        net.sf.rails.game.specific._1870.action.RedeemShare_1870 red = new net.sf.rails.game.specific._1870.action.RedeemShare_1870(company);
                         if (!possibleActions.getList().contains(red)) {
                             possibleActions.add(red);
                             addedCustomAction = true;
                         }
+                    } else {
                     }
+                } else {
                 }
             }
         }

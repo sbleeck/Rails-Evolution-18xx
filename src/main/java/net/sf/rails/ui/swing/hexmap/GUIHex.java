@@ -270,6 +270,7 @@ public class GUIHex implements Observer {
 
     private List<HexSide> barSides;
     private List<HexSide> borderSides;
+    private List<HexSide> riverSides;
 
     // A counter instead of a boolean is used here in order to be able to correctly
     // handle racing conditions for mouse events.
@@ -323,6 +324,13 @@ public class GUIHex implements Observer {
             borderSides = Lists.newArrayListWithCapacity(4);
         }
         borderSides.add(side);
+    }
+
+    public void addRiver(HexSide side) {
+        if (riverSides == null) {
+            riverSides = Lists.newArrayListWithCapacity(4);
+        }
+        riverSides.add(side);
     }
 
     public Rectangle getBounds() {
@@ -518,13 +526,15 @@ g.setColor(State.HIGHLIGHT_PURPLE.getColor());
                 displayMarkings = hexMap.getOrUIManager().isShowMapMarkings();
             }
 
-            // 2. Draw costs even if the tile is "0", but only if the toggle is ON
-if (displayMarkings && getHex().getTileCost() > 0) {
+            // 2. Draw costs in black, but only if the toggle is ON and no tile has been laid
+            if (displayMarkings && getHex().getTileCost() > 0 && getHex().isPreprintedTileCurrent()) {
                 Font oldFont = g.getFont();
                 // Bumped minimum size to 10 for better legibility at extreme small scales
                 int scaledFontSize = Math.max(10, (int) Math.round(12 * dimensions.zoomFactor));
                 g.setFont(new Font("SansSerif", Font.PLAIN, scaledFontSize));
                 FontMetrics fontMetrics = g.getFontMetrics();
+                Color oldColor = g.getColor();
+                g.setColor(Color.BLACK);
                 g.drawString(
                         Bank.format(getHex(), getHex().getTileCost()),
                         dimensions.rectBound.x
@@ -533,6 +543,7 @@ if (displayMarkings && getHex().getTileCost() > 0) {
                                         * 3 / 5,
                         dimensions.rectBound.y
                                 + ((fontMetrics.getHeight() + dimensions.rectBound.height) * 9 / 15));
+                g.setColor(oldColor);
                 g.setFont(oldFont);
             }
 
@@ -696,6 +707,82 @@ drawDestinationMilestones(g);
                 drawBorder(g, dimensions.points.get(startPoint), dimensions.points.get(startPoint.next()));
             }
         }
+        // The Mississippi River uses a custom validator, not standard XML riverSides.
+        try {
+            Class<?> validatorClass = Class.forName("net.sf.rails.game.specific._1870.MississippiRiverValidator");
+            java.lang.reflect.Field riverHexesField = validatorClass.getDeclaredField("RIVER_HEXES");
+            riverHexesField.setAccessible(true);
+            @SuppressWarnings("unchecked")
+            Map<String, Object> riverHexes = (Map<String, Object>) riverHexesField.get(null);
+            
+            Object topology = riverHexes.get(getHex().getId());
+            if (topology != null) {
+                java.lang.reflect.Field westBankField = topology.getClass().getDeclaredField("westBank");
+                westBankField.setAccessible(true);
+                @SuppressWarnings("unchecked")
+                Set<Integer> west = (Set<Integer>) westBankField.get(topology);
+
+                java.lang.reflect.Field eastBankField = topology.getClass().getDeclaredField("eastBank");
+                eastBankField.setAccessible(true);
+                @SuppressWarnings("unchecked")
+                Set<Integer> east = (Set<Integer>) eastBankField.get(topology);
+
+                if (west != null && !west.isEmpty() && east != null && !east.isEmpty()) {
+                    double wx = 0, wy = 0, ex = 0, ey = 0;
+                    for (Integer w : west) {
+                        Point2D p = getSidePoint2D(HexSide.get(w));
+                        wx += p.getX(); wy += p.getY();
+                    }
+                    for (Integer e : east) {
+                        Point2D p = getSidePoint2D(HexSide.get(e));
+                        ex += p.getX(); ey += p.getY();
+                    }
+                    
+                    // Average the banks to find the true entry/exit points
+                    Point2D p1 = new Point2D.Double(wx / west.size(), wy / west.size());
+                    Point2D p2 = new Point2D.Double(ex / east.size(), ey / east.size());
+                    Point2D center = getCenterPoint2D();
+
+                    Color oldColor = g.getColor();
+                    Stroke oldStroke = g.getStroke();
+                    
+                    g.setColor(new Color(64, 164, 223, 180)); // Translucent river blue
+                    g.setStroke(new BasicStroke(10.0f * (float)dimensions.zoomFactor, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
+                    
+                    // Quadratic curve using hex center as the control point
+                    g.draw(new java.awt.geom.QuadCurve2D.Double(p1.getX(), p1.getY(), center.getX(), center.getY(), p2.getX(), p2.getY()));
+                    
+                    g.setColor(oldColor);
+                    g.setStroke(oldStroke);
+                }
+            }
+        } catch (Exception e) {
+            // Not 1870 or validator inaccessible, fallback to standard rivers if any
+            net.sf.rails.game.HexSidesSet rivers = getHex().getRiverSides();
+           if (rivers != null) {
+                java.util.Iterator<HexSide> it = rivers.iterator();
+                if (it.hasNext()) {
+                    Point2D p1 = getSidePoint2D(it.next());
+                    if (it.hasNext()) {
+                        Point2D p2 = getSidePoint2D(it.next());
+                        Point2D center = getCenterPoint2D();
+
+                        Color oldColor = g.getColor();
+                        Stroke oldStroke = g.getStroke();
+                        g.setColor(new Color(64, 164, 223, 180));
+                        g.setStroke(new BasicStroke(10.0f * (float)dimensions.zoomFactor, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
+                        g.draw(new java.awt.geom.QuadCurve2D.Double(p1.getX(), p1.getY(), center.getX(), center.getY(), p2.getX(), p2.getY()));
+                        g.setColor(oldColor);
+                        g.setStroke(oldStroke);
+                    }
+                }
+            }
+        }
+        if (riverSides != null) {
+            for (HexSide startPoint : riverSides) {
+                drawRiver(g, dimensions.points.get(startPoint), dimensions.points.get(startPoint.next()));
+            }
+        }
     }
 
     protected void drawBar(Graphics2D g2d, HexPoint start, HexPoint end) {
@@ -716,6 +803,18 @@ drawDestinationMilestones(g);
 
         g2d.setColor(BORDER_COLOUR);
         g2d.setStroke(new BasicStroke(BORDER_WIDTH));
+        g2d.draw(new Line2D.Double(start.get2D(), end.get2D()));
+
+        g2d.setColor(oldColor);
+        g2d.setStroke(oldStroke);
+    }
+
+    protected void drawRiver(Graphics2D g2d, HexPoint start, HexPoint end) {
+        Color oldColor = g2d.getColor();
+        Stroke oldStroke = g2d.getStroke();
+
+        g2d.setColor(new Color(64, 164, 223, 180)); // Translucent river blue
+        g2d.setStroke(new BasicStroke(12.0f * (float)dimensions.zoomFactor, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
         g2d.draw(new Line2D.Double(start.get2D(), end.get2D()));
 
         g2d.setColor(oldColor);
@@ -1303,14 +1402,15 @@ private void drawBaseToken(Graphics2D g2, PublicCompany co, HexPoint center, dou
         if (destinationMarkers.isEmpty()) return;
 
         java.awt.Font originalFont = g2.getFont();
-        g2.setFont(new java.awt.Font("SansSerif", java.awt.Font.BOLD, 10));
+        int scaledFontSize = Math.max(8, (int) Math.round(10 * dimensions.zoomFactor));
+        g2.setFont(new java.awt.Font("SansSerif", java.awt.Font.BOLD, scaledFontSize));
         java.awt.FontMetrics fm = g2.getFontMetrics();
 
-        int size = 16; 
-        int gap = 2;   
+        int size = (int) Math.round(dimensions.tokenDiameter); 
+        int gap = (int) Math.round(2 * dimensions.zoomFactor);   
         
-        int startX = (int) dimensions.rectBound.getX() + 10;
-        int startY = (int) dimensions.rectBound.getY() + 10;
+        int startX = (int) dimensions.rectBound.getX() + (int)(10 * dimensions.zoomFactor);
+        int startY = (int) dimensions.rectBound.getY() + (int)(10 * dimensions.zoomFactor);
 
         for (int i = 0; i < destinationMarkers.size(); i++) {
             PublicCompany comp = destinationMarkers.get(i);
