@@ -535,14 +535,52 @@ g.setColor(State.HIGHLIGHT_PURPLE.getColor());
                 FontMetrics fontMetrics = g.getFontMetrics();
                 Color oldColor = g.getColor();
                 g.setColor(Color.BLACK);
-                g.drawString(
-                        Bank.format(getHex(), getHex().getTileCost()),
-                        dimensions.rectBound.x
-                                + (dimensions.rectBound.width
-                                        - fontMetrics.stringWidth(Integer.toString(getHex().getTileCost())))
-                                        * 3 / 5,
-                        dimensions.rectBound.y
-                                + ((fontMetrics.getHeight() + dimensions.rectBound.height) * 9 / 15));
+
+                String costString = Bank.format(getHex(), getHex().getTileCost());
+                int textWidth = fontMetrics.stringWidth(costString);
+                int textX = dimensions.rectBound.x + (dimensions.rectBound.width - textWidth) * 3 / 5;
+                int textY = dimensions.rectBound.y + ((fontMetrics.getHeight() + dimensions.rectBound.height) * 9 / 15);
+                
+                g.drawString(costString, textX, textY);
+
+                // Draw terrain symbols based on the XML attribute
+                String terrain = getHex().getTerrain();
+                if (terrain != null) {
+                    Stroke oldStroke = g.getStroke();
+                    g.setStroke(new BasicStroke(1.5f * (float)dimensions.zoomFactor, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
+                    
+                    double cx = textX + textWidth / 2.0;
+                    double cy = textY - fontMetrics.getAscent() - (4 * dimensions.zoomFactor); // Position above text
+                    
+                    if (terrain.equalsIgnoreCase("river")) {
+                        g.setColor(new Color(30, 144, 255)); // Standard river blue
+                        double w = 8 * dimensions.zoomFactor;
+                        double h = 2.5 * dimensions.zoomFactor;
+                        double gap = 4 * dimensions.zoomFactor;
+                        
+                        for (int i = 0; i < 2; i++) {
+                            double yOffset = cy + (i * gap);
+                            java.awt.geom.Path2D.Double wave = new java.awt.geom.Path2D.Double();
+                            wave.moveTo(cx - w, yOffset);
+                            wave.curveTo(cx - w/2, yOffset - h, cx + w/2, yOffset + h, cx + w, yOffset);
+                            g.draw(wave);
+                        }
+                    } else if (terrain.equalsIgnoreCase("mountain") || terrain.equalsIgnoreCase("hill") || terrain.equalsIgnoreCase("hills")) {
+                        g.setColor(new Color(139, 69, 19)); // Mountain brown
+                        double w = 6 * dimensions.zoomFactor;
+                        double h = 8 * dimensions.zoomFactor;
+                        
+                        java.awt.geom.Path2D.Double mountain = new java.awt.geom.Path2D.Double();
+                        // Draw two jagged peaks
+                        mountain.moveTo(cx - w - w/2, cy + h/2);
+                        mountain.lineTo(cx - w/2, cy - h/2);
+                        mountain.lineTo(cx, cy + h/2);
+                        mountain.lineTo(cx + w, cy - h/2 + 2*dimensions.zoomFactor);
+                        mountain.lineTo(cx + w + w/2, cy + h/2);
+                        g.draw(mountain);
+                    }
+                    g.setStroke(oldStroke);
+                }
                 g.setColor(oldColor);
                 g.setFont(oldFont);
             }

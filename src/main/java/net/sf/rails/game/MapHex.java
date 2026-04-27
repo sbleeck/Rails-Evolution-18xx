@@ -189,6 +189,8 @@ public class MapHex extends RailsModel implements RailsOwner, Configurable, Seri
     private final HexSidesSet.Builder borderBuilder = HexSidesSet.builder();
     private HexSidesSet borderSides;
 
+    private String terrain = null;
+
     private final HexSidesSet.Builder invalidBuilder = HexSidesSet.builder();
     private HexSidesSet invalidSides;
 
@@ -297,6 +299,8 @@ public class MapHex extends RailsModel implements RailsOwner, Configurable, Seri
 
         tileCost = tag.getAttributeAsIntegerList("cost");
         label = tag.getAttributeAsString("label", "");
+
+        terrain = tag.getAttributeAsString("terrain", null);
 
         // Off-board revenue values
         valuesPerPhase = tag.getAttributeAsIntegerList("value");
@@ -560,6 +564,8 @@ public class MapHex extends RailsModel implements RailsOwner, Configurable, Seri
     }
 
     public String getLabel() { return label; }
+
+    public String getTerrain() { return terrain; }
 
     /**
      * new wrapper function for the LayTile action that calls the actual upgrade
