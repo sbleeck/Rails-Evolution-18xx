@@ -25,18 +25,63 @@ public class StockRound_1870 extends StockRound {
     private final net.sf.rails.game.state.StringState reissuedThisRound = net.sf.rails.game.state.StringState
             .create(this, "reissuedThisRound", "");
 
+    private final StringState protectingCompanyId = StringState.create(this, "protectingCompanyId", "");
+    private final net.sf.rails.game.state.IntegerState protectingShares = net.sf.rails.game.state.IntegerState.create(this, "protectingShares", 0);
+
+    public static class ProtectShare_1870 extends rails.game.action.PossibleAction {
+        private static final long serialVersionUID = 1L;
+        private final String companyId;
+        private final int shares;
+        public ProtectShare_1870(PublicCompany company, int shares) {
+            super(company.getRoot());
+            this.companyId = company.getId();
+            this.shares = shares;
+            setButtonLabel("Protect " + companyId + " Price");
+        }
+        public String getCompanyId() { return companyId; }
+        public int getShares() { return shares; }
+    }
+
+    public static class DeclineProtection_1870 extends rails.game.action.PossibleAction {
+        private static final long serialVersionUID = 1L;
+        private final String companyId;
+        private final int shares;
+        public DeclineProtection_1870(PublicCompany company, int shares) {
+            super(company.getRoot());
+            this.companyId = company.getId();
+            this.shares = shares;
+            setButtonLabel("Decline Protection");
+        }
+        public String getCompanyId() { return companyId; }
+        public int getShares() { return shares; }
+    }
+
     public StockRound_1870(net.sf.rails.game.GameManager parent, String id) {
 
         super(parent, id);
     }
 
-    public void setNextPlayerAfterProtection(Player protectingPresident) {
+public void setNextPlayerAfterProtection(Player protectingPresident) {
         List<Player> players = playerManager.getPlayers();
         int pIndex = players.indexOf(protectingPresident);
         int nextIndex = (pIndex + 1) % players.size();
         Player nextPlayer = players.get(nextIndex);
 
-        jumpedToPlayer.set(nextPlayer.getName());
+        // Advance the engine's internal pointer immediately
+        setCurrentPlayer(nextPlayer);
+
+        // Wipe the seller's turn state so the new player starts completely fresh
+        hasActed.set(false);
+        companyBoughtThisTurnWrapper.set(null);
+        hasSoldThisTurnBeforeBuying.set(false);
+        sellPrices.clear();
+        numPasses.set(0);
+        
+        // Clear jumpedToPlayer so resume() doesn't double-fire
+        jumpedToPlayer.set(null);
+
+        ReportBuffer.add(this, "=> TURN JUMP: Play resumes with " + nextPlayer.getName()
+                + " (player to the left of the catcher).");
     }
 
     public void processPassedProtection(PublicCompany company, int sharesSold) {
@@ -73,8 +118,15 @@ public class StockRound_1870 extends StockRound {
 
 @Override
     public Player getCurrentPlayer() {
-        // 1870 Rule: If we jumped to a specific player after Price Protection, return
-        // them.
+        // 1. If we are in the middle of a price protection decision, the President acts
+        if (protectingCompanyId.value() != null && !protectingCompanyId.value().isEmpty()) {
+            PublicCompany comp = getRoot().getCompanyManager().getPublicCompany(protectingCompanyId.value());
+            if (comp != null && comp.getPresident() != null) {
+                return comp.getPresident();
+            }
+        }
+
+        // 2. 1870 Rule: If we jumped to a specific player after Price Protection, return them.
         String name = jumpedToPlayer.value();
         if (name != null && !name.isEmpty()) {
             for (Player p : playerManager.getPlayers()) {
@@ -83,23 +135,37 @@ public class StockRound_1870 extends StockRound {
             }
         }
         
-// --- START FIX ---
         Player p = super.getCurrentPlayer();
         if (p == null) {
-            // Fallback: If the round doesn't have a current player set, 
-            // ask the playerManager for the active player.
+            // Fallback: If the round doesn't have a current player set, ask playerManager
             p = playerManager.getCurrentPlayer();
         }
         return p;
-// --- END FIX ---
     }
 
+    @Override
+    protected void adjustSharePrice(PublicCompany comp, Owner player, int shares, boolean soldBefore) {
+        Player president = comp.getPresident();
+        int marketPrice = comp.getCurrentSpace().getPrice() / comp.getShareUnitsForSharePrice();
+
+        // 1870 Price Protection Rule: President can protect if they aren't the seller 
+        // and have enough cash to buy all sold shares from the pool at the market price.
+        if (president != null && president != player && president.getCash() >= (marketPrice * shares)) {
+            protectingCompanyId.set(comp.getId());
+            protectingShares.set(shares);
+            ReportBuffer.add(this, "Price protection opportunity: " + president.getName() + " may protect " + comp.getId() + ".");
+            return; // Intercept! Do not drop the price yet.
+        }
+
+        // Otherwise, execute normal price drop
+        super.adjustSharePrice(comp, player, shares, soldBefore);
+    }
 
     @Override
     public boolean setPossibleActions() {
         boolean result = super.setPossibleActions();
 
-        // --- START FIX ---
+  
         // 1. 1870 Rule: Companies do not buy privates in Stock Rounds
         // We collect in a separate list to avoid ConcurrentModificationException or ImmutableList crashes
         java.util.List<rails.game.action.PossibleAction> actionsToRemove = new java.util.ArrayList<>();
@@ -118,6 +184,44 @@ public class StockRound_1870 extends StockRound {
             log.info("setPossibleActions: No current player found.");
             return result;
         }
+
+        // --- PRICE PROTECTION OVERRIDE ---
+        if (protectingCompanyId.value() != null && !protectingCompanyId.value().isEmpty()) {
+            possibleActions.clear(); // Clear normal actions
+            PublicCompany comp = getRoot().getCompanyManager().getPublicCompany(protectingCompanyId.value());
+            if (comp != null) {
+                possibleActions.add(new ProtectShare_1870(comp, protectingShares.value()));
+                possibleActions.add(new DeclineProtection_1870(comp, protectingShares.value()));
+            }
+            return true;
+        }
+
+
+        // 1870 Rule: Players can legally hold >60% of a company if acquired via price protection.
+        // The base engine thinks this is illegal, forces a sell, and suppresses the Pass/Done buttons.
+        // We restore Pass/Done as long as the player is still within their overall certificate limit.
+float certCount = currentPlayer.getPortfolioModel().getCertificateCount();
+        int certLimit = getRoot().getGameManager().getPlayerCertificateLimit(currentPlayer);
+        
+        if (certCount <= certLimit) {
+            boolean hasNullAction = false;
+            for (rails.game.action.PossibleAction pa : possibleActions.getList()) {
+                if (pa instanceof rails.game.action.NullAction) {
+                    hasNullAction = true;
+                    break;
+                }
+            }
+            
+            if (!hasNullAction) {
+                if (hasActed.value()) {
+                    possibleActions.add(new rails.game.action.NullAction(getRoot(), rails.game.action.NullAction.Mode.DONE));
+                } else {
+                    possibleActions.add(new rails.game.action.NullAction(getRoot(), rails.game.action.NullAction.Mode.PASS));
+                }
+                result = true;
+            }
+        }
+
 
         boolean addedCustomAction = false;
 
@@ -281,6 +385,52 @@ public class StockRound_1870 extends StockRound {
             // 4. Record
             net.sf.rails.common.ReportBuffer.add(this, getCurrentPlayer().getName()
                     + " exchanges MKT private for MKT public president's share. Par set at $100.");
+
+            return true;
+        } else if (action instanceof ProtectShare_1870) {
+            ProtectShare_1870 prot = (ProtectShare_1870) action;
+            PublicCompany company = getRoot().getCompanyManager().getPublicCompany(prot.getCompanyId());
+            Player president = company.getPresident();
+            int sharesToProtect = prot.getShares();
+            int marketPrice = company.getCurrentSpace().getPrice() / company.getShareUnitsForSharePrice();
+            int totalCost = marketPrice * sharesToProtect;
+
+            // 1. President pays Bank
+            net.sf.rails.game.state.Currency.wire(president, totalCost, getRoot().getBank());
+            
+            // 2. Move shares from pool to President
+            int moved = 0;
+            for (net.sf.rails.game.financial.PublicCertificate cert : pool.getCertificates(company)) {
+                if (moved >= sharesToProtect) break;
+                int certShares = cert.getShares();
+                cert.moveTo(president.getPortfolioModel());
+                moved += certShares;
+            }
+
+            net.sf.rails.common.ReportBuffer.add(this, president.getName() + " protects " + company.getId() + " by buying " + sharesToProtect + " shares for " + getRoot().getBank().getCurrency().format(totalCost) + ".");
+
+            // 3. Clear protection state
+            protectingCompanyId.set("");
+            protectingShares.set(0);
+
+            // 4. Turn jumps to the player left of the President
+            setNextPlayerAfterProtection(president);
+
+            return true;
+
+        } else if (action instanceof DeclineProtection_1870) {
+            DeclineProtection_1870 decl = (DeclineProtection_1870) action;
+            PublicCompany company = getRoot().getCompanyManager().getPublicCompany(decl.getCompanyId());
+            int sharesToDrop = decl.getShares();
+
+            net.sf.rails.common.ReportBuffer.add(this, company.getPresident().getName() + " declines to protect " + company.getId() + ".");
+
+            // 1. Clear protection state
+            protectingCompanyId.set("");
+            protectingShares.set(0);
+
+            // 2. Proceed with the delayed price drop
+            processPassedProtection(company, sharesToDrop);
 
             return true;
         }

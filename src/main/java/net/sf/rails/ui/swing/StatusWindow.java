@@ -1975,22 +1975,44 @@ public class StatusWindow extends JFrame implements ActionListener, ActionPerfor
 
                     dynamicButtonPanel.revalidate();
                     dynamicButtonPanel.repaint();
-                } else if (currentRound instanceof net.sf.rails.game.specific._1870.StockRound_1870) {
+  
 
-                    // 1870 Special: Show Redeem and Reissue buttons in the dynamic panel (1817
-                    // style)
+
+} else if (currentRound instanceof net.sf.rails.game.specific._1870.StockRound_1870) {
                     dynamicButtonPanel.setBackground(new Color(230, 240, 255));
                     dynamicButtonPanel.setOpaque(true);
                     dynamicButtonPanel.setBorder(BorderFactory.createLineBorder(SYS_BLUE, 1));
                     dynamicButtonPanel.setLayout(new FlowLayout(FlowLayout.LEFT, 8, 2));
 
+                    boolean isProtecting = false;
+
                     if (possibleActions != null && possibleActions.getList() != null) {
                         for (PossibleAction pa : possibleActions.getList()) {
-                            if (pa instanceof net.sf.rails.game.specific._1870.action.RedeemShare_1870
-                                    || pa instanceof net.sf.rails.game.specific._1870.action.ReissueShares_1870 
-                                    || pa instanceof net.sf.rails.game.specific._1870.action.ExchangeMKT_1870) {
+                            
+                            if (pa instanceof net.sf.rails.game.specific._1870.StockRound_1870.ProtectShare_1870) {
                                 ActionButton btn = new ActionButton(null);
-                                btn.setText(pa.getButtonLabel());
+                                btn.setText("Protect Shares");
+                                btn.setPossibleAction(pa);
+                                btn.addActionListener(this);
+                                styleStatusButton(btn, SYS_BLUE);
+                                dynamicButtonPanel.add(btn);
+                                isProtecting = true;
+                                
+                            } else if (pa instanceof net.sf.rails.game.specific._1870.StockRound_1870.DeclineProtection_1870) {
+                                ActionButton btn = new ActionButton(null);
+                                btn.setText("Decline Protection");
+                                btn.setPossibleAction(pa);
+                                btn.addActionListener(this);
+                                styleStatusButton(btn, Color.RED);
+                                dynamicButtonPanel.add(btn);
+                                isProtecting = true;
+                                
+                            } else if (pa instanceof net.sf.rails.game.specific._1870.action.RedeemShare_1870
+                                    || pa instanceof net.sf.rails.game.specific._1870.action.ReissueShares_1870
+                                    || pa instanceof net.sf.rails.game.specific._1870.action.ExchangeMKT_1870) {
+
+                                ActionButton btn = new ActionButton(null);
+                                btn.setText(pa.getButtonLabel() != null ? pa.getButtonLabel() : pa.getClass().getSimpleName());
                                 btn.setPossibleAction(pa);
                                 btn.addActionListener(this);
                                 styleStatusButton(btn, SYS_BLUE);
@@ -1998,74 +2020,26 @@ public class StatusWindow extends JFrame implements ActionListener, ActionPerfor
                             }
                         }
                     }
+
+                    // Shift to alert colors if a protection decision is pending
+                    if (isProtecting) {
+                        dynamicButtonPanel.setBackground(new Color(255, 230, 230)); 
+                        dynamicButtonPanel.setBorder(BorderFactory.createLineBorder(Color.RED, 1));
+                    }
+
+                    dynamicButtonPanel.setVisible(true);
                     dynamicButtonPanel.revalidate();
                     dynamicButtonPanel.repaint();
 
-                } else if (currentRound instanceof net.sf.rails.game.specific._1870.ShareProtectionRound_1870) {
 
-                    dynamicButtonPanel.setBackground(new Color(255, 240, 230)); // Warning Orange Tint
-                    dynamicButtonPanel.setOpaque(true);
-                    dynamicButtonPanel.setBorder(BorderFactory.createLineBorder(new Color(204, 102, 0), 2));
-                    dynamicButtonPanel.setLayout(new FlowLayout(FlowLayout.LEFT, 15, 5));
 
-                    rails.game.action.BuyCertificate buyAction = null;
-                    rails.game.action.NullAction passAction = null;
 
-                    if (possibleActions != null && possibleActions.getList() != null) {
-                        for (rails.game.action.PossibleAction pa : possibleActions.getList()) {
-                            if (pa instanceof rails.game.action.BuyCertificate) {
-                                buyAction = (rails.game.action.BuyCertificate) pa;
-                            } else if (pa instanceof rails.game.action.NullAction && ((rails.game.action.NullAction) pa)
-                                    .getMode() == rails.game.action.NullAction.Mode.PASS) {
-                                passAction = (rails.game.action.NullAction) pa;
-                            }
-                        }
-                    }
 
-                    String actorName = (effectivePlayer != null) ? effectivePlayer.getName() : "President";
 
-                    if (myTurn && buyAction != null) {
-                        int numShares = buyAction.getNumberBought();
-                        int totalCost = buyAction.getPrice() * numShares;
-                        String compName = buyAction.getCompany().getId();
 
-                        JLabel promptLabel = new JLabel("<html><b>SHARE PROTECTION:</b> " + actorName + ", protect "
-                                + numShares + " share(s) of " + compName + " for $" + totalCost + "?</html>");
-                        promptLabel.setFont(new Font("SansSerif", Font.BOLD, 14));
-                        promptLabel.setForeground(new Color(204, 51, 0));
-                        dynamicButtonPanel.add(promptLabel);
 
-                        JButton yesButton = new JButton("Yes (Catch)");
-                        yesButton.setBackground(new Color(34, 139, 34)); // Green
-                        yesButton.setForeground(Color.WHITE);
-                        yesButton.setOpaque(true);
-                        yesButton.setBorder(BorderFactory.createRaisedBevelBorder());
-                        final rails.game.action.PossibleAction finalBuy = buyAction;
-                        yesButton.addActionListener(e -> process(finalBuy));
-                        dynamicButtonPanel.add(yesButton);
 
-                        JButton noButton = new JButton("No (Let it drop)");
-                        noButton.setBackground(new Color(255, 69, 0)); // Red
-                        noButton.setForeground(Color.WHITE);
-                        noButton.setOpaque(true);
-                        noButton.setBorder(BorderFactory.createRaisedBevelBorder());
-                        final rails.game.action.PossibleAction finalPass = passAction;
-                        noButton.addActionListener(e -> {
-                            if (finalPass != null)
-                                process(finalPass);
-                        });
-                        dynamicButtonPanel.add(noButton);
 
-                    } else {
-                        JLabel waitingLabel = new JLabel(
-                                "<html><b>SHARE PROTECTION:</b> Waiting for " + actorName + " to decide...</html>");
-                        waitingLabel.setFont(new Font("SansSerif", Font.BOLD, 14));
-                        waitingLabel.setForeground(new Color(204, 51, 0));
-                        dynamicButtonPanel.add(waitingLabel);
-                    }
-
-                    dynamicButtonPanel.revalidate();
-                    dynamicButtonPanel.repaint();
 
                 } else if (currentRound instanceof net.sf.rails.game.specific._1817.MergerAndAcquisitionRound_1817
                         && (((net.sf.rails.game.specific._1817.MergerAndAcquisitionRound_1817) currentRound)
