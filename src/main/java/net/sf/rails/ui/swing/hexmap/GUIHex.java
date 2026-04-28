@@ -733,6 +733,21 @@ drawDestinationMilestones(g);
         GUITile.paintTile(g2, dimensions.center, this, visibleTile, visibleRotation,
                 state.getScale(), hexMap.getZoomStep());
     }
+public void paintHexBackground(Graphics2D g) {
+        // Paint standard 18xx light green background for preprinted tiles
+if (getHex().isPreprintedTileCurrent() || !isTilePainted()) {
+                Color oldColor = g.getColor();
+            g.setColor(new Color(180, 210, 180)); // Standard map green
+            g.fill(dimensions.hexagon);
+            
+            // Draw a subtle border frame
+            g.setColor(new Color(160, 190, 160));
+            g.setStroke(new BasicStroke(1.0f));
+            g.draw(dimensions.hexagon);
+            
+            g.setColor(oldColor);
+        }
+    }
 
     public void paintBars(Graphics2D g) {
         if (barSides != null) {
@@ -745,10 +760,10 @@ drawDestinationMilestones(g);
                 drawBorder(g, dimensions.points.get(startPoint), dimensions.points.get(startPoint.next()));
             }
         }
+    }
 
-
-
-// The Mississippi River uses a custom validator.
+// --- START FIX ---
+    public void paintMississippi(Graphics2D g) {
         try {
             Class<?> validatorClass = Class.forName("net.sf.rails.game.specific._1870.MississippiRiverValidator");
             java.lang.reflect.Field riverHexesField = validatorClass.getDeclaredField("RIVER_HEXES");
@@ -764,7 +779,6 @@ drawDestinationMilestones(g);
                 int row = rowChar - 'A';
                 
                 // Logic: Check all 6 standard 18xx grid neighbors. 
-                // If the neighbor is also a river hex, the river must cross that edge midpoint!
                 for (int i = 0; i < 6; i++) {
                     int r = row;
                     int c = col;
@@ -793,10 +807,9 @@ drawDestinationMilestones(g);
                 if (flowEdges.size() == 2) {
                     Point2D p1 = getSidePoint2D(HexSide.get(flowEdges.get(0)));
                     Point2D p2 = getSidePoint2D(HexSide.get(flowEdges.get(1)));
-                    // The center control point perfectly dictates the 0, 60, or -60 degree turns
                     shapes.add(new java.awt.geom.QuadCurve2D.Double(p1.getX(), p1.getY(), center.getX(), center.getY(), p2.getX(), p2.getY()));
                 } else if (flowEdges.size() == 3) {
-                    // Logic for branching rivers (e.g. at J15): Find the 'trunk' incoming edge
+                    // Logic for branching rivers
                     int trunk = 0;
                     for (int i=0; i<3; i++) {
                         int e1 = flowEdges.get(i);
@@ -817,11 +830,11 @@ drawDestinationMilestones(g);
                     Color oldColor = g.getColor();
                     Stroke oldStroke = g.getStroke();
                     
-                    g.setColor(new Color(64, 164, 223, 160)); 
+g.setColor(new Color(64, 164, 223, 100)); // Lighter alpha to let track show through
                     g.setStroke(new BasicStroke(16.0f * (float)dimensions.zoomFactor, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
                     for(Shape s : shapes) g.draw(s);
                     
-                    g.setColor(new Color(20, 100, 180, 200));
+                    g.setColor(new Color(20, 100, 180, 140));
                     float dash = 12.0f * (float)dimensions.zoomFactor;
                     float gap = 20.0f * (float)dimensions.zoomFactor;
                     g.setStroke(new BasicStroke(2.0f * (float)dimensions.zoomFactor, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND, 0, new float[]{dash, gap}, 0));
@@ -831,48 +844,10 @@ drawDestinationMilestones(g);
                     g.setStroke(oldStroke);
                 }
             }
-        } catch (Exception e) {
-            // Fallback for non-1870 maps
-            net.sf.rails.game.HexSidesSet rivers = getHex().getRiverSides();
-            if (rivers != null) {
-                java.util.Iterator<HexSide> it = rivers.iterator();
-                if (it.hasNext()) {
-                    Point2D p1 = getSidePoint2D(it.next());
-                    if (it.hasNext()) {
-                        Point2D p2 = getSidePoint2D(it.next());
-                        Point2D center = getCenterPoint2D();
-                        
-                        Shape riverShape = new java.awt.geom.QuadCurve2D.Double(p1.getX(), p1.getY(), center.getX(), center.getY(), p2.getX(), p2.getY());
-                        
-                        Color oldColor = g.getColor();
-                        Stroke oldStroke = g.getStroke();
-                        g.setColor(new Color(64, 164, 223, 160));
-                        g.setStroke(new BasicStroke(16.0f * (float)dimensions.zoomFactor, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
-                        g.draw(riverShape);
-                        
-                        g.setColor(new Color(20, 100, 180, 200));
-                        float dash = 12.0f * (float)dimensions.zoomFactor;
-                        float gap = 20.0f * (float)dimensions.zoomFactor;
-                        g.setStroke(new BasicStroke(2.0f * (float)dimensions.zoomFactor, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND, 0, new float[]{dash, gap}, 0));
-                        g.draw(riverShape);
-                        
-                        g.setColor(oldColor);
-                        g.setStroke(oldStroke);
-                    }
-                }
-            }
-        }
-
-
-        
-      
-      
-        if (riverSides != null) {
-            for (HexSide startPoint : riverSides) {
-                drawRiver(g, dimensions.points.get(startPoint), dimensions.points.get(startPoint.next()));
-            }
-        }
+        } catch (Exception e) {}
     }
+
+
 
     protected void drawBar(Graphics2D g2d, HexPoint start, HexPoint end) {
         Color oldColor = g2d.getColor();

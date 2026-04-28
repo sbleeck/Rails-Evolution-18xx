@@ -298,23 +298,34 @@ public abstract class HexMap implements MouseListener, MouseMotionListener {
         @Override
         public void paintImage(Graphics2D g) {
             try {
-                // Paint tiles
+               
+
+            // 1. Bottom Layer: Paint the base hex backgrounds and preprinted SVG tiles
                 for (GUIHex hex:hexMap.getHexes()) {
                     Rectangle hexrect = hex.getBounds();
-
-                    if (g.hitClip(hexrect.x, hexrect.y, hexrect.width,
-                            hexrect.height)) {
-                        hex.paintTile(g);
+                    if (g.hitClip(hexrect.x, hexrect.y, hexrect.width, hexrect.height)) {
+                        hex.paintHexBackground(g);
+                        if (hex.getHex().isPreprintedTileCurrent()) {
+                            hex.paintTile(g);
+                        }
                     }
                 }
 
-                // Paint the impassability bars
+                // 2. Middle Layer: Paint the Mississippi River OVER the base tiles
                 for (GUIHex hex:hexMap.getHexes()) {
                     Rectangle hexrect = hex.getBounds();
+                    if (g.hitClip(hexrect.x, hexrect.y, hexrect.width, hexrect.height)) {
+                        hex.paintMississippi(g);
+                    }
+                }
 
-                    if (g.hitClip(hexrect.x, hexrect.y, hexrect.width,
-                            hexrect.height)) {
-                        hex.paintBars(g);
+                // 3. Top Layer: Paint laid SVG Tiles (Upgrades) OVER the river
+                for (GUIHex hex:hexMap.getHexes()) {
+                    Rectangle hexrect = hex.getBounds();
+                    if (g.hitClip(hexrect.x, hexrect.y, hexrect.width, hexrect.height)) {
+                        if (!hex.getHex().isPreprintedTileCurrent()) {
+                            hex.paintTile(g);
+                        }
                     }
                 }
 
