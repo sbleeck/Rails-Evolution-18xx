@@ -1429,6 +1429,12 @@ public class StatusWindow extends JFrame implements ActionListener, ActionPerfor
         // 4. Update Buttons
         if (buttonPanel != null) {
             updateComponentTreeFont(buttonPanel, baseFont);
+            
+            // Make the first 3 buttons smaller so they do not get truncated
+            Font smallerFont = baseFont.deriveFont(Font.BOLD, Math.max(8f, baseSize - 4f));
+            if (pauseButton != null) pauseButton.setFont(smallerFont);
+            if (undoButton != null) undoButton.setFont(smallerFont);
+            if (redoButton != null) redoButton.setFont(smallerFont);
         }
         enforceDynamicMinimumSize();
     }
