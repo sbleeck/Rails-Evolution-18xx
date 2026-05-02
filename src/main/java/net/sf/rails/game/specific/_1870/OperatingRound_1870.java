@@ -176,17 +176,6 @@ public class OperatingRound_1870 extends OperatingRound {
     public boolean buyTrain(rails.game.action.BuyTrain action) {
         boolean success = super.buyTrain(action);
         
-        if (success) {
-            if ("KATY".equals(action.getCompany().getId())) {
-                PrivateCompany mkt = getRoot().getCompanyManager().getPrivateCompany("MKT");
-                // If MKT is not closed yet, this is KATY's first train purchase
-                if (mkt != null && !mkt.isClosed()) {
-                    mkt.close();
-                    net.sf.rails.common.ReportBuffer.add(this, "The MKT private company closes as " + action.getCompany().getId() + " purchases its first train.");
-                }
-            }
-        }
-
         return success;
     }
 
