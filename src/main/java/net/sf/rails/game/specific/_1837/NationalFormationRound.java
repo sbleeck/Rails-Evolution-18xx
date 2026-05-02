@@ -208,6 +208,11 @@ public class NationalFormationRound extends Round {
         playerManager.setCurrentPlayer(p);
     }
 
+    @Override
+    public Player getCurrentPlayer() {
+        return this.currentPlayer;
+    }
+
     protected void processExchange(PublicCompany minor, PublicCompany major, ExchangeMinorAction action) {
         log.info("1837_NFR: Merging " + minor.getId() + " into " + major.getId());
 
@@ -519,14 +524,21 @@ public class NationalFormationRound extends Round {
                 // unlabeled action if the engine is being strict about matching.
                 if (isFormation) {
                     done.setLabel(LocalText.getText("DeclineFormation"));
+                    done.setButtonLabel("Decline Formation");
                 } else {
                     done.setLabel(LocalText.getText("KeepMinor", target.getId()));
+                    done.setButtonLabel("No / Keep Minor");
                 }
                 possibleActions.add(done);
 
                 // Add a hidden/unlabeled NullAction to catch the UI request 
                 // that is failing validation due to the missing label.
                 NullAction plainDone = new NullAction(getRoot(), NullAction.Mode.DONE);
+                if (isFormation) {
+                    plainDone.setButtonLabel("Decline Formation");
+                } else {
+                    plainDone.setButtonLabel("No / Keep Minor");
+                }
                 possibleActions.add(plainDone);
             }
             return true;
@@ -549,7 +561,6 @@ public class NationalFormationRound extends Round {
                 String msg = LocalText.getText("START_MERGED_COMPANY", national.getId(),
                         Bank.format(this, national.getIPOPrice()), national.getStartSpace());
                 ReportBuffer.add(this, msg);
-                DisplayBuffer.add(this, msg);
             }
 
             processExchange(ema.getMinor(), national, ema);

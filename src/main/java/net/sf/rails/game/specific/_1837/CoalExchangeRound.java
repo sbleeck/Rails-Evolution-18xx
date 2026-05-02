@@ -68,10 +68,19 @@ public class CoalExchangeRound extends Round implements GuiTargetedAction {
         findNextActivePlayer();
     }
     
-    @Override 
+@Override 
     public String getPlayerName() { 
-        Player p = gameManager.getCurrentPlayer();
+        Player p = getCurrentPlayer();
         return (p != null) ? p.getName() : ""; 
+    }
+
+    @Override
+    public Player getCurrentPlayer() {
+        List<Player> players = gameManager.getPlayers();
+        if (players != null && currentPlayerIndex.value() >= 0 && currentPlayerIndex.value() < players.size()) {
+            return players.get(currentPlayerIndex.value());
+        }
+        return null;
     }
     
     private List<String> getMajorList() {

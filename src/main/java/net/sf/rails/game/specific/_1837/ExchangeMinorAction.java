@@ -66,7 +66,6 @@ public class ExchangeMinorAction extends PossibleAction implements GuiTargetedAc
 
     @Override
     public Owner getActor() {
-        // --- START FIX ---
         // Lazy Load: Ensure minor is not null before returning.
         // This fixes the "Active Company (Reflect): None" issue in ORPanel
         // where serialization timing left 'minor' as null.
@@ -74,7 +73,6 @@ public class ExchangeMinorAction extends PossibleAction implements GuiTargetedAc
             resolveCompanies();
         }
         return minor;
-        // --- END FIX ---
     }
     
     // Explicitly implement getTarget to match DiscardTrain pattern
@@ -96,7 +94,6 @@ public class ExchangeMinorAction extends PossibleAction implements GuiTargetedAc
         return "Exchange " + minorId + " for " + targetMajorId;
     }
 
-    // --- GuiTargetedAction UI Implementation (StartPrussian Style) ---
 
     @Override
     public Color getButtonColor() {

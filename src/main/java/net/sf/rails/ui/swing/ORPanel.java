@@ -2203,9 +2203,16 @@ if (btnRevPayout != null) {
                         lblPlayerInfo.setVisible(false);
                     }
 
-                    String phaseName = currentRound.getClass().getSimpleName().contains("Formation")
-                            ? "Prussian Formation"
-                            : "Coal Exchange";
+String phaseName = "Phase";
+                    if (currentRound instanceof net.sf.rails.game.specific._1837.NationalFormationRound) {
+                        net.sf.rails.game.specific._1837.PublicCompany_1837 national = ((net.sf.rails.game.specific._1837.NationalFormationRound) currentRound).getNational();
+                        phaseName = (national != null ? national.getId() : "National") + " Formation";
+                    } else if (currentRound.getClass().getSimpleName().contains("Formation")) {
+                        phaseName = "Prussian Formation";
+                    } else if (currentRound.getClass().getSimpleName().contains("CoalExchange")) {
+                        phaseName = "Coal Exchange";
+                    }
+                    
                     String bottomText = "<html><center><font face='SansSerif' size='4'><b>" + phaseName
                             + "</b></font></center></html>";
                     lblPhaseInstruction.setText(bottomText);
@@ -2855,8 +2862,9 @@ if (btnRevPayout != null) {
                             break;
                         }
                     }
-                    else if (pa instanceof rails.game.specific._1835.StartPrussian || 
-                             pa instanceof rails.game.specific._1835.ExchangeForPrussianShare) {
+else if (pa instanceof rails.game.specific._1835.StartPrussian || 
+                             pa instanceof rails.game.specific._1835.ExchangeForPrussianShare ||
+                             pa instanceof net.sf.rails.game.specific._1837.ExchangeMinorAction) {
                         isFormationStep = true;
                     }
                 }

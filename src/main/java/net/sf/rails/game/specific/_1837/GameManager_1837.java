@@ -413,7 +413,14 @@ log.info("1837_TRACE: Starting CER with ID: " + cerId);
             originalOrder.put(companies.get(i).getId(), i);
         }
 
+
+
         displayOrder.sort((c1, c2) -> {
+
+
+
+
+
             // Explicitly identify standard Majors, including KK, SD, and UG.
             boolean isMajor1 = (c1.getType() != null && "Major".equalsIgnoreCase(c1.getType().getId()))
                     || "KK".equalsIgnoreCase(c1.getId())
@@ -425,48 +432,41 @@ log.info("1837_TRACE: Starting CER with ID: " + cerId);
                     || "SD".equalsIgnoreCase(c2.getId())
                     || "UG".equalsIgnoreCase(c2.getId());
 
-            // 1. Minors/Special Companies ALWAYS BEFORE Majors
-            if (!isMajor1 && isMajor2) return -1;
-            if (isMajor1 && !isMajor2) return 1;
-
-            if (!isMajor1 && !isMajor2) {
-                // Both are minors/specials, keep their original running order
-                return Integer.compare(originalOrder.get(c1.getId()), originalOrder.get(c2.getId()));
-            }
-
-            // Both are majors.
-            // 2. Order criteria: Started (open) -> Unstarted (IPO) -> Closed.
-            int cat1 = c1.isClosed() ? 3 : (c1.hasStarted() ? 1 : 2);
-            int cat2 = c2.isClosed() ? 3 : (c2.hasStarted() ? 1 : 2);
+          
+          
+          // Group 1: Minors/Coal, Group 2: Majors with a share value, Group 3: Unopened Majors, Group 4: Closed Majors
+            int cat1 = !isMajor1 ? 1 : (c1.isClosed() ? 4 : (c1.getCurrentSpace() != null ? 2 : 3));
+            int cat2 = !isMajor2 ? 1 : (c2.isClosed() ? 4 : (c2.getCurrentSpace() != null ? 2 : 3));
 
             if (cat1 != cat2) {
                 return Integer.compare(cat1, cat2);
             }
 
-            // 3. If both are Started Majors (cat 1), sort strictly by stock value (highest first)
-            if (cat1 == 1) {
+            // If both are Majors with a share value (Category 2), sort strictly by share value (highest first)
+            if (cat1 == 2) {
                 StockSpace space1 = c1.getCurrentSpace();
                 StockSpace space2 = c2.getCurrentSpace();
 
-                if (space1 != null && space2 != null) {
-                    // Primary Sort: Price (Highest first)
-                    if (space1.getPrice() != space2.getPrice()) {
-                        return Integer.compare(space2.getPrice(), space1.getPrice());
-                    }
-                    // Tie-breakers: column (rightmost first), row (top first), stack position (top first)
-                    if (space1.getColumn() != space2.getColumn()) {
-                        return Integer.compare(space2.getColumn(), space1.getColumn());
-                    }
-                    if (space1.getRow() != space2.getRow()) {
-                        return Integer.compare(space1.getRow(), space2.getRow());
-                    }
-                    return Integer.compare(space1.getStackPosition(c1), space2.getStackPosition(c2));
+                // Primary Sort: Price (Highest first)
+                if (space1.getPrice() != space2.getPrice()) {
+                    return Integer.compare(space2.getPrice(), space1.getPrice());
                 }
+                // Tie-breakers: column (rightmost first), row (top first), stack position (top first)
+                if (space1.getColumn() != space2.getColumn()) {
+                    return Integer.compare(space2.getColumn(), space1.getColumn());
+                }
+                if (space1.getRow() != space2.getRow()) {
+                    return Integer.compare(space1.getRow(), space2.getRow());
+                }
+                return Integer.compare(space1.getStackPosition(c1), space2.getStackPosition(c2));
             }
 
-            // Fallback for Unstarted or Closed majors, or if stock spaces are missing: keep original order
+            // Fallback for Minors (in running order), Unopened, or Closed majors: keep original order
             return Integer.compare(originalOrder.get(c1.getId()), originalOrder.get(c2.getId()));
-        });
+          
+          
+          
+                });
 
         return displayOrder;
     }
