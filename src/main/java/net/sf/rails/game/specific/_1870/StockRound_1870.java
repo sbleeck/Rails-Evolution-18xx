@@ -26,34 +26,49 @@ public class StockRound_1870 extends StockRound {
             .create(this, "reissuedThisRound", "");
 
     private final StringState protectingCompanyId = StringState.create(this, "protectingCompanyId", "");
-    private final net.sf.rails.game.state.IntegerState protectingShares = net.sf.rails.game.state.IntegerState.create(this, "protectingShares", 0);
+    private final net.sf.rails.game.state.IntegerState protectingShares = net.sf.rails.game.state.IntegerState
+            .create(this, "protectingShares", 0);
 
     public static class ProtectShare_1870 extends rails.game.action.PossibleAction {
         private static final long serialVersionUID = 1L;
         private final String companyId;
         private final int shares;
+
         public ProtectShare_1870(PublicCompany company, int shares) {
             super(company.getRoot());
             this.companyId = company.getId();
             this.shares = shares;
             setButtonLabel("Protect " + companyId + " Price");
         }
-        public String getCompanyId() { return companyId; }
-        public int getShares() { return shares; }
+
+        public String getCompanyId() {
+            return companyId;
+        }
+
+        public int getShares() {
+            return shares;
+        }
     }
 
     public static class DeclineProtection_1870 extends rails.game.action.PossibleAction {
         private static final long serialVersionUID = 1L;
         private final String companyId;
         private final int shares;
+
         public DeclineProtection_1870(PublicCompany company, int shares) {
             super(company.getRoot());
             this.companyId = company.getId();
             this.shares = shares;
             setButtonLabel("Decline Protection");
         }
-        public String getCompanyId() { return companyId; }
-        public int getShares() { return shares; }
+
+        public String getCompanyId() {
+            return companyId;
+        }
+
+        public int getShares() {
+            return shares;
+        }
     }
 
     public StockRound_1870(net.sf.rails.game.GameManager parent, String id) {
@@ -61,7 +76,7 @@ public class StockRound_1870 extends StockRound {
         super(parent, id);
     }
 
-public void setNextPlayerAfterProtection(Player protectingPresident) {
+    public void setNextPlayerAfterProtection(Player protectingPresident) {
         List<Player> players = playerManager.getPlayers();
         int pIndex = players.indexOf(protectingPresident);
         int nextIndex = (pIndex + 1) % players.size();
@@ -76,7 +91,7 @@ public void setNextPlayerAfterProtection(Player protectingPresident) {
         hasSoldThisTurnBeforeBuying.set(false);
         sellPrices.clear();
         numPasses.set(0);
-        
+
         // Clear jumpedToPlayer so resume() doesn't double-fire
         jumpedToPlayer.set(null);
 
@@ -116,7 +131,7 @@ public void setNextPlayerAfterProtection(Player protectingPresident) {
         super.resume();
     }
 
-@Override
+    @Override
     public Player getCurrentPlayer() {
         // 1. If we are in the middle of a price protection decision, the President acts
         if (protectingCompanyId.value() != null && !protectingCompanyId.value().isEmpty()) {
@@ -126,7 +141,8 @@ public void setNextPlayerAfterProtection(Player protectingPresident) {
             }
         }
 
-        // 2. 1870 Rule: If we jumped to a specific player after Price Protection, return them.
+        // 2. 1870 Rule: If we jumped to a specific player after Price Protection,
+        // return them.
         String name = jumpedToPlayer.value();
         if (name != null && !name.isEmpty()) {
             for (Player p : playerManager.getPlayers()) {
@@ -134,7 +150,7 @@ public void setNextPlayerAfterProtection(Player protectingPresident) {
                     return p;
             }
         }
-        
+
         Player p = super.getCurrentPlayer();
         if (p == null) {
             // Fallback: If the round doesn't have a current player set, ask playerManager
@@ -148,12 +164,14 @@ public void setNextPlayerAfterProtection(Player protectingPresident) {
         Player president = comp.getPresident();
         int marketPrice = comp.getCurrentSpace().getPrice() / comp.getShareUnitsForSharePrice();
 
-        // 1870 Price Protection Rule: President can protect if they aren't the seller 
-        // and have enough cash to buy all sold shares from the pool at the market price.
+        // 1870 Price Protection Rule: President can protect if they aren't the seller
+        // and have enough cash to buy all sold shares from the pool at the market
+        // price.
         if (president != null && president != player && president.getCash() >= (marketPrice * shares)) {
             protectingCompanyId.set(comp.getId());
             protectingShares.set(shares);
-            ReportBuffer.add(this, "Price protection opportunity: " + president.getName() + " may protect " + comp.getId() + ".");
+            ReportBuffer.add(this,
+                    "Price protection opportunity: " + president.getName() + " may protect " + comp.getId() + ".");
             return; // Intercept! Do not drop the price yet.
         }
 
@@ -165,9 +183,9 @@ public void setNextPlayerAfterProtection(Player protectingPresident) {
     public boolean setPossibleActions() {
         boolean result = super.setPossibleActions();
 
-  
         // 1. 1870 Rule: Companies do not buy privates in Stock Rounds
-        // We collect in a separate list to avoid ConcurrentModificationException or ImmutableList crashes
+        // We collect in a separate list to avoid ConcurrentModificationException or
+        // ImmutableList crashes
         java.util.List<rails.game.action.PossibleAction> actionsToRemove = new java.util.ArrayList<>();
         for (rails.game.action.PossibleAction action : possibleActions.getList()) {
             if (action instanceof rails.game.action.BuyPrivate) {
@@ -196,13 +214,15 @@ public void setNextPlayerAfterProtection(Player protectingPresident) {
             return true;
         }
 
-
-        // 1870 Rule: Players can legally hold >60% of a company if acquired via price protection.
-        // The base engine thinks this is illegal, forces a sell, and suppresses the Pass/Done buttons.
-        // We restore Pass/Done as long as the player is still within their overall certificate limit.
-float certCount = currentPlayer.getPortfolioModel().getCertificateCount();
+        // 1870 Rule: Players can legally hold >60% of a company if acquired via price
+        // protection.
+        // The base engine thinks this is illegal, forces a sell, and suppresses the
+        // Pass/Done buttons.
+        // We restore Pass/Done as long as the player is still within their overall
+        // certificate limit.
+        float certCount = currentPlayer.getPortfolioModel().getCertificateCount();
         int certLimit = getRoot().getGameManager().getPlayerCertificateLimit(currentPlayer);
-        
+
         if (certCount <= certLimit) {
             boolean hasNullAction = false;
             for (rails.game.action.PossibleAction pa : possibleActions.getList()) {
@@ -211,17 +231,18 @@ float certCount = currentPlayer.getPortfolioModel().getCertificateCount();
                     break;
                 }
             }
-            
+
             if (!hasNullAction) {
                 if (hasActed.value()) {
-                    possibleActions.add(new rails.game.action.NullAction(getRoot(), rails.game.action.NullAction.Mode.DONE));
+                    possibleActions
+                            .add(new rails.game.action.NullAction(getRoot(), rails.game.action.NullAction.Mode.DONE));
                 } else {
-                    possibleActions.add(new rails.game.action.NullAction(getRoot(), rails.game.action.NullAction.Mode.PASS));
+                    possibleActions
+                            .add(new rails.game.action.NullAction(getRoot(), rails.game.action.NullAction.Mode.PASS));
                 }
                 result = true;
             }
         }
-
 
         boolean addedCustomAction = false;
 
@@ -230,7 +251,8 @@ float certCount = currentPlayer.getPortfolioModel().getCertificateCount();
             if ("MKT".equals(priv.getId())) {
                 PublicCompany mktPub = getRoot().getCompanyManager().getPublicCompany("MKT");
                 if (mktPub != null && !mktPub.hasFloated()) {
-                    net.sf.rails.game.specific._1870.action.ExchangeMKT_1870 mktAct = new net.sf.rails.game.specific._1870.action.ExchangeMKT_1870(priv);
+                    net.sf.rails.game.specific._1870.action.ExchangeMKT_1870 mktAct = new net.sf.rails.game.specific._1870.action.ExchangeMKT_1870(
+                            priv);
                     if (!possibleActions.getList().contains(mktAct)) {
                         possibleActions.add(mktAct);
                         addedCustomAction = true;
@@ -241,70 +263,74 @@ float certCount = currentPlayer.getPortfolioModel().getCertificateCount();
 
         // 3. Share Redemption & Reissue Logic
         log.info("Starting 1870 President Action evaluation for " + currentPlayer.getName());
-        for (PublicCompany company : getRoot().getCompanyManager().getAllPublicCompanies()) {
-            if (company.isClosed()) continue;
-            
-            if (company.getPresident() != currentPlayer) {
-                // This is a common place where it "skips" if ownership just changed
-                continue;
-            }
 
+        boolean noNormalActionsTaken = !hasActed.value() && !hasSoldThisTurnBeforeBuying.value()
+                && sellPrices.isEmpty();
+        if (noNormalActionsTaken) {
+            for (PublicCompany company : getRoot().getCompanyManager().getAllPublicCompanies()) {
+                if (company.isClosed())
+                    continue;
 
-            // Gatekeeper A: One action per round limit
-            boolean reissued = reissuedThisRound.value().contains(company.getId() + ",");
-            boolean redeemed = redeemedThisRound.value().contains(company.getId() + ",");
-            boolean actedThisRound = reissued || redeemed;
-            
-            
-            // Gatekeeper B: Must have operated at least once
-            if (!actedThisRound && company.hasOperated()) {
-                
-                // --- REISSUE EVALUATION ---
-                int sharesInTreasury = company.getPortfolioModel().getShares(company);
-                int sharesInIpo = ipo.getShares(company);
-                
-                if (sharesInIpo <= 0 && sharesInTreasury > 0) {
-                    net.sf.rails.game.specific._1870.action.ReissueShares_1870 rei = new net.sf.rails.game.specific._1870.action.ReissueShares_1870(company);
-                    if (!possibleActions.getList().contains(rei)) {
-                        possibleActions.add(rei);
-                        addedCustomAction = true;
-                    }
+                if (company.getPresident() != currentPlayer) {
+                    // This is a common place where it "skips" if ownership just changed
+                    continue;
                 }
 
-                // --- REDEEM EVALUATION ---
-                int marketPrice = company.getCurrentSpace().getPrice() / company.getShareUnitsForSharePrice();
-                boolean hasCash = company.getCash() >= marketPrice;
-                int poolShares = pool.getShares(company);
+                // Gatekeeper A: One action per round limit
+                boolean reissued = reissuedThisRound.value().contains(company.getId() + ",");
+                boolean redeemed = redeemedThisRound.value().contains(company.getId() + ",");
+                boolean actedThisRound = reissued || redeemed;
 
-                int playerShares = 0;
-                for (Player p : playerManager.getPlayers()) {
-                    playerShares += p.getPortfolioModel().getShares(company);
-                }
+                // Gatekeeper B: Must have operated at least once
+                if (!actedThisRound && company.hasOperated()) {
 
-                if (sharesInTreasury < 4 && hasCash && (playerShares + poolShares >= 7)) {
-                    // Check players for non-president shares
-                    boolean playersHoldRedeemable = false;
-                    for (Player p : playerManager.getPlayers()) {
-                        for (net.sf.rails.game.financial.PublicCertificate cert : p.getPortfolioModel()
-                                .getCertificates(company)) {
-                            if (!cert.isPresidentShare()) {
-                                playersHoldRedeemable = true;
-                                break;
-                            }
-                        }
-                        if (playersHoldRedeemable) break;
-                    }
-                    
-                    
-                    if (poolShares > 0 || playersHoldRedeemable) {
-                        net.sf.rails.game.specific._1870.action.RedeemShare_1870 red = new net.sf.rails.game.specific._1870.action.RedeemShare_1870(company);
-                        if (!possibleActions.getList().contains(red)) {
-                            possibleActions.add(red);
+                    // --- REISSUE EVALUATION ---
+                    int sharesInTreasury = company.getPortfolioModel().getShares(company);
+                    int sharesInIpo = ipo.getShares(company);
+
+                    if (sharesInIpo <= 0 && sharesInTreasury > 0) {
+                        net.sf.rails.game.specific._1870.action.ReissueShares_1870 rei = new net.sf.rails.game.specific._1870.action.ReissueShares_1870(
+                                company);
+                        if (!possibleActions.getList().contains(rei)) {
+                            possibleActions.add(rei);
                             addedCustomAction = true;
                         }
-                    } else {
                     }
-                } else {
+
+                    // --- REDEEM EVALUATION ---
+                    int marketPrice = company.getCurrentSpace().getPrice() / company.getShareUnitsForSharePrice();
+                    boolean hasCash = company.getCash() >= marketPrice;
+                    int poolShares = pool.getShares(company);
+
+                    int playerShares = 0;
+                    for (Player p : playerManager.getPlayers()) {
+                        playerShares += p.getPortfolioModel().getShares(company);
+                    }
+
+                    if (sharesInTreasury < 4 && hasCash && (playerShares + poolShares >= 7)) {
+                        // Check players for non-president shares
+                        boolean playersHoldRedeemable = false;
+                        for (Player p : playerManager.getPlayers()) {
+                            for (net.sf.rails.game.financial.PublicCertificate cert : p.getPortfolioModel()
+                                    .getCertificates(company)) {
+                                if (!cert.isPresidentShare()) {
+                                    playersHoldRedeemable = true;
+                                    break;
+                                }
+                            }
+                            if (playersHoldRedeemable)
+                                break;
+                        }
+
+                        if (poolShares > 0 || playersHoldRedeemable) {
+                            net.sf.rails.game.specific._1870.action.RedeemShare_1870 red = new net.sf.rails.game.specific._1870.action.RedeemShare_1870(
+                                    company);
+                            if (!possibleActions.getList().contains(red)) {
+                                possibleActions.add(red);
+                                addedCustomAction = true;
+                            }
+                        }
+                    }
                 }
             }
         }
@@ -312,26 +338,29 @@ float certCount = currentPlayer.getPortfolioModel().getCertificateCount();
         return result || addedCustomAction;
     }
 
-
     @Override
-public boolean checkAgainstHoldLimit(net.sf.rails.game.Player player, net.sf.rails.game.PublicCompany company, int number) {
-boolean baseCheck = super.checkAgainstHoldLimit(player, company, number);
+    public boolean checkAgainstHoldLimit(net.sf.rails.game.Player player, net.sf.rails.game.PublicCompany company,
+            int number) {
+        boolean baseCheck = super.checkAgainstHoldLimit(player, company, number);
 
-    // If the base check passes (e.g., under 60% limit, or the stock token is in the Green/Brown zone where limits are lifted), it is legal.
-    if (baseCheck) {
-        return true;
-    }
-    
-    // 1870 Rule Exception: The purchasing president may hold shares in excess of the normal 60% limit if acquired through price protection.
-    // We permit passive holding (number == 0) for the President to bypass the forced sell trigger.
-    // Active buying (number > 0) outside of Green/Brown zones remains blocked by returning false.
-    if (number == 0 && company.getPresident() == player) {
-        return true;
-    }
-    
-    return false;
-}
+        // If the base check passes (e.g., under 60% limit, or the stock token is in the
+        // Green/Brown zone where limits are lifted), it is legal.
+        if (baseCheck) {
+            return true;
+        }
 
+        // 1870 Rule Exception: The purchasing president may hold shares in excess of
+        // the normal 60% limit if acquired through price protection.
+        // We permit passive holding (number == 0) for the President to bypass the
+        // forced sell trigger.
+        // Active buying (number > 0) outside of Green/Brown zones remains blocked by
+        // returning false.
+        if (number == 0 && company.getPresident() == player) {
+            return true;
+        }
+
+        return false;
+    }
 
     @Override
     public boolean process(rails.game.action.PossibleAction action) {
@@ -358,6 +387,8 @@ boolean baseCheck = super.checkAgainstHoldLimit(player, company, number);
             net.sf.rails.common.ReportBuffer.add(this, company.getId() + " reissues " + sharesToReissue
                     + " share(s) to IPO. Par adjusted to " + getRoot().getBank().getCurrency().format(newPar) + ".");
 
+            hasActed.set(true);
+            super.process(new rails.game.action.NullAction(getRoot(), rails.game.action.NullAction.Mode.DONE));
             return true;
 
         } else if (action instanceof net.sf.rails.game.specific._1870.action.RedeemShare_1870) {
@@ -393,8 +424,11 @@ boolean baseCheck = super.checkAgainstHoldLimit(player, company, number);
                         + getRoot().getBank().getCurrency().format(marketPrice) + ".");
             }
 
+            hasActed.set(true);
+            super.process(new rails.game.action.NullAction(getRoot(), rails.game.action.NullAction.Mode.DONE));
             return true;
         } else if (action instanceof ExchangeMKT_1870) {
+
             String mktPrivateId = ((ExchangeMKT_1870) action).getMktPrivateId();
             net.sf.rails.game.PrivateCompany mktPriv = getRoot().getCompanyManager().getPrivateCompany(mktPrivateId);
             PublicCompany mktPub = getRoot().getCompanyManager().getPublicCompany("MKT");
@@ -423,17 +457,20 @@ boolean baseCheck = super.checkAgainstHoldLimit(player, company, number);
 
             // 1. President pays Bank
             net.sf.rails.game.state.Currency.wire(president, totalCost, getRoot().getBank());
-            
+
             // 2. Move shares from pool to President
             int moved = 0;
             for (net.sf.rails.game.financial.PublicCertificate cert : pool.getCertificates(company)) {
-                if (moved >= sharesToProtect) break;
+                if (moved >= sharesToProtect)
+                    break;
                 int certShares = cert.getShares();
                 cert.moveTo(president.getPortfolioModel());
                 moved += certShares;
             }
 
-            net.sf.rails.common.ReportBuffer.add(this, president.getName() + " protects " + company.getId() + " by buying " + sharesToProtect + " shares for " + getRoot().getBank().getCurrency().format(totalCost) + ".");
+            net.sf.rails.common.ReportBuffer.add(this,
+                    president.getName() + " protects " + company.getId() + " by buying " + sharesToProtect
+                            + " shares for " + getRoot().getBank().getCurrency().format(totalCost) + ".");
 
             // 3. Clear protection state
             protectingCompanyId.set("");
@@ -449,7 +486,8 @@ boolean baseCheck = super.checkAgainstHoldLimit(player, company, number);
             PublicCompany company = getRoot().getCompanyManager().getPublicCompany(decl.getCompanyId());
             int sharesToDrop = decl.getShares();
 
-            net.sf.rails.common.ReportBuffer.add(this, company.getPresident().getName() + " declines to protect " + company.getId() + ".");
+            net.sf.rails.common.ReportBuffer.add(this,
+                    company.getPresident().getName() + " declines to protect " + company.getId() + ".");
 
             // 1. Clear protection state
             protectingCompanyId.set("");
