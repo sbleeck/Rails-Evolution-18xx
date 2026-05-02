@@ -136,7 +136,9 @@ public class ORWindow extends DockingFrame implements ActionPerformer {
         }
 
         orUIManager.init(this);
-        setTitle(LocalText.getText("MapWindowTitle"));
+        // setTitle(LocalText.getText("MapWindowTitle"));
+        String baseTitle = LocalText.getText("MapWindowTitle").replace("Rails: Map: ", "").replace("Rails: ", "");
+        setTitle("Rails Evolution - " + gameUIManager.getGameManager().getGameName() + " - " + baseTitle);
         setLocation(10, 10);
         setVisible(false);
 
@@ -277,10 +279,13 @@ public class ORWindow extends DockingFrame implements ActionPerformer {
 
     protected void setMapWindowTitle(Round round) {
         GameManager gameManager = gameUIManager.getGameManager();
-        setTitle(LocalText.getText("MapWindowORTitle",
+String localizedTitle = LocalText.getText("MapWindowORTitle",
                 gameManager.getORId(),
                 gameManager.getRelativeORNumber(),
-                gameManager.getNumOfORs()));
+                gameManager.getNumOfORs());
+        
+        localizedTitle = localizedTitle.replace("Rails: Map: ", "").replace("Rails: ", "");
+        setTitle("Rails Evolution - " + gameManager.getGameName() + " - " + localizedTitle);
     }
 
     @Override
@@ -298,8 +303,8 @@ public class ORWindow extends DockingFrame implements ActionPerformer {
         lastBounds = getBounds();
         orPanel.finish();
         messagePanel.setMessage("");
-        setTitle(LocalText.getText("MapWindowTitle"));
-    }
+String localizedTitle = LocalText.getText("MapWindowTitle").replace("Rails: Map: ", "").replace("Rails: ", "");
+        setTitle("Rails Evolution - " + gameUIManager.getGameManager().getGameName() + " - " + localizedTitle);    }
 
     @Override
     protected String getLayoutFileName() {

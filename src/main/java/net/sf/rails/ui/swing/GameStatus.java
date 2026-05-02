@@ -1477,11 +1477,12 @@ public class GameStatus extends GridPanel {
                 chosenAction = actions.get(0);
             } else if (actions.get(0) instanceof BuyPrivate) {
                 PossibleAction action = actions.get(0);
-                JComponent destination = resolveAnimationDestination(action);
-                if (destination != null && destination.isVisible() && source != null && parentFrame != null) {
-                    new FlightAnimator(parentFrame, source, destination, 200).start(() -> {
-                        gameUIManager.getORUIManager().processBuyPrivate((BuyPrivate) action);
-                    });
+                JComponent dest = resolveAnimationDestination(action);
+                if (dest != null && dest.isVisible() && source != null && parentFrame != null) {
+                    new FlightAnimator(parentFrame, source, action, 200).executeAndFly(
+                            () -> gameUIManager.getORUIManager().processBuyPrivate((BuyPrivate) action),
+                            () -> repaint()
+                    );
                 } else {
                     gameUIManager.getORUIManager().processBuyPrivate((BuyPrivate) action);
                 }
@@ -1490,11 +1491,12 @@ public class GameStatus extends GridPanel {
                 chosenAction = actions.get(0);
             } else if (actions.get(0) instanceof BuyTrain) {
                 PossibleAction action = actions.get(0);
-                JComponent destination = resolveAnimationDestination(action);
-                if (destination != null && destination.isVisible() && source != null && parentFrame != null) {
-                    new FlightAnimator(parentFrame, source, destination, 200).start(() -> {
-                        gameUIManager.getORUIManager().processBuyTrain((BuyTrain) action);
-                    });
+                JComponent dest = resolveAnimationDestination(action);
+                if (dest != null && dest.isVisible() && source != null && parentFrame != null) {
+                    new FlightAnimator(parentFrame, source, action, 200).executeAndFly(
+                            () -> gameUIManager.getORUIManager().processBuyTrain((BuyTrain) action),
+                            () -> repaint()
+                    );
                 } else {
                     gameUIManager.getORUIManager().processBuyTrain((BuyTrain) action);
                 }
@@ -1531,14 +1533,14 @@ public class GameStatus extends GridPanel {
         chosenAction = processGameSpecificFollowUpActions(actor, chosenAction);
 
         if (chosenAction != null) {
-            JComponent destination = resolveAnimationDestination(chosenAction);
+            JComponent dest = resolveAnimationDestination(chosenAction);
 
-            if (destination != null && destination.isVisible() && source != null && parentFrame != null) {
+            if (dest != null && dest.isVisible() && source != null && parentFrame != null) {
                 final PossibleAction finalAction = chosenAction;
-                new FlightAnimator(parentFrame, source, destination, 200).start(() -> {
-                    (parent).process(finalAction);
-                    repaint();
-                });
+                new FlightAnimator(parentFrame, source, finalAction, 200).executeAndFly(
+                        () -> (parent).process(finalAction),
+                        () -> repaint()
+                );
                 return;
             }
 
@@ -5940,78 +5942,89 @@ public class GameStatus extends GridPanel {
     /**
      * Handles asynchronous GlassPane animations for RailCards.
      */
-    private static class FlightAnimator {
+    private class FlightAnimator {
         private final JFrame parentFrame;
         private final JComponent source;
-        private final JComponent destination;
+        private final PossibleAction action;
         private final int durationMs;
 
         private java.awt.image.BufferedImage ghostImage;
         private Point startPt;
-        private Point endPt;
-        private Point currentPt;
 
-        private javax.swing.Timer timer;
-        private long startTime;
-        private JLayeredPane layeredPane;
-        private JComponent animationLayer;
-
-        public FlightAnimator(JFrame parentFrame, JComponent source, JComponent destination, int durationMs) {
+        public FlightAnimator(JFrame parentFrame, JComponent source, PossibleAction action, int durationMs) {
             this.parentFrame = parentFrame;
             this.source = source;
-            this.destination = destination;
+            this.action = action;
             this.durationMs = durationMs;
+
+            if (source.getWidth() > 0 && source.getHeight() > 0) {
+                this.ghostImage = new java.awt.image.BufferedImage(source.getWidth(), source.getHeight(),
+                        java.awt.image.BufferedImage.TYPE_INT_ARGB);
+                Graphics2D g2 = ghostImage.createGraphics();
+                source.paint(g2);
+                g2.dispose();
+
+                JLayeredPane layeredPane = parentFrame.getLayeredPane();
+                this.startPt = SwingUtilities.convertPoint(source.getParent(), source.getLocation(), layeredPane);
+            }
         }
 
-        public void start(Runnable onComplete) {
-            // 1. Capture the source image
-            ghostImage = new java.awt.image.BufferedImage(source.getWidth(), source.getHeight(),
-                    java.awt.image.BufferedImage.TYPE_INT_ARGB);
-            Graphics2D g2 = ghostImage.createGraphics();
-            source.paint(g2);
-            g2.dispose();
+        public void executeAndFly(Runnable processTask, Runnable onComplete) {
+            // 1. Execute game logic first. This blocks the EDT safely if a modal dialog opens.
+            processTask.run();
 
-            // 2. Map coordinates to the LayeredPane
-            layeredPane = parentFrame.getLayeredPane();
-            startPt = SwingUtilities.convertPoint(source.getParent(), source.getLocation(), layeredPane);
-            endPt = SwingUtilities.convertPoint(destination.getParent(), destination.getLocation(), layeredPane);
-            currentPt = new Point(startPt);
+            if (ghostImage == null || startPt == null) {
+                if (onComplete != null) onComplete.run();
+                return;
+            }
 
-            // 3. Setup LayeredPane for rendering
-            animationLayer = new JComponent() {
-                @Override
-                protected void paintComponent(Graphics g) {
-                    if (ghostImage != null && currentPt != null) {
-                        g.drawImage(ghostImage, currentPt.x, currentPt.y, null);
-                    }
+            // 2. Defer animation to let the UI repaint after the dialog closes and state updates.
+            SwingUtilities.invokeLater(() -> {
+                // 3. Re-resolve the destination dynamically since the UI might have rebuilt
+                JComponent destination = resolveAnimationDestination(action);
+                
+                if (destination == null || !destination.isVisible()) {
+                    if (onComplete != null) onComplete.run();
+                    return;
                 }
-            };
 
-            animationLayer.setBounds(0, 0, layeredPane.getWidth(), layeredPane.getHeight());
-            layeredPane.add(animationLayer, JLayeredPane.DRAG_LAYER);
+                JLayeredPane layeredPane = parentFrame.getLayeredPane();
+                Point endPt = SwingUtilities.convertPoint(destination.getParent(), destination.getLocation(), layeredPane);
+                Point currentPt = new Point(startPt);
 
-            // 4. Start Timer Loop
-            startTime = System.currentTimeMillis();
-            timer = new javax.swing.Timer(16, e -> {
-                long elapsed = System.currentTimeMillis() - startTime;
-                float progress = Math.min(1f, (float) elapsed / durationMs);
-
-                // Simple Linear Interpolation (Lerp)
-                currentPt.x = (int) (startPt.x + (endPt.x - startPt.x) * progress);
-                currentPt.y = (int) (startPt.y + (endPt.y - startPt.y) * progress);
-
-                animationLayer.repaint();
-
-                if (progress >= 1f) {
-                    timer.stop();
-                    layeredPane.remove(animationLayer);
-                    layeredPane.repaint();
-                    if (onComplete != null) {
-                        onComplete.run();
+                JComponent animationLayer = new JComponent() {
+                    @Override
+                    protected void paintComponent(Graphics g) {
+                        if (ghostImage != null && currentPt != null) {
+                            g.drawImage(ghostImage, currentPt.x, currentPt.y, null);
+                        }
                     }
-                }
+                };
+
+                animationLayer.setBounds(0, 0, layeredPane.getWidth(), layeredPane.getHeight());
+                layeredPane.add(animationLayer, JLayeredPane.DRAG_LAYER);
+
+                long startTime = System.currentTimeMillis();
+                javax.swing.Timer timer = new javax.swing.Timer(16, e -> {
+                    long elapsed = System.currentTimeMillis() - startTime;
+                    float progress = Math.min(1f, (float) elapsed / durationMs);
+
+                    currentPt.x = (int) (startPt.x + (endPt.x - startPt.x) * progress);
+                    currentPt.y = (int) (startPt.y + (endPt.y - startPt.y) * progress);
+
+                    animationLayer.repaint();
+
+                    if (progress >= 1f) {
+                        ((javax.swing.Timer) e.getSource()).stop();
+                        layeredPane.remove(animationLayer);
+                        layeredPane.repaint();
+                        if (onComplete != null) {
+                            onComplete.run();
+                        }
+                    }
+                });
+                timer.start();
             });
-            timer.start();
         }
     }
 

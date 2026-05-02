@@ -1030,27 +1030,17 @@ public class StatusWindow extends JFrame implements ActionListener, ActionPerfor
     }
 
     public void finishRound() {
-        setTitle(LocalText.getText("GAME_STATUS_TITLE") + " - " + buildTimestamp);
-        // Fixes the behaviour that closed Minors didnt
-        // vanish from the display after the end of a forced
-        // Formationround in 1835
-        // Martin 19.7.2017
-        // Erik 10.10.2020: However, this somehow completely blanks the
-        // StatusWindow in SOH, each time treasury share selling in the first
-        // OR step completes. I haven't been able to find the cause.
-        // Therefore this method is overridden in SOH.
-        // TODO: a better solution is wanted.
+setTitle("Rails Evolution - " + gameUIManager.getGameManager().getGameName() + " - " + LocalText.getText("GAME_STATUS_TITLE") + " - " + buildTimestamp);
+
         gameStatus.recreate();
         gameStatus.initTurn(-1, true);
         passButton.setEnabled(false);
     }
 
     public void endOfGame() {
-        // setVisible(true);
-        // gameUIManager.reportWindow.setVisible(true);
-        // gameUIManager.stockChart.setVisible(true);
 
-        setTitle(LocalText.getText("EoGTitle") + " - " + buildTimestamp);
+
+setTitle("Rails Evolution - " + gameUIManager.getGameManager().getGameName() + " - " + LocalText.getText("EoGTitle") + " - " + buildTimestamp);
 
         // Enable Passbutton
         passButton.setEnabled(true);
@@ -1253,7 +1243,7 @@ public class StatusWindow extends JFrame implements ActionListener, ActionPerfor
         }
 
         this.buildTimestamp = loadedBuildTime;
-        setTitle(LocalText.getText("GAME_STATUS_TITLE") + " - " + buildTimestamp);
+setTitle("Rails Evolution - " + gameUIManager.getGameManager().getGameName() + " - " + LocalText.getText("GAME_STATUS_TITLE") + " - " + buildTimestamp);
 
         pane.setLayout(new BorderLayout());
         initMenu();
@@ -1720,20 +1710,21 @@ public class StatusWindow extends JFrame implements ActionListener, ActionPerfor
             enableAIButton(enableSRButton);
 
             String customTitle = currentRound.getOwnWindowTitle();
+            String titlePrefix = "Rails Evolution - " + gameUIManager.getGameManager().getGameName() + " - ";
             if (Util.hasValue(customTitle)) {
-                setTitle(customTitle + " - " + buildTimestamp);
+                setTitle(titlePrefix + customTitle + " - " + buildTimestamp);
             }
 
             if (currentRound instanceof TreasuryShareRound) {
                 if (!Util.hasValue(customTitle)) {
-                    setTitle(LocalText.getText(
+                    setTitle(titlePrefix + LocalText.getText(
                             "TRADE_TREASURY_SHARES_TITLE",
                             ((TreasuryShareRound) currentRound).getOperatingCompany().getId(),
                             String.valueOf(gameUIManager.getGameManager().getORId())) + " - " + buildTimestamp);
                 }
             } else if ((currentRound instanceof ShareSellingRound)) {
                 if (!Util.hasValue(customTitle)) {
-                    setTitle(LocalText.getText(
+                    setTitle(titlePrefix + LocalText.getText(
                             "EMERGENCY_SHARE_SELLING_TITLE",
                             (((ShareSellingRound) currentRound).getCompanyNeedingCash().getId())) + " - "
                             + buildTimestamp);
@@ -1746,7 +1737,7 @@ public class StatusWindow extends JFrame implements ActionListener, ActionPerfor
 
             } else if (currentRound instanceof StockRound) {
                 if (!Util.hasValue(customTitle)) {
-                    setTitle(LocalText.getText(
+                    setTitle(titlePrefix + LocalText.getText(
                             "STOCK_ROUND_TITLE",
                             String.valueOf(((StockRound) currentRound).getStockRoundNumber())) + " - "
                             + buildTimestamp);

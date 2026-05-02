@@ -37,17 +37,26 @@
         <Players min="3" max="6"/>
     </Game>
 
+     <Game name="1870">
+        <Note>U="1817">
+        <Note>Playable, needs full stress testing.</Note>
+        <Description><![CDATA[<html>
+            <h3 style="margin-top:0;">1870 - Railroading across the Trans Mississippi</h3>
+            <b>Designer:</b> Bill Dixon<br>
+            <b>Publisher:</b> Mayfair Games, Inc. (1992, 1995)<br><br>
+            <b>Limitations:</b><br>
+            working on it!
+        </html>]]></Description>
+        <Players min="2" max="6"/>
+    </Game>s
+
     <Game name="1830">
         <Description><![CDATA[<html>
             <h3 style="margin-top:0;">1830: The Game of Railroads and Robber Barons</h3>
             <b>Designer:</b> Francis Tresham and Bruce Shelley<br>
             <b>Publisher:</b> The Avalon Hill Game Company (1986)<br>
             <i>Includes Pere Marquette variant by Federico Vellani and Coalfields variant by Alan R. Moon.</i><br><br>
-            <b>Limitations:</b>
-            <ul>
-                <li>The M&H/NYC share swap can only be executed in the SR, in the owning player's turn.</li>
-                <li>Privates cannot be traded between players.</li>
-            </ul>
+
         </html>]]></Description>
         <Players min="2" max="6"/>
     </Game>
@@ -150,17 +159,7 @@
         <Players min="2" max="8"/>
     </Game>
 
-    <Game name="1870">
-        <Note>Under construction.</Note>
-        <Description><![CDATA[<html>
-            <h3 style="margin-top:0;">1870 - Railroading across the Trans Mississippi</h3>
-            <b>Designer:</b> Bill Dixon<br>
-            <b>Publisher:</b> Mayfair Games, Inc. (1992, 1995)<br><br>
-            <b>Limitations:</b><br>
-            working on it!
-        </html>]]></Description>
-        <Players min="2" max="6"/>
-    </Game>
+   
 
     <Game name="1880">
         <Description><![CDATA[<html>

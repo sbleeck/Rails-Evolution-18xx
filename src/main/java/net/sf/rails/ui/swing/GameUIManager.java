@@ -415,6 +415,7 @@ public class GameUIManager implements DialogOwner {
         splashWindow.notifyOfStep(SplashWindow.STEP_STOCK_CHART);
         stockChartWindow = new StockChartWindow(this);
         stockChartWindow.setName("StockChartWindow");
+        stockChartWindow.setTitle("Rails Evolution - " + railsRoot.getGameName() + " - Stock Market");
 
         // Ensure the layout manager doesn't force a rectangular grid if we are in 1837
         if (getGameManager().getRoot().getStockMarket()
@@ -439,9 +440,11 @@ public class GameUIManager implements DialogOwner {
 
         // --- FIX: Register Report Window for Safe Storage ---
         registerWindowStorage(reportWindow);
+        reportWindow.setTitle("Rails Evolution - " + railsRoot.getGameName() + " - Game Report");
 
         orWindow = new ORWindow(this, splashWindow);
         orWindow.setName("MapWindow");
+        orWindow.setTitle("Rails Evolution - " + railsRoot.getGameName() + " - Map & Operations");
         orUIManager = orWindow.getORUIManager();
 
         // --- FIX: Register Map Window for Safe Storage ---
@@ -456,6 +459,7 @@ public class GameUIManager implements DialogOwner {
             statusWindow.setName("StatusWindow");
 
             statusWindow.init(this);
+            statusWindow.setTitle("Rails Evolution - " + railsRoot.getGameName() + " - Game Status");
 
             // Register Status Window for Safe Storage
             registerWindowStorage(statusWindow);
@@ -491,6 +495,8 @@ public class GameUIManager implements DialogOwner {
         splashWindow.notifyOfStep(SplashWindow.STEP_CONFIG_WINDOW);
         configWindow = new ConfigWindow(statusWindow);
         configWindow.setName("ConfigWindow");
+
+        configWindow.setTitle("Rails Evolution - " + railsRoot.getGameName() + " - Configuration");
 
         // --- FIX: Register Config Window for Safe Storage ---
         registerWindowStorage(configWindow);
@@ -649,6 +655,7 @@ public class GameUIManager implements DialogOwner {
                                 .forName(startRoundWindowClassName).asSubclass(StartRoundWindow.class);
                         startRoundWindow = startRoundWindowClass.newInstance();
                         startRoundWindow.init(startRound, this, orUIManager);
+                        startRoundWindow.setTitle("Rails Evolution - " + railsRoot.getGameName() + " - Start Round");
                     } catch (Exception e) {
                         log.error("GUIM: Failed to init StartRoundWindow", e);
                         System.exit(1);

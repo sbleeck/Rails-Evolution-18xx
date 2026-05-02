@@ -61,7 +61,7 @@ public class WorthChartWindow extends JDialog {
     private String[] macroGroups;
 
     public WorthChartWindow(JFrame parentFrame, GameManager gm) {
-        super(parentFrame, "Player Worth History Chart - Reveal Mode", false);
+        super(parentFrame, "Rails Evolution - " + gm.getGameName() + " - Player Worth Analysis", false);
         this.data = new WorthData(gm);
         this.revealController = new RevealController(data.roundKeys.size());
 
@@ -795,10 +795,11 @@ public class WorthChartWindow extends JDialog {
                     }
                 }
 
-                if (currentTs == 0 && lastTs > 0)
+                if (currentTs < lastTs) {
                     currentTs = lastTs;
-                if (currentTs > lastTs)
+                } else if (currentTs > lastTs) {
                     lastTs = currentTs;
+                }
                 this.timestamps.add(currentTs);
             }
 
@@ -949,10 +950,92 @@ public class WorthChartWindow extends JDialog {
                 boundaryIndices.add(band.endIdx);
             }
 
-            if (actualTimeMode) {
-                g2d.setColor(new Color(250, 250, 250));
-                g2d.fillRect(padLeft, padTop, chartW, chartH);
+            int globalMaxOrCycle = -1;
+            int globalMaxSubRound = 1;
+            for (String key : data.roundKeys) {
+                String macro = key.contains(":") ? key.split(":")[1] : key;
+                if (macro.startsWith("OR_")) {
+                    try {
+                        String[] parts = macro.substring(3).split("\\.");
+                        int cycle = Integer.parseInt(parts[0]);
+                        int sub = parts.length > 1 ? Integer.parseInt(parts[1]) : 1;
+                        if (cycle > globalMaxOrCycle)
+                            globalMaxOrCycle = cycle;
+                        if (sub > globalMaxSubRound)
+                            globalMaxSubRound = sub;
+                    } catch (Exception ex) {
+                    }
+                }
+            }
 
+            for (RoundBand band : bands) {
+                int startX;
+                int endX;
+                if (actualTimeMode) {
+                    long startTs = data.timestamps.get(band.startIdx);
+                    long endTs = data.timestamps.get(band.endIdx);
+                    if (band.endIdx == data.roundKeys.size() - 1)
+                        endTs = maxTime;
+                    startX = (int) (padLeft + ((double) (startTs - minTime) / timeRange) * chartW);
+                    endX = (int) (padLeft + ((double) (endTs - minTime) / timeRange) * chartW);
+                } else {
+                    startX = (int) (padLeft + band.startIdx * xStep);
+                    endX = (int) (padLeft + band.endIdx * xStep);
+                    if (band.endIdx == data.roundKeys.size() - 1)
+                        endX = w - padRight;
+                }
+
+                Color bgColor = Color.WHITE;
+                if (band.originalMacro.startsWith("OR_")) {
+                    try {
+                        String[] parts = band.originalMacro.substring(3).split("\\.");
+                        int currentOrCycle = Integer.parseInt(parts[0]);
+                        int maxSubRound = 1;
+                        String targetMacroPrefix = "OR_" + parts[0] + ".";
+                        for (String key : data.roundKeys) {
+                            String macro = key.contains(":") ? key.split(":")[1] : key;
+                            if (macro.startsWith(targetMacroPrefix)) {
+                                try {
+                                    maxSubRound = Math.max(maxSubRound,
+                                            Integer.parseInt(macro.substring(targetMacroPrefix.length())));
+                                } catch (Exception ex) {
+                                }
+                            }
+                        }
+                        if (currentOrCycle == globalMaxOrCycle)
+                            maxSubRound = Math.max(maxSubRound, globalMaxSubRound);
+
+                        if (maxSubRound == 1)
+                            bgColor = new Color(255, 255, 230);
+                        else if (maxSubRound == 2)
+                            bgColor = new Color(235, 255, 235);
+                        else if (maxSubRound == 3)
+                            bgColor = new Color(245, 235, 220);
+                        else
+                            bgColor = new Color(230, 230, 230);
+                    } catch (Exception e) {
+                        bgColor = new Color(245, 245, 245);
+                    }
+                } else if (band.originalMacro.startsWith("SR_")) {
+                    bgColor = new Color(245, 245, 245);
+                } else if (band.originalMacro.contains("M&A") || band.originalMacro.contains("Merger")) {
+                    bgColor = new Color(230, 240, 255);
+                }
+
+                g2d.setColor(bgColor);
+                g2d.fillRect(startX, padTop, endX - startX, chartH);
+
+                if (!actualTimeMode) {
+                    g2d.setColor(Color.BLACK);
+                    int strW = g2d.getFontMetrics().stringWidth(band.name);
+                    int textX = Math.max(padLeft,
+                            Math.min(startX + (endX - startX) / 2 - strW / 2, w - padRight - strW));
+                    g2d.drawString(band.name, textX, h - padBottom + 20);
+                    g2d.drawLine(startX, h - padBottom, startX, h - padBottom + 5);
+                }
+            }
+
+            if (actualTimeMode) {
                 long[] niceIntervals = {
                         60 * 1000L, // 1 min
                         5 * 60 * 1000L, // 5 min
@@ -995,78 +1078,6 @@ public class WorthChartWindow extends JDialog {
                     g2d.drawLine(x, h - padBottom, x, h - padBottom + 5);
                 }
             } else {
-                int globalMaxOrCycle = -1;
-                int globalMaxSubRound = 1;
-                for (String key : data.roundKeys) {
-                    String macro = key.contains(":") ? key.split(":")[1] : key;
-                    if (macro.startsWith("OR_")) {
-                        try {
-                            String[] parts = macro.substring(3).split("\\.");
-                            int cycle = Integer.parseInt(parts[0]);
-                            int sub = parts.length > 1 ? Integer.parseInt(parts[1]) : 1;
-                            if (cycle > globalMaxOrCycle)
-                                globalMaxOrCycle = cycle;
-                            if (sub > globalMaxSubRound)
-                                globalMaxSubRound = sub;
-                        } catch (Exception ex) {
-                        }
-                    }
-                }
-
-                for (RoundBand band : bands) {
-                    int startX = (int) (padLeft + band.startIdx * xStep);
-                    int endX = (int) (padLeft + band.endIdx * xStep);
-                    if (band.endIdx == data.roundKeys.size() - 1)
-                        endX = w - padRight;
-
-                    Color bgColor = Color.WHITE;
-                    if (band.originalMacro.startsWith("OR_")) {
-                        try {
-                            String[] parts = band.originalMacro.substring(3).split("\\.");
-                            int currentOrCycle = Integer.parseInt(parts[0]);
-                            int maxSubRound = 1;
-                            String targetMacroPrefix = "OR_" + parts[0] + ".";
-                            for (String key : data.roundKeys) {
-                                String macro = key.contains(":") ? key.split(":")[1] : key;
-                                if (macro.startsWith(targetMacroPrefix)) {
-                                    try {
-                                        maxSubRound = Math.max(maxSubRound,
-                                                Integer.parseInt(macro.substring(targetMacroPrefix.length())));
-                                    } catch (Exception ex) {
-                                    }
-                                }
-                            }
-                            if (currentOrCycle == globalMaxOrCycle)
-                                maxSubRound = Math.max(maxSubRound, globalMaxSubRound);
-
-                            if (maxSubRound == 1)
-                                bgColor = new Color(255, 255, 230);
-                            else if (maxSubRound == 2)
-                                bgColor = new Color(235, 255, 235);
-                            else if (maxSubRound == 3)
-                                bgColor = new Color(245, 235, 220);
-                            else
-                                bgColor = new Color(230, 230, 230);
-                        } catch (Exception e) {
-                            bgColor = new Color(245, 245, 245);
-                        }
-                    } else if (band.originalMacro.startsWith("SR_")) {
-                        bgColor = new Color(245, 245, 245);
-                    } else if (band.originalMacro.contains("M&A") || band.originalMacro.contains("Merger")) {
-                        bgColor = new Color(230, 240, 255);
-                    }
-
-                    g2d.setColor(bgColor);
-                    g2d.fillRect(startX, padTop, endX - startX, chartH);
-
-                    g2d.setColor(Color.BLACK);
-                    int strW = g2d.getFontMetrics().stringWidth(band.name);
-                    int textX = Math.max(padLeft,
-                            Math.min(startX + (endX - startX) / 2 - strW / 2, w - padRight - strW));
-                    g2d.drawString(band.name, textX, h - padBottom + 20);
-                    g2d.drawLine(startX, h - padBottom, startX, h - padBottom + 5);
-                }
-
                 if (timeMode) {
                     g2d.setColor(Color.RED);
                     g2d.setFont(new Font("Arial", Font.BOLD, 14));

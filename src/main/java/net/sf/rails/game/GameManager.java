@@ -426,39 +426,31 @@ public class GameManager extends RailsManager implements Configurable, Owner {
         return 0;
     }
 
-    /**
-     * Grants a time bonus to a player, ensuring it is only awarded once per
-     * specific turn context.
-     * Prevents "farming" time by undoing/redoing the start of a turn.
-     */
-    public void grantTimeBonus(Player player, String roundId, int amount) {
 
+    public void grantTimeBonus(Player player, String roundId, int amount) {
         if (player == null || amount <= 0)
             return;
 
-        // Create a unique key: "RoundID:PlayerName" (e.g., "OR_1.1:Bjoern" or
-        // "SR_1:Bjoern")
-        String key = roundId + ":" + player.getName();
+        String companyContext = "";
+        if (getCurrentRound() instanceof OperatingRound) {
+            PublicCompany comp = ((OperatingRound) getCurrentRound()).operatingCompany.value();
+            if (comp != null) {
+                companyContext = ":" + comp.getId();
+            }
+        }
+
+        // Create a unique key: "RoundID:CompanyID:PlayerName" (e.g., "OR_1.1:PR:Bjoern" or "SR_1::Bjoern")
+        String key = roundId + companyContext + ":" + player.getName();
 
         if (awardedBonuses.contains(key)) {
-            // if (isReloading()) {
-            // log.info("RELOAD [Bonus SKIPPED] Player: " + player.getName() + " | Key: " +
-            // key
-            // + " already exists. Remaining: " + player.getTimeBankModel().value() + "s");
-            // }
             return;
         }
 
         // Grant Bonus & Mark as Awarded
         player.getTimeBankModel().add(amount);
         awardedBonuses.add(key);
-        // if (isReloading()) {
-        // log.info("RELOAD [Bonus GRANTED] Player: " + player.getName() + " | Granted:
-        // " + amount + "s | Reason: "
-        // + roundId + " | Remaining: " + player.getTimeBankModel().value() + "s");
-        // }
-
     }
+   
 
     // --- PERSISTENT STATE FIELDS ---
     protected final GenericState<Double> timeMgmtOperatorMultiplier = new GenericState<>(this, "OperatorMultiplier");
@@ -1262,19 +1254,11 @@ public class GameManager extends RailsManager implements Configurable, Owner {
             operatingRoundLimit.set(numOfORs.value());
         }
 
-        // log.info("[STATE] Starting Stock Round {}", stockRoundNumber.value()); //
-        // 'essential logging' keep!
-
-        if (isTimeManagementEnabled()) {
-            Player priorityPlayer = getRoot().getPlayerManager().getPriorityPlayer();
-            if (priorityPlayer != null) {
-
-                if (!isReloading()) {
-                    priorityPlayer.getTimeBankModel().add(getTimeMgmtShareRoundIncrement());
-                    // triggerUITimeFlash(priorityPlayer, this.timeMgmtShareRoundIncrement); // Keep
-                    // commented out if disabled
+if (isTimeManagementEnabled()) {
+            if (!isReloading()) {
+                for (Player p : getRoot().getPlayerManager().getPlayers()) {
+                    grantTimeBonus(p, sr.getId(), getTimeMgmtShareRoundIncrement());
                 }
-
             }
         }
         sr.start();
