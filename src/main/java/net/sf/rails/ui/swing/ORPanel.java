@@ -2271,6 +2271,15 @@ if (btnRevPayout != null) {
             }
         }
 
+       Color headerBg = orComp.getBgColour();
+        Color headerFg = orComp.getFgColour();
+
+        if (currentRound != null && currentRound.getClass().getSimpleName().contains("ConnectionRun")) {
+            instruction = "CONNECTION RUN";
+            headerBg = new Color(255, 215, 0); // Gold
+            headerFg = Color.BLACK;
+        }
+
         if (lblCompanyInfo != null) {
             String playerInfo = (orComp.getPresident() != null) ? orComp.getPresident().getName() : "";
 
@@ -2281,8 +2290,9 @@ if (btnRevPayout != null) {
 
             lblCompanyInfo.setText(topText);
 
-            lblCompanyInfo.setBackground(orComp.getBgColour());
-            lblCompanyInfo.setForeground(orComp.getFgColour());
+
+            lblCompanyInfo.setBackground(headerBg);
+            lblCompanyInfo.setForeground(headerFg);
 
             // Standard top/side border, open bottom to merge with instruction
             lblCompanyInfo.setBorder(BorderFactory.createMatteBorder(1, 1, 0, 1, Color.DARK_GRAY));
@@ -2291,8 +2301,9 @@ if (btnRevPayout != null) {
             if (lblPlayerInfo != null) {
                 lblPlayerInfo.setText(
                         "<html><center><font face='SansSerif' size='5'>" + playerInfo + "</font></center></html>");
-                lblPlayerInfo.setBackground(orComp.getBgColour());
-                lblPlayerInfo.setForeground(orComp.getFgColour());
+
+                lblPlayerInfo.setBackground(headerBg);
+                lblPlayerInfo.setForeground(headerFg);
                 lblPlayerInfo.setBorder(BorderFactory.createMatteBorder(0, 1, 0, 1, Color.DARK_GRAY));
                 lblPlayerInfo.setVisible(true);
             }
@@ -2305,8 +2316,9 @@ if (btnRevPayout != null) {
             lblPhaseInstruction.setText(bottomText);
 
             // Set colors to match the Company ID above
-            lblPhaseInstruction.setBackground(orComp.getBgColour());
-            lblPhaseInstruction.setForeground(orComp.getFgColour());
+
+            lblPhaseInstruction.setBackground(headerBg);
+            lblPhaseInstruction.setForeground(headerFg);
 
             // Remove the 5px gap. Set top inset to 0.
             // Border: 0px Top, 1px Left, 1px Bottom, 1px Right
@@ -2913,6 +2925,16 @@ this.currentOperatingComp = engineActiveComp;
 
             // THE DORMANCY INTERCEPT (Hardened)
             boolean onlyPassRemains = validOrActions.size() == 1 && deferredNullAction != null;
+
+            // If any valid OR action is a GuiTargetedAction, we should use it for the header context
+            if (contextProvider == null) {
+                for (PossibleAction pa : validOrActions) {
+                    if (pa instanceof GuiTargetedAction) {
+                        contextProvider = (GuiTargetedAction) pa;
+                        break;
+                    }
+                }
+            }
 
             // Rule: The panel must remain active if the user needs to explicitly click
             // 'Done'

@@ -44,7 +44,7 @@
 	
 	<Company name="MKT" type="Private" basePrice="160" revenue="20"
 		longname="Missouri-Kansas-Texas Railroad"
-             description="10% share of the MKT. Pays $20 revenue. Cannot be bought by a public company. Closes when the MKT buys its first train, exchanging for a 10% share of the MKT.">
+             description="10% share of the KATY. Pays $20 revenue.">
 		<Info key="ComesWithCertificate" parm="KATY,10"></Info>
 	</Company>
 
