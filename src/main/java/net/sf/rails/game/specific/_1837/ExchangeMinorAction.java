@@ -43,6 +43,18 @@ public class ExchangeMinorAction extends PossibleAction implements GuiTargetedAc
         return minor;
     }
 
+    /**
+     * Required by ORPanel to display the acting player's name in the header.
+     */
+    @Override
+    public String getPlayerName() {
+        PublicCompany m = getMinor();
+        if (m != null && m.getPresident() != null) {
+            return m.getPresident().getName();
+        }
+        return "";
+    }
+    
     public PublicCompany getTargetMajor() {
         if (targetMajor == null) resolveCompanies();
         return targetMajor;

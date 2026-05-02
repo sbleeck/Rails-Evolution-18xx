@@ -401,4 +401,77 @@ log.info("1837_TRACE: Starting CER with ID: " + cerId);
             super.nextRound(prevRound);
         }
     }
+
+
+@Override
+    public List<PublicCompany> getCompaniesInDisplayOrder(List<PublicCompany> companies) {
+        List<PublicCompany> displayOrder = new java.util.ArrayList<>(companies);
+
+        // Capture original running order for stable sorting of minors and fallbacks
+        final java.util.Map<String, Integer> originalOrder = new java.util.HashMap<>();
+        for (int i = 0; i < companies.size(); i++) {
+            originalOrder.put(companies.get(i).getId(), i);
+        }
+
+        displayOrder.sort((c1, c2) -> {
+            // Explicitly identify standard Majors, including KK, SD, and UG.
+            boolean isMajor1 = (c1.getType() != null && "Major".equalsIgnoreCase(c1.getType().getId()))
+                    || "KK".equalsIgnoreCase(c1.getId())
+                    || "SD".equalsIgnoreCase(c1.getId())
+                    || "UG".equalsIgnoreCase(c1.getId());
+                    
+            boolean isMajor2 = (c2.getType() != null && "Major".equalsIgnoreCase(c2.getType().getId()))
+                    || "KK".equalsIgnoreCase(c2.getId())
+                    || "SD".equalsIgnoreCase(c2.getId())
+                    || "UG".equalsIgnoreCase(c2.getId());
+
+            // 1. Minors/Special Companies ALWAYS BEFORE Majors
+            if (!isMajor1 && isMajor2) return -1;
+            if (isMajor1 && !isMajor2) return 1;
+
+            if (!isMajor1 && !isMajor2) {
+                // Both are minors/specials, keep their original running order
+                return Integer.compare(originalOrder.get(c1.getId()), originalOrder.get(c2.getId()));
+            }
+
+            // Both are majors.
+            // 2. Order criteria: Started (open) -> Unstarted (IPO) -> Closed.
+            int cat1 = c1.isClosed() ? 3 : (c1.hasStarted() ? 1 : 2);
+            int cat2 = c2.isClosed() ? 3 : (c2.hasStarted() ? 1 : 2);
+
+            if (cat1 != cat2) {
+                return Integer.compare(cat1, cat2);
+            }
+
+            // 3. If both are Started Majors (cat 1), sort strictly by stock value (highest first)
+            if (cat1 == 1) {
+                StockSpace space1 = c1.getCurrentSpace();
+                StockSpace space2 = c2.getCurrentSpace();
+
+                if (space1 != null && space2 != null) {
+                    // Primary Sort: Price (Highest first)
+                    if (space1.getPrice() != space2.getPrice()) {
+                        return Integer.compare(space2.getPrice(), space1.getPrice());
+                    }
+                    // Tie-breakers: column (rightmost first), row (top first), stack position (top first)
+                    if (space1.getColumn() != space2.getColumn()) {
+                        return Integer.compare(space2.getColumn(), space1.getColumn());
+                    }
+                    if (space1.getRow() != space2.getRow()) {
+                        return Integer.compare(space1.getRow(), space2.getRow());
+                    }
+                    return Integer.compare(space1.getStackPosition(c1), space2.getStackPosition(c2));
+                }
+            }
+
+            // Fallback for Unstarted or Closed majors, or if stock spaces are missing: keep original order
+            return Integer.compare(originalOrder.get(c1.getId()), originalOrder.get(c2.getId()));
+        });
+
+        return displayOrder;
+    }
+
+
+
+    
 }

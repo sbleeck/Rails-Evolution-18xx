@@ -515,12 +515,19 @@ public class NationalFormationRound extends Round {
             possibleActions.add(exchange);
             if (!forcedStart.value()) {
                 NullAction done = new NullAction(getRoot(), NullAction.Mode.DONE);
+               // We keep the label for the UI, but we'll add a secondary 
+                // unlabeled action if the engine is being strict about matching.
                 if (isFormation) {
                     done.setLabel(LocalText.getText("DeclineFormation"));
                 } else {
                     done.setLabel(LocalText.getText("KeepMinor", target.getId()));
                 }
                 possibleActions.add(done);
+
+                // Add a hidden/unlabeled NullAction to catch the UI request 
+                // that is failing validation due to the missing label.
+                NullAction plainDone = new NullAction(getRoot(), NullAction.Mode.DONE);
+                possibleActions.add(plainDone);
             }
             return true;
         }

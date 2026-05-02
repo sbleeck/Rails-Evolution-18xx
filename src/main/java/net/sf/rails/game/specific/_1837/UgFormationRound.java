@@ -44,4 +44,7 @@ net.sf.rails.common.ReportBuffer.add(gameManager, "Initial " + major.getId() + "
         // Asset transfer natively executes the U1/U3 forced co-exchange by sweeping all minor certs
         Merger1837.mergeMinor(gameManager, minor, major);
     }
+
+
+
 }

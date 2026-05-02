@@ -3,6 +3,7 @@ package net.sf.rails.game.specific._1837;
 import net.sf.rails.game.GameManager;
 import net.sf.rails.game.PublicCompany;
 import net.sf.rails.game.financial.PublicCertificate;
+import rails.game.action.NullAction;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -14,27 +15,7 @@ public class KKFormationRound extends NationalFormationRound {
         super(parent, id);
     }
 
-    @Override
-    public boolean setPossibleActions() {
-        boolean b = super.setPossibleActions();
-        
-        // Workaround for stale client label caching: Add the expected client action so validation passes.
-        boolean hasDone = false;
-        for (rails.game.action.PossibleAction pa : possibleActions.getList()) {
-            if (pa instanceof rails.game.action.NullAction && ((rails.game.action.NullAction) pa).getMode() == rails.game.action.NullAction.Mode.DONE) {
-                hasDone = true;
-                break;
-            }
-        }
-        
-        if (hasDone) {
-            rails.game.action.NullAction passAction = new rails.game.action.NullAction(gameManager.getRoot(), rails.game.action.NullAction.Mode.DONE);
-            passAction.setLabel("Done / Keep Trains");
-            possibleActions.add(passAction);
-        }
-        
-        return b;
-    }
+
 
     
     @Override
@@ -63,6 +44,7 @@ public class KKFormationRound extends NationalFormationRound {
         }
 
 
+        
 
 
         // Execute asset transfer and standard individual exchange
@@ -71,6 +53,17 @@ public class KKFormationRound extends NationalFormationRound {
       
     }
 
-
+@Override
+    public boolean setPossibleActions() {
+        boolean b = super.setPossibleActions();
+        
+        // Ensure the "No" button is always a standard NullAction that ORPanel can validate.
+        NullAction passAction = new NullAction(gameManager.getRoot(), rails.game.action.NullAction.Mode.DONE);
+        passAction.setLabel("No / Keep Minor");
+        passAction.setButtonLabel("No / Keep Minor");
+        possibleActions.add(passAction);
+        
+        return b;
+    }
 
 }
