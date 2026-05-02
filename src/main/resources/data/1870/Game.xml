@@ -15,8 +15,8 @@
 				<NoSaleInFirstSR/>
 			</StockRound>
 			
-			<OperatingRound class="net.sf.rails.game.specific._1870.OperatingRound_1870">
-                <EmergencyTrainBuying mustBuyCheapestTrain="yes" mayBuyFromCompany="yes"/>
+<OperatingRound class="net.sf.rails.game.specific._1870.OperatingRound_1870">
+                <EmergencyTrainBuying mustBuyCheapestTrain="yes" mayBuyFromCompany="no"/>
             </OperatingRound>
 
 		</GameParameters>
