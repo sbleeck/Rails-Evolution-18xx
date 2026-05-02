@@ -24,4 +24,18 @@ public class PublicCompany_1870 extends PublicCompany {
     public void setConnected(boolean connected) {
         this.setReachedDestination(connected);
     }
+
+@Override
+    public void payout(int amount) {
+        String allocationText = getLastRevenueAllocation();
+        String splitText = net.sf.rails.common.LocalText.getText(rails.game.action.SetDividend.getAllocationNameKey(rails.game.action.SetDividend.SPLIT));
+        
+        if (allocationText != null && allocationText.equals(splitText)) {
+            // 1870 Rules: If half dividends are paid, the share value token does not move.
+            return;
+        }
+        super.payout(amount);
+    }
+
+
 }

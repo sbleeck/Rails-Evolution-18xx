@@ -8,6 +8,7 @@
 			<PlayerShareLimit percentage="60">
 				<PriceProtection/>
 			</PlayerShareLimit>
+			
 			<BankPoolLimit percentage="50"/>
 
 			<StockRound class="net.sf.rails.game.specific._1870.StockRound_1870">
@@ -30,7 +31,7 @@
 		<Players number="3" cash="700" certLimit="20"/>
 		<Players number="4" cash="525" certLimit="16"/>
 		<Players number="5" cash="420" certLimit="13"/>
-		<Players number="6" cash="350" certLimit="11"/>
+		<Players number="6" cash="350" certLimit="9"/>
 	</Component>
 	<Component name="Bank" class="net.sf.rails.game.financial.Bank">
 		<Bank amount="12000"/>
@@ -94,23 +95,25 @@
 </Tiles>
             <Trains limitStep="3"/>
 			<OperatingRounds number="3"/>
+			<Privates close="yes"/>
+			<OffBoardRevenue step="2"/>
 		</Phase>
 		<Phase name="6" realName="5">
 <Tiles colour="yellow,green,brown,grey">
 <Lays companyType="Public" colour="yellow" number="2"/>
 </Tiles>
             <Trains rusted="3"/>
-			<Privates close="yes"/>
-			<OffBoardRevenue step="2"/>
+
 		</Phase>
 		<Phase name="8" realName="6">
             <Trains rusted="4"/>
+						<OffBoardRevenue step="3"/>
+
 		</Phase>
 		<Phase name="10" realName="7">
 		</Phase>
 		<Phase name="12" realName="8">
 			<Trains rusted="5"/>
-			<OffBoardRevenue step="3"/>
 		</Phase>
 	</Component>	
 	<Component name="RevenueManager" class="net.sf.rails.algorithms.RevenueManager">
