@@ -114,7 +114,16 @@ public class OperatingRound_1870 extends OperatingRound {
                 }
             }
 
-            // 4. Trigger Dialog if suspected illegal (and not replaying)
+            // 4. Check 'P' Hex Restrictions
+            if (!isSuspectedIllegal && "63".equals(tileName)) {
+                java.util.List<String> pHexes = java.util.Arrays.asList("B11", "C18", "J3", "J5", "N17");
+                if (pHexes.contains(hexId)) {
+                    isSuspectedIllegal = true;
+                    reason = "violates the 'P' hex restriction. Brown tile 63 is a standard tile and cannot be placed on 'P' hexes. You must use the 'P' specific tile 170.";
+                }
+            }
+
+            // 5. Trigger Dialog if suspected illegal (and not replaying)
             if (isSuspectedIllegal && !getRoot().getGameManager().isReloading()) {
 
                 int choice = javax.swing.JOptionPane.showOptionDialog(null,

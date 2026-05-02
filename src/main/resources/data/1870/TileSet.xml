@@ -52,13 +52,13 @@
 	<Tile id="69" quantity="1" />
 
 	<!-- Green -->
-	<Tile id="14" quantity="4">
-		<Upgrade id="63" />
-		<Upgrade id="170" label="P"/>
+<Tile id="14" quantity="4">
+		<Upgrade id="63" hex="-B11,C18,J3,J5,N17" />
+		<Upgrade id="170" hex="B11,C18,J3,J5,N17" />
 	</Tile>
-	<Tile id="15" quantity="4">
-		<Upgrade id="63" />
-		<Upgrade id="170" label="P"/>
+<Tile id="15" quantity="4">
+		<Upgrade id="63" hex="-B11,C18,J3,J5,N17" />
+		<Upgrade id="170" hex="B11,C18,J3,J5,N17" />
 	</Tile>
 	<Tile id="16" quantity="2">
 		<Upgrade id="43,70" />
@@ -97,6 +97,7 @@
 		<Upgrade id="39,43,45,70" />
 	</Tile>
 	<Tile id="141" quantity="2">
+		<Upgrade id="145,146,147" />
 	</Tile>
 	<Tile id="142" quantity="2">
 		<Upgrade id="145,146,147" />
