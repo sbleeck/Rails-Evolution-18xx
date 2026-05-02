@@ -149,7 +149,7 @@ public class OperatingRound_1870 extends OperatingRound {
             boolean isStartingCity = false;
             if (hex.getId().equals("C18") && opCompany.getId().equals("MP"))
                 isStartingCity = true;
-            if (hex.getId().equals("K16") && opCompany.getId().equals("SSW"))
+            if (hex.getId().equals("K16") && opCompany.getId().equals("SW"))
                 isStartingCity = true;
 
             if (isStartingCity) {
@@ -192,7 +192,7 @@ public class OperatingRound_1870 extends OperatingRound {
     }
 
     /**
-     * 1870 Rule: MP and SSW can purchase the Bridge Company during Phase 1.
+     * 1870 Rule: MP and SW can purchase the Bridge Company during Phase 1.
      * Includes a check for the optional 'RestrictPrivateTradingToSameOwner'
      * constraint.
      */
@@ -218,7 +218,7 @@ public class OperatingRound_1870 extends OperatingRound {
         if (phase != null && "1".equals(phase.toText())) {
             PublicCompany company = getOperatingCompany();
 
-            if (company != null && (company.getId().equals("MP") || company.getId().equals("SSW"))) {
+            if (company != null && (company.getId().equals("MP") || company.getId().equals("SW"))) {
                 PrivateCompany bridge = getRoot().getCompanyManager().getPrivateCompany("Brdg");
 
                 if (bridge != null && !bridge.isClosed() && bridge.getOwner() instanceof net.sf.rails.game.Player) {
@@ -506,7 +506,7 @@ public class OperatingRound_1870 extends OperatingRound {
 
             if (phase != null && "1".equals(phase.toText()) && privateComp != null
                     && "Brdg".equals(privateComp.getId())) {
-                if (company != null && (company.getId().equals("MP") || company.getId().equals("SSW"))) {
+                if (company != null && (company.getId().equals("MP") || company.getId().equals("SW"))) {
                     return privateComp.getOwner() == company.getPresident();
                 }
             }

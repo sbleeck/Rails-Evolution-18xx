@@ -417,7 +417,7 @@
 		<Destination hex="O4"/>
 	</Company>
 	
-	<Company name="SSW" type="Public" tokens="5" fgColour="FFFFFF" bgColour="6000ff"
+	<Company name="SW" type="Public" tokens="5" fgColour="FFFFFF" bgColour="6000ff"
 		longname="St. Louis Southwestern Railway">
 		<Home hex="Q54"/>
 		<Destination hex="Z39,Z41"/>
