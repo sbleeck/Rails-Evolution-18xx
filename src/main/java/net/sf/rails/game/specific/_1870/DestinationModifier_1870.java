@@ -9,6 +9,7 @@ import net.sf.rails.game.BonusToken;
 import net.sf.rails.game.Phase;
 import net.sf.rails.game.PublicCompany;
 import org.slf4j.Logger;
+import net.sf.rails.game.GameManager;
 import org.slf4j.LoggerFactory;
 
 import java.util.List;
@@ -19,6 +20,9 @@ public class DestinationModifier_1870 implements RevenueDynamicModifier {
     private int calculatedBonus = 0;
     private RevenueAdapter revenueAdapter;
     private Phase phase;
+    private boolean isConnectionRunRound = false;
+    private MapHex homeHex;
+    private MapHex destHex;
 
     @Override
     public boolean prepareModifier(RevenueAdapter revenueAdapter) {
@@ -28,20 +32,19 @@ public class DestinationModifier_1870 implements RevenueDynamicModifier {
         this.revenueAdapter = revenueAdapter;
         this.phase = revenueAdapter.getPhase();
         
-        // Only active if the company has achieved its connection run
-        return comp.hasReachedDestination();
+GameManager gm = revenueAdapter.getRoot().getGameManager();
+        this.isConnectionRunRound = (gm.getCurrentRound() instanceof ConnectionRunRound_1870);
+
+        if (this.isConnectionRunRound) {
+            this.destHex = comp.getDestinationHex();
+            this.homeHex = comp.getHomeHexes().isEmpty() ? null : comp.getHomeHexes().get(0);
+        }
+
+        // Active if it's the Connection Run OR if the destination bonus token is in play
+        return comp.hasReachedDestination() || this.isConnectionRunRound;
+
     }
 
-    @Override
-    public int predictionValue(List<RevenueTrainRun> runs) {
-        return calculateDestinationBonus(runs);
-    }
-
-    @Override
-    public int evaluationValue(List<RevenueTrainRun> runs, boolean isFinal) {
-        calculatedBonus = calculateDestinationBonus(runs);
-        return calculatedBonus;
-    }
 
 @Override
     public String prettyPrint(RevenueAdapter revenueAdapter) {
@@ -93,4 +96,43 @@ public class DestinationModifier_1870 implements RevenueDynamicModifier {
         }
         return false;
     }
+
+    public int predictionValue(List<RevenueTrainRun> runs) {
+        return calculateDestinationBonus(runs);
+    }
+
+    @Override
+    public int evaluationValue(List<RevenueTrainRun> runs, boolean isFinal) {
+        if (!isValidConnectionRun(runs)) {
+            return -999999;
+        }
+        calculatedBonus = calculateDestinationBonus(runs);
+        return calculatedBonus;
+    }
+
+    private boolean isValidConnectionRun(List<RevenueTrainRun> runs) {
+        if (!isConnectionRunRound) return true;
+        if (destHex == null || homeHex == null) return true; // Safety fallback
+
+        for (RevenueTrainRun run : runs) {
+            if (!run.hasAValidRun()) continue;
+
+            List<NetworkVertex> vertices = run.getRunVertices();
+            if (vertices == null || vertices.isEmpty()) continue;
+
+            String firstId = vertices.get(0).getHex().getId();
+            String lastId = vertices.get(vertices.size() - 1).getHex().getId();
+
+            boolean matchesDirect = (firstId.equals(homeHex.getId()) && lastId.equals(destHex.getId()));
+            boolean matchesReverse = (firstId.equals(destHex.getId()) && lastId.equals(homeHex.getId()));
+
+            if (matchesDirect || matchesReverse) {
+                return true; // Found the required connection train
+            }
+        }
+        
+        return false;
+    }
+    
+
 }

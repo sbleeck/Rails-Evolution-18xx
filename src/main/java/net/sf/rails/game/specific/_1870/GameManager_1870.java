@@ -7,6 +7,8 @@ import net.sf.rails.game.financial.StockSpace;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Deque;
+import java.util.ArrayDeque;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -14,6 +16,7 @@ import org.slf4j.LoggerFactory;
 public class GameManager_1870 extends GameManager {
 
     private static final Logger log = LoggerFactory.getLogger(GameManager_1870.class);
+    private final Deque<Round> interruptStack = new ArrayDeque<>();
 
     public GameManager_1870(RailsRoot parent, String id) {
         super(parent, id);
@@ -31,8 +34,7 @@ public class GameManager_1870 extends GameManager {
     public void startShareProtectionRound(Round currentRound, PublicCompany company, net.sf.rails.game.Player seller,
             int sharesSold) {
 
-        setInterruptedRound(currentRound);
-
+interruptStack.push((Round) getCurrentRound());
         String roundName = "ShareProtectionRound_in_" + currentRound.getId() + "_" + System.nanoTime();
 
         ShareProtectionRound_1870 spr = (ShareProtectionRound_1870) createRound(ShareProtectionRound_1870.class,
@@ -58,8 +60,9 @@ public class GameManager_1870 extends GameManager {
             getRoot().getRevenueManager()
                     .addDynamicModifier(new net.sf.rails.game.specific._1870.CattleModifier_1870());
             getRoot().getRevenueManager().addDynamicModifier(new net.sf.rails.game.specific._1870.GulfModifier_1870());
-            getRoot().getRevenueManager().addDynamicModifier(new net.sf.rails.game.specific._1870.DestinationModifier_1870());
-            
+            getRoot().getRevenueManager()
+                    .addDynamicModifier(new net.sf.rails.game.specific._1870.DestinationModifier_1870());
+
         }
     }
 
@@ -67,9 +70,8 @@ public class GameManager_1870 extends GameManager {
     public void nextRound(net.sf.rails.game.Round round) {
         if (round instanceof net.sf.rails.game.specific._1870.ShareProtectionRound_1870 ||
                 round instanceof net.sf.rails.game.specific._1870.ConnectionRunRound_1870) {
-            net.sf.rails.game.Round interrupted = (net.sf.rails.game.Round) getInterruptedRound();
-            if (interrupted != null) {
-                setInterruptedRound(null);
+            if (!interruptStack.isEmpty()) {
+                net.sf.rails.game.Round interrupted = interruptStack.pop();
                 setRound(interrupted);
                 interrupted.resume();
                 return;
@@ -78,31 +80,34 @@ public class GameManager_1870 extends GameManager {
         super.nextRound(round);
     }
 
-
-@Override
+    @Override
     public List<PublicCompany> getCompaniesInDisplayOrder(List<PublicCompany> companies) {
         List<PublicCompany> displayOrder = new ArrayList<>(companies);
 
         displayOrder.sort((c1, c2) -> {
-            // A company is considered a "minor" (or special company) if it does not have a standard stock price,
-            // or if its type explicitly marks it as such (Minor, Coal, Destination, Cattle, Gulf).
-            boolean isMinor1 = !c1.hasStockPrice() || (c1.getType() != null && 
-                ("Minor".equalsIgnoreCase(c1.getType().getId()) || 
-                 "Coal".equalsIgnoreCase(c1.getType().getId()) ||
-                 "Destination".equalsIgnoreCase(c1.getType().getId()) ||
-                 "Cattle".equalsIgnoreCase(c1.getType().getId()) ||
-                 "Gulf".equalsIgnoreCase(c1.getType().getId())));
-                 
-            boolean isMinor2 = !c2.hasStockPrice() || (c2.getType() != null && 
-                ("Minor".equalsIgnoreCase(c2.getType().getId()) || 
-                 "Coal".equalsIgnoreCase(c2.getType().getId()) ||
-                 "Destination".equalsIgnoreCase(c2.getType().getId()) ||
-                 "Cattle".equalsIgnoreCase(c2.getType().getId()) ||
-                 "Gulf".equalsIgnoreCase(c2.getType().getId())));
+            // A company is considered a "minor" (or special company) if it does not have a
+            // standard stock price,
+            // or if its type explicitly marks it as such (Minor, Coal, Destination, Cattle,
+            // Gulf).
+            boolean isMinor1 = !c1.hasStockPrice() || (c1.getType() != null &&
+                    ("Minor".equalsIgnoreCase(c1.getType().getId()) ||
+                            "Coal".equalsIgnoreCase(c1.getType().getId()) ||
+                            "Destination".equalsIgnoreCase(c1.getType().getId()) ||
+                            "Cattle".equalsIgnoreCase(c1.getType().getId()) ||
+                            "Gulf".equalsIgnoreCase(c1.getType().getId())));
+
+            boolean isMinor2 = !c2.hasStockPrice() || (c2.getType() != null &&
+                    ("Minor".equalsIgnoreCase(c2.getType().getId()) ||
+                            "Coal".equalsIgnoreCase(c2.getType().getId()) ||
+                            "Destination".equalsIgnoreCase(c2.getType().getId()) ||
+                            "Cattle".equalsIgnoreCase(c2.getType().getId()) ||
+                            "Gulf".equalsIgnoreCase(c2.getType().getId())));
 
             // 1. Minors/Special Companies BEFORE Majors
-            if (isMinor1 && !isMinor2) return -1;
-            if (!isMinor1 && isMinor2) return 1;
+            if (isMinor1 && !isMinor2)
+                return -1;
+            if (!isMinor1 && isMinor2)
+                return 1;
 
             if (isMinor1 && isMinor2) {
                 // Keep minors in their natural ID order
@@ -121,7 +126,8 @@ public class GameManager_1870 extends GameManager {
                 return Integer.compare(cat1, cat2);
             }
 
-            // 3. If both are Open and Started (cat 1), sort strictly by stock value (highest first)
+            // 3. If both are Open and Started (cat 1), sort strictly by stock value
+            // (highest first)
             if (cat1 == 1) {
                 StockSpace space1 = c1.getCurrentSpace();
                 StockSpace space2 = c2.getCurrentSpace();
@@ -131,7 +137,8 @@ public class GameManager_1870 extends GameManager {
                     if (space1.getPrice() != space2.getPrice()) {
                         return Integer.compare(space2.getPrice(), space1.getPrice());
                     }
-                    // Tie-breakers: column (rightmost first), row (top first), stack position (top first)
+                    // Tie-breakers: column (rightmost first), row (top first), stack position (top
+                    // first)
                     if (space1.getColumn() != space2.getColumn()) {
                         return Integer.compare(space2.getColumn(), space1.getColumn());
                     }
@@ -151,8 +158,7 @@ public class GameManager_1870 extends GameManager {
 
     public void startConnectionRunRound(Round currentRound, PublicCompany company) {
 
-        setInterruptedRound(currentRound);
-
+interruptStack.push((Round) getCurrentRound());
         String roundName = "ConnectionRunRound_" + company.getId() + "_" + System.nanoTime();
 
         ConnectionRunRound_1870 crr = (ConnectionRunRound_1870) createRound(ConnectionRunRound_1870.class, roundName);
