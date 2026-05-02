@@ -161,6 +161,37 @@ public class StockRound_1870 extends StockRound {
         return p;
     }
 
+
+    @Override
+    protected void finishRound() {
+        if (raiseIfSoldOut) {
+            try {
+                for (PublicCompany company : getRoot().getCompanyManager().getAllPublicCompanies()) {
+                    if (company.hasStarted() && company.hasStockPrice() && !company.isClosed()) {
+                        // 1870 Rule: Stock rises if 100% of shares are in player OR company hands
+                        int ipoShares = ipo.getShares(company);
+                        int poolShares = pool.getShares(company);
+                        if (ipoShares == 0 && poolShares == 0) {
+                            net.sf.rails.common.ReportBuffer.add(this, net.sf.rails.common.LocalText.getText("SoldOut", company.getId()));
+                            stockMarket.soldOut(company);
+                        }
+                    }
+                }
+            } catch (Exception e) {
+                log.error("Error in 1870 finishRound", e);
+            }
+        }
+
+        // Disable base class sold out check to prevent duplicate bumps or incorrect logic
+        boolean originalRaise = raiseIfSoldOut;
+        raiseIfSoldOut = false;
+        
+        super.finishRound();
+        
+        raiseIfSoldOut = originalRaise;
+    }
+
+    
     @Override
     protected void adjustSharePrice(PublicCompany comp, Owner player, int shares, boolean soldBefore) {
         Player president = comp.getPresident();
