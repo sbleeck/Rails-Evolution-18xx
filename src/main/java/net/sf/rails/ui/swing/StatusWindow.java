@@ -978,43 +978,7 @@ public class StatusWindow extends JFrame implements ActionListener, ActionPerfor
         }
 
         
-        // 1870 Ambiguity Check: If a President clicks a certificate in the pool, 
-        // determine if they are buying for themselves (Player) or for the company (Redemption).
-        if (executedAction instanceof BuyCertificate && "1870".equals(gameUIManager.getGameManager().getGameName())) {
-            BuyCertificate buy = (BuyCertificate) executedAction;
-
-            net.sf.rails.game.specific._1870.action.RedeemShare_1870 redeemAction = null;
-            if (possibleActions != null) {
-                for (PossibleAction pa : possibleActions.getList()) {
-                    if (pa instanceof RedeemShare_1870) {
-                        RedeemShare_1870 r = (RedeemShare_1870) pa;
-                        if (r.getCompanyId().equals(buy.getCompany().getId())) {
-                            redeemAction = r;
-                            break;
-                        }
-                    }
-                }
-            }
-
-            if (redeemAction != null) {
-                String[] options = { "Player (" + buy.getPlayer().getName() + ")",
-                        "Company (" + buy.getCompany().getId() + ")" };
-                int choice = JOptionPane.showOptionDialog(this,
-                        "Who is acquiring this " + (buy.getNumberBought() * 10) + "% share?",
-                        "1870: Select Actor",
-                        JOptionPane.DEFAULT_OPTION,
-                        JOptionPane.QUESTION_MESSAGE,
-                        null,
-                        options,
-                        options[0]);
-
-                if (choice == 1) {
-                    executedAction = redeemAction;
-                } else if (choice == JOptionPane.CLOSED_OPTION) {
-                    return false; // Cancel action
-                }
-            }
-        }
+        
         return gameUIManager.processAction(executedAction);
     }
 
@@ -2012,11 +1976,21 @@ public class StatusWindow extends JFrame implements ActionListener, ActionPerfor
                                 styleStatusButton(btn, Color.RED);
                                 dynamicButtonPanel.add(btn);
                                 isProtecting = true;
-                                
-                            } else if (pa instanceof net.sf.rails.game.specific._1870.action.RedeemShare_1870
-                                    || pa instanceof net.sf.rails.game.specific._1870.action.ReissueShares_1870
-                                    || pa instanceof net.sf.rails.game.specific._1870.action.ExchangeMKT_1870) {
-
+                                } else if (pa instanceof net.sf.rails.game.specific._1870.action.RedeemShare_1870) {
+                                ActionButton btn = new ActionButton(null);
+                                btn.setText(pa.getButtonLabel() != null ? pa.getButtonLabel() : pa.getClass().getSimpleName());
+                                btn.setPossibleAction(pa);
+                                btn.addActionListener(this);
+                                styleStatusButton(btn, SYS_GREEN);
+                                dynamicButtonPanel.add(btn);
+                            } else if (pa instanceof net.sf.rails.game.specific._1870.action.ReissueShares_1870) {
+                                ActionButton btn = new ActionButton(null);
+                                btn.setText(pa.getButtonLabel() != null ? pa.getButtonLabel() : pa.getClass().getSimpleName());
+                                btn.setPossibleAction(pa);
+                                btn.addActionListener(this);
+                                styleStatusButton(btn, SYS_RED);
+                                dynamicButtonPanel.add(btn);
+                            } else if (pa instanceof net.sf.rails.game.specific._1870.action.ExchangeMKT_1870) {
                                 ActionButton btn = new ActionButton(null);
                                 btn.setText(pa.getButtonLabel() != null ? pa.getButtonLabel() : pa.getClass().getSimpleName());
                                 btn.setPossibleAction(pa);
@@ -2024,6 +1998,8 @@ public class StatusWindow extends JFrame implements ActionListener, ActionPerfor
                                 styleStatusButton(btn, SYS_BLUE);
                                 dynamicButtonPanel.add(btn);
                             }
+                           
+                            
                         }
                     }
 

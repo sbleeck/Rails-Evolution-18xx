@@ -3,6 +3,11 @@ package net.sf.rails.game.specific._1870;
 import net.sf.rails.common.LocalText;
 import net.sf.rails.common.ReportBuffer;
 import net.sf.rails.game.*;
+import net.sf.rails.game.financial.StockSpace;
+
+import java.util.ArrayList;
+import java.util.List;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -74,6 +79,75 @@ public class GameManager_1870 extends GameManager {
     }
 
 
+@Override
+    public List<PublicCompany> getCompaniesInDisplayOrder(List<PublicCompany> companies) {
+        List<PublicCompany> displayOrder = new ArrayList<>(companies);
+
+        displayOrder.sort((c1, c2) -> {
+            // A company is considered a "minor" (or special company) if it does not have a standard stock price,
+            // or if its type explicitly marks it as such (Minor, Coal, Destination, Cattle, Gulf).
+            boolean isMinor1 = !c1.hasStockPrice() || (c1.getType() != null && 
+                ("Minor".equalsIgnoreCase(c1.getType().getId()) || 
+                 "Coal".equalsIgnoreCase(c1.getType().getId()) ||
+                 "Destination".equalsIgnoreCase(c1.getType().getId()) ||
+                 "Cattle".equalsIgnoreCase(c1.getType().getId()) ||
+                 "Gulf".equalsIgnoreCase(c1.getType().getId())));
+                 
+            boolean isMinor2 = !c2.hasStockPrice() || (c2.getType() != null && 
+                ("Minor".equalsIgnoreCase(c2.getType().getId()) || 
+                 "Coal".equalsIgnoreCase(c2.getType().getId()) ||
+                 "Destination".equalsIgnoreCase(c2.getType().getId()) ||
+                 "Cattle".equalsIgnoreCase(c2.getType().getId()) ||
+                 "Gulf".equalsIgnoreCase(c2.getType().getId())));
+
+            // 1. Minors/Special Companies BEFORE Majors
+            if (isMinor1 && !isMinor2) return -1;
+            if (!isMinor1 && isMinor2) return 1;
+
+            if (isMinor1 && isMinor2) {
+                // Keep minors in their natural ID order
+                return c1.getId().compareTo(c2.getId());
+            }
+
+            // Both are majors.
+            // 2. Order criteria: Open (not closed) before Closed.
+            // Cat 1: Open and Started
+            // Cat 2: Open and Unstarted (IPO phase)
+            // Cat 3: Closed
+            int cat1 = c1.isClosed() ? 3 : (c1.hasStarted() ? 1 : 2);
+            int cat2 = c2.isClosed() ? 3 : (c2.hasStarted() ? 1 : 2);
+
+            if (cat1 != cat2) {
+                return Integer.compare(cat1, cat2);
+            }
+
+            // 3. If both are Open and Started (cat 1), sort strictly by stock value (highest first)
+            if (cat1 == 1) {
+                StockSpace space1 = c1.getCurrentSpace();
+                StockSpace space2 = c2.getCurrentSpace();
+
+                if (space1 != null && space2 != null) {
+                    // Primary Sort: Price (Highest first)
+                    if (space1.getPrice() != space2.getPrice()) {
+                        return Integer.compare(space2.getPrice(), space1.getPrice());
+                    }
+                    // Tie-breakers: column (rightmost first), row (top first), stack position (top first)
+                    if (space1.getColumn() != space2.getColumn()) {
+                        return Integer.compare(space2.getColumn(), space1.getColumn());
+                    }
+                    if (space1.getRow() != space2.getRow()) {
+                        return Integer.compare(space1.getRow(), space2.getRow());
+                    }
+                    return Integer.compare(space1.getStackPosition(c1), space2.getStackPosition(c2));
+                }
+            }
+
+            // Fallback for Unstarted or Closed majors, or if stock spaces are null
+            return c1.getId().compareTo(c2.getId());
+        });
+
+        return displayOrder;
+    }
 
     public void startConnectionRunRound(Round currentRound, PublicCompany company) {
 

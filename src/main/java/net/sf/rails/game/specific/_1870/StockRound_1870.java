@@ -275,13 +275,18 @@ float certCount = currentPlayer.getPortfolioModel().getCertificateCount();
                 int marketPrice = company.getCurrentSpace().getPrice() / company.getShareUnitsForSharePrice();
                 boolean hasCash = company.getCash() >= marketPrice;
                 int poolShares = pool.getShares(company);
-                
-                
-                if (sharesInTreasury < 4 && hasCash) {
+
+                int playerShares = 0;
+                for (Player p : playerManager.getPlayers()) {
+                    playerShares += p.getPortfolioModel().getShares(company);
+                }
+
+                if (sharesInTreasury < 4 && hasCash && (playerShares + poolShares >= 7)) {
                     // Check players for non-president shares
                     boolean playersHoldRedeemable = false;
                     for (Player p : playerManager.getPlayers()) {
-                        for (net.sf.rails.game.financial.PublicCertificate cert : p.getPortfolioModel().getCertificates(company)) {
+                        for (net.sf.rails.game.financial.PublicCertificate cert : p.getPortfolioModel()
+                                .getCertificates(company)) {
                             if (!cert.isPresidentShare()) {
                                 playersHoldRedeemable = true;
                                 break;
@@ -306,6 +311,27 @@ float certCount = currentPlayer.getPortfolioModel().getCertificateCount();
 
         return result || addedCustomAction;
     }
+
+
+    @Override
+public boolean checkAgainstHoldLimit(net.sf.rails.game.Player player, net.sf.rails.game.PublicCompany company, int number) {
+boolean baseCheck = super.checkAgainstHoldLimit(player, company, number);
+
+    // If the base check passes (e.g., under 60% limit, or the stock token is in the Green/Brown zone where limits are lifted), it is legal.
+    if (baseCheck) {
+        return true;
+    }
+    
+    // 1870 Rule Exception: The purchasing president may hold shares in excess of the normal 60% limit if acquired through price protection.
+    // We permit passive holding (number == 0) for the President to bypass the forced sell trigger.
+    // Active buying (number > 0) outside of Green/Brown zones remains blocked by returning false.
+    if (number == 0 && company.getPresident() == player) {
+        return true;
+    }
+    
+    return false;
+}
+
 
     @Override
     public boolean process(rails.game.action.PossibleAction action) {
