@@ -156,17 +156,27 @@ public class ConnectionRunRound_1870 extends OperatingRound_1870 {
         if (action instanceof SetDividend) {
 
             if (!getRoot().getGameManager().isReloading()) {
-                String message = "Please confirm the connection run value you entered: $" + ((SetDividend) action).getActualRevenue();
-                int choice = javax.swing.JOptionPane.showConfirmDialog(
+                SetDividend sdAction = (SetDividend) action;
+                Object input = javax.swing.JOptionPane.showInputDialog(
                         null,
-                        message,
-                        "Confirm Connection Run Payout",
-                        javax.swing.JOptionPane.YES_NO_OPTION,
-                        javax.swing.JOptionPane.QUESTION_MESSAGE
+                        "Verify or edit the connection run value:",
+                        "Connection Run Payout",
+                        javax.swing.JOptionPane.QUESTION_MESSAGE,
+                        null,
+                        null,
+                        String.valueOf(sdAction.getActualRevenue())
                 );
-                
-                if (choice != javax.swing.JOptionPane.YES_OPTION) {
-                    return false; // Abort processing if the user declines
+
+                if (input == null) {
+                    return false; // Abort if user cancels
+                }
+
+                try {
+                    int newRev = Integer.parseInt(input.toString());
+                    sdAction.setActualRevenue(newRev);
+                } catch (NumberFormatException e) {
+                    net.sf.rails.common.DisplayBuffer.add(this, "Invalid number entered. Aborting connection run.");
+                    return false;
                 }
             }
             boolean success = super.process(action);
