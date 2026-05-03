@@ -221,13 +221,18 @@ public class StockRound_1870 extends StockRound {
         // We collect in a separate list to avoid ConcurrentModificationException or
         // ImmutableList crashes
         java.util.List<rails.game.action.PossibleAction> actionsToRemove = new java.util.ArrayList<>();
+
         for (rails.game.action.PossibleAction action : possibleActions.getList()) {
             if (action instanceof rails.game.action.BuyPrivate) {
                 actionsToRemove.add(action);
             }
+            // 1870 Rule: Explicitly enforce no stock selling in the first round to close any loopholes.
+if (action instanceof rails.game.action.SellShares && getRoot().getGameManager().getSRNumber() == 1) {
+                actionsToRemove.add(action);
+            }
         }
         if (!actionsToRemove.isEmpty()) {
-            log.info("Removing BuyPrivate actions from Stock Round per 1870 rules.");
+            log.info("Removing restricted actions (BuyPrivate/SellShares) from Stock Round per 1870 rules.");
             possibleActions.removeAll(actionsToRemove);
         }
 

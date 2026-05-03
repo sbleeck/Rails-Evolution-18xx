@@ -154,6 +154,21 @@ public class ConnectionRunRound_1870 extends OperatingRound_1870 {
     @Override
     public boolean process(PossibleAction action) {
         if (action instanceof SetDividend) {
+
+            if (!getRoot().getGameManager().isReloading()) {
+                String message = "Please confirm the connection run value you entered: $" + ((SetDividend) action).getActualRevenue();
+                int choice = javax.swing.JOptionPane.showConfirmDialog(
+                        null,
+                        message,
+                        "Confirm Connection Run Payout",
+                        javax.swing.JOptionPane.YES_NO_OPTION,
+                        javax.swing.JOptionPane.QUESTION_MESSAGE
+                );
+                
+                if (choice != javax.swing.JOptionPane.YES_OPTION) {
+                    return false; // Abort processing if the user declines
+                }
+            }
             boolean success = super.process(action);
 
             // CRITICAL FIX: The 1870 Connection Run consists solely of a single payout.

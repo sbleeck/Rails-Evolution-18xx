@@ -2368,13 +2368,16 @@ public class GameStatus extends GridPanel {
             }
         }
 
+JPanel[] currentPanels = playerPrivatesPanel;
         for (int i = 0; i < np; i++) {
-            if (playerPrivatesPanel[i] == null)
+            if (currentPanels == null || i >= currentPanels.length) continue;
+            JPanel panel = currentPanels[i];
+            if (panel == null)
                 continue;
 
-            playerPrivatesPanel[i].removeAll();
+            panel.removeAll();
             // Add top spacing so cards don't look "stuck" to the top border
-            playerPrivatesPanel[i].add(Box.createVerticalStrut(5));
+            panel.add(Box.createVerticalStrut(5));
 
             net.sf.rails.game.Player p = players.getPlayerByPosition(i);
             if (p == null)

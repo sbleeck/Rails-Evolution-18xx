@@ -38,7 +38,6 @@
     </Game>
 
      <Game name="1870">
-        <Note>U="1817">
         <Note>Playable, needs full stress testing.</Note>
         <Description><![CDATA[<html>
             <h3 style="margin-top:0;">1870 - Railroading across the Trans Mississippi</h3>
@@ -118,7 +117,7 @@
                 <li>Bankruptcy mechanics.</li>
                 <li>TGV running over track used by other trains.</li>
             </ul>
-            <i>Note: Players should check calculated H-train revenues and correct using the spinner if necessary.</i>
+            <i>Note: Players should check calculated H-train revenues and correct using the spinner if necessary.</i></Note>
         </html>]]></Description>
         <Players min="2" max="6"/>
     </Game>

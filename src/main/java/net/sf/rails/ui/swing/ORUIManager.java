@@ -891,26 +891,100 @@ public class ORUIManager implements DialogOwner {
         }
     }
 
-    public void processBuyPrivate(BuyPrivate action) {
+
+public void processBuyPrivate(BuyPrivate action) {
         if (action == null)
             return;
-        int price = action.getMinimumPrice();
-        if (action.getMinimumPrice() != action.getMaximumPrice()) {
-            String input = JOptionPane.showInputDialog(orWindow, LocalText.getText("NegotiatePrice"),
-                    String.valueOf(price));
-            try {
-                price = Integer.parseInt(input);
-            } catch (Exception e) {
-            }
+
+        int minPrice = action.getMinimumPrice();
+        int maxPrice = action.getMaximumPrice();
+        int price = minPrice;
+
+        // Gather Buyer Information
+        PublicCompany buyer = this.orComp;
+        String buyerId = (buyer != null) ? buyer.getId() : "Unknown";
+        String directorName = (buyer != null && buyer.getPresident() != null) ? buyer.getPresident().getId() : "Unknown";
+
+        // Gather Private Company Information
+        PrivateCompany pc = action.getPrivateCompany();
+        String pcName = (pc.getName() != null) ? pc.getName() : "Unknown";
+        String pcId = (pc.getId() != null) ? pc.getId() : "Unknown";
+        String ownerName = (pc.getOwner() != null) ? pc.getOwner().getId() : "Unknown";
+        
+        // Extract Hover/Info text and format for HTML display
+        String infoText = pc.getInfoText();
+        if (infoText != null && !infoText.isEmpty()) {
+            infoText = infoText.replaceAll("\\n", "<br>");
         } else {
-            if (JOptionPane.showConfirmDialog(orWindow, LocalText.getText("ConfirmBuyPrivate",
-                    action.getPrivateCompany().getId(), gameUIManager.format(price))) != JOptionPane.YES_OPTION)
-                return;
+            infoText = "No additional information available.";
         }
+
+        String formattedMin = gameUIManager.format(minPrice);
+        String formattedMax = gameUIManager.format(maxPrice);
+
+        // Build the rich HTML dialog content
+        StringBuilder msg = new StringBuilder();
+        msg.append("<html><div style='width: 350px; font-family: sans-serif;'>");
+        msg.append("<h3 style='margin-top: 0;'>Buy Private Company</h3>");
+        
+        msg.append("<table width='100%'>");
+        msg.append("<tr><td><b>Buyer:</b></td><td>").append(buyerId).append(" (Director: ").append(directorName).append(")</td></tr>");
+        msg.append("<tr><td><b>Private:</b></td><td>").append(pcName).append(" [").append(pcId).append("]</td></tr>");
+        msg.append("<tr><td><b>Owner:</b></td><td>").append(ownerName).append("</td></tr>");
+        msg.append("<tr><td><b>Price Range:</b></td><td>").append(formattedMin).append(" - ").append(formattedMax).append("</td></tr>");
+        msg.append("</table><br>");
+        
+        msg.append("<b>Details:</b><br>");
+        msg.append("<div style='padding: 5px; border: 1px solid gray; background-color: #f9f9f9; font-size: 10px;'>");
+        msg.append(infoText).append("</div><br>");
+
+        // Handle Variable vs Fixed Price Dialogs
+        if (minPrice != maxPrice) {
+            msg.append("<b>Enter purchase price:</b></div></html>");
+            
+            // Note: showInputDialog returns an Object. We cast it to String if it's not null.
+            Object inputObj = JOptionPane.showInputDialog(
+                    orWindow, 
+                    msg.toString(), 
+                    "Negotiate Price", 
+                    JOptionPane.QUESTION_MESSAGE, 
+                    null, 
+                    null, 
+                    String.valueOf(price)
+            );
+            
+            if (inputObj == null) {
+                return; // User canceled
+            }
+            
+            try {
+                String inputStr = inputObj.toString().replaceAll("[^0-9]", ""); // Strip non-numeric characters just in case
+                price = Integer.parseInt(inputStr);
+            } catch (Exception e) {
+                return; // Invalid input or empty
+            }
+            
+            // Validate bounds before processing
+            if (price < minPrice || price > maxPrice) {
+                JOptionPane.showMessageDialog(orWindow, "Price out of bounds (" + minPrice + " - " + maxPrice + ")", "Error", JOptionPane.ERROR_MESSAGE);
+                return;
+            }
+
+        } else {
+            msg.append("<b>Confirm purchase for ").append(formattedMin).append("?</b></div></html>");
+            if (JOptionPane.showConfirmDialog(orWindow, msg.toString(), "Confirm Purchase", JOptionPane.YES_NO_OPTION, JOptionPane.QUESTION_MESSAGE) != JOptionPane.YES_OPTION) {
+                return; // User canceled
+            }
+        }
+
         action.setPrice(price);
-        if (orWindow.process(action))
+        if (orWindow.process(action)) {
             updateMessage();
+        }
     }
+
+
+
 
     protected void takeLoans(TakeLoans action) {
         if (action.getMaxNumber() == 1) {

@@ -529,9 +529,12 @@ g.setColor(State.HIGHLIGHT_PURPLE.getColor());
             // 2. Draw costs in black, but only if the toggle is ON and no tile has been laid
             if (displayMarkings && getHex().getTileCost() > 0 && getHex().isPreprintedTileCurrent()) {
                 Font oldFont = g.getFont();
-                // Bumped minimum size to 10 for better legibility at extreme small scales
-                int scaledFontSize = Math.max(10, (int) Math.round(12 * dimensions.zoomFactor));
-                g.setFont(new Font("SansSerif", Font.PLAIN, scaledFontSize));
+               
+                // Force fractional scaling to bypass OS integer font minimum limits
+                float scaledFontSize = (float) Math.max(3.0, 7.0 * dimensions.zoomFactor);
+                g.setFont(new Font("SansSerif", Font.PLAIN, 12).deriveFont(scaledFontSize));
+
+                
                 FontMetrics fontMetrics = g.getFontMetrics();
                 Color oldColor = g.getColor();
                 g.setColor(Color.BLACK);
@@ -1319,7 +1322,7 @@ private void drawBaseToken(Graphics2D g2, PublicCompany co, HexPoint center, dou
             rawText = rawText.replaceAll("<[^>]*>", "");
 
 // 1. SET FONT: Bold and scaled based on zoomFactor for better fit
-            int scaledFontSize = Math.max(8, (int) Math.round(16 * dimensions.zoomFactor));
+int scaledFontSize = Math.max(8, (int) Math.round(10 * dimensions.zoomFactor));
             Font overlayFont = new Font("SansSerif", Font.BOLD, scaledFontSize);
             g.setFont(overlayFont);
             restore = true;

@@ -461,7 +461,10 @@ public void setState(State state) {
 
 public boolean isShortShare() {
         boolean isShort = false;
-        if (customLabel != null && (customLabel.toLowerCase().contains("short") || customLabel.contains("-"))) {
+        // Capture to a local variable to prevent thread race conditions
+        String safeLabel = this.customLabel; 
+        
+        if (safeLabel != null && (safeLabel.toLowerCase().contains("short") || safeLabel.contains("-"))) {
             isShort = true;
         } else if (certificates != null) {
             for (Certificate c : certificates) {

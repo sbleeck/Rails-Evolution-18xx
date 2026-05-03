@@ -2212,7 +2212,7 @@ String phaseName = "Phase";
                     } else if (currentRound.getClass().getSimpleName().contains("CoalExchange")) {
                         phaseName = "Coal Exchange";
                     }
-                    
+
                     String bottomText = "<html><center><font face='SansSerif' size='4'><b>" + phaseName
                             + "</b></font></center></html>";
                     lblPhaseInstruction.setText(bottomText);
@@ -2613,7 +2613,7 @@ String phaseName = "Phase";
             } else if (action instanceof BuyPrivate) {
             BuyPrivate bp = (BuyPrivate) action;
             highlightTarget = bp.getPrivateCompany();
-            label = "Buy " + highlightTarget.getId();
+label = "Buy " + highlightTarget.getId() + " (" + bp.getMinimumPrice() + "-" + bp.getMaximumPrice() + ")";
             bgColor = new Color(255, 235, 235); // Matches RailCard private company styling
             borderColor = new Color(200, 150, 150);
             textColor = Color.BLACK;
