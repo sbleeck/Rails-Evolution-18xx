@@ -81,14 +81,32 @@ boolean startsAtDest = (destHex != null && startNode.getHex() == destHex);
                 
                 // Edge vertices often return 0 value. We must scan the hex's vertices 
                 // within the run to find the actual station value.
+
                 for (NetworkVertex v : vertices) {
                     if (v.getHex() == targetHex) {
+                        // --- START FIX ---
+                        // Get the base value first
                         int val = revenueAdapter.getVertexValue(v, run.getTrain(), phase);
+                        
+                        // Rule Check: Ensure we only double the value valid for THIS company.
+                        // We subtract any bonus tokens not belonging to us before doubling.
+                        if (targetHex.getBonusTokens() != null) {
+                            for (net.sf.rails.game.BonusToken t : targetHex.getBonusTokens()) {
+                                String tName = t.getName();
+                                if (tName != null && !tName.startsWith(comp.getId())) {
+                                    val -= t.getValue(); 
+                                    // If it's an open port, others still get $10[cite: 2]
+                                    if (tName.contains("Port_Open")) val += 10;
+                                }
+                            }
+                        }
+                        // --- END FIX ---
                         if (val > runBonus) {
                             runBonus = val;
                         }
                     }
                 }
+                
                 totalBonus += runBonus;
                 
                 // Dynamically update the token's UI value to stop it from showing '0' on the map
