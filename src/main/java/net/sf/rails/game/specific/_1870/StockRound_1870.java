@@ -192,21 +192,30 @@ public class StockRound_1870 extends StockRound {
     }
 
     
-    @Override
+@Override
     protected void adjustSharePrice(PublicCompany comp, Owner player, int shares, boolean soldBefore) {
         Player president = comp.getPresident();
         int marketPrice = comp.getCurrentSpace().getPrice() / comp.getShareUnitsForSharePrice();
 
      // 1870 Price Protection Rule: President can protect if they aren't the seller,
-        // haven't sold shares of this company this round, and have enough cash.
+        // haven't sold shares already this round, and have enough cash to buy the shares at market price. We check the president's sell status to prevent gaming the protection by selling shares and then protecting to reset the price.
         boolean presidentHasSold = president != null && president.hasSoldThisRound(comp);
         
+
         if (president != null && president != player && !presidentHasSold && president.getCash() >= (marketPrice * shares)) {
-                        protectingCompanyId.set(comp.getId());
-            protectingShares.set(shares);
-            ReportBuffer.add(this,
-                    "Price protection opportunity: " + president.getName() + " may protect " + comp.getId() + ".");
-            return; // Intercept! Do not drop the price yet.
+            float currentCerts = president.getPortfolioModel().getCertificateCount();
+            int certLimit = getRoot().getGameManager().getPlayerCertificateLimit(president);
+            
+            if ((currentCerts + shares) <= certLimit) {
+
+                protectingCompanyId.set(comp.getId());
+                protectingShares.set(shares);
+                ReportBuffer.add(this,
+                        "Price protection opportunity: " + president.getName() + " may protect " + comp.getId() + ".");
+                return; // Intercept! Do not drop the price yet.
+
+            }
+
         }
 
         // Otherwise, execute normal price drop
