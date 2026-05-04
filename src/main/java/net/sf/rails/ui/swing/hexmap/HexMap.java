@@ -987,7 +987,12 @@ private boolean displayHexNames = false;
         this.trainPaths = trainPaths;
 
         // only repaint if routes existed before or exist now
-        if (dirtyRect != null) repaintRoutes(dirtyRect);
+        if (dirtyRect != null) {
+            repaintRoutes(dirtyRect);
+            // Repaint the entire tokens layer to guarantee that the fancy text in the center of the hexes
+            // is updated correctly, since the dirtyRect from the routes might not cover the hex centers.
+            repaintTokens(new Rectangle(getSize()));
+        }
     }
 
     /**

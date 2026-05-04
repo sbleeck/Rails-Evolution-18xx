@@ -359,6 +359,7 @@ public class GUIHex implements Observer {
             // trigger hexmap marks repaint if status changes
             hexMap.repaintMarks(getMarksDirtyBounds());
             hexMap.repaintTiles(getBounds()); // tile is drawn smaller if selected
+            hexMap.repaintTokens(getBounds()); // update needed for fancy city values on tokens layer
         }
         this.state = state;
     }
@@ -738,7 +739,7 @@ public class GUIHex implements Observer {
             java.util.List<java.awt.geom.GeneralPath> activePaths = hexMap.getTrainPaths();
             
             if (activePaths != null && !activePaths.isEmpty()) {
-                paintFancyCityValues(g);
+                paintFancyCityValues(g, activePaths);
             }
         }
 
@@ -746,7 +747,7 @@ public class GUIHex implements Observer {
         
     }
 
-    private void paintFancyCityValues(Graphics2D g) {
+    private void paintFancyCityValues(Graphics2D g, java.util.List<java.awt.geom.GeneralPath> activePaths) {
         int hexValue = 0;
 
         // 1. Check for phase-specific hex value (e.g., standard off-board areas or upgraded tiles)
@@ -778,9 +779,9 @@ public class GUIHex implements Observer {
             Color oldColor = g.getColor();
             Stroke oldStroke = g.getStroke();
 
-            // Comically large font (scaling with zoom, base size 36)
-            int fontSize = (int) Math.max(20, Math.round(36 * dimensions.zoomFactor));
-            g.setFont(new Font("SansSerif", Font.BOLD, fontSize));
+            // Comically large font (scaling with zoom, base size 24 - 1/3 smaller than 36)
+            float fontSize = (float) Math.max(14.0, 24.0 * dimensions.zoomFactor);
+            g.setFont(new Font("SansSerif", Font.BOLD, 12).deriveFont(fontSize));
 
             String text = String.valueOf(hexValue);
             FontMetrics fm = g.getFontMetrics();
@@ -791,6 +792,17 @@ public class GUIHex implements Observer {
             float textX = (float) (dimensions.center.getX() - textWidth / 2.0);
             float textY = (float) (dimensions.center.getY() + textHeight / 2.0 - fm.getDescent());
 
+            // Determine if this hex is on the active network path
+            boolean isOnNetwork = false;
+            if (activePaths != null) {
+                for (java.awt.geom.GeneralPath path : activePaths) {
+                    if (path.intersects(dimensions.hexagon.getBounds2D())) {
+                        isOnNetwork = true;
+                        break;
+                    }
+                }
+            }
+
             // Draw a thick black "halo" for extreme contrast
             g.setColor(Color.BLACK);
             int offset = Math.max(1, (int)(2 * dimensions.zoomFactor));
@@ -799,8 +811,10 @@ public class GUIHex implements Observer {
             g.drawString(text, textX + offset, textY - offset);
             g.drawString(text, textX + offset, textY + offset);
 
-            // Draw the bright yellow core
-            g.setColor(Color.YELLOW);
+            // Draw the core color based on network status
+            // Using Cyan for active (logical, distinct, not yellow/green/brown)
+            // Using Light Gray for inactive
+            g.setColor(isOnNetwork ? Color.CYAN : Color.LIGHT_GRAY);
             g.drawString(text, textX, textY);
 
             g.setFont(oldFont);
@@ -1395,7 +1409,7 @@ public class GUIHex implements Observer {
 
     public void update() {
         hexMap.repaintTiles(getBounds());
-        hexMap.repaintTokens(getBounds()); // needed if new tile has new token placement spot
+        hexMap.repaintTokens(getMarksDirtyBounds()); // needed if new tile has new token placement spot, and for large texts like fancy city values
     }
 
     public String toText() {
