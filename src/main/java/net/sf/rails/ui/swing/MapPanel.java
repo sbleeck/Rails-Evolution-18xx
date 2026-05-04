@@ -352,12 +352,26 @@ public class MapPanel extends JPanel {
     // 1. Create the Button
     final JButton layersBtn = new JButton("Layers");
     layersBtn.setFocusable(false);
-    layersBtn.setFont(new Font("SansSerif", Font.BOLD, 11));
-    layersBtn.setBackground(new Color(255, 255, 255, 200)); // Semi-transparent white
-    layersBtn.setBorder(BorderFactory.createLineBorder(Color.GRAY));
-    
-    // 2. Position it (Top Right)
-    layersBtn.setBounds(10, 10, 70, 25);
+    // Increase font size
+        layersBtn.setFont(new Font("SansSerif", Font.BOLD, 14)); 
+        
+        // Solid white background with black text for maximum contrast
+        layersBtn.setBackground(Color.BLUE); 
+        layersBtn.setForeground(Color.WHITE);
+        
+        // Force the background to paint correctly across all operating systems
+        layersBtn.setOpaque(true);
+        layersBtn.setContentAreaFilled(true);
+        
+        // Use a raised bevel border to create a "drop shadow" floating effect
+        layersBtn.setBorder(BorderFactory.createCompoundBorder(
+                BorderFactory.createRaisedBevelBorder(),
+                BorderFactory.createEmptyBorder(2, 5, 2, 5)
+        ));
+        
+        // 2. Position it (Top Left, moved slightly further in, made larger)
+        layersBtn.setBounds(20, 20, 95, 35);
+
     
     // 3. Create the "Pop-out" Menu
     layersBtn.addActionListener(new ActionListener() {
