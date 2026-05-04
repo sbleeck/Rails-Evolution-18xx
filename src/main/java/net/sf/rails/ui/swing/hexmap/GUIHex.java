@@ -1460,8 +1460,10 @@ int scaledFontSize = Math.max(8, (int) Math.round(10 * dimensions.zoomFactor));
         net.sf.rails.game.CompanyManager cm = hexMap.getMapManager().getRoot().getCompanyManager();
         if (cm != null) {
             for (PublicCompany comp : cm.getAllPublicCompanies()) {
-                if (comp.getDestinationHex() != null && comp.getDestinationHex().equals(getHex())) {
-                    destinationMarkers.add(comp);
+               if (comp.getDestinationHex() != null && comp.getDestinationHex().equals(getHex())) {
+                    if (!comp.hasReachedDestination()) {
+                        destinationMarkers.add(comp);
+                    }
                 }
             }
         }
@@ -1481,16 +1483,13 @@ int scaledFontSize = Math.max(8, (int) Math.round(10 * dimensions.zoomFactor));
 
         for (int i = 0; i < destinationMarkers.size(); i++) {
             PublicCompany comp = destinationMarkers.get(i);
-            boolean connected = comp.hasReachedDestination();
             
             int x = startX + (i * (size + gap));
             int y = startY;
 
             // 1. Draw Background
             java.awt.Color bg = comp.getBgColour();
-            if (connected) {
-                bg = new java.awt.Color(bg.getRed(), bg.getGreen(), bg.getBlue(), 100);
-            }
+
             g2.setColor(bg);
             g2.fillRect(x, y, size, size);
 
@@ -1501,9 +1500,7 @@ int scaledFontSize = Math.max(8, (int) Math.round(10 * dimensions.zoomFactor));
 
             // 3. Draw Company ID
             java.awt.Color fg = comp.getFgColour();
-            if (connected) {
-                fg = new java.awt.Color(fg.getRed(), fg.getGreen(), fg.getBlue(), 100);
-            }
+ 
             g2.setColor(fg);
             String id = comp.getId().substring(0, Math.min(comp.getId().length(), 3));
             int tx = x + (size - fm.stringWidth(id)) / 2;
@@ -1511,12 +1508,7 @@ int scaledFontSize = Math.max(8, (int) Math.round(10 * dimensions.zoomFactor));
             g2.drawString(id, tx, ty);
 
             // 4. Overlay Checkmark if connected
-            if (connected) {
-                g2.setColor(new java.awt.Color(0, 150, 0)); 
-                g2.setStroke(new java.awt.BasicStroke(2.0f));
-                g2.drawLine(x + 2, y + size/2, x + size/2, y + size - 2);
-                g2.drawLine(x + size/2, y + size - 2, x + size - 2, y + 2);
-            }
+
         }
         g2.setFont(originalFont);
     }
