@@ -167,7 +167,6 @@ public class OperatingRound_1870 extends OperatingRound {
             }
         }
 
-
         return success;
 
     }
@@ -175,7 +174,7 @@ public class OperatingRound_1870 extends OperatingRound {
     @Override
     public boolean buyTrain(rails.game.action.BuyTrain action) {
         boolean success = super.buyTrain(action);
-        
+
         return success;
     }
 
@@ -200,20 +199,20 @@ public class OperatingRound_1870 extends OperatingRound {
     public boolean setPossibleActions() {
         boolean result = super.setPossibleActions();
 
-// // 1870 Rule: MKT cannot be bought by a public company.
-//         rails.game.action.PossibleAction actionToRemove = null;
-//         for (rails.game.action.PossibleAction action : possibleActions.getList()) {
-//             if (action instanceof BuyPrivate) {
-//                 if ("MKT".equals(((BuyPrivate) action).getPrivateCompany().getId())) {
-//                     actionToRemove = action;
-//                     break;
-//                 }
-//             }
-//         }
-        // if (actionToRemove != null) {
-        //     possibleActions.remove(actionToRemove);
+        // // 1870 Rule: MKT cannot be bought by a public company.
+        // rails.game.action.PossibleAction actionToRemove = null;
+        // for (rails.game.action.PossibleAction action : possibleActions.getList()) {
+        // if (action instanceof BuyPrivate) {
+        // if ("MKT".equals(((BuyPrivate) action).getPrivateCompany().getId())) {
+        // actionToRemove = action;
+        // break;
         // }
-        
+        // }
+        // }
+        // if (actionToRemove != null) {
+        // possibleActions.remove(actionToRemove);
+        // }
+
         Phase phase = Phase.getCurrent(this);
         if (phase != null && "1".equals(phase.toText())) {
             PublicCompany company = getOperatingCompany();
@@ -223,7 +222,7 @@ public class OperatingRound_1870 extends OperatingRound {
 
                 if (bridge != null && !bridge.isClosed() && bridge.getOwner() instanceof net.sf.rails.game.Player) {
 
-                    boolean allowPurchase = (bridge.getOwner() == company.getPresident());
+boolean allowPurchase = (bridge.getOwner() == company.getPresident());
 
                     if (allowPurchase) {
                         // Phase 1 price is restricted to $20 - $40.
@@ -507,7 +506,7 @@ public class OperatingRound_1870 extends OperatingRound {
             if (phase != null && "1".equals(phase.toText()) && privateComp != null
                     && "Brdg".equals(privateComp.getId())) {
                 if (company != null && (company.getId().equals("MP") || company.getId().equals("SW"))) {
-                    return privateComp.getOwner() == company.getPresident();
+return privateComp.getOwner() == company.getPresident();
                 }
             }
         }
@@ -636,7 +635,6 @@ public class OperatingRound_1870 extends OperatingRound {
         }
     }
 
-
     @Override
     public boolean layBaseToken(rails.game.action.LayBaseToken action) {
         // Intercept forced token lays for the 1870 destination run
@@ -645,7 +643,8 @@ public class OperatingRound_1870 extends OperatingRound {
             net.sf.rails.game.MapHex hex = action.getChosenHex();
             net.sf.rails.game.Stop stop = action.getChosenStop();
 
-            // Bypass the parent class validation checks (slot capacity, already present, etc.)
+            // Bypass the parent class validation checks (slot capacity, already present,
+            // etc.)
             // and forcefully lay the token to satisfy 1870 destination rules.
             if (hex.layBaseToken(company, stop)) {
                 company.layBaseToken(hex, 0); // Execute the lay at $0 cost
@@ -653,11 +652,10 @@ public class OperatingRound_1870 extends OperatingRound {
             }
             return false;
         }
-        
+
         // For all other normal token lays, defer to the standard engine rules
         return super.layBaseToken(action);
     }
-    
 
     private void addExtraStationMarker(PublicCompany company) {
         // Create a new token for the company
@@ -670,20 +668,19 @@ public class OperatingRound_1870 extends OperatingRound {
 
     @Override
     public void executeDestinationActions(List<PublicCompany> companies) {
-//NOT triggered here
+        // NOT triggered here
     }
 
- 
     @Override
     protected boolean finishTurnSpecials() {
-if (checkConnections()) {
+        if (checkConnections()) {
             return false; // Suspend the current round to let the Connection Run interrupt take over
         }
-                return super.finishTurnSpecials();
+        return super.finishTurnSpecials();
     }
 
-private boolean checkConnections() {
-            PublicCompany currentCompany = getOperatingCompany();
+    private boolean checkConnections() {
+        PublicCompany currentCompany = getOperatingCompany();
         java.util.List<PublicCompany> eligibleCompanies = new java.util.ArrayList<>();
 
         for (PublicCompany comp : getRoot().getCompanyManager().getAllPublicCompanies()) {
@@ -696,7 +693,8 @@ private boolean checkConnections() {
             }
         }
 
-if (eligibleCompanies.isEmpty()) return false;
+        if (eligibleCompanies.isEmpty())
+            return false;
 
         // Sort by share price descending
         eligibleCompanies.sort((c1, c2) -> {
@@ -722,7 +720,6 @@ if (eligibleCompanies.isEmpty()) return false;
         return false;
     }
 
-    
     private boolean hasReachedDestination(PublicCompany company) {
 
         // Re-enable the guard to prevent multiple triggers
@@ -740,107 +737,25 @@ if (eligibleCompanies.isEmpty()) return false;
             return false;
         }
 
-        int maxCities = 0;
-        for (net.sf.rails.game.Train t : company.getTrains()) {
-            net.sf.rails.algorithms.NetworkTrain nt = net.sf.rails.algorithms.NetworkTrain.createFromRailsTrain(t);
-            if (nt != null) {
-                int len = Math.max(nt.getMajors(), nt.getMinors());
-                if (len > maxCities)
-                    maxCities = len;
+        // Replace the flawed DFS with the engine's true RevenueAdapter.
+        // This ensures track geometry (e.g., sharp curves, reversals) is correctly
+        // enforced,
+        // preventing false positives from subsequent tokens.
+        DestinationModifier_1870.testMode = true;
+        try {
+            net.sf.rails.algorithms.RevenueAdapter ra = net.sf.rails.algorithms.RevenueAdapter
+                    .createRevenueAdapter(getRoot(), company, net.sf.rails.game.Phase.getCurrent(this));
+            if (ra != null) {
+                ra.initRevenueCalculator(true); // Enforce multigraph evaluation
+                int maxRev = ra.calculateRevenue();
+                return maxRev >= 999999;
             }
-        }
-
-        if (maxCities == 0) {
-            return false;
-        }
-
-        net.sf.rails.algorithms.NetworkAdapter networkAdapter = net.sf.rails.algorithms.NetworkAdapter
-                .create(getRoot());
-        net.sf.rails.algorithms.NetworkGraph graph = networkAdapter.getRouteGraphCached(company, false);
-
-        if (graph == null) {
-            return false;
-        }
-
-        java.util.Set<net.sf.rails.algorithms.NetworkVertex> validStarts = new java.util.HashSet<>();
-
-        // STRICTLY ONLY START FROM THE HOME STATION
-        for (net.sf.rails.algorithms.NetworkVertex v : graph.getCompanyBaseTokenVertexes(company)) {
-            if (v.getHex().equals(homeHex)) {
-                validStarts.add(v);
-            }
-        }
-
-        if (validStarts.isEmpty()) {
-            return false;
-        }
-
-        org.jgrapht.graph.SimpleGraph<net.sf.rails.algorithms.NetworkVertex, net.sf.rails.algorithms.NetworkEdge> jGraph = graph
-                .getGraph();
-
-        for (net.sf.rails.algorithms.NetworkVertex startNode : validStarts) {
-            // Pass the starting path string to trace the route
-            if (dfsFindDestination(jGraph, startNode, destHex, maxCities, new java.util.HashSet<>(),
-                    new java.util.HashSet<>(), 1, homeHex.getId() + "[C:1]")) {
-                return true;
-            }
+        } finally {
+            DestinationModifier_1870.testMode = false;
         }
 
         return false;
+        // --- END FIX ---
     }
-
-    private boolean dfsFindDestination(
-            org.jgrapht.graph.SimpleGraph<net.sf.rails.algorithms.NetworkVertex, net.sf.rails.algorithms.NetworkEdge> graph,
-            net.sf.rails.algorithms.NetworkVertex current, MapHex destination, int maxCities,
-            java.util.Set<net.sf.rails.algorithms.NetworkVertex> visitedVertices,
-            java.util.Set<net.sf.rails.algorithms.NetworkEdge> visitedEdges,
-            int cityCount, String pathLog) {
-
-        // Only consider the destination reached if we hit the actual city/town/offboard
-        // node inside the hex
-        if (current.getHex() != null && current.getHex().equals(destination)) {
-            if (current.isMajor() || current.isMinor() || current.isStation()) {
-                log.info(">>> DEBUG: FINAL PATH: {}", pathLog);
-                return true;
-            }
-        }
-
-        if (current.isStation() && current.isSink() && !visitedVertices.isEmpty()) {
-            return false; // Blocked by another company's token
-        }
-
-        visitedVertices.add(current);
-
-        for (net.sf.rails.algorithms.NetworkEdge edge : graph.edgesOf(current)) {
-            if (visitedEdges.contains(edge))
-                continue;
-
-            net.sf.rails.algorithms.NetworkVertex neighbor = org.jgrapht.Graphs.getOppositeVertex(graph, edge, current);
-            if (visitedVertices.contains(neighbor))
-                continue;
-
-            int newCityCount = cityCount;
-            String appendLog = neighbor.getHex() != null ? neighbor.getHex().getId() : "?";
-
-            // Count cities and towns accurately
-            if (neighbor.isMajor() || neighbor.isMinor()) {
-                newCityCount++;
-                appendLog += "[C:" + newCityCount + "]";
-            }
-
-            if (newCityCount <= maxCities) {
-                visitedEdges.add(edge);
-                if (dfsFindDestination(graph, neighbor, destination, maxCities, visitedVertices, visitedEdges,
-                        newCityCount, pathLog + " -> " + appendLog)) {
-                    return true;
-                }
-                visitedEdges.remove(edge);
-            }
-        }
-
-        visitedVertices.remove(current);
-        return false;
-    }
-
 
 }
