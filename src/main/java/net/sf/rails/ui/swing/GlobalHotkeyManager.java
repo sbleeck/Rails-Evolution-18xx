@@ -43,6 +43,9 @@ public class GlobalHotkeyManager implements KeyEventDispatcher {
             if (e.getKeyCode() == KeyEvent.VK_A) {
                 isAKeyPressed = false;
             }
+            if (e.getKeyCode() == KeyEvent.VK_SPACE) {
+                return true; 
+            }
             return false; // Always let release events propagate
         }
 
@@ -120,6 +123,12 @@ public class GlobalHotkeyManager implements KeyEventDispatcher {
                 triggerBuyIPOTrain();
             }
             return true; // Consume the event even if locked
+        }
+        if (keyCode == KeyEvent.VK_SPACE) {
+            if (gameUIManager.getORUIManager() != null) {
+                gameUIManager.getORUIManager().toggleMapMarkings();
+            }
+            return true; 
         }
 
         return false;

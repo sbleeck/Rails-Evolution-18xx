@@ -613,9 +613,26 @@ public void hideAllOverlays() {
         return showMapMarkings;
     }
 
-    public void toggleMapMarkings() {
+public void toggleMapMarkings() {
+// --- START FIX ---
         this.showMapMarkings = !this.showMapMarkings;
-        // The repaint is handled by your existing Spacebar hotkey logic
+        
+        this.showHexNames = this.showMapMarkings;
+        this.showFriendlyHexes = this.showMapMarkings;
+        this.showDestinationMarkers = this.showMapMarkings;
+        this.showHomeIdentifiers = this.showMapMarkings;
+        this.showRevenueRoutes = this.showMapMarkings;
+
+        updateCompanyHighlights();
+        
+        if (orPanel != null) {
+            orPanel.redrawRoutes();
+        }
+
+        if (map != null) {
+            map.repaintAll(new Rectangle(map.getSize()));
+        }
+// --- END FIX ---
     }
 
     public void processAction(String command, List<PossibleAction> actions, Component source) {
