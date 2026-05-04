@@ -97,8 +97,22 @@ GameManager gm = revenueAdapter.getRoot().getGameManager();
         return false;
     }
 
+@Override
     public int predictionValue(List<RevenueTrainRun> runs) {
-        return calculateDestinationBonus(runs);
+        int actualBonus = calculateDestinationBonus(runs);
+        
+        // The DFS RevenueCalculator uses predictionValue to aggressively prune branches.
+        // Because the connection run requires a specific path that might have lower 
+        // base values until the destination is reached, the engine will prematurely 
+        // prune the correct path if we do not provide an optimistic prediction.
+        if (isConnectionRunRound && actualBonus == 0) {
+            // If we haven't secured the bonus yet, add a safe optimistic upper bound
+            // to keep the search branch alive so subsequent trains can attempt the connection.
+            // 200 is a safe upper bound for a doubled late-game destination city.
+            return 200; 
+        }
+        
+        return actualBonus;
     }
 
     @Override

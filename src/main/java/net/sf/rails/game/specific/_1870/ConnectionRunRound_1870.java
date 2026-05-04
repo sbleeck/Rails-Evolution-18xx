@@ -15,11 +15,11 @@ public class ConnectionRunRound_1870 extends OperatingRound_1870 {
 
     public ConnectionRunRound_1870(GameManager parent, String id) {
         super(parent, id);
-        
+
         this.steps = new GameDef.OrStep[] {
-            GameDef.OrStep.INITIAL, 
-            GameDef.OrStep.CALC_REVENUE, 
-            GameDef.OrStep.FINAL
+                GameDef.OrStep.INITIAL,
+                GameDef.OrStep.CALC_REVENUE,
+                GameDef.OrStep.FINAL
         };
     }
 
@@ -37,23 +37,26 @@ public class ConnectionRunRound_1870 extends OperatingRound_1870 {
         @Override
         public Object clone() {
             int[] allowedRevenueActions = new int[] { SetDividend.PAYOUT, SetDividend.WITHHOLD };
-            TargetedSetDividend clone = new TargetedSetDividend(getRoot(), this.getActualRevenue(), allowedRevenueActions);
+            TargetedSetDividend clone = new TargetedSetDividend(getRoot(), this.getActualRevenue(),
+                    allowedRevenueActions);
             clone.setActualCompanyTreasuryRevenue(this.getActualCompanyTreasuryRevenue());
             clone.setRevenueAllocation(this.getRevenueAllocation());
             return clone;
         }
-       
 
         @Override
         public boolean equals(Object o) {
-            if (this == o) return true;
-            if (o == null || !(o instanceof SetDividend)) return false;
+            if (this == o)
+                return true;
+            if (o == null || !(o instanceof SetDividend))
+                return false;
             SetDividend other = (SetDividend) o;
-            
-            // Relax the getClass() check to allow UI clones to safely match the engine's original action
+
+            // Relax the getClass() check to allow UI clones to safely match the engine's
+            // original action
             return this.getCompany().equals(other.getCompany()) &&
-                   this.getActualRevenue() == other.getActualRevenue() &&
-                   this.getRevenueAllocation() == other.getRevenueAllocation();
+                    this.getActualRevenue() == other.getActualRevenue() &&
+                    this.getRevenueAllocation() == other.getRevenueAllocation();
         }
 
         @Override
@@ -107,8 +110,9 @@ public class ConnectionRunRound_1870 extends OperatingRound_1870 {
         }
     }
 
-    @Override
+@Override
     public void start() {
+
         String compId = connectionCompanyId.value();
         if (compId != null && !compId.isEmpty()) {
             PublicCompany connectionCompany = getRoot().getCompanyManager().getPublicCompany(compId);
@@ -118,6 +122,7 @@ public class ConnectionRunRound_1870 extends OperatingRound_1870 {
             }
         }
         super.start();
+
     }
 
     @Override
@@ -144,9 +149,15 @@ public class ConnectionRunRound_1870 extends OperatingRound_1870 {
             // 1870 Rule: Connection runs do not allow Half Dividends
             int[] allowedRevenueActions = new int[] { SetDividend.PAYOUT, SetDividend.WITHHOLD };
 
-            SetDividend modifiedAction = new TargetedSetDividend(getRoot(), originalAction.getActualRevenue(), allowedRevenueActions);
+            SetDividend modifiedAction = new TargetedSetDividend(getRoot(), originalAction.getActualRevenue(),
+                    allowedRevenueActions);
             modifiedAction.setActualRevenue(originalAction.getActualRevenue());
 
+            possibleActions.add(modifiedAction);
+        } else {
+            // Since the RUN_TRAINS step is bypassed, inject a default action
+            int[] allowedRevenueActions = new int[] { SetDividend.PAYOUT, SetDividend.WITHHOLD };
+            TargetedSetDividend modifiedAction = new TargetedSetDividend(getRoot(), 0, allowedRevenueActions);
             possibleActions.add(modifiedAction);
         }
     }
@@ -164,8 +175,7 @@ public class ConnectionRunRound_1870 extends OperatingRound_1870 {
                         javax.swing.JOptionPane.QUESTION_MESSAGE,
                         null,
                         null,
-                        String.valueOf(sdAction.getActualRevenue())
-                );
+                        String.valueOf(sdAction.getActualRevenue()));
 
                 if (input == null) {
                     return false; // Abort if user cancels
@@ -198,4 +208,6 @@ public class ConnectionRunRound_1870 extends OperatingRound_1870 {
     public String getRoundName() {
         return "Connection Run";
     }
+
+
 }

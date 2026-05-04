@@ -200,19 +200,19 @@ public class OperatingRound_1870 extends OperatingRound {
     public boolean setPossibleActions() {
         boolean result = super.setPossibleActions();
 
-// 1870 Rule: MKT cannot be bought by a public company.
-        rails.game.action.PossibleAction actionToRemove = null;
-        for (rails.game.action.PossibleAction action : possibleActions.getList()) {
-            if (action instanceof BuyPrivate) {
-                if ("MKT".equals(((BuyPrivate) action).getPrivateCompany().getId())) {
-                    actionToRemove = action;
-                    break;
-                }
-            }
-        }
-        if (actionToRemove != null) {
-            possibleActions.remove(actionToRemove);
-        }
+// // 1870 Rule: MKT cannot be bought by a public company.
+//         rails.game.action.PossibleAction actionToRemove = null;
+//         for (rails.game.action.PossibleAction action : possibleActions.getList()) {
+//             if (action instanceof BuyPrivate) {
+//                 if ("MKT".equals(((BuyPrivate) action).getPrivateCompany().getId())) {
+//                     actionToRemove = action;
+//                     break;
+//                 }
+//             }
+//         }
+        // if (actionToRemove != null) {
+        //     possibleActions.remove(actionToRemove);
+        // }
         
         Phase phase = Phase.getCurrent(this);
         if (phase != null && "1".equals(phase.toText())) {
@@ -611,6 +611,21 @@ public class OperatingRound_1870 extends OperatingRound {
                 destToken.setValue(0); // The doubling effect will be handled by the revenue calculator
                 destHex.layBonusToken(destToken, getRoot().getPhaseManager());
 
+                // We also need to add a standard BaseToken so the network graph
+                // treats this station as a valid base token for future runs.
+                net.sf.rails.game.BaseToken routingToken = net.sf.rails.game.BaseToken.create(company);
+                company.getBaseTokensModel().addBaseToken(routingToken, false);
+                if (destHex.getStops() != null && !destHex.getStops().isEmpty()) {
+                    rails.game.action.LayBaseToken forceLay = new rails.game.action.LayBaseToken(getRoot(),
+                            rails.game.action.LayBaseToken.FORCED_LAY);
+                    forceLay.setCompany(company);
+                    forceLay.setChosenHex(destHex);
+                    forceLay.setChosenStation(destHex.getStops().iterator().next().getRelatedStationNumber());
+                    forceLay.setCost(0);
+                    layBaseToken(forceLay);
+
+                }
+
                 net.sf.rails.common.ReportBuffer.add(this,
                         company.getId() + " places its destination marker for free on " + destHex.getId() + ".");
             } else {
@@ -620,6 +635,29 @@ public class OperatingRound_1870 extends OperatingRound {
             }
         }
     }
+
+
+    @Override
+    public boolean layBaseToken(rails.game.action.LayBaseToken action) {
+        // Intercept forced token lays for the 1870 destination run
+        if (action.getType() == rails.game.action.LayBaseToken.FORCED_LAY) {
+            net.sf.rails.game.PublicCompany company = action.getCompany();
+            net.sf.rails.game.MapHex hex = action.getChosenHex();
+            net.sf.rails.game.Stop stop = action.getChosenStop();
+
+            // Bypass the parent class validation checks (slot capacity, already present, etc.)
+            // and forcefully lay the token to satisfy 1870 destination rules.
+            if (hex.layBaseToken(company, stop)) {
+                company.layBaseToken(hex, 0); // Execute the lay at $0 cost
+                return true;
+            }
+            return false;
+        }
+        
+        // For all other normal token lays, defer to the standard engine rules
+        return super.layBaseToken(action);
+    }
+    
 
     private void addExtraStationMarker(PublicCompany company) {
         // Create a new token for the company
@@ -638,12 +676,14 @@ public class OperatingRound_1870 extends OperatingRound {
  
     @Override
     protected boolean finishTurnSpecials() {
-        checkConnections();
-        return super.finishTurnSpecials();
+if (checkConnections()) {
+            return false; // Suspend the current round to let the Connection Run interrupt take over
+        }
+                return super.finishTurnSpecials();
     }
 
-    private void checkConnections() {
-        PublicCompany currentCompany = getOperatingCompany();
+private boolean checkConnections() {
+            PublicCompany currentCompany = getOperatingCompany();
         java.util.List<PublicCompany> eligibleCompanies = new java.util.ArrayList<>();
 
         for (PublicCompany comp : getRoot().getCompanyManager().getAllPublicCompanies()) {
@@ -656,7 +696,7 @@ public class OperatingRound_1870 extends OperatingRound {
             }
         }
 
-        if (eligibleCompanies.isEmpty()) return;
+if (eligibleCompanies.isEmpty()) return false;
 
         // Sort by share price descending
         eligibleCompanies.sort((c1, c2) -> {
@@ -677,7 +717,9 @@ public class OperatingRound_1870 extends OperatingRound {
             if (currentEligible) {
                 ((GameManager_1870) gameManager).startConnectionRunRound(this, currentCompany);
             }
+            return true; // Indicates we triggered an interrupt
         }
+        return false;
     }
 
     

@@ -534,7 +534,7 @@ g.setColor(State.HIGHLIGHT_PURPLE.getColor());
                 float scaledFontSize = (float) Math.max(3.0, 7.0 * dimensions.zoomFactor);
                 g.setFont(new Font("SansSerif", Font.PLAIN, 12).deriveFont(scaledFontSize));
 
-                
+
                 FontMetrics fontMetrics = g.getFontMetrics();
                 Color oldColor = g.getColor();
                 g.setColor(Color.BLACK);
@@ -834,7 +834,7 @@ if (getHex().isPreprintedTileCurrent() || !isTilePainted()) {
                     Stroke oldStroke = g.getStroke();
                     
 g.setColor(new Color(64, 164, 223, 100)); // Lighter alpha to let track show through
-                    g.setStroke(new BasicStroke(16.0f * (float)dimensions.zoomFactor, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
+                    g.setStroke(new BasicStroke(10.0f * (float)dimensions.zoomFactor, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
                     for(Shape s : shapes) g.draw(s);
                     
                     g.setColor(new Color(20, 100, 180, 140));
@@ -881,7 +881,7 @@ g.setColor(new Color(64, 164, 223, 100)); // Lighter alpha to let track show thr
         Stroke oldStroke = g2d.getStroke();
 
         g2d.setColor(new Color(64, 164, 223, 180)); // Translucent river blue
-        g2d.setStroke(new BasicStroke(12.0f * (float)dimensions.zoomFactor, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
+        g2d.setStroke(new BasicStroke(8.0f * (float)dimensions.zoomFactor, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
         g2d.draw(new Line2D.Double(start.get2D(), end.get2D()));
 
         g2d.setColor(oldColor);
