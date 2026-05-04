@@ -83,6 +83,18 @@ public class ORUIManager implements DialogOwner {
 
     private boolean showHomeIdentifiers = true;
     private boolean showRevenueRoutes = true;
+private boolean showFancyCityValues = true; // Default to off
+
+    public boolean isShowFancyCityValues() {
+        return showFancyCityValues;
+    }
+
+    public void toggleFancyCityValues() {
+        this.showFancyCityValues = !this.showFancyCityValues;
+        if (map != null) {
+            map.repaintAll(new Rectangle(map.getSize()));
+        }
+    }
 
     public boolean isShowHomeIdentifiers() {
         return showHomeIdentifiers;
@@ -582,6 +594,7 @@ public void hideAllOverlays() {
         this.showDestinationMarkers = false;
         this.showHomeIdentifiers = false;
         this.showRevenueRoutes = false;
+        this.showFancyCityValues = false;
 
         // Synchronize internal highlight logic and train paths[cite: 1, 3]
         updateCompanyHighlights();

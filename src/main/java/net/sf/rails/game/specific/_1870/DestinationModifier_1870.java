@@ -36,10 +36,8 @@ public class DestinationModifier_1870 implements RevenueDynamicModifier {
 GameManager gm = revenueAdapter.getRoot().getGameManager();
         this.isConnectionRunRound = (gm.getCurrentRound() instanceof ConnectionRunRound_1870);
 
-if (this.isConnectionRunRound || testMode) {
-                this.destHex = comp.getDestinationHex();
-            this.homeHex = comp.getHomeHexes().isEmpty() ? null : comp.getHomeHexes().get(0);
-        }
+this.destHex = comp.getDestinationHex();
+        this.homeHex = comp.getHomeHexes().isEmpty() ? null : comp.getHomeHexes().get(0);
 
 // Active if it's the Connection Run, testing phase, or destination reached
         return comp.hasReachedDestination() || this.isConnectionRunRound || testMode;
@@ -60,7 +58,7 @@ if (this.isConnectionRunRound || testMode) {
         // No path adjustment is necessary for the destination modifier
     }
 
-    private int calculateDestinationBonus(List<RevenueTrainRun> runs) {
+private int calculateDestinationBonus(List<RevenueTrainRun> runs) {
         int totalBonus = 0;
         if (runs == null) return 0;
         
@@ -71,65 +69,69 @@ if (this.isConnectionRunRound || testMode) {
             List<NetworkVertex> vertices = run.getRunVertices();
             if (vertices == null || vertices.isEmpty()) continue;
 
-            // The rules require the destination to be at the END of a run.
-            // A train run path lists vertices sequentially, so we check index 0 and the last index.
             NetworkVertex startNode = vertices.get(0);
             NetworkVertex endNode = vertices.get(vertices.size() - 1);
+            
+boolean startsAtDest = (destHex != null && startNode.getHex() == destHex);
+            boolean endsAtDest = (destHex != null && endNode.getHex() == destHex);
 
-            if (checkHexForBonus(startNode, destTokenName)) {
-                totalBonus += revenueAdapter.getVertexValue(startNode, run.getTrain(), phase);
-            } else if (vertices.size() > 1 && checkHexForBonus(endNode, destTokenName)) {
-                totalBonus += revenueAdapter.getVertexValue(endNode, run.getTrain(), phase);
+            if (startsAtDest || (vertices.size() > 1 && endsAtDest)) {
+                int runBonus = 0;
+                MapHex targetHex = startsAtDest ? startNode.getHex() : endNode.getHex();
+                
+                // Edge vertices often return 0 value. We must scan the hex's vertices 
+                // within the run to find the actual station value.
+                for (NetworkVertex v : vertices) {
+                    if (v.getHex() == targetHex) {
+                        int val = revenueAdapter.getVertexValue(v, run.getTrain(), phase);
+                        if (val > runBonus) {
+                            runBonus = val;
+                        }
+                    }
+                }
+                totalBonus += runBonus;
+                
+                // Dynamically update the token's UI value to stop it from showing '0' on the map
+                if (runBonus > 0 && targetHex != null && targetHex.getBonusTokens() != null) {
+                    for (BonusToken t : targetHex.getBonusTokens()) {
+                        if (destTokenName.equals(t.getName())) {
+                            t.setValue(runBonus);
+                        }
+                    }
+                }
             }
         }
         return totalBonus;
     }
+    
 
-    private boolean checkHexForBonus(NetworkVertex v, String destTokenName) {
-        if (v == null || v.getHex() == null) return false;
-        MapHex hex = v.getHex();
-        if (hex.getBonusTokens() == null) return false;
-        
-        for (BonusToken t : hex.getBonusTokens()) {
-            if (destTokenName.equals(t.getName())) {
-                return true;
-            }
-        }
-        return false;
-    }
 
 @Override
     public int predictionValue(List<RevenueTrainRun> runs) {
-        int actualBonus = calculateDestinationBonus(runs);
-        
-        // The DFS RevenueCalculator uses predictionValue to aggressively prune branches.
-        // Because the connection run requires a specific path that might have lower 
-        // base values until the destination is reached, the engine will prematurely 
-        // prune the correct path if we do not provide an optimistic prediction.
-        if (isConnectionRunRound && actualBonus == 0) {
-            // If we haven't secured the bonus yet, add a safe optimistic upper bound
-            // to keep the search branch alive so subsequent trains can attempt the connection.
-            // 200 is a safe upper bound for a doubled late-game destination city.
-            return 200; 
+        if (testMode) {
+            return 999999;
         }
-        
-        return actualBonus;
+        // Return authentic bonus. Do not hack prediction bounds for normal rounds.
+        return calculateDestinationBonus(runs);
     }
 
-    @Override
+@Override
     public int evaluationValue(List<RevenueTrainRun> runs, boolean isFinal) {
-        if (!isValidConnectionRun(runs)) {
-            return -999999;
-        }
+        // testMode relies on this massive value to confirm a valid connection exists
         if (testMode) {
-            return 999999; // Massive boost to guarantee it gets selected during testing
+            return isValidConnectionRun(runs) ? 999999 : 0;
         }
-        calculatedBonus = calculateDestinationBonus(runs);
-        return calculatedBonus;
+        
+        int bonus = calculateDestinationBonus(runs);
+        if (isFinal) {
+            calculatedBonus = bonus;
+        }
+        return bonus;
     }
+
 
     private boolean isValidConnectionRun(List<RevenueTrainRun> runs) {
-if (!isConnectionRunRound && !testMode) return true;
+if (destHex == null || homeHex == null) return false;
         if (destHex == null || homeHex == null) return false;
         
         for (RevenueTrainRun run : runs) {

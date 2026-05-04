@@ -355,13 +355,15 @@ public abstract class HexMap implements MouseListener, MouseMotionListener {
             } catch (ConfigurationException e) {
 
             } finally {
-                if (colour1 == null) colour1 = Color.CYAN;
-                if (colour2 == null) colour2 = Color.PINK;
-                if (colour3 == null) colour3 = Color.ORANGE;
-                if (colour4 == null) colour4 = Color.GRAY;
+// Vibrant, distinct colors with slight transparency (Alpha 200/255)
+                // This prevents the wider lines from completely obscuring the track below.
+                if (colour1 == null) colour1 = new Color(255, 50, 50, 200);   // Vibrant Red
+                if (colour2 == null) colour2 = new Color(50, 200, 255, 200);  // Bright Cyan
+                if (colour3 == null) colour3 = new Color(255, 150, 0, 200);   // Neon Orange
+                if (colour4 == null) colour4 = new Color(150, 50, 255, 200);  // Deep Purple
             }
         }
-        private static final int STROKE_WIDTH = 5;
+        private static final int STROKE_WIDTH = 10;
         private static final int STROKE_CAP = BasicStroke.CAP_ROUND;
         private static final int STROKE_JOIN = BasicStroke.JOIN_BEVEL;
 

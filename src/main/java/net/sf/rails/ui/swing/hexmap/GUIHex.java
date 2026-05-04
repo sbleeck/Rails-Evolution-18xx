@@ -37,6 +37,7 @@ import net.sf.rails.game.state.Observable;
 import net.sf.rails.game.state.Observer;
 import net.sf.rails.ui.swing.GUIGlobals;
 import net.sf.rails.ui.swing.GUIToken;
+import net.sf.rails.ui.swing.ORUIManager;
 
 import com.google.common.collect.Lists;
 import java.util.Objects; // Fügt den fehlenden Import hinzu
@@ -725,6 +726,86 @@ public class GUIHex implements Observer {
         // Only draw Milestone squares if the toggle is enabled
         if (hexMap.getOrUIManager() != null && hexMap.getOrUIManager().isShowDestinationMarkers()) {
             drawDestinationMilestones(g);
+        }
+        
+
+
+// COMICAL CITY VALUES: Show if toggled ON and routes are actually plotted[cite: 5, 6].
+        ORUIManager manager = hexMap.getOrUIManager();
+        if (manager != null && manager.isShowFancyCityValues()) {
+            
+            // source of truth: does the Map have paths to draw?
+            java.util.List<java.awt.geom.GeneralPath> activePaths = hexMap.getTrainPaths();
+            
+            if (activePaths != null && !activePaths.isEmpty()) {
+                paintFancyCityValues(g);
+            }
+        }
+
+
+        
+    }
+
+    private void paintFancyCityValues(Graphics2D g) {
+        int hexValue = 0;
+
+        // 1. Check for phase-specific hex value (e.g., standard off-board areas or upgraded tiles)
+        try {
+            if (getHex().hasValuesPerPhase()) {
+                hexValue = getHex().getCurrentValueForPhase(hexMap.getPhase());
+            }
+        } catch (Exception e) {}
+
+        // 2. If no phase-specific hex value, check the individual stations on the hex
+        if (hexValue == 0 && getHex().getStops() != null) {
+            for (Stop stop : getHex().getStops()) {
+                if (stop.getRelatedStation() != null) {
+                    int val = stop.getRelatedStation().getValue();
+                    if (val > hexValue) hexValue = val; // Grab the maximum value available on the hex
+                }
+            }
+        }
+
+        if (getHex().getBonusTokens() != null) {
+            for (BonusToken token : getHex().getBonusTokens()) {
+                hexValue += token.getValue();
+            }
+        }
+
+        // 3. Draw the value if it exists
+        if (hexValue > 0) {
+            Font oldFont = g.getFont();
+            Color oldColor = g.getColor();
+            Stroke oldStroke = g.getStroke();
+
+            // Comically large font (scaling with zoom, base size 36)
+            int fontSize = (int) Math.max(20, Math.round(36 * dimensions.zoomFactor));
+            g.setFont(new Font("SansSerif", Font.BOLD, fontSize));
+
+            String text = String.valueOf(hexValue);
+            FontMetrics fm = g.getFontMetrics();
+            int textWidth = fm.stringWidth(text);
+            int textHeight = fm.getAscent();
+
+            // Center exactly on the hex
+            float textX = (float) (dimensions.center.getX() - textWidth / 2.0);
+            float textY = (float) (dimensions.center.getY() + textHeight / 2.0 - fm.getDescent());
+
+            // Draw a thick black "halo" for extreme contrast
+            g.setColor(Color.BLACK);
+            int offset = Math.max(1, (int)(2 * dimensions.zoomFactor));
+            g.drawString(text, textX - offset, textY - offset);
+            g.drawString(text, textX - offset, textY + offset);
+            g.drawString(text, textX + offset, textY - offset);
+            g.drawString(text, textX + offset, textY + offset);
+
+            // Draw the bright yellow core
+            g.setColor(Color.YELLOW);
+            g.drawString(text, textX, textY);
+
+            g.setFont(oldFont);
+            g.setColor(oldColor);
+            g.setStroke(oldStroke);
         }
     }
 

@@ -607,7 +607,6 @@ return privateComp.getOwner() == company.getPresident();
                 // Place as a BonusToken to sit on the edge and bypass city slot limits
                 net.sf.rails.game.BonusToken destToken = net.sf.rails.game.BonusToken.create(company);
                 destToken.setName(company.getId() + "_Dest");
-                destToken.setValue(0); // The doubling effect will be handled by the revenue calculator
                 destHex.layBonusToken(destToken, getRoot().getPhaseManager());
 
                 // We also need to add a standard BaseToken so the network graph

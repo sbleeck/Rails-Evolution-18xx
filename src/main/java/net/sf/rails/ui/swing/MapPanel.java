@@ -377,39 +377,31 @@ public class MapPanel extends JPanel {
     layersBtn.addActionListener(new ActionListener() {
         @Override
         public void actionPerformed(ActionEvent e) {
-            JPopupMenu menu = new JPopupMenu();
-            
-            // Checkbox for Hex Names
-            JCheckBoxMenuItem itemHexNames = new JCheckBoxMenuItem("Hex Names", orUIManager.isShowHexNames());
-            itemHexNames.addActionListener(ae -> orUIManager.toggleHexNames());
-            
-           JCheckBoxMenuItem itemTerrain = new JCheckBoxMenuItem("Terrain Costs", orUIManager.isShowTerrainCosts());
-            itemTerrain.addActionListener(ae -> orUIManager.toggleTerrainCosts());
-            JCheckBoxMenuItem itemFriendly = new JCheckBoxMenuItem("Friendly Hexes", orUIManager.isShowFriendlyHexes());
-        itemFriendly.addActionListener(ae -> orUIManager.toggleFriendlyHexes());
+           
 
-        JCheckBoxMenuItem itemDest = new JCheckBoxMenuItem("Destination Markers", orUIManager.isShowDestinationMarkers());
-            itemDest.addActionListener(ae -> orUIManager.toggleDestinationMarkers());
+JPopupMenu menu = new JPopupMenu();
+                
+                menu.add(new JCheckBoxMenuItem("Hex Names", orUIManager.isShowHexNames()))
+                    .addActionListener(ae -> orUIManager.toggleHexNames());
+                menu.add(new JCheckBoxMenuItem("Terrain Costs", orUIManager.isShowTerrainCosts()))
+                    .addActionListener(ae -> orUIManager.toggleTerrainCosts());
+                menu.add(new JCheckBoxMenuItem("Friendly Hexes", orUIManager.isShowFriendlyHexes()))
+                    .addActionListener(ae -> orUIManager.toggleFriendlyHexes());
+                menu.add(new JCheckBoxMenuItem("Destination Markers", orUIManager.isShowDestinationMarkers()))
+                    .addActionListener(ae -> orUIManager.toggleDestinationMarkers());
+                menu.add(new JCheckBoxMenuItem("Home Identifiers", orUIManager.isShowHomeIdentifiers()))
+                    .addActionListener(ae -> orUIManager.toggleHomeIdentifiers());
+                menu.add(new JCheckBoxMenuItem("Revenue Routes", orUIManager.isShowRevenueRoutes()))
+                    .addActionListener(ae -> orUIManager.toggleRevenueRoutes());
+                menu.add(new JCheckBoxMenuItem("Fancy City Values", orUIManager.isShowFancyCityValues()))
+                    .addActionListener(ae -> orUIManager.toggleFancyCityValues());
+                
+                menu.addSeparator();
+                JMenuItem hideAll = new JMenuItem("Hide All Overlays");
+                hideAll.addActionListener(ae -> orUIManager.hideAllOverlays());
+                menu.add(hideAll);
 
 
-            JCheckBoxMenuItem itemHome = new JCheckBoxMenuItem("Home Identifiers", orUIManager.isShowHomeIdentifiers());
-            itemHome.addActionListener(ae -> orUIManager.toggleHomeIdentifiers());
-
-            JCheckBoxMenuItem itemRoutes = new JCheckBoxMenuItem("Revenue Routes", orUIManager.isShowRevenueRoutes());
-            itemRoutes.addActionListener(ae -> orUIManager.toggleRevenueRoutes());
-
-
-            menu.add(itemHexNames);
-            menu.add(itemTerrain);
-            menu.add(itemFriendly);
-            menu.add(itemDest);
-            menu.add(itemHome);
-            menu.add(itemRoutes);
-            menu.addSeparator(); // Visual break for the master action
-            JMenuItem itemHideAll = new JMenuItem("Hide All Overlays");
-            itemHideAll.addActionListener(ae -> orUIManager.hideAllOverlays());
-            
-            menu.add(itemHideAll);
             // Show menu relative to the button
             menu.show(layersBtn, 0, layersBtn.getHeight());
         }
