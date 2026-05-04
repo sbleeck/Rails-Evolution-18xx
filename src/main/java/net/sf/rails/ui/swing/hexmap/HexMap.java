@@ -31,7 +31,7 @@ import java.awt.font.FontRenderContext;
 import java.awt.geom.AffineTransform;
 import java.awt.Shape;
 import net.sf.rails.game.PublicCompany; // Added for the new method signature
-import net.sf.rails.game.Token;       // Added to check tokens
+import net.sf.rails.game.Token; // Added to check tokens
 
 import net.sf.rails.common.Config;
 import net.sf.rails.common.parser.ConfigurationException;
@@ -57,7 +57,6 @@ import java.awt.font.FontRenderContext;
 import java.awt.geom.AffineTransform;
 import java.awt.Shape;
 
-
 /**
  * Base class that stores common info for HexMap independant of Hex
  * orientations. The hex map manages several layers. Content is seperated in
@@ -80,21 +79,23 @@ public abstract class HexMap implements MouseListener, MouseMotionListener {
 
         /**
          * @param rOp Rectangle to be added to the set. Only added if not
-         * contained in a rectangle of the set. If added, all of the set's
-         * rectangles which are a sub-area of this rectangle are dropped (in
-         * order to keep the rectangle list as small as possible).
+         *            contained in a rectangle of the set. If added, all of the set's
+         *            rectangles which are a sub-area of this rectangle are dropped (in
+         *            order to keep the rectangle list as small as possible).
          */
         public void add(Rectangle rOp) {
             // exit if rectangle already contained in set of rectangles
             for (Rectangle r : rs) {
-                if (r.contains(rOp)) return;
+                if (r.contains(rOp))
+                    return;
             }
 
             // build new set (do not include rectangles contained by new
             // rectangle)
             ImmutableList.Builder<Rectangle> newRs = ImmutableList.builder();
             for (Rectangle r : rs) {
-                if (!rOp.contains(r)) newRs.add(r);
+                if (!rOp.contains(r))
+                    newRs.add(r);
             }
             newRs.add(rOp);
             rs = newRs.build();
@@ -107,7 +108,7 @@ public abstract class HexMap implements MouseListener, MouseMotionListener {
          * removed.
          *
          * @return The intersection between the given rectangle and the set of
-         * rectangles. Returns null if the intersection is empty.
+         *         rectangles. Returns null if the intersection is empty.
          */
         public Rectangle getIntersectionAndRemoveFromSet(Rectangle rOp) {
             Rectangle intersection = null;
@@ -141,7 +142,7 @@ public abstract class HexMap implements MouseListener, MouseMotionListener {
                     }
                     // region 2
                     if ((r.x + r.width) > (rOp.x + rOp.width)
-                        && r.x < (rOp.x + rOp.width)) {
+                            && r.x < (rOp.x + rOp.width)) {
                         newRs.add(new Rectangle((rOp.x + rOp.width), r.y,
                                 (r.x + r.width - rOp.x - rOp.width), r.height));
                     }
@@ -151,7 +152,7 @@ public abstract class HexMap implements MouseListener, MouseMotionListener {
                         int x2 = Math.min(r.x + r.width, rOp.x + rOp.width);
                         if (x1 < x2)
                             newRs.add(new Rectangle(x1, r.y, x2 - x1, rOp.y
-                                                                      - r.y));
+                                    - r.y));
                     }
                     // region 4
                     if ((r.y + r.height) > (rOp.y + rOp.height)) {
@@ -199,7 +200,6 @@ public abstract class HexMap implements MouseListener, MouseMotionListener {
             this.hexMap = hexMap;
         }
 
-
         @Override
         public final void repaint() {
             bufferDirtyRegions.add(new Rectangle(0, 0, getWidth(), getHeight()));
@@ -211,7 +211,6 @@ public abstract class HexMap implements MouseListener, MouseMotionListener {
             bufferDirtyRegions.add(r);
             super.repaint(r);
         }
-        
 
         @Override
         public final void paintComponent(Graphics g) {
@@ -222,16 +221,16 @@ public abstract class HexMap implements MouseListener, MouseMotionListener {
 
                 // Abort if called too early or if bounds are invalid.
                 Rectangle rectClip = g.getClipBounds();
-                if (rectClip == null) return;
+                if (rectClip == null)
+                    return;
 
                 // ensure that image buffer of this layer is valid
                 if (bufferedImage == null
-                    || bufferedImage.getWidth() != getWidth()
-                    || bufferedImage.getHeight() != getHeight()) {
+                        || bufferedImage.getWidth() != getWidth()
+                        || bufferedImage.getHeight() != getHeight()) {
                     // create new buffer image
-                    bufferedImage =
-                            new BufferedImage(getWidth(), getHeight(),
-                                    BufferedImage.TYPE_INT_ARGB);
+                    bufferedImage = new BufferedImage(getWidth(), getHeight(),
+                            BufferedImage.TYPE_INT_ARGB);
 
                     // clear information of the image buffer's dirty regions
                     bufferDirtyRegions = new RectangleSet();
@@ -246,12 +245,10 @@ public abstract class HexMap implements MouseListener, MouseMotionListener {
 
                 // determine which parts of the clip are dirty and have to be
                 // redrawn
-                Rectangle dirtyClipArea =
-                        bufferDirtyRegions.getIntersectionAndRemoveFromSet(rectClip);
+                Rectangle dirtyClipArea = bufferDirtyRegions.getIntersectionAndRemoveFromSet(rectClip);
                 if (dirtyClipArea != null) {
                     // buffer redraw is necessary
-                    Graphics2D imageGraphics =
-                            (Graphics2D) bufferedImage.getGraphics();
+                    Graphics2D imageGraphics = (Graphics2D) bufferedImage.getGraphics();
 
                     // apply the clip of the component's repaint to its image
                     // buffer
@@ -277,9 +274,8 @@ public abstract class HexMap implements MouseListener, MouseMotionListener {
                 }
 
                 // now buffer is valid and can be used
-                BufferedImage bufferedRect =
-                        bufferedImage.getSubimage(rectClip.x, rectClip.y,
-                                rectClip.width, rectClip.height);
+                BufferedImage bufferedRect = bufferedImage.getSubimage(rectClip.x, rectClip.y,
+                        rectClip.width, rectClip.height);
                 g.drawImage(bufferedRect, rectClip.x, rectClip.y, null);
             }
         }
@@ -314,7 +310,7 @@ public abstract class HexMap implements MouseListener, MouseMotionListener {
                 }
 
                 // 2. Middle Layer: Paint the Mississippi River OVER the base tiles
-                for (GUIHex hex:hexMap.getHexes()) {
+                for (GUIHex hex : hexMap.getHexes()) {
                     Rectangle hexrect = hex.getBounds();
                     if (g.hitClip(hexrect.x, hexrect.y, hexrect.width, hexrect.height)) {
                         hex.paintMississippi(g);
@@ -322,7 +318,7 @@ public abstract class HexMap implements MouseListener, MouseMotionListener {
                 }
 
                 // 3. Top Layer: Paint laid SVG Tiles (Upgrades) OVER the river
-                for (GUIHex hex:hexMap.getHexes()) {
+                for (GUIHex hex : hexMap.getHexes()) {
                     Rectangle hexrect = hex.getBounds();
                     if (g.hitClip(hexrect.x, hexrect.y, hexrect.width, hexrect.height)) {
                         if (!hex.getHex().isPreprintedTileCurrent()) {
@@ -355,12 +351,16 @@ public abstract class HexMap implements MouseListener, MouseMotionListener {
             } catch (ConfigurationException e) {
 
             } finally {
-// Vibrant, distinct colors with slight transparency (Alpha 200/255)
+                // Vibrant, distinct colors with slight transparency (Alpha 200/255)
                 // This prevents the wider lines from completely obscuring the track below.
-                if (colour1 == null) colour1 = new Color(255, 50, 50, 200);   // Vibrant Red
-                if (colour2 == null) colour2 = new Color(50, 200, 255, 200);  // Bright Cyan
-                if (colour3 == null) colour3 = new Color(255, 150, 0, 200);   // Neon Orange
-                if (colour4 == null) colour4 = new Color(150, 50, 255, 200);  // Deep Purple
+                if (colour1 == null)
+                    colour1 = new Color(255, 50, 50, 200); // Vibrant Red
+                if (colour2 == null)
+                    colour2 = new Color(50, 200, 255, 200); // Bright Cyan
+                if (colour3 == null)
+                    colour3 = new Color(255, 150, 0, 200); // Neon Orange
+                if (colour4 == null)
+                    colour4 = new Color(150, 50, 255, 200); // Deep Purple
             }
         }
         private static final int STROKE_WIDTH = 10;
@@ -388,10 +388,9 @@ public abstract class HexMap implements MouseListener, MouseMotionListener {
             Rectangle r = null;
             for (Rectangle pathRect : pathRects) {
                 // enlarge path rectangle with margin
-                Rectangle pathMarginRect =
-                        new Rectangle(pathRect.x - margin, pathRect.y - margin,
-                                pathRect.width + margin * 2, pathRect.height
-                                                             + margin * 2);
+                Rectangle pathMarginRect = new Rectangle(pathRect.x - margin, pathRect.y - margin,
+                        pathRect.width + margin * 2, pathRect.height
+                                + margin * 2);
                 if (r == null) {
                     r = pathMarginRect;
                 } else {
@@ -414,15 +413,13 @@ public abstract class HexMap implements MouseListener, MouseMotionListener {
                 if (hexMap.getTrainPaths() != null) {
                     Stroke oldStroke = g.getStroke();
                     Color oldColor = g.getColor();
-                    Stroke trainStroke =
-                            new BasicStroke((int) (STROKE_WIDTH * hexMap.getZoomFactor()),
-                                    STROKE_CAP, STROKE_JOIN);
+                    Stroke trainStroke = new BasicStroke((int) (STROKE_WIDTH * hexMap.getZoomFactor()),
+                            STROKE_CAP, STROKE_JOIN);
                     g.setStroke(trainStroke);
 
-                    Color[] trainColors =
-                            new Color[] { colour1, colour2, colour3, colour4 };
+                    Color[] trainColors = new Color[] { colour1, colour2, colour3, colour4 };
                     int color = 0;
-                    for (GeneralPath path:hexMap.getTrainPaths()) {
+                    for (GeneralPath path : hexMap.getTrainPaths()) {
                         g.setColor(trainColors[color++ % trainColors.length]);
                         g.draw(path);
                     }
@@ -489,17 +486,17 @@ public abstract class HexMap implements MouseListener, MouseMotionListener {
 
         private void drawLabel(Graphics2D g2, int index, int xCoordinate,
                 int yCoordinate, boolean letter) {
-            String label =
-                    letter ? getLetterLabel(index) : hexMap.getNumberLabel(index);
+            String label = letter ? getLetterLabel(index) : hexMap.getNumberLabel(index);
 
-           // Use FontMetrics for precise centering regardless of scale
+            // Use FontMetrics for precise centering regardless of scale
             FontMetrics fm = g2.getFontMetrics();
             int textWidth = fm.stringWidth(label);
-            
-            // Center horizontally, and offset vertically by ~1/3 ascent for baseline alignment
+
+            // Center horizontally, and offset vertically by ~1/3 ascent for baseline
+            // alignment
             int finalX = xCoordinate - (textWidth / 2);
             int finalY = yCoordinate + (fm.getAscent() / 3);
-            
+
             g2.drawString(label, finalX, finalY);
         }
 
@@ -525,8 +522,10 @@ public abstract class HexMap implements MouseListener, MouseMotionListener {
                     log.trace("hex ={}", hex);
                     Rectangle hexrect = hex.getBounds();
 
-                    if (g.hitClip(hexrect.x, hexrect.y, hexrect.width,
-                            hexrect.height)) {
+// Expand the hit check area by 50 pixels in all directions.
+                    // This prevents oversized revenue numbers from being clipped or skipped 
+                    // when they spill over hex boundaries.
+                    if (g.hitClip(hexrect.x - 50, hexrect.y - 50, hexrect.width + 100, hexrect.height + 100)) {
                         hex.paintTokensAndText(g);
                     }
                 }
@@ -595,11 +594,10 @@ public abstract class HexMap implements MouseListener, MouseMotionListener {
 
     // dynamic variables
 
-
     protected double scale;
     private int zoomStep = 10; // can be overwritten in config
     private double zoomFactor = 1; // defined dynamically if zoomStep changed
-private boolean displayHexNames = false;
+    private boolean displayHexNames = false;
     private boolean displayBuildNumbers = true;
 
     protected Dimension originalSize;
@@ -646,6 +644,7 @@ private boolean displayHexNames = false;
     public void zoomOut() {
         zoom(false);
     }
+
     public boolean getDisplayHexNames() {
         return displayHexNames;
     }
@@ -661,7 +660,6 @@ private boolean displayHexNames = false;
     public void setDisplayBuildNumbers(boolean display) {
         this.displayBuildNumbers = display;
     }
-    
 
     public void init(ORUIManager orUIManager, MapManager mapManager) {
 
@@ -728,10 +726,9 @@ private boolean displayHexNames = false;
     }
 
     protected void setupHexesGUI() {
-        ImmutableMap.Builder<MapHex, GUIHex> hexMapBuilder =
-                ImmutableMap.builder();
+        ImmutableMap.Builder<MapHex, GUIHex> hexMapBuilder = ImmutableMap.builder();
 
-        for (MapHex hex:mapManager.getHexes()) {
+        for (MapHex hex : mapManager.getHexes()) {
             GUIHex guiHex = new GUIHex(this, hex, scale);
             hexMapBuilder.put(hex, guiHex);
         }
@@ -739,7 +736,7 @@ private boolean displayHexNames = false;
     }
 
     protected void scaleHexesGUI() {
-        for (GUIHex hex:hex2gui.values()) {
+        for (GUIHex hex : hex2gui.values()) {
             hex.setDimensions(scale, zoomFactor);
         }
     }
@@ -760,7 +757,7 @@ private boolean displayHexNames = false;
     }
 
     public void setupBars() {
-       for (MapHex hex : hex2gui.keySet()) {
+        for (MapHex hex : hex2gui.keySet()) {
             HexSidesSet impassable = hex.getImpassableSides();
             if (impassable != null) {
                 for (HexSide side : impassable) {
@@ -801,7 +798,7 @@ private boolean displayHexNames = false;
         return hex2gui.get(hex);
     }
 
-    public Collection<GUIHex>  getHexes() {
+    public Collection<GUIHex> getHexes() {
         return hex2gui.values();
     }
 
@@ -858,9 +855,11 @@ private boolean displayHexNames = false;
     }
 
     public void selectHex(GUIHex clickedHex) {
-        log.debug("selecthex called for hex {}, selected was {}", clickedHex != null ? clickedHex.toText() : "null", selectedHex != null ? selectedHex.toText() : "null");
+        log.debug("selecthex called for hex {}, selected was {}", clickedHex != null ? clickedHex.toText() : "null",
+                selectedHex != null ? selectedHex.toText() : "null");
 
-        if (selectedHex == clickedHex) return;
+        if (selectedHex == clickedHex)
+            return;
         if (selectedHex != null) {
             // Hexes with only invalids do not change state
             if (selectedHex.getState() != GUIHex.State.INVALIDS) {
@@ -887,8 +886,7 @@ private boolean displayHexNames = false;
     }
 
     public List<GUIHex> getHexesByCurrentTileId(Tile tile) {
-        ImmutableList.Builder<GUIHex> hexBuilder =
-                ImmutableList.builder();
+        ImmutableList.Builder<GUIHex> hexBuilder = ImmutableList.builder();
         for (MapHex hex : hex2gui.keySet()) {
             if (hex.getCurrentTile() == tile) {
                 hexBuilder.add(hex2gui.get(hex));
@@ -897,102 +895,98 @@ private boolean displayHexNames = false;
         return hexBuilder.build();
     }
 
-
-    // FIXME: Remove the code here, only used for reference during rewrite of token code
-//    @SuppressWarnings("unchecked")
-//    public <T extends LayToken> void setAllowedTokenLays(
-//            List<T> allowedTokenLays) {
-//
-//        this.allowedTokenLays = (List<LayToken>) allowedTokenLays;
-//        allowedTokensPerHex = new HashMap<MapHex, List<LayToken>>();
-//        bonusTokenLayingEnabled = false;
-//
-//        /* Build the per-hex allowances map */
-//        for (LayToken allowance : this.allowedTokenLays) {
-//            List<MapHex> locations = allowance.getLocations();
-//            if (locations == null) {
-//                /*
-//                 * The location may be null, which means: anywhere. This is
-//                 * intended to be a temporary fixture, to be replaced by a
-//                 * detailed allowed-tiles-per-hex specification later.
-//                 */
-//                // For now, allow all hexes having non-filled city stations
-//                if (allowance instanceof LayBaseToken) {
-//                    MapHex hex;
-//                    for (GUIHex guiHex : hex2gui.values()) {
-//                        hex = guiHex.getHexModel();
-//                        if (hex.hasTokenSlotsLeft()) {
-//                            allowTokenOnHex(hex, allowance);
-//                        }
-//                    }
-//                } else {
-//                    allowTokenOnHex(null, allowance);
-//                }
-//            } else {
-//                for (MapHex location : locations) {
-//                    allowTokenOnHex(location, allowance);
-//                }
-//            }
-//            if (allowance instanceof LayBonusToken) {
-//                bonusTokenLayingEnabled = true;
-//            }
-//        }
-//    }
-//
-//    private void allowTokenOnHex(MapHex hex, LayToken allowance) {
-//        if (!allowedTokensPerHex.containsKey(hex)) {
-//            allowedTokensPerHex.put(hex, new ArrayList<LayToken>());
-//        }
-//        allowedTokensPerHex.get(hex).add(allowance);
-//    }
-//
-//    public List<LayToken> getTokenAllowanceForHex(MapHex hex) {
-//        List<LayToken> allowances = new ArrayList<LayToken>(2);
-//        if (hex != null && allowedTokensPerHex.containsKey(hex)) {
-//            allowances.addAll(allowedTokensPerHex.get(hex));
-//        }
-//        if (allowedTokensPerHex.containsKey(null)) {
-//            allowances.addAll(allowedTokensPerHex.get(null));
-//        }
-//        return allowances;
-//    }
-//
-//    public List<LayBaseToken> getBaseTokenAllowanceForHex(MapHex hex) {
-//        List<LayBaseToken> allowances = new ArrayList<LayBaseToken>(2);
-//        for (LayToken allowance : getTokenAllowanceForHex(hex)) {
-//            if (allowance instanceof LayBaseToken) {
-//                allowances.add((LayBaseToken) allowance);
-//            }
-//        }
-//        return allowances;
-//    }
-//
-//    public List<LayBonusToken> getBonusTokenAllowanceForHex(MapHex hex) {
-//        List<LayBonusToken> allowances = new ArrayList<LayBonusToken>(2);
-//        for (LayToken allowance : getTokenAllowanceForHex(hex)) {
-//            if (allowance instanceof LayBonusToken) {
-//                allowances.add((LayBonusToken) allowance);
-//            }
-//        }
-//        return allowances;
-//    }
-//
+    // FIXME: Remove the code here, only used for reference during rewrite of token
+    // code
+    // @SuppressWarnings("unchecked")
+    // public <T extends LayToken> void setAllowedTokenLays(
+    // List<T> allowedTokenLays) {
+    //
+    // this.allowedTokenLays = (List<LayToken>) allowedTokenLays;
+    // allowedTokensPerHex = new HashMap<MapHex, List<LayToken>>();
+    // bonusTokenLayingEnabled = false;
+    //
+    // /* Build the per-hex allowances map */
+    // for (LayToken allowance : this.allowedTokenLays) {
+    // List<MapHex> locations = allowance.getLocations();
+    // if (locations == null) {
+    // /*
+    // * The location may be null, which means: anywhere. This is
+    // * intended to be a temporary fixture, to be replaced by a
+    // * detailed allowed-tiles-per-hex specification later.
+    // */
+    // // For now, allow all hexes having non-filled city stations
+    // if (allowance instanceof LayBaseToken) {
+    // MapHex hex;
+    // for (GUIHex guiHex : hex2gui.values()) {
+    // hex = guiHex.getHexModel();
+    // if (hex.hasTokenSlotsLeft()) {
+    // allowTokenOnHex(hex, allowance);
+    // }
+    // }
+    // } else {
+    // allowTokenOnHex(null, allowance);
+    // }
+    // } else {
+    // for (MapHex location : locations) {
+    // allowTokenOnHex(location, allowance);
+    // }
+    // }
+    // if (allowance instanceof LayBonusToken) {
+    // bonusTokenLayingEnabled = true;
+    // }
+    // }
+    // }
+    //
+    // private void allowTokenOnHex(MapHex hex, LayToken allowance) {
+    // if (!allowedTokensPerHex.containsKey(hex)) {
+    // allowedTokensPerHex.put(hex, new ArrayList<LayToken>());
+    // }
+    // allowedTokensPerHex.get(hex).add(allowance);
+    // }
+    //
+    // public List<LayToken> getTokenAllowanceForHex(MapHex hex) {
+    // List<LayToken> allowances = new ArrayList<LayToken>(2);
+    // if (hex != null && allowedTokensPerHex.containsKey(hex)) {
+    // allowances.addAll(allowedTokensPerHex.get(hex));
+    // }
+    // if (allowedTokensPerHex.containsKey(null)) {
+    // allowances.addAll(allowedTokensPerHex.get(null));
+    // }
+    // return allowances;
+    // }
+    //
+    // public List<LayBaseToken> getBaseTokenAllowanceForHex(MapHex hex) {
+    // List<LayBaseToken> allowances = new ArrayList<LayBaseToken>(2);
+    // for (LayToken allowance : getTokenAllowanceForHex(hex)) {
+    // if (allowance instanceof LayBaseToken) {
+    // allowances.add((LayBaseToken) allowance);
+    // }
+    // }
+    // return allowances;
+    // }
+    //
+    // public List<LayBonusToken> getBonusTokenAllowanceForHex(MapHex hex) {
+    // List<LayBonusToken> allowances = new ArrayList<LayBonusToken>(2);
+    // for (LayToken allowance : getTokenAllowanceForHex(hex)) {
+    // if (allowance instanceof LayBonusToken) {
+    // allowances.add((LayBonusToken) allowance);
+    // }
+    // }
+    // return allowances;
+    // }
+    //
     public List<GeneralPath> getTrainPaths() {
         return trainPaths;
     }
 
-    public void setTrainPaths(List<GeneralPath> trainPaths) {
-        Rectangle dirtyRect =
-                routesLayer.getRoutesBounds(this.trainPaths, trainPaths);
+public void setTrainPaths(List<GeneralPath> trainPaths) {
+        // --- START FIX ---
         this.trainPaths = trainPaths;
 
-        // only repaint if routes existed before or exist now
-        if (dirtyRect != null) {
-            repaintRoutes(dirtyRect);
-            // Repaint the entire tokens layer to guarantee that the fancy text in the center of the hexes
-            // is updated correctly, since the dirtyRect from the routes might not cover the hex centers.
-            repaintTokens(new Rectangle(getSize()));
-        }
+        // Force the entire map to repaint. This ensures the RoutesLayer and TokensTextsLayer 
+        // stay perfectly in sync, even if the paths span the entire board.
+        repaintAll(new Rectangle(getSize()));
+        // --- END FIX ---
     }
 
     /**
@@ -1030,10 +1024,9 @@ private boolean displayHexNames = false;
 
             // force the tool tip popup to appear immediately
             ToolTipManager ttm = ToolTipManager.sharedInstance();
-            MouseEvent phantomME =
-                    new MouseEvent(toolTipsLayer, MouseEvent.MOUSE_MOVED,
-                            System.currentTimeMillis(), 0, arg0.getX(),
-                            arg0.getY(), 0, false);
+            MouseEvent phantomME = new MouseEvent(toolTipsLayer, MouseEvent.MOUSE_MOVED,
+                    System.currentTimeMillis(), 0, arg0.getX(),
+                    arg0.getY(), 0, false);
 
             int priorToolTipDelay = ttm.getInitialDelay();
             ttm.setInitialDelay(0);
@@ -1051,7 +1044,8 @@ private boolean displayHexNames = false;
     }
 
     @Override
-    public void mouseDragged(MouseEvent arg0) {}
+    public void mouseDragged(MouseEvent arg0) {
+    }
 
     @Override
     public synchronized void mouseMoved(MouseEvent arg0) {
@@ -1059,22 +1053,25 @@ private boolean displayHexNames = false;
         GUIHex newHex = getHexContainingPoint(point);
 
         // ignore if mouse has not entered a new hex
-        if (hexAtMousePosition == newHex) return;
+        if (hexAtMousePosition == newHex)
+            return;
 
         // provide for hex highlighting
         if (hexAtMousePosition != null)
             hexAtMousePosition.removeHighlightRequest();
-        if (newHex != null) newHex.addHighlightRequest();
+        if (newHex != null)
+            newHex.addHighlightRequest();
 
         // display tool tip
         // setToolTipText(newHex != null ? newHex.getToolTip() : null);
-setToolTipText(newHex != null ? newHex.getToolTip() : null);
+        setToolTipText(newHex != null ? newHex.getToolTip() : null);
 
         hexAtMousePosition = newHex;
     }
 
     @Override
-    public void mouseEntered(MouseEvent arg0) {}
+    public void mouseEntered(MouseEvent arg0) {
+    }
 
     @Override
     public synchronized void mouseExited(MouseEvent arg0) {
@@ -1086,10 +1083,12 @@ setToolTipText(newHex != null ? newHex.getToolTip() : null);
     }
 
     @Override
-    public void mousePressed(MouseEvent arg0) {}
+    public void mousePressed(MouseEvent arg0) {
+    }
 
     @Override
-    public void mouseReleased(MouseEvent arg0) {}
+    public void mouseReleased(MouseEvent arg0) {
+    }
 
     /**
      * Triggers for asynchronous repaint of specific layers If possible, these
@@ -1117,7 +1116,8 @@ setToolTipText(newHex != null ? newHex.getToolTip() : null);
      * needed!
      */
     public synchronized void repaintAll(Rectangle r) {
-        if (r == null) return; // Ignore invalid repaint requests
+        if (r == null)
+            return; // Ignore invalid repaint requests
         for (JComponent l : layers) {
             l.repaint(r);
         }
@@ -1148,19 +1148,19 @@ setToolTipText(newHex != null ? newHex.getToolTip() : null);
         return layers.get(layers.size() - 1).getSize();
     }
 
-public void addMouseListener(java.awt.event.MouseListener ml) {
+    public void addMouseListener(java.awt.event.MouseListener ml) {
         for (JComponent l : layers) {
             l.addMouseListener(ml);
         }
     }
 
     public void removeMouseListener(java.awt.event.MouseListener ml) {
-        if (layers == null) return;
+        if (layers == null)
+            return;
         for (JComponent l : layers) {
             l.removeMouseListener(ml);
         }
     }
-    
 
     private void addMouseMotionListener(MouseMotionListener ml) {
         for (JComponent l : layers) {
@@ -1168,9 +1168,9 @@ public void addMouseListener(java.awt.event.MouseListener ml) {
         }
     }
 
-
     // 1. Return the list from the internal map
-    // (GUIHex objects are not added as Swing Components, so iterating layer components fails)
+    // (GUIHex objects are not added as Swing Components, so iterating layer
+    // components fails)
     public List<GUIHex> getGuiHexList() {
         return new ArrayList<>(hex2gui.values());
     }
@@ -1180,13 +1180,11 @@ public void addMouseListener(java.awt.event.MouseListener ml) {
         return hex2gui;
     }
 
-
-
     // 2. Track highlighted hexes
     private List<GUIHex> currentHighlightedGuiHexes = new ArrayList<>();
 
-// 3. Set highlights
-public void setOwnerHighlight(List<GUIHex> guiHexes, String label) {
+    // 3. Set highlights
+    public void setOwnerHighlight(List<GUIHex> guiHexes, String label) {
 
         if (currentHighlightedGuiHexes != null) {
             for (GUIHex h : currentHighlightedGuiHexes) {
@@ -1202,15 +1200,12 @@ public void setOwnerHighlight(List<GUIHex> guiHexes, String label) {
 
             }
         }
-        
+
         Rectangle r = new Rectangle(getSize());
-        repaintAll(r); 
+        repaintAll(r);
     }
 
-
-
-
-private GUIHex currentDestinationHex = null;
+    private GUIHex currentDestinationHex = null;
 
     public void setDestinationHighlight(GUIHex hex, boolean active) {
         if (currentDestinationHex != null) {
@@ -1224,10 +1219,7 @@ private GUIHex currentDestinationHex = null;
         }
 
         Rectangle r = new Rectangle(getSize());
-        repaintAll(r); 
+        repaintAll(r);
     }
-
-
-
 
 }

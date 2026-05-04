@@ -27,8 +27,10 @@ import net.sf.rails.game.BonusToken;
 import net.sf.rails.game.HexSide;
 import net.sf.rails.game.MapHex;
 import net.sf.rails.game.MapOrientation;
+import net.sf.rails.game.OperatingRound;
 import net.sf.rails.game.PrivateCompany;
 import net.sf.rails.game.PublicCompany;
+import net.sf.rails.game.Round;
 import net.sf.rails.game.Station;
 import net.sf.rails.game.Stop;
 import net.sf.rails.game.Tile;
@@ -38,7 +40,7 @@ import net.sf.rails.game.state.Observer;
 import net.sf.rails.ui.swing.GUIGlobals;
 import net.sf.rails.ui.swing.GUIToken;
 import net.sf.rails.ui.swing.ORUIManager;
-
+import net.sf.rails.game.round.RoundFacade;
 import com.google.common.collect.Lists;
 import java.util.Objects; // Fügt den fehlenden Import hinzu
 // ... (existing imports)
@@ -52,6 +54,7 @@ import java.awt.font.FontRenderContext; // Add import
 public class GUIHex implements Observer {
 
     private String customOverlayText = null;
+
 
     /**
      * Static class that describes x-y coordinates for GUIHexes
@@ -767,9 +770,25 @@ public class GUIHex implements Observer {
             }
         }
 
+PublicCompany currentComp = null;
+        if (hexMap.getOrUIManager() != null && hexMap.getOrUIManager().getGameUIManager() != null) {
+            RoundFacade round = hexMap.getOrUIManager().getGameUIManager().getCurrentRound();
+            if (round instanceof OperatingRound) {
+                currentComp = ((OperatingRound) round).getOperatingCompany();
+            }
+        }
+
         if (getHex().getBonusTokens() != null) {
             for (BonusToken token : getHex().getBonusTokens()) {
-                hexValue += token.getValue();
+                String tName = token.getName();
+                if (currentComp != null && tName != null) {
+                    // Cattle/Port Ownership Check via name string (e.g., "ATSF_Cattle")[cite: 2]
+                    if (tName.startsWith(currentComp.getId())) {
+                        hexValue += token.getValue(); 
+                    } else if (tName.contains("Port_Open")) {
+                        hexValue += 10; // Open Port bonus for non-owners[cite: 2]
+                    }
+                }
             }
         }
 
