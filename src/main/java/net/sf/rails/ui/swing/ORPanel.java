@@ -1793,7 +1793,9 @@ if (btnRevPayout != null) {
                 }
             }
 
-            if (finalRes && isDisplayCurrentRoutes()) {
+// Only draw the path if the toggle is enabled
+            if (finalRes && isDisplayCurrentRoutes() && 
+                orUIManager != null && orUIManager.isShowRevenueRoutes()) {
                 revenueAdapter.drawOptimalRunAsPath(orUIManager.getMap());
             }
 
@@ -2127,8 +2129,13 @@ if (btnRevPayout != null) {
     }
 
     public void redrawRoutes() {
-        // Delegate to existing route update logic
-        if (activePhase == 3) { // Revenue phase
+// Check both the Config and our new dynamic toggle[cite: 1]
+        boolean show = isDisplayCurrentRoutes();
+        if (orUIManager != null && !orUIManager.isShowRevenueRoutes()) {
+            show = false;
+        }
+
+        if (activePhase == 3 && show) { // Revenue phase
             updateCurrentRoutes(true);
         } else {
             disableRoutesDisplay();

@@ -342,22 +342,22 @@ String localizedTitle = LocalText.getText("MapWindowTitle").replace("Rails: Map:
             }
         });
 
-        // SPACE KEY: toggle through visuals
-        String SHOW_NUMBERS_KEY = "showNumbersAction";
-        inputMap.put(KeyStroke.getKeyStroke(KeyEvent.VK_SPACE, 0), SHOW_NUMBERS_KEY);
-        actionMap.put(SHOW_NUMBERS_KEY, new AbstractAction() {
-            public void actionPerformed(ActionEvent e) {
-                if (orPanel != null) {
-                    orPanel.toggleTileBuildNumbers();
-                    orUIManager.toggleCompanyHighlights();
-                    orUIManager.toggleMapMarkings();
-                    // Force a full map repaint to ensure the costs appear/disappear instantly
-                    if (orUIManager.getMap() != null) {
-                        orUIManager.getMap().repaintAll(new Rectangle(orUIManager.getMap().getSize()));
-                    }
-                }
-            }
-        });
+        // // SPACE KEY: toggle through visuals
+        // String SHOW_NUMBERS_KEY = "showNumbersAction";
+        // inputMap.put(KeyStroke.getKeyStroke(KeyEvent.VK_SPACE, 0), SHOW_NUMBERS_KEY);
+        // actionMap.put(SHOW_NUMBERS_KEY, new AbstractAction() {
+        //     public void actionPerformed(ActionEvent e) {
+        //         if (orPanel != null) {
+        //             orPanel.toggleTileBuildNumbers();
+        //             orUIManager.toggleCompanyHighlights();
+        //             orUIManager.toggleMapMarkings();
+        //             // Force a full map repaint to ensure the costs appear/disappear instantly
+        //             if (orUIManager.getMap() != null) {
+        //                 orUIManager.getMap().repaintAll(new Rectangle(orUIManager.getMap().getSize()));
+        //             }
+        //         }
+        //     }
+        // });
 
 
         // --- 2. MAP & UPGRADE ACTIONS ---

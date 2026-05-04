@@ -67,6 +67,7 @@ public class MapPanel extends JPanel {
 
         layeredPane = new JLayeredPane();
         layeredPane.setLayout(null);
+        setupLayersButton(gameUIManager.getORUIManager());
         layeredPane.setPreferredSize(originalMapSize);
         map.setBounds(0, 0, originalMapSize.width, originalMapSize.height);
         map.addLayers(layeredPane, 1);
@@ -347,4 +348,60 @@ public class MapPanel extends JPanel {
         }
     }
 
+    private void setupLayersButton(final ORUIManager orUIManager) {
+    // 1. Create the Button
+    final JButton layersBtn = new JButton("Layers");
+    layersBtn.setFocusable(false);
+    layersBtn.setFont(new Font("SansSerif", Font.BOLD, 11));
+    layersBtn.setBackground(new Color(255, 255, 255, 200)); // Semi-transparent white
+    layersBtn.setBorder(BorderFactory.createLineBorder(Color.GRAY));
+    
+    // 2. Position it (Top Right)
+    layersBtn.setBounds(10, 10, 70, 25);
+    
+    // 3. Create the "Pop-out" Menu
+    layersBtn.addActionListener(new ActionListener() {
+        @Override
+        public void actionPerformed(ActionEvent e) {
+            JPopupMenu menu = new JPopupMenu();
+            
+            // Checkbox for Hex Names
+            JCheckBoxMenuItem itemHexNames = new JCheckBoxMenuItem("Hex Names", orUIManager.isShowHexNames());
+            itemHexNames.addActionListener(ae -> orUIManager.toggleHexNames());
+            
+           JCheckBoxMenuItem itemTerrain = new JCheckBoxMenuItem("Terrain Costs", orUIManager.isShowTerrainCosts());
+            itemTerrain.addActionListener(ae -> orUIManager.toggleTerrainCosts());
+            JCheckBoxMenuItem itemFriendly = new JCheckBoxMenuItem("Friendly Hexes", orUIManager.isShowFriendlyHexes());
+        itemFriendly.addActionListener(ae -> orUIManager.toggleFriendlyHexes());
+
+        JCheckBoxMenuItem itemDest = new JCheckBoxMenuItem("Destination Markers", orUIManager.isShowDestinationMarkers());
+            itemDest.addActionListener(ae -> orUIManager.toggleDestinationMarkers());
+
+
+            JCheckBoxMenuItem itemHome = new JCheckBoxMenuItem("Home Identifiers", orUIManager.isShowHomeIdentifiers());
+            itemHome.addActionListener(ae -> orUIManager.toggleHomeIdentifiers());
+
+            JCheckBoxMenuItem itemRoutes = new JCheckBoxMenuItem("Revenue Routes", orUIManager.isShowRevenueRoutes());
+            itemRoutes.addActionListener(ae -> orUIManager.toggleRevenueRoutes());
+
+
+            menu.add(itemHexNames);
+            menu.add(itemTerrain);
+            menu.add(itemFriendly);
+            menu.add(itemDest);
+            menu.add(itemHome);
+            menu.add(itemRoutes);
+            menu.addSeparator(); // Visual break for the master action
+            JMenuItem itemHideAll = new JMenuItem("Hide All Overlays");
+            itemHideAll.addActionListener(ae -> orUIManager.hideAllOverlays());
+            
+            menu.add(itemHideAll);
+            // Show menu relative to the button
+            menu.show(layersBtn, 0, layersBtn.getHeight());
+        }
+    });
+
+    // 4. Add to the Layered Pane at a high level
+    layeredPane.add(layersBtn, JLayeredPane.PALETTE_LAYER);
+}
 }

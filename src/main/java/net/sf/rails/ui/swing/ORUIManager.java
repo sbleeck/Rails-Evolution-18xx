@@ -80,6 +80,65 @@ public class ORUIManager implements DialogOwner {
         INACTIVE, SELECT_HEX, SELECT_UPGRADE, SET_REVENUE, SELECT_PAYOUT
     }
 
+
+    private boolean showHomeIdentifiers = true;
+    private boolean showRevenueRoutes = true;
+
+    public boolean isShowHomeIdentifiers() {
+        return showHomeIdentifiers;
+    }
+
+    public void toggleHomeIdentifiers() {
+        this.showHomeIdentifiers = !this.showHomeIdentifiers;
+        if (map != null) map.repaintAll(new Rectangle(map.getSize()));
+    }
+
+    public boolean isShowRevenueRoutes() {
+        return showRevenueRoutes;
+    }
+
+    public void toggleRevenueRoutes() {
+        this.showRevenueRoutes = !this.showRevenueRoutes;
+        // Trigger the ORPanel to immediately redraw or clear the paths
+        if (orPanel != null) orPanel.redrawRoutes();
+    }
+
+    private boolean showFriendlyHexes = true; 
+
+    private boolean showDestinationMarkers = true;
+
+    public boolean isShowDestinationMarkers() {
+        return showDestinationMarkers;
+    }
+
+    public void toggleDestinationMarkers() {
+        this.showDestinationMarkers = !this.showDestinationMarkers;
+        
+        // Refresh the highlights to catch any 1870 destination markers
+        updateCompanyHighlights();
+        
+        if (map != null) {
+            map.repaintAll(new Rectangle(map.getSize()));
+        }
+    }
+
+    public boolean isShowFriendlyHexes() {
+        return showFriendlyHexes;
+    }
+
+    public void toggleFriendlyHexes() {
+        this.showFriendlyHexes = !this.showFriendlyHexes;
+
+        // Force an immediate update of the highlight states
+        updateCompanyHighlights();
+        
+        if (map != null) {
+            map.repaintAll(new Rectangle(map.getSize()));
+        }
+
+        log.info("DEBUG: Toggled Friendly Hexes: " + showFriendlyHexes);
+    }
+
     /* Keys of dialogs owned by this class */
     public static final String SELECT_DESTINATION_COMPANIES_DIALOG = "SelectDestinationCompanies";
     public static final String REPAY_LOANS_DIALOG = "RepayLoans";
@@ -491,6 +550,51 @@ public class ORUIManager implements DialogOwner {
     }
 
     private boolean showMapMarkings = true;
+    private boolean showHexNames = true;
+    private boolean showTerrainCosts = true;
+    public boolean isShowTerrainCosts() {
+        return showTerrainCosts;
+    }
+
+    public void toggleTerrainCosts() {
+        this.showTerrainCosts = !this.showTerrainCosts;
+        if (map != null) {
+            map.repaintAll(new Rectangle(map.getSize()));
+        }
+    }
+    public boolean isShowHexNames() {
+        return showHexNames;
+    }
+
+    public void toggleHexNames() {
+        this.showHexNames = !this.showHexNames;
+        if (map != null) {
+            map.repaintAll(new Rectangle(map.getSize()));
+        }
+    }
+    /**
+     * Resets all map overlays to hidden.
+     */
+public void hideAllOverlays() {
+        this.showHexNames = false;
+        this.showTerrainCosts = false;
+        this.showFriendlyHexes = false;
+        this.showDestinationMarkers = false;
+        this.showHomeIdentifiers = false;
+        this.showRevenueRoutes = false;
+
+        // Synchronize internal highlight logic and train paths[cite: 1, 3]
+        updateCompanyHighlights();
+        if (orPanel != null) {
+            orPanel.redrawRoutes();
+        }
+
+        // Repaint the entire map to reflect all changes[cite: 1]
+        if (map != null) {
+            map.repaintAll(new Rectangle(map.getSize()));
+        }
+        log.info("DEBUG: All 6 map overlays hidden via Master Reset.");
+    }
 
     public boolean isShowMapMarkings() {
         return showMapMarkings;
@@ -1339,6 +1443,12 @@ public void processBuyPrivate(BuyPrivate action) {
 
         // If toggled OFF, clear map and return immediately
         if (!showCompanyHighlights) {
+            map.setOwnerHighlight(null, null);
+            return;
+        }
+
+        // If toggled OFF, clear all highlights from the map and exit
+        if (!showFriendlyHexes) {
             map.setOwnerHighlight(null, null);
             return;
         }

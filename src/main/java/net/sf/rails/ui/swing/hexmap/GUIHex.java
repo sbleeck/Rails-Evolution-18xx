@@ -456,8 +456,10 @@ public class GUIHex implements Observer {
 
             // Intercept TOKEN_SELECTABLE during 1817 Auctions to force the purple style
             boolean is1817AuctionSelection = false;
-            if (state == State.TOKEN_SELECTABLE && hexMap != null && hexMap.getOrUIManager() != null && hexMap.getOrUIManager().getGameUIManager() != null) {
-                net.sf.rails.game.round.RoundFacade currentRound = hexMap.getOrUIManager().getGameUIManager().getCurrentRound();
+            if (state == State.TOKEN_SELECTABLE && hexMap != null && hexMap.getOrUIManager() != null
+                    && hexMap.getOrUIManager().getGameUIManager() != null) {
+                net.sf.rails.game.round.RoundFacade currentRound = hexMap.getOrUIManager().getGameUIManager()
+                        .getCurrentRound();
                 if (currentRound instanceof net.sf.rails.game.specific._1817.AuctionRound_1817) {
                     is1817AuctionSelection = true;
                 }
@@ -490,7 +492,7 @@ public class GUIHex implements Observer {
                 g.draw(innerHex);
 
                 g.setStroke(new BasicStroke(strokeWidth));
-g.setColor(State.HIGHLIGHT_PURPLE.getColor());
+                g.setColor(State.HIGHLIGHT_PURPLE.getColor());
                 g.draw(innerHex);
             } else {
                 g.setStroke(new BasicStroke(strokeWidth));
@@ -520,20 +522,21 @@ g.setColor(State.HIGHLIGHT_PURPLE.getColor());
         try {
             paintStationTokens(g);
             paintOffStationTokens(g);
-// 1. Check the toggle state
+
+            // 1. Check the new terrain cost toggle state
             boolean displayMarkings = true;
             if (hexMap.getOrUIManager() != null) {
-                displayMarkings = hexMap.getOrUIManager().isShowMapMarkings();
+                displayMarkings = hexMap.getOrUIManager().isShowTerrainCosts();
             }
 
-            // 2. Draw costs in black, but only if the toggle is ON and no tile has been laid
+            // 2. Draw costs in black, but only if the toggle is ON and no tile has been
+            // laid
             if (displayMarkings && getHex().getTileCost() > 0 && getHex().isPreprintedTileCurrent()) {
                 Font oldFont = g.getFont();
-               
+
                 // Force fractional scaling to bypass OS integer font minimum limits
                 float scaledFontSize = (float) Math.max(3.0, 7.0 * dimensions.zoomFactor);
                 g.setFont(new Font("SansSerif", Font.PLAIN, 12).deriveFont(scaledFontSize));
-
 
                 FontMetrics fontMetrics = g.getFontMetrics();
                 Color oldColor = g.getColor();
@@ -543,43 +546,45 @@ g.setColor(State.HIGHLIGHT_PURPLE.getColor());
                 int textWidth = fontMetrics.stringWidth(costString);
                 int textX = dimensions.rectBound.x + (dimensions.rectBound.width - textWidth) * 3 / 5;
                 int textY = dimensions.rectBound.y + ((fontMetrics.getHeight() + dimensions.rectBound.height) * 9 / 15);
-                
+
                 g.drawString(costString, textX, textY);
 
                 // Draw terrain symbols based on the XML attribute
                 String terrain = getHex().getTerrain();
                 if (terrain != null) {
                     Stroke oldStroke = g.getStroke();
-                    g.setStroke(new BasicStroke(1.5f * (float)dimensions.zoomFactor, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
-                    
+                    g.setStroke(new BasicStroke(1.5f * (float) dimensions.zoomFactor, BasicStroke.CAP_ROUND,
+                            BasicStroke.JOIN_ROUND));
+
                     double cx = textX + textWidth / 2.0;
                     double cy = textY - fontMetrics.getAscent() - (4 * dimensions.zoomFactor); // Position above text
-                    
+
                     if (terrain.equalsIgnoreCase("river")) {
                         g.setColor(new Color(30, 144, 255)); // Standard river blue
                         double w = 8 * dimensions.zoomFactor;
                         double h = 2.5 * dimensions.zoomFactor;
                         double gap = 4 * dimensions.zoomFactor;
-                        
+
                         for (int i = 0; i < 2; i++) {
                             double yOffset = cy + (i * gap);
                             java.awt.geom.Path2D.Double wave = new java.awt.geom.Path2D.Double();
                             wave.moveTo(cx - w, yOffset);
-                            wave.curveTo(cx - w/2, yOffset - h, cx + w/2, yOffset + h, cx + w, yOffset);
+                            wave.curveTo(cx - w / 2, yOffset - h, cx + w / 2, yOffset + h, cx + w, yOffset);
                             g.draw(wave);
                         }
-                    } else if (terrain.equalsIgnoreCase("mountain") || terrain.equalsIgnoreCase("hill") || terrain.equalsIgnoreCase("hills")) {
+                    } else if (terrain.equalsIgnoreCase("mountain") || terrain.equalsIgnoreCase("hill")
+                            || terrain.equalsIgnoreCase("hills")) {
                         g.setColor(new Color(139, 69, 19)); // Mountain brown
                         double w = 6 * dimensions.zoomFactor;
                         double h = 8 * dimensions.zoomFactor;
-                        
+
                         java.awt.geom.Path2D.Double mountain = new java.awt.geom.Path2D.Double();
                         // Draw two jagged peaks
-                        mountain.moveTo(cx - w - w/2, cy + h/2);
-                        mountain.lineTo(cx - w/2, cy - h/2);
-                        mountain.lineTo(cx, cy + h/2);
-                        mountain.lineTo(cx + w, cy - h/2 + 2*dimensions.zoomFactor);
-                        mountain.lineTo(cx + w + w/2, cy + h/2);
+                        mountain.moveTo(cx - w - w / 2, cy + h / 2);
+                        mountain.lineTo(cx - w / 2, cy - h / 2);
+                        mountain.lineTo(cx, cy + h / 2);
+                        mountain.lineTo(cx + w, cy - h / 2 + 2 * dimensions.zoomFactor);
+                        mountain.lineTo(cx + w + w / 2, cy + h / 2);
                         g.draw(mountain);
                     }
                     g.setStroke(oldStroke);
@@ -591,30 +596,30 @@ g.setColor(State.HIGHLIGHT_PURPLE.getColor());
             if (!isTilePainted())
                 return;
 
-            // Force label drawing strictly for SVG/preprinted tiles to bypass the GUITile skip
-            Tile visibleTile = getVisibleTile();
-            if (visibleTile != null && visibleTile.isPrepainted()) {
-                String hexLabel = getHex().getLabel();
-                if (hexLabel != null && !hexLabel.isEmpty()) {
-                    Font oldFontLabel = g.getFont();
-                    int scaledLabelSize = Math.max(10, (int) Math.round(14 * dimensions.zoomFactor));
-                    g.setFont(new Font("SansSerif", Font.BOLD, scaledLabelSize));
-                    
-                    FontMetrics fontMetrics = g.getFontMetrics();
-                    g.setColor(Color.BLACK);
-                    // Scale the offsets so the text doesn't drift outside the hex
-                    g.drawString(hexLabel, 
-                            dimensions.rectBound.x + (int)(15 * dimensions.zoomFactor), 
-                            dimensions.rectBound.y + fontMetrics.getHeight() + (int)(5 * dimensions.zoomFactor));
-                    g.setFont(oldFontLabel);
+            // Draw preprinted labels only if enabled in UIManager
+            if (hexMap.getOrUIManager() != null && hexMap.getOrUIManager().isShowHexNames()) {
+                Tile visibleTile = getVisibleTile();
+                if (visibleTile != null && visibleTile.isPrepainted()) {
+                    String hexLabel = getHex().getLabel();
+                    if (hexLabel != null && !hexLabel.isEmpty()) {
+                        Font oldFontLabel = g.getFont();
+                        int scaledLabelSize = Math.max(10, (int) Math.round(14 * dimensions.zoomFactor));
+                        g.setFont(new Font("SansSerif", Font.BOLD, scaledLabelSize));
+
+                        FontMetrics fontMetrics = g.getFontMetrics();
+                        g.setColor(Color.BLACK);
+                        g.drawString(hexLabel,
+                                dimensions.rectBound.x + (int) (15 * dimensions.zoomFactor),
+                                dimensions.rectBound.y + fontMetrics.getHeight() + (int) (5 * dimensions.zoomFactor));
+                        g.setFont(oldFontLabel);
+                    }
                 }
             }
-            
+
             Map<PublicCompany, Stop> homes = getHex().getHomes();
 
             if (homes != null) {
                 for (PublicCompany company : homes.keySet()) {
-
 
                     // 1. Permanent Coal Value Rendering (Independent of company status)
                     boolean isCoal = company.getType() != null && "Coal".equals(company.getType().getId());
@@ -638,12 +643,15 @@ g.setColor(State.HIGHLIGHT_PURPLE.getColor());
                                 val = homeCity.getRelatedStation().getValue();
                             }
                             if (val == 0) {
-                                net.sf.rails.game.PrivateCompany pc = hexMap.getMapManager().getRoot().getCompanyManager().getPrivateCompany(company.getId());
+                                net.sf.rails.game.PrivateCompany pc = hexMap.getMapManager().getRoot()
+                                        .getCompanyManager().getPrivateCompany(company.getId());
                                 if (pc != null) {
                                     java.util.List<Integer> revList = pc.getRevenue();
                                     if (revList != null && !revList.isEmpty()) {
-                                        String phaseName = (hexMap.getPhase() != null) ? hexMap.getPhase().getId() : "null";
-                                        if (revList.size() > 1 && !phaseName.equals("null") && phaseName.compareTo("5") >= 0) {
+                                        String phaseName = (hexMap.getPhase() != null) ? hexMap.getPhase().getId()
+                                                : "null";
+                                        if (revList.size() > 1 && !phaseName.equals("null")
+                                                && phaseName.compareTo("5") >= 0) {
                                             val = revList.get(1);
                                         } else {
                                             val = revList.get(0);
@@ -651,17 +659,17 @@ g.setColor(State.HIGHLIGHT_PURPLE.getColor());
                                     }
                                 }
                             }
-                        } catch (Exception e) {}
+                        } catch (Exception e) {
+                        }
 
-                        if (val > 0 && homeCity != null) {
-                            HexPoint origin = getTokenCenter(1, homeCity); 
+                        if (hexMap.getOrUIManager() != null && hexMap.getOrUIManager().isShowHomeIdentifiers()) {
+                            HexPoint origin = getTokenCenter(1, homeCity);
                             drawCoalMineValue(g, company.getId(), origin, val);
                         }
                     }
 
                     if (company.isClosed())
                         continue;
-
 
                     // Only draw the company name if there isn't yet a token of that company
                     if (hex.hasTokenOfCompany(company))
@@ -683,11 +691,17 @@ g.setColor(State.HIGHLIGHT_PURPLE.getColor());
                     }
 
                     if (homeCity != null) {
-                        // check the number of tokens laid there already
+
+                        // Define the center point 'p' first so it's available for the draw call
                         HexPoint p = getTokenCenter(1, homeCity);
-                        if (company.isDisplayHomeHex()) {
-drawHome(g, company, p, homeCity);
+
+                        if (company.isDisplayHomeHex() &&
+                                hexMap.getOrUIManager() != null &&
+                                hexMap.getOrUIManager().isShowHomeIdentifiers()) {
+
+                            drawHome(g, company, p, homeCity);
                         }
+
                     }
                 }
             }
@@ -708,7 +722,10 @@ drawHome(g, company, p, homeCity);
         if (activeOwnerLabel != null) {
             drawString(g, activeOwnerLabel, 0, 0);
         }
-drawDestinationMilestones(g);
+        // Only draw Milestone squares if the toggle is enabled
+        if (hexMap.getOrUIManager() != null && hexMap.getOrUIManager().isShowDestinationMarkers()) {
+            drawDestinationMilestones(g);
+        }
     }
 
     public void setCustomOverlayText(String text) {
@@ -736,18 +753,19 @@ drawDestinationMilestones(g);
         GUITile.paintTile(g2, dimensions.center, this, visibleTile, visibleRotation,
                 state.getScale(), hexMap.getZoomStep());
     }
-public void paintHexBackground(Graphics2D g) {
+
+    public void paintHexBackground(Graphics2D g) {
         // Paint standard 18xx light green background for preprinted tiles
-if (getHex().isPreprintedTileCurrent() || !isTilePainted()) {
-                Color oldColor = g.getColor();
+        if (getHex().isPreprintedTileCurrent() || !isTilePainted()) {
+            Color oldColor = g.getColor();
             g.setColor(new Color(180, 210, 180)); // Standard map green
             g.fill(dimensions.hexagon);
-            
+
             // Draw a subtle border frame
             g.setColor(new Color(160, 190, 160));
             g.setStroke(new BasicStroke(1.0f));
             g.draw(dimensions.hexagon);
-            
+
             g.setColor(oldColor);
         }
     }
@@ -765,7 +783,7 @@ if (getHex().isPreprintedTileCurrent() || !isTilePainted()) {
         }
     }
 
-// --- START FIX ---
+    // --- START FIX ---
     public void paintMississippi(Graphics2D g) {
         try {
             Class<?> validatorClass = Class.forName("net.sf.rails.game.specific._1870.MississippiRiverValidator");
@@ -773,32 +791,48 @@ if (getHex().isPreprintedTileCurrent() || !isTilePainted()) {
             riverHexesField.setAccessible(true);
             @SuppressWarnings("unchecked")
             Map<String, Object> riverHexes = (Map<String, Object>) riverHexesField.get(null);
-            
+
             if (riverHexes.containsKey(getHex().getId())) {
                 List<Integer> flowEdges = new ArrayList<>();
                 String currentId = getHex().getId();
                 char rowChar = currentId.charAt(0);
                 int col = Integer.parseInt(currentId.substring(1));
                 int row = rowChar - 'A';
-                
-                // Logic: Check all 6 standard 18xx grid neighbors. 
+
+                // Logic: Check all 6 standard 18xx grid neighbors.
                 for (int i = 0; i < 6; i++) {
                     int r = row;
                     int c = col;
-                    switch(i) {
-                        case 0: r++; c--; break; // SW
-                        case 1: c-=2; break;     // W
-                        case 2: r--; c--; break; // NW
-                        case 3: r--; c++; break; // NE
-                        case 4: c+=2; break;     // E
-                        case 5: r++; c++; break; // SE
+                    switch (i) {
+                        case 0:
+                            r++;
+                            c--;
+                            break; // SW
+                        case 1:
+                            c -= 2;
+                            break; // W
+                        case 2:
+                            r--;
+                            c--;
+                            break; // NW
+                        case 3:
+                            r--;
+                            c++;
+                            break; // NE
+                        case 4:
+                            c += 2;
+                            break; // E
+                        case 5:
+                            r++;
+                            c++;
+                            break; // SE
                     }
-                    String neighborId = "" + (char)('A' + r) + c;
+                    String neighborId = "" + (char) ('A' + r) + c;
                     if (riverHexes.containsKey(neighborId)) {
                         flowEdges.add(i);
                     }
                 }
-                
+
                 // If it's an end-cap (like A16), it enters from off-map (opposite side)
                 if (flowEdges.size() == 1) {
                     flowEdges.add((flowEdges.get(0) + 3) % 6);
@@ -806,51 +840,59 @@ if (getHex().isPreprintedTileCurrent() || !isTilePainted()) {
 
                 List<Shape> shapes = new ArrayList<>();
                 Point2D center = getCenterPoint2D();
-                
+
                 if (flowEdges.size() == 2) {
                     Point2D p1 = getSidePoint2D(HexSide.get(flowEdges.get(0)));
                     Point2D p2 = getSidePoint2D(HexSide.get(flowEdges.get(1)));
-                    shapes.add(new java.awt.geom.QuadCurve2D.Double(p1.getX(), p1.getY(), center.getX(), center.getY(), p2.getX(), p2.getY()));
+                    shapes.add(new java.awt.geom.QuadCurve2D.Double(p1.getX(), p1.getY(), center.getX(), center.getY(),
+                            p2.getX(), p2.getY()));
                 } else if (flowEdges.size() == 3) {
                     // Logic for branching rivers
                     int trunk = 0;
-                    for (int i=0; i<3; i++) {
+                    for (int i = 0; i < 3; i++) {
                         int e1 = flowEdges.get(i);
-                        int e2 = flowEdges.get((i+1)%3);
-                        int e3 = flowEdges.get((i+2)%3);
-                        int d1 = Math.min(Math.abs(e1-e2), 6-Math.abs(e1-e2));
-                        int d2 = Math.min(Math.abs(e1-e3), 6-Math.abs(e1-e3));
-                        if (d1 + d2 >= 4) { trunk = i; }
+                        int e2 = flowEdges.get((i + 1) % 3);
+                        int e3 = flowEdges.get((i + 2) % 3);
+                        int d1 = Math.min(Math.abs(e1 - e2), 6 - Math.abs(e1 - e2));
+                        int d2 = Math.min(Math.abs(e1 - e3), 6 - Math.abs(e1 - e3));
+                        if (d1 + d2 >= 4) {
+                            trunk = i;
+                        }
                     }
                     Point2D pTrunk = getSidePoint2D(HexSide.get(flowEdges.get(trunk)));
-                    Point2D pB1 = getSidePoint2D(HexSide.get(flowEdges.get((trunk+1)%3)));
-                    Point2D pB2 = getSidePoint2D(HexSide.get(flowEdges.get((trunk+2)%3)));
-                    shapes.add(new java.awt.geom.QuadCurve2D.Double(pTrunk.getX(), pTrunk.getY(), center.getX(), center.getY(), pB1.getX(), pB1.getY()));
-                    shapes.add(new java.awt.geom.QuadCurve2D.Double(pTrunk.getX(), pTrunk.getY(), center.getX(), center.getY(), pB2.getX(), pB2.getY()));
+                    Point2D pB1 = getSidePoint2D(HexSide.get(flowEdges.get((trunk + 1) % 3)));
+                    Point2D pB2 = getSidePoint2D(HexSide.get(flowEdges.get((trunk + 2) % 3)));
+                    shapes.add(new java.awt.geom.QuadCurve2D.Double(pTrunk.getX(), pTrunk.getY(), center.getX(),
+                            center.getY(), pB1.getX(), pB1.getY()));
+                    shapes.add(new java.awt.geom.QuadCurve2D.Double(pTrunk.getX(), pTrunk.getY(), center.getX(),
+                            center.getY(), pB2.getX(), pB2.getY()));
                 }
 
                 if (!shapes.isEmpty()) {
                     Color oldColor = g.getColor();
                     Stroke oldStroke = g.getStroke();
-                    
-g.setColor(new Color(64, 164, 223, 100)); // Lighter alpha to let track show through
-                    g.setStroke(new BasicStroke(10.0f * (float)dimensions.zoomFactor, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
-                    for(Shape s : shapes) g.draw(s);
-                    
+
+                    g.setColor(new Color(64, 164, 223, 100)); // Lighter alpha to let track show through
+                    g.setStroke(new BasicStroke(10.0f * (float) dimensions.zoomFactor, BasicStroke.CAP_ROUND,
+                            BasicStroke.JOIN_ROUND));
+                    for (Shape s : shapes)
+                        g.draw(s);
+
                     g.setColor(new Color(20, 100, 180, 140));
-                    float dash = 12.0f * (float)dimensions.zoomFactor;
-                    float gap = 20.0f * (float)dimensions.zoomFactor;
-                    g.setStroke(new BasicStroke(2.0f * (float)dimensions.zoomFactor, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND, 0, new float[]{dash, gap}, 0));
-                    for(Shape s : shapes) g.draw(s);
-                    
+                    float dash = 12.0f * (float) dimensions.zoomFactor;
+                    float gap = 20.0f * (float) dimensions.zoomFactor;
+                    g.setStroke(new BasicStroke(2.0f * (float) dimensions.zoomFactor, BasicStroke.CAP_ROUND,
+                            BasicStroke.JOIN_ROUND, 0, new float[] { dash, gap }, 0));
+                    for (Shape s : shapes)
+                        g.draw(s);
+
                     g.setColor(oldColor);
                     g.setStroke(oldStroke);
                 }
             }
-        } catch (Exception e) {}
+        } catch (Exception e) {
+        }
     }
-
-
 
     protected void drawBar(Graphics2D g2d, HexPoint start, HexPoint end) {
         Color oldColor = g2d.getColor();
@@ -881,14 +923,15 @@ g.setColor(new Color(64, 164, 223, 100)); // Lighter alpha to let track show thr
         Stroke oldStroke = g2d.getStroke();
 
         g2d.setColor(new Color(64, 164, 223, 180)); // Translucent river blue
-        g2d.setStroke(new BasicStroke(8.0f * (float)dimensions.zoomFactor, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
+        g2d.setStroke(
+                new BasicStroke(8.0f * (float) dimensions.zoomFactor, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
         g2d.draw(new Line2D.Double(start.get2D(), end.get2D()));
 
         g2d.setColor(oldColor);
         g2d.setStroke(oldStroke);
     }
 
-private void paintStationTokens(Graphics2D g2) {
+    private void paintStationTokens(Graphics2D g2) {
         for (Stop stop : getHex().getStops()) {
             int j = 0;
             for (BaseToken token : stop.getBaseTokens()) {
@@ -896,7 +939,7 @@ private void paintStationTokens(Graphics2D g2) {
                 PublicCompany company = token.getParent();
                 drawBaseToken(g2, company, origin, dimensions.tokenDiameter);
             }
-// --- START FIX ---
+            // --- START FIX ---
             // check for temporary token
             if (upgrade instanceof TokenHexUpgrade && ((TokenHexUpgrade) upgrade).getAction() instanceof LayBaseToken) {
                 TokenHexUpgrade tokenUpgrade = (TokenHexUpgrade) upgrade;
@@ -908,7 +951,7 @@ private void paintStationTokens(Graphics2D g2) {
                     }
                 }
             }
-// --- END FIX ---
+            // --- END FIX ---
         }
     }
 
@@ -930,8 +973,7 @@ private void paintStationTokens(Graphics2D g2) {
         }
     }
 
-
-private void drawBaseToken(Graphics2D g2, PublicCompany co, HexPoint center, double diameter) {
+    private void drawBaseToken(Graphics2D g2, PublicCompany co, HexPoint center, double diameter) {
 
         GUIToken token = new GUIToken(
                 co.getFgColour(), co.getBgColour(), co.getId(), center, diameter);
@@ -943,7 +985,7 @@ private void drawBaseToken(Graphics2D g2, PublicCompany co, HexPoint center, dou
 
     }
 
-   private void drawHome(Graphics2D g2, PublicCompany co, HexPoint origin, Stop homeCity) {
+    private void drawHome(Graphics2D g2, PublicCompany co, HexPoint origin, Stop homeCity) {
         // 1. Branch logic: Check if this is a Major, National, or Coal company
         boolean isMajor = false;
         boolean isCoal = false;
@@ -1017,7 +1059,7 @@ private void drawBaseToken(Graphics2D g2, PublicCompany co, HexPoint center, dou
         double zoom = dimensions.zoomFactor;
         double xOffset = 0;
         double yOffset = 0;
-        
+
         switch (compId) {
             case "RGTE":
             case "EOD":
@@ -1039,43 +1081,44 @@ private void drawBaseToken(Graphics2D g2, PublicCompany co, HexPoint center, dou
                 yOffset = 18 * zoom;
                 break;
         }
-        
+
         double centerX = origin.getX() + xOffset;
         double centerY = origin.getY() + yOffset;
-        
+
         String text = String.valueOf(value);
         Font oldFont = g2.getFont();
         Color oldColor = g2.getColor();
         Stroke oldStroke = g2.getStroke();
-        
+
         int fontSize = (int) Math.round(11 * zoom);
-        if (fontSize < 8) fontSize = 8;
+        if (fontSize < 8)
+            fontSize = 8;
         g2.setFont(new Font("SansSerif", Font.BOLD, fontSize));
-        
+
         FontMetrics fm = g2.getFontMetrics();
         int textWidth = fm.stringWidth(text);
         int textHeight = fm.getAscent();
-        
-        int boxWidth = Math.max((int)(16 * zoom), textWidth + (int)(6 * zoom));
-        int boxHeight = textHeight + (int)(4 * zoom);
-        
+
+        int boxWidth = Math.max((int) (16 * zoom), textWidth + (int) (6 * zoom));
+        int boxHeight = textHeight + (int) (4 * zoom);
+
         double boxX = centerX - boxWidth / 2.0;
         double boxY = centerY - boxHeight / 2.0;
-        
+
         // Draw black square
         g2.setColor(Color.BLACK);
         g2.fill(new java.awt.geom.Rectangle2D.Double(boxX, boxY, boxWidth, boxHeight));
-        
+
         // Draw white border
         g2.setColor(Color.WHITE);
         g2.setStroke(new BasicStroke(1.0f));
         g2.draw(new java.awt.geom.Rectangle2D.Double(boxX, boxY, boxWidth, boxHeight));
-        
+
         // Draw text
         float textX = (float) (centerX - textWidth / 2.0);
         float textY = (float) (centerY + textHeight / 2.0 - fm.getDescent());
         g2.drawString(text, textX, textY);
-        
+
         g2.setFont(oldFont);
         g2.setColor(oldColor);
         g2.setStroke(oldStroke);
@@ -1094,8 +1137,6 @@ private void drawBaseToken(Graphics2D g2, PublicCompany co, HexPoint center, dou
         HexPoint tokenCenter;
         if (positionCode != 0) {
 
-            
-
             double initial = TILE_GRID_SCALE * dimensions.zoomFactor;
 
             double r = MapOrientation.DEG30 * (positionCode / (double) 50);
@@ -1108,9 +1149,9 @@ private void drawBaseToken(Graphics2D g2, PublicCompany co, HexPoint center, dou
         double delta_x = 0, delta_y = 0;
         switch (stop.getSlots()) {
             case 2:
-            int curveHint = Math.abs(positionCode) % 10;
+                int curveHint = Math.abs(positionCode) % 10;
                 if (curveHint >= 6 && curveHint <= 9) {
-                    // Use trigonometry to split the tokens diagonally. 
+                    // Use trigonometry to split the tokens diagonally.
                     double splitAngle = Math.toRadians(120.0);
                     double offset = (-0.5 + currentToken) * CITY_SIZE * dimensions.zoomFactor;
                     delta_x = offset * Math.cos(splitAngle);
@@ -1175,9 +1216,9 @@ private void drawBaseToken(Graphics2D g2, PublicCompany co, HexPoint center, dou
     public String getToolTip() {
         return null;
         // if (upgrade != null)
-        //     return upgrade.getUpgradeToolTip();
+        // return upgrade.getUpgradeToolTip();
         // else
-        //     return getDefaultToolTip();
+        // return getDefaultToolTip();
     }
 
     private String bonusToolTipText(List<RevenueBonusTemplate> bonuses) {
@@ -1321,8 +1362,8 @@ private void drawBaseToken(Graphics2D g2, PublicCompany co, HexPoint center, dou
             // Strip remaining HTML tags
             rawText = rawText.replaceAll("<[^>]*>", "");
 
-// 1. SET FONT: Bold and scaled based on zoomFactor for better fit
-int scaledFontSize = Math.max(8, (int) Math.round(10 * dimensions.zoomFactor));
+            // 1. SET FONT: Bold and scaled based on zoomFactor for better fit
+            int scaledFontSize = Math.max(8, (int) Math.round(10 * dimensions.zoomFactor));
             Font overlayFont = new Font("SansSerif", Font.BOLD, scaledFontSize);
             g.setFont(overlayFont);
             restore = true;
@@ -1350,6 +1391,10 @@ int scaledFontSize = Math.max(8, (int) Math.round(10 * dimensions.zoomFactor));
                 int y_pos = y_final + (i * lineHeight); // Shift down for second line
                 // Apply different styles for ID vs Price
                 if (i == 0) {
+                    // Line 0 (ID): Skip drawing if Hex Names toggle is OFF in the UIManager
+                    if (hexMap.getOrUIManager() != null && !hexMap.getOrUIManager().isShowHexNames()) {
+                        continue;
+                    }
                     // Line 0 (ID): White Text with Black Outline (High Contrast)
                     g.setColor(Color.BLACK);
                     g.drawString(line, x_final - 1, y_pos - 1);
@@ -1441,26 +1486,34 @@ int scaledFontSize = Math.max(8, (int) Math.round(10 * dimensions.zoomFactor));
      * Toggles the destination highlight state.
      */
     public void setDestinationHighlight(boolean active) {
-        if (active) {
+        // Block the highlight if the toggle is OFF
+        // Moved from Destination Markers to Home Identifiers as requested
+        boolean visible = true;
+        if (hexMap.getOrUIManager() != null) {
+            visible = hexMap.getOrUIManager().isShowHomeIdentifiers();
+        }
+
+        if (active && visible) {
             setState(State.HIGHLIGHT_DESTINATION);
             hexMap.repaintMarks(getMarksDirtyBounds());
         } else {
+            // Revert state if the highlight is deactivated or the layer is toggled OFF
             if (getState() == State.HIGHLIGHT_DESTINATION) {
                 setState(State.NORMAL);
             }
         }
     }
 
- private void drawDestinationMilestones(Graphics2D g2) {
+    private void drawDestinationMilestones(Graphics2D g2) {
 
+        if (hexMap == null || hexMap.getMapManager() == null || hexMap.getMapManager().getRoot() == null)
+            return;
 
-        if (hexMap == null || hexMap.getMapManager() == null || hexMap.getMapManager().getRoot() == null) return;
-        
         java.util.List<PublicCompany> destinationMarkers = new java.util.ArrayList<>();
         net.sf.rails.game.CompanyManager cm = hexMap.getMapManager().getRoot().getCompanyManager();
         if (cm != null) {
             for (PublicCompany comp : cm.getAllPublicCompanies()) {
-               if (comp.getDestinationHex() != null && comp.getDestinationHex().equals(getHex())) {
+                if (comp.getDestinationHex() != null && comp.getDestinationHex().equals(getHex())) {
                     if (!comp.hasReachedDestination()) {
                         destinationMarkers.add(comp);
                     }
@@ -1468,22 +1521,23 @@ int scaledFontSize = Math.max(8, (int) Math.round(10 * dimensions.zoomFactor));
             }
         }
 
-        if (destinationMarkers.isEmpty()) return;
+        if (destinationMarkers.isEmpty())
+            return;
 
         java.awt.Font originalFont = g2.getFont();
         int scaledFontSize = Math.max(8, (int) Math.round(10 * dimensions.zoomFactor));
         g2.setFont(new java.awt.Font("SansSerif", java.awt.Font.BOLD, scaledFontSize));
         java.awt.FontMetrics fm = g2.getFontMetrics();
 
-        int size = (int) Math.round(dimensions.tokenDiameter); 
-        int gap = (int) Math.round(2 * dimensions.zoomFactor);   
-        
-        int startX = (int) dimensions.rectBound.getX() + (int)(10 * dimensions.zoomFactor);
-        int startY = (int) dimensions.rectBound.getY() + (int)(10 * dimensions.zoomFactor);
+        int size = (int) Math.round(dimensions.tokenDiameter);
+        int gap = (int) Math.round(2 * dimensions.zoomFactor);
+
+        int startX = (int) dimensions.rectBound.getX() + (int) (10 * dimensions.zoomFactor);
+        int startY = (int) dimensions.rectBound.getY() + (int) (10 * dimensions.zoomFactor);
 
         for (int i = 0; i < destinationMarkers.size(); i++) {
             PublicCompany comp = destinationMarkers.get(i);
-            
+
             int x = startX + (i * (size + gap));
             int y = startY;
 
@@ -1500,7 +1554,7 @@ int scaledFontSize = Math.max(8, (int) Math.round(10 * dimensions.zoomFactor));
 
             // 3. Draw Company ID
             java.awt.Color fg = comp.getFgColour();
- 
+
             g2.setColor(fg);
             String id = comp.getId().substring(0, Math.min(comp.getId().length(), 3));
             int tx = x + (size - fm.stringWidth(id)) / 2;
