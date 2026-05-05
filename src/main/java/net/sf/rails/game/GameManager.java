@@ -2645,16 +2645,11 @@ if (isTimeManagementEnabled()) {
 
         if (!java.awt.GraphicsEnvironment.isHeadless()) {
             javax.swing.SwingUtilities.invokeLater(() -> {
-                // Gather player names and final net worths for potential upload
-                java.util.List<String> names = new java.util.ArrayList<>();
+                // Gather players and final net worths for potential upload
+                java.util.List<Player> players = new java.util.ArrayList<>();
                 java.util.List<Integer> scores = new java.util.ArrayList<>();
                 for (Player p : getRoot().getPlayerManager().getPlayers()) {
-
-                    String fullName = p.getFullName();
-                    if (fullName == null || fullName.trim().isEmpty()) {
-                        fullName = p.getName();
-                    }
-                    names.add(fullName);
+                    players.add(p);
                     scores.add(p.getWorth());
                 }
 
@@ -2670,7 +2665,7 @@ if (isTimeManagementEnabled()) {
 
                 if (dialogResult == javax.swing.JOptionPane.YES_OPTION) {
                     try {
-                        ResultUploader.uploadGameResult(getGameName(), names, scores);
+                        ResultUploader.uploadGameResult(getGameName(), players, scores);
                         log.info("results upload triggered.");
                     } catch (Exception e) {
                         log.error("Failed to transmit results: " + e.getMessage());

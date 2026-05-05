@@ -12,8 +12,8 @@ import java.util.stream.Collectors;
 public class ResultUploader {
     private static final String SCRIPT_URL = "https://script.google.com/macros/s/AKfycbybDcQ3X6QvuDTB0JiSDaIpM-sfmSfRCwEVE9KLSYFp-x-9XpfOSWSLVn8MGdM9CUCt/exec";
 
-    public static void uploadGameResult(String gameName, List<String> players, List<Integer> scores) {
-        String playersJson = players.stream().map(p -> "\"" + p + "\"").collect(Collectors.joining(",", "[", "]"));
+    public static void uploadGameResult(String gameName, List<Player> players, List<Integer> scores) {
+        String playersJson = players.stream().map(p -> "\"" + p.getFullName() + "\"").collect(Collectors.joining(",", "[", "]"));
         String scoresJson = scores.stream().map(String::valueOf).collect(Collectors.joining(",", "[", "]"));
         String jsonBody = String.format("{\"gameName\":\"%s\", \"players\":%s, \"scores\":%s}", gameName, playersJson,
                 scoresJson);
