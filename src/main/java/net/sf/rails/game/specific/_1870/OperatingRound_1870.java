@@ -175,6 +175,10 @@ public class OperatingRound_1870 extends OperatingRound {
     public boolean buyTrain(rails.game.action.BuyTrain action) {
         boolean success = super.buyTrain(action);
 
+        if (success) {
+            checkConnections();
+        }
+        
         return success;
     }
 
@@ -235,6 +239,9 @@ boolean allowPurchase = (bridge.getOwner() == company.getPresident());
         // 1870 Rule: Cattle Company token placement
         PublicCompany comp = getOperatingCompany();
         if (comp != null) {
+if (comp.hasDestination() && !comp.hasReachedDestination()) {
+                possibleActions.add(new ForceConnectionRunAction(getRoot(), comp.getId()));
+            }
             PrivateCompany cattle = getAvailableCattleCompany(comp);
             if (cattle != null) {
                 // Add a single action with a null hex. The dialog will open when clicked.
@@ -312,6 +319,19 @@ boolean allowPurchase = (bridge.getOwner() == company.getPresident());
 
     @Override
     public boolean processGameSpecificAction(rails.game.action.PossibleAction action) {
+        if (action instanceof ForceConnectionRunAction) {
+            ForceConnectionRunAction forceAction = (ForceConnectionRunAction) action;
+            PublicCompany comp = (PublicCompany) forceAction.getTarget();
+            if (comp != null && !comp.hasReachedDestination()) {
+                applyDestinationBonus(comp);
+                if (gameManager instanceof GameManager_1870) {
+                    ((GameManager_1870) gameManager).startConnectionRunRound(this, comp);
+                }
+                return true;
+            }
+            return false;
+        }
+
         if (action instanceof net.sf.rails.game.specific._1870.action.LayCattleToken_1870) {
             net.sf.rails.game.specific._1870.action.LayCattleToken_1870 cattleAction = (net.sf.rails.game.specific._1870.action.LayCattleToken_1870) action;
             PublicCompany comp = getRoot().getCompanyManager().getPublicCompany(cattleAction.getCompanyId());
@@ -757,4 +777,57 @@ return privateComp.getOwner() == company.getPresident();
         // --- END FIX ---
     }
 
+
+
+// --- START FIX ---
+    public static class ForceConnectionRunAction extends rails.game.action.PossibleAction implements rails.game.action.GuiTargetedAction {
+        private static final long serialVersionUID = 1L;
+        private final String companyId;
+
+        public ForceConnectionRunAction(net.sf.rails.game.RailsRoot root, String companyId) {
+            super(root);
+            this.companyId = companyId;
+        }
+
+        @Override
+        public String getGroupLabel() { return "CONNECTION RUN"; }
+
+        @Override
+        public String getButtonLabel() { return "Force Connection Run"; }
+
+        @Override
+        public net.sf.rails.game.state.Owner getTarget() { return getRoot().getCompanyManager().getPublicCompany(companyId); }
+
+        @Override
+        public net.sf.rails.game.state.Owner getActor() { return getRoot().getCompanyManager().getPublicCompany(companyId); }
+
+        @Override
+        public java.awt.Color getHighlightBackgroundColor() { return new java.awt.Color(255, 69, 0); } // Red-Orange
+
+        @Override
+        public java.awt.Color getHighlightBorderColor() { return java.awt.Color.BLACK; }
+
+        @Override
+        public java.awt.Color getHighlightTextColor() { return java.awt.Color.WHITE; }
+
+        @Override
+        public java.awt.Color getButtonColor() { return new java.awt.Color(255, 69, 0); }
+
+        @Override
+        public int getHotkey() { return 0; }
+
+        @Override
+        public boolean equals(Object o) {
+            if (this == o) return true;
+            if (o == null || getClass() != o.getClass()) return false;
+            ForceConnectionRunAction that = (ForceConnectionRunAction) o;
+            return java.util.Objects.equals(companyId, that.companyId);
+        }
+
+        @Override
+        public int hashCode() {
+            return java.util.Objects.hash(companyId);
+        }
+    }
+// --- END FIX ---
 }
