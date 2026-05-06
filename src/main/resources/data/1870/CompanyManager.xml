@@ -30,7 +30,7 @@
 	
 	<Company name="Brdg" type="Private" basePrice="40" revenue="10"
 		longname="Mississippi River Bridge Company"
-             description="Blocks all companies from bridging the Mississippi River until sold. Owning public company gets a $40 discount when building on Mississippi hexes. If bought by MP or SW in Phase 1, they may lay an extra free tile at their home city. Closes at the start of Phase 5." >
+             description="Blocks all companies from bridging the Mississippi River until sold. Owning public company gets a $40 discount when building on Mississippi hexes. If bought by MP or CB in Phase 1, they may lay an extra free tile at their home city. Closes at the start of Phase 5." >
 	<ClosingConditions><CloseManually/></ClosingConditions>
 	</Company>	
 
@@ -98,8 +98,8 @@ bgColour="333333" longname="St. Louis-San Francisco Railway"
 		<Destination hex="A2" />
 	</Company>
 	
-	<Company name="SW" type="Public" tokens="3" fgColour="FFFFFF"
-		bgColour="228B22" longname="St. Louis Southwestern Railway">
+	<Company name="CB" type="Public" tokens="3" fgColour="FFFFFF"
+		bgColour="228B22" longname="St. Louis Southwestern Railway (Cotton Belt)">
 		<Home hex="H17" />
 		<Destination hex="J3" />
 	</Company>

@@ -20,11 +20,16 @@ public class GulfModifier_1870 implements RevenueDynamicModifier {
     private int calculatedBonus = 0;
 
     @Override
-    public boolean prepareModifier(RevenueAdapter revenueAdapter) {
+public boolean prepareModifier(RevenueAdapter revenueAdapter) {
         net.sf.rails.game.PublicCompany comp = revenueAdapter.getCompany();
-        if (comp == null || comp.getPortfolioModel() == null) return false;
+// --- START FIX ---
+// --- DELETE ---        if (comp == null || comp.getPortfolioModel() == null) return false;
+// --- DELETE ---        
+// --- DELETE ---        for (net.sf.rails.game.PrivateCompany priv : comp.getPortfolioModel().getPrivateCompanies()) {
+        if (comp == null) return false;
         
-        for (net.sf.rails.game.PrivateCompany priv : comp.getPortfolioModel().getPrivateCompanies()) {
+        for (net.sf.rails.game.PrivateCompany priv : comp.getPrivates()) {
+// --- END FIX ---
             if (priv != null) {
                 String id = priv.getId();
                 String name = priv.getName() != null ? priv.getName() : "";
@@ -96,11 +101,15 @@ public class GulfModifier_1870 implements RevenueDynamicModifier {
         return totalBonus;
     }
 
-    private boolean hasGulfToken(MapHex hex) {
+private boolean hasGulfToken(MapHex hex) {
         if (hex == null || hex.getBonusTokens() == null) return false;
         for (BonusToken t : hex.getBonusTokens()) {
-            if ("Gulf".equals(t.getName())) return true;
+// --- START FIX ---
+// --- DELETE ---            if ("Gulf".equals(t.getName())) return true;
+            if (t.getName() != null && t.getName().contains("Gulf")) return true;
+// --- END FIX ---
         }
         return false;
     }
+    
 }

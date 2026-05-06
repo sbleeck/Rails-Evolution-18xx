@@ -94,6 +94,7 @@ public class ORPanel extends GridPanel
     public ActionButton btnTokenSkip, btnTokenConfirm;
     public ActionButton buttonOC, button1, button2, button3; // Legacy placeholders
     private JLabel focusLight;
+    public JSpinner revSpinner;
 
     private GameAction currentUndoAction;
     private GameAction currentRedoAction;
@@ -258,7 +259,7 @@ public class ORPanel extends GridPanel
                 phase = 3;
             } else if (pa instanceof BuyTrain && (phase == 0 || phase > 4)) {
                 phase = 4;
-            } else if (!(pa instanceof LayTile) && !(pa instanceof LayToken) 
+            } else if (!(pa instanceof LayTile) && !(pa instanceof LayToken)
                     && !(pa instanceof SetDividend) && !(pa instanceof BuyTrain)
                     && !(pa instanceof NullAction) && !(pa instanceof GameAction)
                     && !(pa instanceof rails.game.correct.CorrectionModeAction)) {
@@ -925,7 +926,7 @@ public class ORPanel extends GridPanel
     public void resetSidebarState() {
         if (btnDone != null) {
             btnDone.setActionCommand(DONE_CMD);
-if (btnDone.getPossibleActions() != null) {
+            if (btnDone.getPossibleActions() != null) {
                 btnDone.getPossibleActions().clear();
             }
             btnDone.setPossibleAction(null);
@@ -939,8 +940,8 @@ if (btnDone.getPossibleActions() != null) {
             btnTokenSkip.setEnabled(false);
         if (btnTokenConfirm != null)
             btnTokenConfirm.setEnabled(false);
-        
-if (btnRevPayout != null) {
+
+        if (btnRevPayout != null) {
             btnRevPayout.setEnabled(false);
             if (btnRevPayout.getPossibleActions() != null) {
                 btnRevPayout.getPossibleActions().clear();
@@ -961,9 +962,6 @@ if (btnRevPayout != null) {
             }
             btnRevSplit.setPossibleAction(null);
         }
-
-
-
 
         if (btnTrainSkip != null)
             btnTrainSkip.setEnabled(false);
@@ -1316,16 +1314,17 @@ if (btnRevPayout != null) {
 
         JPanel revDisplayPanel = new JPanel(new GridLayout(1, hasDirectCompanyIncomeInOR ? 2 : 1, 5, 0));
         revDisplayPanel.setOpaque(false);
-        revDisplayPanel.setMaximumSize(new Dimension(getSidebarWidth() - scale(10), scale(45)));
+        revDisplayPanel.setMaximumSize(new Dimension(Integer.MAX_VALUE, scale(70)));
+        revDisplayPanel.setPreferredSize(new Dimension(getSidebarWidth() - scale(10), scale(50)));
 
         JPanel divBox = new JPanel();
         divBox.setLayout(new BoxLayout(divBox, BoxLayout.Y_AXIS));
         divBox.setOpaque(false);
-        
+
         lblRoute = new JLabel("0", SwingConstants.CENTER);
         lblRoute.setAlignmentX(Component.CENTER_ALIGNMENT);
         lblRoute.setFont(new Font("SansSerif", Font.BOLD, 18));
-        
+
         if (hasDirectCompanyIncomeInOR) {
             JLabel lblDivTitle = new JLabel("Route", SwingConstants.CENTER);
             lblDivTitle.setAlignmentX(Component.CENTER_ALIGNMENT);
@@ -1334,7 +1333,40 @@ if (btnRevPayout != null) {
         } else {
             divBox.add(Box.createVerticalStrut(10));
         }
-        divBox.add(lblRoute);
+
+        JPanel routeContainer = new JPanel();
+        routeContainer.setLayout(new BoxLayout(routeContainer, BoxLayout.X_AXIS));
+        routeContainer.setOpaque(false);
+        routeContainer.add(Box.createHorizontalGlue());
+
+        revSpinner = new JSpinner(new SpinnerNumberModel(0, 0, 10000, 10));
+        revSpinner.setPreferredSize(new Dimension(80, 30));
+        revSpinner.setMaximumSize(new Dimension(100, 35));
+        revSpinner.setFont(new Font("SansSerif", Font.BOLD, 16));
+        revSpinner.addChangeListener(e -> {
+            if (isRevenueValueToBeSet) {
+                int val = (Integer) revSpinner.getValue();
+                int special = 0;
+                try {
+                    if (lblFixed != null)
+                        special = Integer.parseInt(lblFixed.getText().replaceAll("[^\\d]", ""));
+                } catch (Exception ex) {
+                }
+                setRevenue(orCompIndex, val + special, special);
+            }
+        });
+
+        routeContainer.add(revSpinner);
+        routeContainer.add(Box.createHorizontalGlue());
+        divBox.add(routeContainer);
+
+
+
+     
+     
+     
+     
+     
         revDisplayPanel.add(divBox);
 
         if (hasDirectCompanyIncomeInOR) {
@@ -1758,6 +1790,9 @@ if (btnRevPayout != null) {
                 if (routeRev < 0)
                     routeRev = 0;
                 lblRoute.setText(format(routeRev));
+                if (revSpinner != null) {
+                    revSpinner.setValue(routeRev);
+                }
             }
             if (lblFixed != null) {
                 lblFixed.setText(format(special));
@@ -1793,9 +1828,9 @@ if (btnRevPayout != null) {
                 }
             }
 
-// Only draw the path if the toggle is enabled
-            if (finalRes && isDisplayCurrentRoutes() && 
-                orUIManager != null && orUIManager.isShowRevenueRoutes()) {
+            // Only draw the path if the toggle is enabled
+            if (finalRes && isDisplayCurrentRoutes() &&
+                    orUIManager != null && orUIManager.isShowRevenueRoutes()) {
                 revenueAdapter.drawOptimalRunAsPath(orUIManager.getMap());
             }
 
@@ -2129,7 +2164,7 @@ if (btnRevPayout != null) {
     }
 
     public void redrawRoutes() {
-// Check both the Config and our new dynamic toggle[cite: 1]
+        // Check both the Config and our new dynamic toggle[cite: 1]
         boolean show = isDisplayCurrentRoutes();
         if (orUIManager != null && !orUIManager.isShowRevenueRoutes()) {
             show = false;
@@ -2152,7 +2187,13 @@ if (btnRevPayout != null) {
 
     public int getRevenue(int index) {
         // Return 0 or cached value. 1837 uses this to read spinner values.
+        // --- START FIX ---
+        if (revSpinner != null) {
+            return (Integer) revSpinner.getValue();
+        }
+        // --- DELETE --- // return (orComp != null) ? orComp.getLastRevenue() : 0;
         return (orComp != null) ? orComp.getLastRevenue() : 0;
+        // --- END FIX ---
     }
 
     public int getCompanyTreasuryBonusRevenue(int index) {
@@ -2210,9 +2251,10 @@ if (btnRevPayout != null) {
                         lblPlayerInfo.setVisible(false);
                     }
 
-String phaseName = "Phase";
+                    String phaseName = "Phase";
                     if (currentRound instanceof net.sf.rails.game.specific._1837.NationalFormationRound) {
-                        net.sf.rails.game.specific._1837.PublicCompany_1837 national = ((net.sf.rails.game.specific._1837.NationalFormationRound) currentRound).getNational();
+                        net.sf.rails.game.specific._1837.PublicCompany_1837 national = ((net.sf.rails.game.specific._1837.NationalFormationRound) currentRound)
+                                .getNational();
                         phaseName = (national != null ? national.getId() : "National") + " Formation";
                     } else if (currentRound.getClass().getSimpleName().contains("Formation")) {
                         phaseName = "Prussian Formation";
@@ -2272,7 +2314,8 @@ String phaseName = "Phase";
 
         }
         // Dynamically override instruction if a GuiTargetedAction is active
-        if (specialContainer != null && specialContainer.isVisible() && specialPanel != null && specialPanel.getComponentCount() > 0) {
+        if (specialContainer != null && specialContainer.isVisible() && specialPanel != null
+                && specialPanel.getComponentCount() > 0) {
             Component firstBtn = specialPanel.getComponent(0);
             if (firstBtn instanceof ActionButton && !((ActionButton) firstBtn).getPossibleActions().isEmpty()) {
                 PossibleAction pa = ((ActionButton) firstBtn).getPossibleActions().get(0);
@@ -2285,7 +2328,7 @@ String phaseName = "Phase";
             }
         }
 
-       Color headerBg = orComp.getBgColour();
+        Color headerBg = orComp.getBgColour();
         Color headerFg = orComp.getFgColour();
 
         if (currentRound != null && currentRound.getClass().getSimpleName().contains("ConnectionRun")) {
@@ -2303,7 +2346,6 @@ String phaseName = "Phase";
                     "</center></html>";
 
             lblCompanyInfo.setText(topText);
-
 
             lblCompanyInfo.setBackground(headerBg);
             lblCompanyInfo.setForeground(headerFg);
@@ -2406,12 +2448,15 @@ String phaseName = "Phase";
                 int routeRev = totalRev - fixedRev;
 
                 lblRoute.setText(format(routeRev));
+                if (revSpinner != null)
+                    revSpinner.setValue(routeRev);
                 lblFixed.setText(format(fixedRev));
             } else {
                 lblRoute.setText(format(orComp.getLastRevenue()));
+                if (revSpinner != null)
+                    revSpinner.setValue(orComp.getLastRevenue());
             }
         }
-
 
         if (trainDisplay != null)
             trainDisplay.updateAssets(orComp);
@@ -2565,7 +2610,7 @@ String phaseName = "Phase";
             label = action.getButtonLabel();
             if (label == null || label.isEmpty())
                 label = action.toString();
-} else if (action instanceof GuiTargetedAction) {
+        } else if (action instanceof GuiTargetedAction) {
             // PRIORITY: If the action defines its own visual signature, use it.
             GuiTargetedAction gta = (GuiTargetedAction) action;
             label = gta.getButtonLabel();
@@ -2579,7 +2624,8 @@ String phaseName = "Phase";
             textColor = gta.getHighlightTextColor();
 
         } else if (action instanceof DiscardTrain) {
-            // FALLBACK: Only used if DiscardTrain somehow stops implementing GuiTargetedAction
+            // FALLBACK: Only used if DiscardTrain somehow stops implementing
+            // GuiTargetedAction
             bgColor = UITheme.ACTION_DISCARD;
 
             borderColor = Color.BLACK;
@@ -2617,10 +2663,10 @@ String phaseName = "Phase";
             }
         } else if (action instanceof LayBaseToken) {
             highlightTarget = ((LayBaseToken) action).getCompany();
-            } else if (action instanceof BuyPrivate) {
+        } else if (action instanceof BuyPrivate) {
             BuyPrivate bp = (BuyPrivate) action;
             highlightTarget = bp.getPrivateCompany();
-label = "Buy " + highlightTarget.getId() + " (" + bp.getMinimumPrice() + "-" + bp.getMaximumPrice() + ")";
+            label = "Buy " + highlightTarget.getId() + " (" + bp.getMinimumPrice() + "-" + bp.getMaximumPrice() + ")";
             bgColor = new Color(255, 235, 235); // Matches RailCard private company styling
             borderColor = new Color(200, 150, 150);
             textColor = Color.BLACK;
@@ -2637,12 +2683,14 @@ label = "Buy " + highlightTarget.getId() + " (" + bp.getMinimumPrice() + "-" + b
                 try {
                     java.lang.reflect.Method m = sp.getClass().getMethod("getHelp");
                     subText = (String) m.invoke(sp);
-                } catch (Exception e) {}
+                } catch (Exception e) {
+                }
                 if (subText == null || subText.trim().isEmpty()) {
                     try {
                         java.lang.reflect.Method m = sp.getClass().getMethod("getInfo");
                         subText = (String) m.invoke(sp);
-                    } catch (Exception e) {}
+                    } catch (Exception e) {
+                    }
                 }
             }
         }
@@ -2658,7 +2706,7 @@ label = "Buy " + highlightTarget.getId() + " (" + bp.getMinimumPrice() + "-" + b
             html.append("<b style='font-size: 12px;'>").append(label).append("</b>");
 
             if (subText != null && !subText.trim().isEmpty()) {
-                // Inject the XML rule description on a second line. 
+                // Inject the XML rule description on a second line.
                 // Color inherits from the button's dynamic text color to maintain contrast.
                 html.append("<br><span style='font-size: 10px; font-weight: normal;'>");
                 html.append(subText);
@@ -2678,8 +2726,10 @@ label = "Buy " + highlightTarget.getId() + " (" + bp.getMinimumPrice() + "-" + b
         btn.setMaximumSize(new Dimension(getSidebarWidth() - scale(20), scale(60)));
         bindActionHotkey(btn, action);
 
-        if (highlightTarget != null && highlightTarget.getInfoText() != null && !highlightTarget.getInfoText().isEmpty()) {
-            btn.setToolTipText("<html><div style='width: 250px;'>" + highlightTarget.getInfoText().replaceAll("\\n", "<br>") + "</div></html>");
+        if (highlightTarget != null && highlightTarget.getInfoText() != null
+                && !highlightTarget.getInfoText().isEmpty()) {
+            btn.setToolTipText("<html><div style='width: 250px;'>"
+                    + highlightTarget.getInfoText().replaceAll("\\n", "<br>") + "</div></html>");
         }
 
         // Attach HexHighlightMouseListener based on specific Company type
@@ -2868,24 +2918,23 @@ label = "Buy " + highlightTarget.getId() + " (" + bp.getMinimumPrice() + "-" + b
                             // Once we find a discard context, we lock it in and stop searching
                             break;
                         }
-                    }
-else if (pa instanceof rails.game.specific._1835.StartPrussian || 
-                             pa instanceof rails.game.specific._1835.ExchangeForPrussianShare ||
-                             pa instanceof net.sf.rails.game.specific._1837.ExchangeMinorAction) {
+                    } else if (pa instanceof rails.game.specific._1835.StartPrussian ||
+                            pa instanceof rails.game.specific._1835.ExchangeForPrussianShare ||
+                            pa instanceof net.sf.rails.game.specific._1837.ExchangeMinorAction) {
                         isFormationStep = true;
                     }
                 }
             }
 
             // Sync Context
-if (isFormationStep) {
+            if (isFormationStep) {
                 engineActiveComp = null;
                 this.orComp = null;
                 this.currentOperatingComp = null;
             } else if (engineActiveComp != null && !engineActiveComp.isClosed()) {
-this.currentOperatingComp = engineActiveComp;
+                this.currentOperatingComp = engineActiveComp;
                 this.orComp = engineActiveComp;
-                        }
+            }
 
             // 3. FILTER & DETECT SPECIAL ACTIONS
             List<PossibleAction> specialActions = new ArrayList<>();
@@ -2910,12 +2959,12 @@ this.currentOperatingComp = engineActiveComp;
                 validOrActions.add(pa);
 
                 boolean isStandardUIAction = (pa instanceof LayTile) ||
-                                             (pa instanceof LayToken) ||
-                                             (pa instanceof BuyTrain) ||
-                                             (pa instanceof SetDividend) ||
-                                             (pa instanceof NullAction) ||
-                                             (pa instanceof GameAction) ||
-                                             (pa instanceof CorrectionModeAction);
+                        (pa instanceof LayToken) ||
+                        (pa instanceof BuyTrain) ||
+                        (pa instanceof SetDividend) ||
+                        (pa instanceof NullAction) ||
+                        (pa instanceof GameAction) ||
+                        (pa instanceof CorrectionModeAction);
 
                 if (!isStandardUIAction) {
                     specialActions.add(pa);
@@ -2929,11 +2978,12 @@ this.currentOperatingComp = engineActiveComp;
                 }
             }
 
-            // Ensure the decline/pass button appears cleanly in the special panel during Formation
+            // Ensure the decline/pass button appears cleanly in the special panel during
+            // Formation
             if (isFormationStep && deferredNullAction != null) {
                 specialActions.add(deferredNullAction);
             }
-            
+
             // Determine phase based ONLY on valid OR actions
             int computedPhase = determineActivePhase(validOrActions);
             boolean hasStandardActions = computedPhase > 0;
@@ -2941,7 +2991,8 @@ this.currentOperatingComp = engineActiveComp;
             // THE DORMANCY INTERCEPT (Hardened)
             boolean onlyPassRemains = validOrActions.size() == 1 && deferredNullAction != null;
 
-            // If any valid OR action is a GuiTargetedAction, we should use it for the header context
+            // If any valid OR action is a GuiTargetedAction, we should use it for the
+            // header context
             if (contextProvider == null) {
                 for (PossibleAction pa : validOrActions) {
                     if (pa instanceof GuiTargetedAction) {
