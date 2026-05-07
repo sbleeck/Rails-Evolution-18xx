@@ -3133,8 +3133,12 @@ public class ORPanel extends GridPanel
 
     // ... (lines of unchanged context code) ...
 
-    // --- START FIX ---
-    public void handleEnterPress() {
+   public void handleEnterPress() {
+        // Prioritize the explicitly set default button to restore expected 'Enter' behavior
+        if (currentDefaultButton != null && currentDefaultButton.isVisible() && currentDefaultButton.isEnabled()) {
+            currentDefaultButton.doClick();
+            return;
+        }
 
         // 1. Check Special Panel (Discards, etc)
         if (specialContainer != null && specialContainer.isVisible()) {

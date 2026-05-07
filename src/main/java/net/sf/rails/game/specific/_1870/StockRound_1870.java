@@ -25,7 +25,8 @@ public class StockRound_1870 extends StockRound {
     private final net.sf.rails.game.state.StringState reissuedThisRound = net.sf.rails.game.state.StringState
             .create(this, "reissuedThisRound", "");
 
-            
+    private final net.sf.rails.game.state.StringState companiesThatHaveReissued = net.sf.rails.game.state.StringState
+.create(this, "companiesThatHaveReissued", "");
 
     private final StringState protectingCompanyId = StringState.create(this, "protectingCompanyId", "");
     private final net.sf.rails.game.state.IntegerState protectingShares = net.sf.rails.game.state.IntegerState
@@ -412,10 +413,41 @@ if (action instanceof rails.game.action.SellShares && getRoot().getGameManager()
 
     @Override
     public boolean process(rails.game.action.PossibleAction action) {
+      if (action instanceof rails.game.action.BuyCertificate) {
+            rails.game.action.BuyCertificate buyAction = (rails.game.action.BuyCertificate) action;
+            PublicCompany comp = buyAction.getCompany();
+            
+            // Check if the purchase is from the IPO by comparing the unique portfolio names
+            boolean fromIPO = false;
+            if (buyAction.getFromName() != null && ipo != null) {
+                fromIPO = buyAction.getFromName().equals(ipo.getUniqueName());
+            } else if (buyAction.getFromPortfolio() == ipo) {
+                fromIPO = true;
+            }
+            
+            boolean result = super.process(action);
+            
+            if (result && fromIPO && companiesThatHaveReissued.value().contains(comp.getId() + ",")) {
+                // 1870 rules limit purchases to 1 certificate per turn, but we'll check numberBought just in case.
+                int certsBought = buyAction.getNumberBought() > 0 ? buyAction.getNumberBought() : 1;
+                int cost = buyAction.getPrice() * certsBought;
+                
+                // The base engine wired the player's money to the Bank.
+                // We wire it from the Bank to the Company to complete the reissue transaction.
+                net.sf.rails.game.state.Currency.wire(getRoot().getBank(), cost, comp);
+                net.sf.rails.common.ReportBuffer.add(this, "Payment for reissued share transferred to " + comp.getId() + " treasury.");
+            }
+            return result;
+        }
+        
         if (action instanceof net.sf.rails.game.specific._1870.action.ReissueShares_1870) {
             String companyId = ((net.sf.rails.game.specific._1870.action.ReissueShares_1870) action).getCompanyId();
             PublicCompany company = getRoot().getCompanyManager().getPublicCompany(companyId);
             reissuedThisRound.set(reissuedThisRound.value() + company.getId() + ",");
+
+            if (!companiesThatHaveReissued.value().contains(company.getId() + ",")) {
+companiesThatHaveReissued.set(companiesThatHaveReissued.value() + company.getId() + ",");
+}
 
             int sharesToReissue = company.getPortfolioModel().getShares(company);
             for (net.sf.rails.game.financial.PublicCertificate cert : company.getPortfolioModel()
@@ -435,9 +467,15 @@ if (action instanceof rails.game.action.SellShares && getRoot().getGameManager()
             net.sf.rails.common.ReportBuffer.add(this, company.getId() + " reissues " + sharesToReissue
                     + " share(s) to IPO. Par adjusted to " + getRoot().getBank().getCurrency().format(newPar) + ".");
 
+numPasses.set(0);
+            List<Player> players = playerManager.getPlayers();
+            int pIndex = players.indexOf(getCurrentPlayer());
+            playerManager.setPriorityPlayer(players.get((pIndex + 1) % players.size()));
+
             hasActed.set(true);
             super.process(new rails.game.action.NullAction(getRoot(), rails.game.action.NullAction.Mode.DONE));
             return true;
+
 
         } else if (action instanceof net.sf.rails.game.specific._1870.action.RedeemShare_1870) {
             String companyId = ((net.sf.rails.game.specific._1870.action.RedeemShare_1870) action).getCompanyId();
@@ -471,6 +509,11 @@ if (action instanceof rails.game.action.SellShares && getRoot().getGameManager()
                 net.sf.rails.common.ReportBuffer.add(this, company.getId() + " redeems a share for "
                         + getRoot().getBank().getCurrency().format(marketPrice) + ".");
             }
+
+numPasses.set(0);
+            List<Player> players = playerManager.getPlayers();
+            int pIndex = players.indexOf(getCurrentPlayer());
+            playerManager.setPriorityPlayer(players.get((pIndex + 1) % players.size()));
 
             hasActed.set(true);
             super.process(new rails.game.action.NullAction(getRoot(), rails.game.action.NullAction.Mode.DONE));
@@ -548,6 +591,8 @@ if (action instanceof rails.game.action.SellShares && getRoot().getGameManager()
         }
         return super.process(action);
     }
+
+    
 
     private int calculateNewPar(int oldPar, int marketPrice) {
         int target = (int) Math.round(marketPrice * 0.75);
