@@ -3129,7 +3129,7 @@ JPanel[] currentPanels = playerPrivatesPanel;
                 bgIpo = BG_SPOTLIGHT_INACTIVE;
                 bgCurr = BG_SPOTLIGHT_INACTIVE;
 
-                bgDet = BG_MAUVE;
+                bgDet = c.hasFloated() ? BG_MAUVE : BG_INACTIVE;
                 bgCurr = BG_POOL;
             }
 
@@ -3344,7 +3344,7 @@ JPanel[] currentPanels = playerPrivatesPanel;
             Color bgRow;
             if (isOperating) {
                 bgRow = BG_OPERATING; // Yellow
-            } else if (!isActive) {
+            } else if (!c.hasFloated()) {
                 bgRow = BG_INACTIVE; // Grey
             } else {
                 bgRow = BG_MAUVE; // Mauve (Default for Active)
@@ -3362,6 +3362,10 @@ JPanel[] currentPanels = playerPrivatesPanel;
             if (compRevenue[i] != null) {
                 compRevenue[i].setBackground(bgRow);
                 compRevenue[i].setOpaque(true);
+            }
+            if (compRetained[i] != null) {
+                compRetained[i].setBackground(bgRow);
+                compRetained[i].setOpaque(true);
             }
 
             if (compDest[i] != null) {
@@ -5085,7 +5089,7 @@ JPanel[] currentPanels = playerPrivatesPanel;
                         treasuryShareCards[i], null, dimCard, null, getBorder.apply(true, false));
                 treasuryPanels[i]
                         .setBackground(isOperating ? BG_OPERATING
-                                : (isMinor || !isActive ? BG_INACTIVE : BG_MAUVE));
+                                : (isMinor || !c.hasFloated() ? BG_INACTIVE : BG_MAUVE));
                 treasuryPanels[i].setOpaque(true);
 
                 addField(treasuryPanels[i], certInTreasuryXOffset, y, 1, 1, 0, visible);
@@ -5139,7 +5143,7 @@ JPanel[] currentPanels = playerPrivatesPanel;
                 }
             };
 
-            f.setBackground(isOperating ? BG_OPERATING : (!isActive ? BG_INACTIVE : BG_MAUVE));
+            f.setBackground(isOperating ? BG_OPERATING : (!c.hasFloated() ? BG_INACTIVE : BG_MAUVE));
             f.setOpaque(true);
             f.setBorder(BorderFactory.createCompoundBorder(bDet, BorderFactory.createEmptyBorder(0, 0, 0, 5)));
             ((JLabel) f).setHorizontalAlignment(SwingConstants.RIGHT);
@@ -5157,7 +5161,7 @@ JPanel[] currentPanels = playerPrivatesPanel;
             // 1. TRAINS PANEL (Now 2nd column)
             compTrainsButtonPanel[i] = new JPanel(new GridBagLayout());
             compTrainsButtonPanel[i].setBorder(bDet);
-            compTrainsButtonPanel[i].setBackground(isOperating ? BG_OPERATING : (!isActive ? BG_INACTIVE : BG_MAUVE));
+            compTrainsButtonPanel[i].setBackground(isOperating ? BG_OPERATING : (!c.hasFloated() ? BG_INACTIVE : BG_MAUVE));
             compTrainsButtonPanel[i].setOpaque(true);
 
             GridBagConstraints gbcT = new GridBagConstraints();
@@ -5200,7 +5204,7 @@ JPanel[] currentPanels = playerPrivatesPanel;
                 }
             };
 
-            f.setBackground(isOperating ? BG_OPERATING : (!isActive ? BG_INACTIVE : BG_MAUVE));
+            f.setBackground(isOperating ? BG_OPERATING : (!c.hasFloated() ? BG_INACTIVE : BG_MAUVE));
             f.setOpaque(true);
             f.setBorder(BorderFactory.createCompoundBorder(bDet, BorderFactory.createEmptyBorder(0, 0, 0, 5)));
             ((JLabel) f).setHorizontalAlignment(SwingConstants.RIGHT);
@@ -5228,7 +5232,7 @@ JPanel[] currentPanels = playerPrivatesPanel;
                 }
             };
 
-            f.setBackground(isOperating ? BG_OPERATING : (!isActive ? BG_INACTIVE : BG_MAUVE));
+            f.setBackground(isOperating ? BG_OPERATING : (!c.hasFloated() ? BG_INACTIVE : BG_MAUVE));
             f.setOpaque(true);
             f.setBorder(BorderFactory.createCompoundBorder(bDet, BorderFactory.createEmptyBorder(0, 0, 0, 5)));
             ((JLabel) f).setHorizontalAlignment(SwingConstants.RIGHT);
@@ -5260,7 +5264,7 @@ JPanel[] currentPanels = playerPrivatesPanel;
             // 3b. DESTINATION PANEL
             compDest[i] = new JPanel(new FlowLayout(FlowLayout.CENTER, 2, 0));
             compDest[i].setOpaque(true);
-            compDest[i].setBackground(isOperating ? BG_OPERATING : (!isActive ? BG_INACTIVE : BG_MAUVE));
+            compDest[i].setBackground(isOperating ? BG_OPERATING : (!c.hasFloated() ? BG_INACTIVE : BG_MAUVE));
             compDest[i].setBorder(bDet);
             compDest[i].setPreferredSize(dimTokens);
             updateCompanyDestinationDisplay(i, c, compDest[i]);
@@ -5269,7 +5273,7 @@ JPanel[] currentPanels = playerPrivatesPanel;
             // 4. MARKERS/TOKENS PANEL (Now 5th column)
             compTokens[i] = new JPanel(new FlowLayout(FlowLayout.CENTER, 2, 0));
             compTokens[i].setOpaque(true);
-            compTokens[i].setBackground(isOperating ? BG_OPERATING : (!isActive ? BG_INACTIVE : BG_MAUVE));
+            compTokens[i].setBackground(isOperating ? BG_OPERATING : (!c.hasFloated() ? BG_INACTIVE : BG_MAUVE));
             compTokens[i].setBorder(bDet);
             compTokens[i].setPreferredSize(dimTokens);
             updateCompanyTokenDisplay(i, c, compTokens[i]);
@@ -5279,7 +5283,7 @@ JPanel[] currentPanels = playerPrivatesPanel;
                 // Use FlowLayout to stack multiple privates horizontally if necessary
                 compPrivatesPanel[i] = new JPanel(new FlowLayout(FlowLayout.CENTER, 2, 0));
                 compPrivatesPanel[i].setOpaque(true);
-                compPrivatesPanel[i].setBackground(isOperating ? BG_OPERATING : (!isActive ? BG_INACTIVE : BG_MAUVE));
+                compPrivatesPanel[i].setBackground(isOperating ? BG_OPERATING : (!c.hasFloated() ? BG_INACTIVE : BG_MAUVE));
                 compPrivatesPanel[i].setBorder(bDet);
                 // No fixed preference size; let it grow with content, but set minimum
                 compPrivatesPanel[i].setMinimumSize(dimStd);
@@ -5292,7 +5296,7 @@ JPanel[] currentPanels = playerPrivatesPanel;
                 // We use buySellGroup to maintain UI focus consistency.
                 ClickField cf = new ClickField("", "takeLoan_" + c.getId(), "Take Loans", this, buySellGroup);
                 compLoans[i] = cf;
-                cf.setBackground(isOperating ? BG_OPERATING : (!isActive ? BG_INACTIVE : BG_MAUVE));
+                cf.setBackground(isOperating ? BG_OPERATING : (!c.hasFloated() ? BG_INACTIVE : BG_MAUVE));
                 cf.setOpaque(true);
                 cf.setBorder(bDet);
                 cf.setPreferredSize(dimStd);
