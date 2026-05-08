@@ -613,6 +613,26 @@ public abstract class HexMap implements MouseListener, MouseMotionListener {
     /** list of generalpath elements to indicate train runs */
     private List<GeneralPath> trainPaths;
 
+    public java.util.Set<MapHex> getRouteHexes() {
+        return routeHexes;
+    }
+
+    public void setTrainPaths(List<GeneralPath> trainPaths, java.util.Collection<MapHex> involvedHexes) {
+        this.trainPaths = trainPaths;
+        this.routeHexes.clear();
+        if (involvedHexes != null) {
+            this.routeHexes.addAll(involvedHexes);
+        }
+
+        // Force the entire map to repaint. This ensures the RoutesLayer and TokensTextsLayer 
+        // stay perfectly in sync, even if the paths span the entire board.
+        repaintAll(new Rectangle(getSize()));
+    }
+
+
+    /** Set of hexes logically involved in the current train routes */
+    private java.util.Set<MapHex> routeHexes = new java.util.HashSet<>();
+
     // Definitions used by subclasses
     protected static final double PEAK_MARGIN = 1.0;
     protected static final double FLAT_MARGIN = 0.80;
@@ -980,13 +1000,11 @@ public abstract class HexMap implements MouseListener, MouseMotionListener {
     }
 
 public void setTrainPaths(List<GeneralPath> trainPaths) {
-        // --- START FIX ---
         this.trainPaths = trainPaths;
 
         // Force the entire map to repaint. This ensures the RoutesLayer and TokensTextsLayer 
         // stay perfectly in sync, even if the paths span the entire board.
         repaintAll(new Rectangle(getSize()));
-        // --- END FIX ---
     }
 
     /**
@@ -1221,5 +1239,7 @@ public void setTrainPaths(List<GeneralPath> trainPaths) {
         Rectangle r = new Rectangle(getSize());
         repaintAll(r);
     }
+
+    
 
 }

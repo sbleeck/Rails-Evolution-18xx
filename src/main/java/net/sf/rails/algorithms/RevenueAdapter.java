@@ -890,18 +890,6 @@ public class RevenueAdapter implements Runnable {
         return runPrettyPrint.toString();
     }
 
-    public void drawOptimalRunAsPath(HexMap map) {
-        List<RevenueTrainRun> listRuns = getOptimalRun();
-
-        List<GeneralPath> pathList = new ArrayList<>();
-        if (listRuns != null) {
-            for (RevenueTrainRun run : listRuns) {
-                pathList.add(run.getAsPath(map));
-            }
-        }
-        map.setTrainPaths(pathList);
-    }
-
     @Override
     public String toString() {
         StringBuilder buffer = new StringBuilder();
@@ -924,4 +912,28 @@ public class RevenueAdapter implements Runnable {
         return this.networkAdapter;
     }
 
+    public void drawOptimalRunAsPath(HexMap map) {
+        List<RevenueTrainRun> listRuns = getOptimalRun();
+
+        List<GeneralPath> pathList = new ArrayList<>();
+        Set<MapHex> routeHexes = new HashSet<>(); // --- FIX: Initialize logical hex collection
+
+        if (listRuns != null) {
+            for (RevenueTrainRun run : listRuns) {
+                pathList.add(run.getAsPath(map));
+                
+                // Extract the logical hexes the train actually visits
+                if (run.getRunVertices() != null) {
+                    for (NetworkVertex v : run.getRunVertices()) {
+                        if (v.getHex() != null) {
+                            routeHexes.add(v.getHex());
+                        }
+                    }
+                }
+            }
+        }
+        
+        // --- FIX: Pass BOTH the graphical lines and logical hexes to the map ---
+        map.setTrainPaths(pathList, routeHexes);
+    }
 }

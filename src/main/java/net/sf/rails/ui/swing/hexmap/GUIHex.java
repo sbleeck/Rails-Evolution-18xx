@@ -760,23 +760,31 @@ public class GUIHex implements Observer {
             }
         } catch (Exception e) {}
 
-        // 2. If no phase-specific hex value, check the individual stations on the hex
-        if (hexValue == 0 && getHex().getStops() != null) {
-            for (Stop stop : getHex().getStops()) {
-                if (stop.getRelatedStation() != null) {
-                    int val = stop.getRelatedStation().getValue();
-                    if (val > hexValue) hexValue = val; // Grab the maximum value available on the hex
-                }
-            }
-        }
-
-PublicCompany currentComp = null;
+        // Fetch the operating company FIRST before checking the stops
+        PublicCompany currentComp = null;
         if (hexMap.getOrUIManager() != null && hexMap.getOrUIManager().getGameUIManager() != null) {
             RoundFacade round = hexMap.getOrUIManager().getGameUIManager().getCurrentRound();
             if (round instanceof OperatingRound) {
                 currentComp = ((OperatingRound) round).getOperatingCompany();
             }
         }
+
+        // 2. If no phase-specific hex value, check the individual stations on the hex
+        if (hexValue == 0 && getHex().getStops() != null) {
+            for (Stop stop : getHex().getStops()) {
+                // Only count the value if the operating company is allowed to stop here
+                if (currentComp != null && !stop.isRunToAllowedFor(currentComp, true)) {
+                    continue; 
+                }
+                
+                if (stop.getRelatedStation() != null) {
+                    // Use getValueForPhase to get the correct current value (e.g. for 1837 mines)
+                    int val = stop.getValueForPhase(hexMap.getPhase());
+                    if (val > hexValue) hexValue = val; 
+                }
+            }
+        }
+
 
         if (getHex().getBonusTokens() != null) {
             for (BonusToken token : getHex().getBonusTokens()) {
@@ -811,16 +819,12 @@ PublicCompany currentComp = null;
             float textX = (float) (dimensions.center.getX() - textWidth / 2.0);
             float textY = (float) (dimensions.center.getY() + textHeight / 2.0 - fm.getDescent());
 
-            // Determine if this hex is on the active network path
+           // Determine if this hex is logically on the active network path
             boolean isOnNetwork = false;
-            if (activePaths != null) {
-                for (java.awt.geom.GeneralPath path : activePaths) {
-                    if (path.intersects(dimensions.hexagon.getBounds2D())) {
-                        isOnNetwork = true;
-                        break;
-                    }
-                }
+            if (hexMap.getRouteHexes() != null && hexMap.getRouteHexes().contains(getHex())) {
+                isOnNetwork = true;
             }
+            
 
             // Draw a thick black "halo" for extreme contrast
             g.setColor(Color.BLACK);
