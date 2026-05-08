@@ -18,28 +18,13 @@ public class GulfModifier_1870 implements RevenueDynamicModifier {
 
     private static final Logger log = LoggerFactory.getLogger(GulfModifier_1870.class);
     private int calculatedBonus = 0;
-
-
+    private net.sf.rails.game.PublicCompany operatingCompany;
 
     @Override
     public boolean prepareModifier(RevenueAdapter revenueAdapter) {
-        net.sf.rails.game.PublicCompany comp = revenueAdapter.getCompany();
-        if (comp == null) return false;
-        
-        for (net.sf.rails.game.PrivateCompany priv : comp.getPrivates()) {
-            if (priv != null) {
-                String id = priv.getId();
-                String name = priv.getName() != null ? priv.getName() : "";
-                if ("Gulf".equals(id) || name.contains("Gulf")) {
-                    return true;
-                }
-            }
-        }
-        return false;
+        operatingCompany = revenueAdapter.getCompany();
+        return operatingCompany != null;
     }
-
-
-
 
     @Override
     public int predictionValue(List<RevenueTrainRun> runs) {
@@ -69,47 +54,65 @@ public class GulfModifier_1870 implements RevenueDynamicModifier {
 
     private int calculateGulfBonus(List<RevenueTrainRun> runs) {
         int totalBonus = 0;
-        if (runs == null) return 0;
+        if (runs == null)
+            return 0;
 
         for (RevenueTrainRun run : runs) {
             Set<MapHex> visitedHexes = new HashSet<>();
 
             if (run.getRunVertices() != null) {
                 for (NetworkVertex v : run.getRunVertices()) {
-                    if (v != null && v.getHex() != null) visitedHexes.add(v.getHex());
+                    if (v != null && v.getHex() != null)
+                        visitedHexes.add(v.getHex());
                 }
             }
 
-            List<NetworkEdge> edges = run.getEdges(); 
+            List<NetworkEdge> edges = run.getEdges();
             if (edges != null) {
                 for (NetworkEdge e : edges) {
                     List<NetworkVertex> path = e.getVertexPath();
                     if (path != null) {
                         for (NetworkVertex v : path) {
-                            if (v != null && v.getHex() != null) visitedHexes.add(v.getHex());
+                            if (v != null && v.getHex() != null)
+                                visitedHexes.add(v.getHex());
                         }
                     }
                 }
             }
-            
+
             for (MapHex hex : visitedHexes) {
-                if (hasGulfToken(hex)) {
-                    totalBonus += 20;
-                }
+                totalBonus += getGulfTokenBonus(hex);
             }
         }
         return totalBonus;
     }
 
-private boolean hasGulfToken(MapHex hex) {
-        if (hex == null || hex.getBonusTokens() == null) return false;
+    private int getGulfTokenBonus(MapHex hex) {
+        if (hex == null || hex.getBonusTokens() == null)
+            return 0;
         for (BonusToken t : hex.getBonusTokens()) {
-// --- START FIX ---
-// --- DELETE ---            if ("Gulf".equals(t.getName())) return true;
-            if (t.getName() != null && t.getName().contains("Gulf")) return true;
-// --- END FIX ---
+            String tName = t.getName();
+            if (tName != null) {
+                String lowerName = tName.toLowerCase();
+                if (lowerName.contains("gulf")) {
+                    boolean owner = false;
+                    if (operatingCompany != null) {
+                        owner = tName.startsWith(operatingCompany.getId() + "_");
+                        if (!owner) {
+                            for (net.sf.rails.game.PrivateCompany priv : operatingCompany.getPrivates()) {
+                                if ("Gulf".equals(priv.getId()) || (priv.getName() != null && priv.getName().contains("Gulf"))) {
+                                    owner = true;
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                    if (owner) return 20;
+                    if (lowerName.contains("closed")) return 0;
+                    return 10;
+                }
+            }
         }
-        return false;
+        return 0;
     }
-    
 }

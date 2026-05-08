@@ -55,7 +55,6 @@ public class GUIHex implements Observer {
 
     private String customOverlayText = null;
 
-
     /**
      * Static class that describes x-y coordinates for GUIHexes
      */
@@ -731,34 +730,33 @@ public class GUIHex implements Observer {
         if (hexMap.getOrUIManager() != null && hexMap.getOrUIManager().isShowDestinationMarkers()) {
             drawDestinationMilestones(g);
         }
-        
 
-
-// COMICAL CITY VALUES: Show if toggled ON and routes are actually plotted[cite: 5, 6].
+        // COMICAL CITY VALUES: Show if toggled ON and routes are actually plotted[cite:
+        // 5, 6].
         ORUIManager manager = hexMap.getOrUIManager();
         if (manager != null && manager.isShowFancyCityValues()) {
-            
+
             // source of truth: does the Map have paths to draw?
             java.util.List<java.awt.geom.GeneralPath> activePaths = hexMap.getTrainPaths();
-            
+
             if (activePaths != null && !activePaths.isEmpty()) {
                 paintFancyCityValues(g, activePaths);
             }
         }
 
-
-        
     }
 
     private void paintFancyCityValues(Graphics2D g, java.util.List<java.awt.geom.GeneralPath> activePaths) {
         int hexValue = 0;
 
-        // 1. Check for phase-specific hex value (e.g., standard off-board areas or upgraded tiles)
+        // 1. Check for phase-specific hex value (e.g., standard off-board areas or
+        // upgraded tiles)
         try {
             if (getHex().hasValuesPerPhase()) {
                 hexValue = getHex().getCurrentValueForPhase(hexMap.getPhase());
             }
-        } catch (Exception e) {}
+        } catch (Exception e) {
+        }
 
         // Fetch the operating company FIRST before checking the stops
         PublicCompany currentComp = null;
@@ -774,19 +772,19 @@ public class GUIHex implements Observer {
             for (Stop stop : getHex().getStops()) {
                 // Only count the value if the operating company is allowed to stop here
                 if (currentComp != null && !stop.isRunToAllowedFor(currentComp, true)) {
-                    continue; 
+                    continue;
                 }
-                
+
                 if (stop.getRelatedStation() != null) {
                     // Use getValueForPhase to get the correct current value (e.g. for 1837 mines)
                     int val = stop.getValueForPhase(hexMap.getPhase());
-                    if (val > hexValue) hexValue = val; 
+                    if (val > hexValue)
+                        hexValue = val;
                 }
             }
         }
 
-
-if (hexMap != null) {
+        if (hexMap != null) {
             hexValue += hexMap.getDynamicHexBonus(getHex());
         }
 
@@ -794,19 +792,33 @@ if (hexMap != null) {
             for (BonusToken token : getHex().getBonusTokens()) {
                 String tName = token.getName();
                 if (currentComp != null && tName != null) {
-                    if (tName.startsWith(currentComp.getId())) {
-                        hexValue += token.getValue(); 
-                    } else if ("Gulf".equals(tName)) {
-                        // The engine cache handles the dynamic +20 for the owner. 
-                        // We manually apply the token's static value (10 when open, 0 when closed) for non-owners.
-                        boolean isOwner = false;
-                        for (net.sf.rails.game.PrivateCompany priv : currentComp.getPrivates()) {
-                            if ("Gulf".equals(priv.getId()) || (priv.getName() != null && priv.getName().contains("Gulf"))) {
-                                isOwner = true;
-                                break;
+                    if (tName.toLowerCase().contains("gulf")) {
+                        boolean isOwner = tName.startsWith(currentComp.getId() + "_");
+                        if (!isOwner) {
+                            for (net.sf.rails.game.PrivateCompany priv : currentComp.getPrivates()) {
+                                if ("Gulf".equals(priv.getId()) || (priv.getName() != null && priv.getName().contains("Gulf"))) {
+                                    isOwner = true;
+                                    break;
+                                }
                             }
                         }
-                        if (!isOwner) {
+                        
+                        int cacheVal = (hexMap == null) ? 0 : hexMap.getDynamicHexBonus(getHex());
+                        
+                        if (isOwner) {
+                            if (cacheVal < 20) hexValue += 20;
+                        } else {
+                            if (tName.toLowerCase().contains("open")) {
+                                if (cacheVal < 10) hexValue += 10;
+                            } else if (!tName.toLowerCase().contains("closed") && token.getValue() > 0) {
+                                if (cacheVal < token.getValue()) hexValue += token.getValue();
+                            }
+                        }
+                    } else if (tName.startsWith(currentComp.getId())) {
+                        // Prevent double counting: DestinationModifier mutates the token value and
+                        // also returns the bonus to the cache. If we add both, it mimics a higher
+                        // phase.
+                        if (hexMap == null || hexMap.getDynamicHexBonus(getHex()) == 0) {
                             hexValue += token.getValue();
                         }
                     }
@@ -833,16 +845,15 @@ if (hexMap != null) {
             float textX = (float) (dimensions.center.getX() - textWidth / 2.0);
             float textY = (float) (dimensions.center.getY() + textHeight / 2.0 - fm.getDescent());
 
-           // Determine if this hex is logically on the active network path
+            // Determine if this hex is logically on the active network path
             boolean isOnNetwork = false;
             if (hexMap.getRouteHexes() != null && hexMap.getRouteHexes().contains(getHex())) {
                 isOnNetwork = true;
             }
-            
 
             // Draw a thick black "halo" for extreme contrast
             g.setColor(Color.BLACK);
-            int offset = Math.max(1, (int)(2 * dimensions.zoomFactor));
+            int offset = Math.max(1, (int) (2 * dimensions.zoomFactor));
             g.drawString(text, textX - offset, textY - offset);
             g.drawString(text, textX - offset, textY + offset);
             g.drawString(text, textX + offset, textY - offset);
@@ -1256,8 +1267,15 @@ if (hexMap != null) {
         g2.setStroke(oldStroke);
     }
 
-    private void drawBonusToken(Graphics2D g2, BonusToken bt, HexPoint origin) {
-        GUIToken token = new GUIToken(Color.BLACK, Color.WHITE, "+" + bt.getValue(),
+private void drawBonusToken(Graphics2D g2, BonusToken bt, HexPoint origin) {
+        String text = "+" + bt.getValue();
+        if (bt.getName() != null) {
+            String lower = bt.getName().toLowerCase();
+            if (lower.contains("gulf")) {
+                text = lower.contains("open") ? "+10" : "+20";
+            }
+        }
+        GUIToken token = new GUIToken(Color.BLACK, Color.WHITE, text,
                 origin, 15);
         token.drawToken(g2);
     }
@@ -1446,7 +1464,8 @@ if (hexMap != null) {
 
     public void update() {
         hexMap.repaintTiles(getBounds());
-        hexMap.repaintTokens(getMarksDirtyBounds()); // needed if new tile has new token placement spot, and for large texts like fancy city values
+        hexMap.repaintTokens(getMarksDirtyBounds()); // needed if new tile has new token placement spot, and for large
+                                                     // texts like fancy city values
     }
 
     public String toText() {

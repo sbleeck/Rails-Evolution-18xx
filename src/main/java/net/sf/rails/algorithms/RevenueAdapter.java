@@ -955,9 +955,7 @@ public class RevenueAdapter implements Runnable {
             if (hex == null) continue;
             
             RevenueTrainRun fakeRun = new RevenueTrainRun(this, dummyTrain);
-            if (fakeRun.getRunVertices() != null) {
-                fakeRun.getRunVertices().add(v);
-            }
+
             
             List<RevenueTrainRun> fakeRuns = new ArrayList<>();
             fakeRuns.add(fakeRun);

@@ -445,12 +445,12 @@ public class OperatingRound_1870 extends OperatingRound {
                     if (gulfPriv != null) {
                         net.sf.rails.game.BonusToken gulfToken = net.sf.rails.game.BonusToken.create(gulfPriv);
                         if (gulfToken != null) {
-                            String tokenName = gulfAction.isOpen() ? "Gulf_Open" : "Gulf_Closed";
+                            String tokenName = comp.getId() + "_" + (gulfAction.isOpen() ? "Gulf_Open" : "Gulf_Closed");
                             gulfToken.setName(tokenName);
-                            gulfToken.setValue(20);
+                            gulfToken.setValue(0);
                             hex.layBonusToken(gulfToken, getRoot().getPhaseManager());
                             net.sf.rails.common.ReportBuffer.add(this, comp.getId()
-                                    + " places the Gulf Shippingcomp.getId() + \" flips the Gulf Shipping token to \" + newName + \".\"); token ("
+                                    + " places the Gulf Shipping token ("
                                     + tokenName + ") on " + hex.getId() + ".");
                             if (!gulfAction.isOpen()) {
                                 gulfPriv.close();
@@ -469,11 +469,13 @@ public class OperatingRound_1870 extends OperatingRound {
             if (comp != null) {
                 net.sf.rails.game.BonusToken existingToken = getGulfTokenOnMap();
                 if (existingToken != null) {
-                    String newName = "Gulf_Open".equals(existingToken.getName()) ? "Gulf_Closed" : "Gulf_Open";
+String oldName = existingToken.getName();
+                    String newName = oldName.contains("Open") ? oldName.replace("Open", "Closed") : oldName.replace("Closed", "Open");
                     existingToken.setName(newName);
                     net.sf.rails.common.ReportBuffer.add(this,
                             comp.getId() + " flips the Gulf Shipping token to " + newName + ".");
-                    if ("Gulf_Closed".equals(newName)) {
+                    if (newName.contains("Closed")) {
+
                         PrivateCompany gulfPriv = getOwnedGulfCompany(comp);
                         if (gulfPriv != null) {
                             gulfPriv.close();
@@ -567,11 +569,12 @@ public class OperatingRound_1870 extends OperatingRound {
         return null;
     }
 
-    private net.sf.rails.game.BonusToken getGulfTokenOnMap() {
+private net.sf.rails.game.BonusToken getGulfTokenOnMap() {
         for (MapHex hex : getRoot().getMapManager().getHexes()) {
             if (hex.getBonusTokens() != null) {
                 for (net.sf.rails.game.BonusToken t : hex.getBonusTokens()) {
-                    if ("Gulf_Open".equals(t.getName()) || "Gulf_Closed".equals(t.getName())) {
+                    String tName = t.getName();
+                    if (tName != null && tName.toLowerCase().contains("gulf")) {
                         return t;
                     }
                 }
