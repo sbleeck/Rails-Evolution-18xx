@@ -14,8 +14,13 @@ public class FlipGulfToken_1870 extends PossibleAction {
 
     public String getCompanyId() { return companyId; }
 
-    @Override
+@Override
     public String toString() {
-        return "Flip Gulf Shipping token (Open <-> Closed)";
+        return "Flip port";
+    }
+
+    @Override
+    public String getButtonLabel() {
+        return toString();
     }
 }

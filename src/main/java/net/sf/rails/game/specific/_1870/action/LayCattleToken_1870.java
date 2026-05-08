@@ -21,7 +21,12 @@ public class LayCattleToken_1870 extends PossibleAction {
 
     @Override
     public String toString() {
-        return "Place Southern Cattle Company token" + (hexId != null ? " on " + hexId : "");
+        return "Place Cattle token" + (hexId != null ? " on " + hexId : "");
+    }
+
+
+    @Override
+    public String getButtonLabel() {
+        return toString();
     }
 }
-// --- END FIX ---

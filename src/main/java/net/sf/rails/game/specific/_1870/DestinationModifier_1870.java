@@ -84,8 +84,7 @@ boolean startsAtDest = (destHex != null && startNode.getHex() == destHex);
 
                 for (NetworkVertex v : vertices) {
                     if (v.getHex() == targetHex) {
-                        // --- START FIX ---
-                        // Get the base value first
+// Get the base value first
                         int val = revenueAdapter.getVertexValue(v, run.getTrain(), phase);
                         
                         // Rule Check: Ensure we only double the value valid for THIS company.
@@ -93,14 +92,23 @@ boolean startsAtDest = (destHex != null && startNode.getHex() == destHex);
                         if (targetHex.getBonusTokens() != null) {
                             for (net.sf.rails.game.BonusToken t : targetHex.getBonusTokens()) {
                                 String tName = t.getName();
-                                if (tName != null && !tName.startsWith(comp.getId())) {
+                                boolean belongsToUs = false;
+                                
+                                if (tName != null && tName.startsWith(comp.getId())) {
+                                    belongsToUs = true;
+                                } else if (t.getParent() != null && t.getParent() instanceof net.sf.rails.game.PrivateCompany) {
+                                    if (((net.sf.rails.game.PrivateCompany) t.getParent()).getOwner() == comp) {
+                                        belongsToUs = true;
+                                    }
+                                }
+                                
+                                if (!belongsToUs && tName != null) {
                                     val -= t.getValue(); 
-                                    // If it's an open port, others still get $10[cite: 2]
-                                    if (tName.contains("Port_Open")) val += 10;
+                                    // If it's an open port, others still get $10
+                                    if (tName.contains("Gulf_Open")) val += 10;
                                 }
                             }
                         }
-                        // --- END FIX ---
                         if (val > runBonus) {
                             runBonus = val;
                         }

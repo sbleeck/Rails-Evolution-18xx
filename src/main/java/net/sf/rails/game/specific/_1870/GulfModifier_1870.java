@@ -19,17 +19,14 @@ public class GulfModifier_1870 implements RevenueDynamicModifier {
     private static final Logger log = LoggerFactory.getLogger(GulfModifier_1870.class);
     private int calculatedBonus = 0;
 
+
+
     @Override
-public boolean prepareModifier(RevenueAdapter revenueAdapter) {
+    public boolean prepareModifier(RevenueAdapter revenueAdapter) {
         net.sf.rails.game.PublicCompany comp = revenueAdapter.getCompany();
-// --- START FIX ---
-// --- DELETE ---        if (comp == null || comp.getPortfolioModel() == null) return false;
-// --- DELETE ---        
-// --- DELETE ---        for (net.sf.rails.game.PrivateCompany priv : comp.getPortfolioModel().getPrivateCompanies()) {
         if (comp == null) return false;
         
         for (net.sf.rails.game.PrivateCompany priv : comp.getPrivates()) {
-// --- END FIX ---
             if (priv != null) {
                 String id = priv.getId();
                 String name = priv.getName() != null ? priv.getName() : "";
@@ -40,6 +37,9 @@ public boolean prepareModifier(RevenueAdapter revenueAdapter) {
         }
         return false;
     }
+
+
+
 
     @Override
     public int predictionValue(List<RevenueTrainRun> runs) {

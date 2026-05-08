@@ -20,21 +20,7 @@ public class CattleModifier_1870 implements RevenueDynamicModifier {
     private static final Logger log = LoggerFactory.getLogger(CattleModifier_1870.class);
     private int calculatedBonus = 0;
 
-@Override
-    public boolean prepareModifier(RevenueAdapter revenueAdapter) {
-        net.sf.rails.game.PublicCompany comp = revenueAdapter.getCompany();
-        if (comp == null || comp.getPortfolioModel() == null) return false;
-        
-        for (net.sf.rails.game.PrivateCompany priv : comp.getPortfolioModel().getPrivateCompanies()) {
-            if (priv != null) {
-                String id = priv.getId();
-                if ("SCC".equals(id) || "Cattle".equals(id)) {
-                    return true;
-                }
-            }
-        }
-        return false;
-    }
+
 
     @Override
     public int predictionValue(List<RevenueTrainRun> runs) {
@@ -54,7 +40,7 @@ public class CattleModifier_1870 implements RevenueDynamicModifier {
     public void adjustOptimalRun(List<RevenueTrainRun> optimalRuns) {
     }
 
-@Override
+    @Override
     public String prettyPrint(RevenueAdapter revenueAdapter) {
         if (calculatedBonus > 0) {
             return "Cattle Company Bonus: $" + calculatedBonus;
@@ -62,12 +48,11 @@ public class CattleModifier_1870 implements RevenueDynamicModifier {
         return "";
     }
 
-private int calculateCattleBonus(List<RevenueTrainRun> runs) {
+    private int calculateCattleBonus(List<RevenueTrainRun> runs) {
         int totalBonus = 0;
         if (runs == null) {
             return 0;
         }
-
 
         for (RevenueTrainRun run : runs) {
             Set<MapHex> visitedHexes = new HashSet<>();
@@ -82,7 +67,7 @@ private int calculateCattleBonus(List<RevenueTrainRun> runs) {
             }
 
             // 2. Check hexes associated with edges
-            List<NetworkEdge> edges = run.getEdges(); 
+            List<NetworkEdge> edges = run.getEdges();
             if (edges != null) {
                 for (NetworkEdge e : edges) {
                     List<NetworkVertex> path = e.getVertexPath();
@@ -95,9 +80,10 @@ private int calculateCattleBonus(List<RevenueTrainRun> runs) {
                     }
                 }
             }
-            
+
             java.util.List<String> hexIds = new java.util.ArrayList<>();
-            for (MapHex h : visitedHexes) hexIds.add(h.getId());
+            for (MapHex h : visitedHexes)
+                hexIds.add(h.getId());
 
             // 3. Award $10 once per hex touched by this specific train run
             for (MapHex hex : visitedHexes) {
@@ -107,12 +93,13 @@ private int calculateCattleBonus(List<RevenueTrainRun> runs) {
                 }
             }
         }
-        
+
         return totalBonus;
     }
 
     private boolean hasCattleToken(MapHex hex) {
-        if (hex == null || hex.getBonusTokens() == null) return false;
+        if (hex == null || hex.getBonusTokens() == null)
+            return false;
         for (BonusToken t : hex.getBonusTokens()) {
             if ("Cattle".equals(t.getName())) {
                 return true;
@@ -121,5 +108,19 @@ private int calculateCattleBonus(List<RevenueTrainRun> runs) {
         return false;
     }
 
-
+@Override
+    public boolean prepareModifier(RevenueAdapter revenueAdapter) {
+        net.sf.rails.game.PublicCompany comp = revenueAdapter.getCompany();
+        if (comp == null) return false;
+        
+        for (net.sf.rails.game.PrivateCompany priv : comp.getPrivates()) {
+            if (priv != null) {
+                String id = priv.getId();
+                if ("SCC".equals(id) || "Cattle".equals(id)|| "Cattl".equals(id)) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
 }

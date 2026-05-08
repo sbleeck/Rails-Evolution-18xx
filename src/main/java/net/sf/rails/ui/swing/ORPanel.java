@@ -1897,6 +1897,11 @@ public class ORPanel extends GridPanel
                     root.getPhaseManager().getCurrentPhase());
             revenueAdapter.initRevenueCalculator(true);
             revenueAdapter.addRevenueListener(this);
+
+            if (orUIManager != null && orUIManager.getMap() != null) {
+                orUIManager.getMap().setDynamicHexBonusCache(revenueAdapter.getDynamicHexBonusCache());
+            }
+            
             revenueThread = new Thread(revenueAdapter);
             revenueThread.start();
         } else {

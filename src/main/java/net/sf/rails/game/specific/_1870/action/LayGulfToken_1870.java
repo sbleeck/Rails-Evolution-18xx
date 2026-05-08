@@ -21,9 +21,12 @@ public class LayGulfToken_1870 extends PossibleAction {
     public void setHexId(String hexId) { this.hexId = hexId; }
     public boolean isOpen() { return isOpen; }
 
+public String toString() {
+        return (isOpen ? "Lay open port" : "Lay closed port") + (hexId != null ? " (" + hexId + ")" : "");
+    }
+
     @Override
-    public String toString() {
-        String state = isOpen ? "Open Port" : "Closed Port";
-        return "Place Gulf Shipping token (" + state + ")" + (hexId != null ? " on " + hexId : "");
+    public String getButtonLabel() {
+        return toString();
     }
 }

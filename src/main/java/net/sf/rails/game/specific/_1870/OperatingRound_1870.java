@@ -178,7 +178,7 @@ public class OperatingRound_1870 extends OperatingRound {
         if (success) {
             checkConnections();
         }
-        
+
         return success;
     }
 
@@ -226,7 +226,7 @@ public class OperatingRound_1870 extends OperatingRound {
 
                 if (bridge != null && !bridge.isClosed() && bridge.getOwner() instanceof net.sf.rails.game.Player) {
 
-boolean allowPurchase = (bridge.getOwner() == company.getPresident());
+                    boolean allowPurchase = (bridge.getOwner() == company.getPresident());
 
                     if (allowPurchase) {
                         // Phase 1 price is restricted to $20 - $40.
@@ -239,7 +239,7 @@ boolean allowPurchase = (bridge.getOwner() == company.getPresident());
         // 1870 Rule: Cattle Company token placement
         PublicCompany comp = getOperatingCompany();
         if (comp != null) {
-if (comp.hasDestination() && !comp.hasReachedDestination()) {
+            if (comp.hasDestination() && !comp.hasReachedDestination()) {
                 possibleActions.add(new ForceConnectionRunAction(getRoot(), comp.getId()));
             }
             PrivateCompany cattle = getAvailableCattleCompany(comp);
@@ -450,7 +450,12 @@ if (comp.hasDestination() && !comp.hasReachedDestination()) {
                             gulfToken.setValue(20);
                             hex.layBonusToken(gulfToken, getRoot().getPhaseManager());
                             net.sf.rails.common.ReportBuffer.add(this, comp.getId()
-                                    + " places the Gulf Shipping token (" + tokenName + ") on " + hex.getId() + ".");
+                                    + " places the Gulf Shippingcomp.getId() + \" flips the Gulf Shipping token to \" + newName + \".\"); token ("
+                                    + tokenName + ") on " + hex.getId() + ".");
+                            if (!gulfAction.isOpen()) {
+                                gulfPriv.close();
+                                net.sf.rails.common.ReportBuffer.add(this, gulfPriv.getName() + " is closed.");
+                            }
                         }
                     }
                     return true;
@@ -468,6 +473,13 @@ if (comp.hasDestination() && !comp.hasReachedDestination()) {
                     existingToken.setName(newName);
                     net.sf.rails.common.ReportBuffer.add(this,
                             comp.getId() + " flips the Gulf Shipping token to " + newName + ".");
+                    if ("Gulf_Closed".equals(newName)) {
+                        PrivateCompany gulfPriv = getOwnedGulfCompany(comp);
+                        if (gulfPriv != null) {
+                            gulfPriv.close();
+                            net.sf.rails.common.ReportBuffer.add(this, gulfPriv.getName() + " is closed.");
+                        }
+                    }
                     return true;
                 }
             }
@@ -526,7 +538,7 @@ if (comp.hasDestination() && !comp.hasReachedDestination()) {
             if (phase != null && "1".equals(phase.toText()) && privateComp != null
                     && "Brdg".equals(privateComp.getId())) {
                 if (company != null && (company.getId().equals("MP") || company.getId().equals("SW"))) {
-return privateComp.getOwner() == company.getPresident();
+                    return privateComp.getOwner() == company.getPresident();
                 }
             }
         }
@@ -777,10 +789,9 @@ return privateComp.getOwner() == company.getPresident();
         // --- END FIX ---
     }
 
-
-
-// --- START FIX ---
-    public static class ForceConnectionRunAction extends rails.game.action.PossibleAction implements rails.game.action.GuiTargetedAction {
+    // --- START FIX ---
+    public static class ForceConnectionRunAction extends rails.game.action.PossibleAction
+            implements rails.game.action.GuiTargetedAction {
         private static final long serialVersionUID = 1L;
         private final String companyId;
 
@@ -790,36 +801,56 @@ return privateComp.getOwner() == company.getPresident();
         }
 
         @Override
-        public String getGroupLabel() { return "CONNECTION RUN"; }
+        public String getGroupLabel() {
+            return "CONNECTION RUN";
+        }
 
         @Override
-        public String getButtonLabel() { return "Force Connection Run"; }
+        public String getButtonLabel() {
+            return "Force Connection Run";
+        }
 
         @Override
-        public net.sf.rails.game.state.Owner getTarget() { return getRoot().getCompanyManager().getPublicCompany(companyId); }
+        public net.sf.rails.game.state.Owner getTarget() {
+            return getRoot().getCompanyManager().getPublicCompany(companyId);
+        }
 
         @Override
-        public net.sf.rails.game.state.Owner getActor() { return getRoot().getCompanyManager().getPublicCompany(companyId); }
+        public net.sf.rails.game.state.Owner getActor() {
+            return getRoot().getCompanyManager().getPublicCompany(companyId);
+        }
 
         @Override
-        public java.awt.Color getHighlightBackgroundColor() { return new java.awt.Color(255, 69, 0); } // Red-Orange
+        public java.awt.Color getHighlightBackgroundColor() {
+            return new java.awt.Color(255, 69, 0);
+        } // Red-Orange
 
         @Override
-        public java.awt.Color getHighlightBorderColor() { return java.awt.Color.BLACK; }
+        public java.awt.Color getHighlightBorderColor() {
+            return java.awt.Color.BLACK;
+        }
 
         @Override
-        public java.awt.Color getHighlightTextColor() { return java.awt.Color.WHITE; }
+        public java.awt.Color getHighlightTextColor() {
+            return java.awt.Color.WHITE;
+        }
 
         @Override
-        public java.awt.Color getButtonColor() { return new java.awt.Color(255, 69, 0); }
+        public java.awt.Color getButtonColor() {
+            return new java.awt.Color(255, 69, 0);
+        }
 
         @Override
-        public int getHotkey() { return 0; }
+        public int getHotkey() {
+            return 0;
+        }
 
         @Override
         public boolean equals(Object o) {
-            if (this == o) return true;
-            if (o == null || getClass() != o.getClass()) return false;
+            if (this == o)
+                return true;
+            if (o == null || getClass() != o.getClass())
+                return false;
             ForceConnectionRunAction that = (ForceConnectionRunAction) o;
             return java.util.Objects.equals(companyId, that.companyId);
         }
@@ -829,5 +860,5 @@ return privateComp.getOwner() == company.getPresident();
             return java.util.Objects.hash(companyId);
         }
     }
-// --- END FIX ---
+    // --- END FIX ---
 }

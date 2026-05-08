@@ -428,6 +428,7 @@ public class RevenueAdapter implements Runnable {
         }
 
         populateRevenueCalculator();
+        buildDynamicHexBonusCache();
     }
 
     private int maxVisitVertices() {
@@ -935,5 +936,36 @@ public class RevenueAdapter implements Runnable {
         
         // --- FIX: Pass BOTH the graphical lines and logical hexes to the map ---
         map.setTrainPaths(pathList, routeHexes);
+    }
+
+    private Map<MapHex, Integer> dynamicHexBonusCache = new HashMap<>();
+
+    public Map<MapHex, Integer> getDynamicHexBonusCache() {
+        return dynamicHexBonusCache;
+    }
+
+    private void buildDynamicHexBonusCache() {
+        dynamicHexBonusCache.clear();
+        if (revenueManager == null || !hasDynamicModifiers || trains == null || trains.isEmpty()) return;
+
+        NetworkTrain dummyTrain = trains.get(0);
+        
+        for (NetworkVertex v : rcVertices) {
+            MapHex hex = v.getHex();
+            if (hex == null) continue;
+            
+            RevenueTrainRun fakeRun = new RevenueTrainRun(this, dummyTrain);
+            if (fakeRun.getRunVertices() != null) {
+                fakeRun.getRunVertices().add(v);
+            }
+            
+            List<RevenueTrainRun> fakeRuns = new ArrayList<>();
+            fakeRuns.add(fakeRun);
+            
+            int bonus = revenueManager.predictionValue(fakeRuns);
+            if (bonus > 0) {
+                dynamicHexBonusCache.put(hex, Math.max(dynamicHexBonusCache.getOrDefault(hex, 0), bonus));
+            }
+        }
     }
 }

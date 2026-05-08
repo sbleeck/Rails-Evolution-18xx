@@ -786,15 +786,29 @@ public class GUIHex implements Observer {
         }
 
 
+if (hexMap != null) {
+            hexValue += hexMap.getDynamicHexBonus(getHex());
+        }
+
         if (getHex().getBonusTokens() != null) {
             for (BonusToken token : getHex().getBonusTokens()) {
                 String tName = token.getName();
                 if (currentComp != null && tName != null) {
-                    // Cattle/Port Ownership Check via name string (e.g., "ATSF_Cattle")[cite: 2]
                     if (tName.startsWith(currentComp.getId())) {
                         hexValue += token.getValue(); 
-                    } else if (tName.contains("Port_Open")) {
-                        hexValue += 10; // Open Port bonus for non-owners[cite: 2]
+                    } else if ("Gulf".equals(tName)) {
+                        // The engine cache handles the dynamic +20 for the owner. 
+                        // We manually apply the token's static value (10 when open, 0 when closed) for non-owners.
+                        boolean isOwner = false;
+                        for (net.sf.rails.game.PrivateCompany priv : currentComp.getPrivates()) {
+                            if ("Gulf".equals(priv.getId()) || (priv.getName() != null && priv.getName().contains("Gulf"))) {
+                                isOwner = true;
+                                break;
+                            }
+                        }
+                        if (!isOwner) {
+                            hexValue += token.getValue();
+                        }
                     }
                 }
             }

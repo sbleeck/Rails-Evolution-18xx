@@ -1007,6 +1007,21 @@ public void setTrainPaths(List<GeneralPath> trainPaths) {
         repaintAll(new Rectangle(getSize()));
     }
 
+    private Map<MapHex, Integer> dynamicHexBonusCache = new java.util.HashMap<>();
+
+    public void setDynamicHexBonusCache(Map<MapHex, Integer> cache) {
+        if (cache != null) {
+            this.dynamicHexBonusCache = new java.util.HashMap<>(cache);
+        } else {
+            this.dynamicHexBonusCache.clear();
+        }
+        repaintAll(new Rectangle(getSize()));
+    }
+
+    public int getDynamicHexBonus(MapHex hex) {
+        return dynamicHexBonusCache.getOrDefault(hex, 0);
+    }
+    
     /**
      * Off-board tiles must be able to retrieve the current phase.
      *
