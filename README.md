@@ -1,7 +1,7 @@
 <h1 align="center">
   <br>
   <a href="https://www.youtube.com/@Rails-Evolution-18xx">
-    <img src="./src/main/resources/assets/logo.jpeg alt="Rails Evolution Logo" width="300">
+<img src="./src/main/resources/assets/logo.jpeg" alt="Rails Evolution Logo" width="300">
   </a>
   <br>
   Rails Evolution - Digital 18xx Engine
