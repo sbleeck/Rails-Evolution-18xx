@@ -433,6 +433,12 @@ public class StockRound_1837 extends StockRound {
             return false;
         }
         
+        // National companies (KK, UG, etc.) are sellable as soon as they are formed,
+        // bypassing the standard 1837 restriction.
+        if ("National".equals(company.getType().getId())) {
+            return true;
+        }
+        
         // Enforce 1837 Rule 9.1: No shares may be sold in a corporation that has not yet operated.
         return company.hasOperated();
     }
