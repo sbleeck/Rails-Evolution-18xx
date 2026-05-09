@@ -576,20 +576,36 @@ private static final int[] offStationTokenX = new int[] { -20, 20 };
                             wave.curveTo(cx - w / 2, yOffset - h, cx + w / 2, yOffset + h, cx + w, yOffset);
                             g.draw(wave);
                         }
-                    } else if (terrain.equalsIgnoreCase("mountain") || terrain.equalsIgnoreCase("hill")
-                            || terrain.equalsIgnoreCase("hills")) {
+                    } else if (terrain.equalsIgnoreCase("mountains") || terrain.equalsIgnoreCase("mountain")) {
                         g.setColor(new Color(139, 69, 19)); // Mountain brown
-                        double w = 6 * dimensions.zoomFactor;
-                        double h = 8 * dimensions.zoomFactor;
+                        double w = 4 * dimensions.zoomFactor; // width of one peak base
+                        double h = 10 * dimensions.zoomFactor; // taller height
 
                         java.awt.geom.Path2D.Double mountain = new java.awt.geom.Path2D.Double();
-                        // Draw two jagged peaks
-                        mountain.moveTo(cx - w - w / 2, cy + h / 2);
-                        mountain.lineTo(cx - w / 2, cy - h / 2);
+                        // Draw four jagged peaks
+                        mountain.moveTo(cx - 2 * w, cy + h / 2);
+                        mountain.lineTo(cx - 1.5 * w, cy - h / 2);
+                        mountain.lineTo(cx - w, cy + h / 2);
+                        mountain.lineTo(cx - 0.5 * w, cy - h / 2);
                         mountain.lineTo(cx, cy + h / 2);
-                        mountain.lineTo(cx + w, cy - h / 2 + 2 * dimensions.zoomFactor);
-                        mountain.lineTo(cx + w + w / 2, cy + h / 2);
+                        mountain.lineTo(cx + 0.5 * w, cy - h / 2);
+                        mountain.lineTo(cx + w, cy + h / 2);
+                        mountain.lineTo(cx + 1.5 * w, cy - h / 2);
+                        mountain.lineTo(cx + 2 * w, cy + h / 2);
                         g.draw(mountain);
+                    } else if (terrain.equalsIgnoreCase("hill") || terrain.equalsIgnoreCase("hills")) {
+                        g.setColor(new Color(139, 69, 19)); // Same brown
+                        double w = 6 * dimensions.zoomFactor;
+                        double h = 5 * dimensions.zoomFactor; // lower height
+
+                        java.awt.geom.Path2D.Double hill = new java.awt.geom.Path2D.Double();
+                        // Draw two simpler peaks
+                        hill.moveTo(cx - w, cy + h / 2);
+                        hill.lineTo(cx - w / 2, cy - h / 2);
+                        hill.lineTo(cx, cy + h / 2);
+                        hill.lineTo(cx + w / 2, cy - h / 2);
+                        hill.lineTo(cx + w, cy + h / 2);
+                        g.draw(hill);
                     }
                     g.setStroke(oldStroke);
                 }
