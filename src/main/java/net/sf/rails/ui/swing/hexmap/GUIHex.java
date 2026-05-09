@@ -257,8 +257,8 @@ public class GUIHex implements Observer {
     private static final int MARKS_DIRTY_MARGIN = 4;
 
     // positions of offStation Tokens
-    private static final int[] offStationTokenX = new int[] { -11, 0 };
-    private static final int[] offStationTokenY = new int[] { -19, 0 };
+private static final int[] offStationTokenX = new int[] { -20, 20 };
+    private static final int[] offStationTokenY = new int[] { -28, 28 };
 
     // static fields
     private final HexMap hexMap;
@@ -778,6 +778,9 @@ public class GUIHex implements Observer {
                 if (stop.getRelatedStation() != null) {
                     // Use getValueForPhase to get the correct current value (e.g. for 1837 mines)
                     int val = stop.getValueForPhase(hexMap.getPhase());
+                    if (val == 0) {
+                        val = stop.getRelatedStation().getValue();
+                    }
                     if (val > hexValue)
                         hexValue = val;
                 }
@@ -821,7 +824,12 @@ public class GUIHex implements Observer {
                         if (hexMap == null || hexMap.getDynamicHexBonus(getHex()) == 0) {
                             hexValue += token.getValue();
                         }
+                        
                     }
+                }
+                // 1817 Coal Mines are bonus tokens that grant $10 to the route
+                if ("CoalMine".equalsIgnoreCase(token.getName()) || "CoalMine".equalsIgnoreCase(token.getId())) {
+                    hexValue += 10;
                 }
             }
         }
@@ -927,9 +935,19 @@ public class GUIHex implements Observer {
     }
 
     // --- START FIX ---
-    public void paintMississippi(Graphics2D g) {
+public void paintMississippi(Graphics2D g) {
+        // Ensure this river logic only executes if the active game is 1870
+        if (hexMap == null || hexMap.getMapManager() == null || hexMap.getMapManager().getRoot() == null) {
+            return;
+        }
+        String gameName = hexMap.getMapManager().getRoot().getGameName();
+        if (gameName == null || !gameName.equals("1870")) {
+            return;
+        }
+
         try {
             Class<?> validatorClass = Class.forName("net.sf.rails.game.specific._1870.MississippiRiverValidator");
+            
             java.lang.reflect.Field riverHexesField = validatorClass.getDeclaredField("RIVER_HEXES");
             riverHexesField.setAccessible(true);
             @SuppressWarnings("unchecked")
@@ -1242,7 +1260,7 @@ public class GUIHex implements Observer {
         int textWidth = fm.stringWidth(text);
         int textHeight = fm.getAscent();
 
-        int boxWidth = Math.max((int) (16 * zoom), textWidth + (int) (6 * zoom));
+        int boxWidth = Math.max((int) (20 * zoom), textWidth + (int) (6 * zoom));
         int boxHeight = textHeight + (int) (4 * zoom);
 
         double boxX = centerX - boxWidth / 2.0;
@@ -1267,18 +1285,117 @@ public class GUIHex implements Observer {
         g2.setStroke(oldStroke);
     }
 
-private void drawBonusToken(Graphics2D g2, BonusToken bt, HexPoint origin) {
-        String text = "+" + bt.getValue();
-        if (bt.getName() != null) {
-            String lower = bt.getName().toLowerCase();
-            if (lower.contains("gulf")) {
-                text = lower.contains("open") ? "+10" : "+20";
+
+
+
+// Cache for loaded SVGs to ensure high rendering performance during map zooming/panning
+    private static final Map<String, org.apache.batik.gvt.GraphicsNode> svgCache = new java.util.concurrent.ConcurrentHashMap<>();
+    // Cache for missing SVGs to prevent continuous disk polling
+    private static final Set<String> svgNotFoundCache = new java.util.concurrent.ConcurrentSkipListSet<>();
+
+    private void drawBonusToken(Graphics2D g2, BonusToken bt, HexPoint origin) {
+        String rawName = bt.getName();
+        String tokenName = rawName;
+
+        if (rawName == null || rawName.isEmpty()) {
+            tokenName = String.valueOf(bt.getValue());
+        } else {
+            String lowerName = rawName.toLowerCase();
+            
+            // Map dynamic or company-specific token names to generic SVG file names
+            if (lowerName.contains("gulf")) {
+                tokenName = lowerName.contains("closed") ? "Gulf_Closed" : "Gulf_Open";
+            } else if (lowerName.contains("cattle") || lowerName.equals("scc")) {
+                tokenName = "Cattle";
             }
         }
-        GUIToken token = new GUIToken(Color.BLACK, Color.WHITE, text,
+
+        // DEBUG LOGGING
+        System.out.println("DEBUG SVG: Raw token name = '" + rawName + "', Resolved name = '" + tokenName + "'");
+
+        if (!svgNotFoundCache.contains(tokenName)) {
+            org.apache.batik.gvt.GraphicsNode svgIcon = svgCache.get(tokenName);
+            
+            // 1. Load the SVG if it's not cached yet
+            if (svgIcon == null) {
+                try {
+                    System.out.println("DEBUG SVG: Attempting to load " + tokenName + ".svg");
+                    
+                    // Look in the classpath first
+                    String resourcePath = "/images/tokens/" + tokenName + ".svg";
+                    java.net.URL url = getClass().getResource(resourcePath);
+                    System.out.println("DEBUG SVG: Classpath check for " + resourcePath + " returned: " + url);
+                    
+                    // Fallback to a local data folder
+                    if (url == null) {
+                        java.io.File f = new java.io.File("data/tokens/" + tokenName + ".svg");
+                        System.out.println("DEBUG SVG: Local file check for " + f.getPath() + " -> Absolute: " + f.getAbsolutePath() + ", Exists: " + f.exists());
+                        if (f.exists()) {
+                            url = f.toURI().toURL();
+                        }
+                    }
+
+                    if (url != null) {
+                        System.out.println("DEBUG SVG: Loading SVG from URL: " + url);
+                        String parser = org.apache.batik.util.XMLResourceDescriptor.getXMLParserClassName();
+                        org.apache.batik.anim.dom.SAXSVGDocumentFactory f = new org.apache.batik.anim.dom.SAXSVGDocumentFactory(parser);
+                        org.w3c.dom.Document doc = f.createDocument(url.toString());
+                        
+                        org.apache.batik.bridge.UserAgent userAgent = new org.apache.batik.bridge.UserAgentAdapter();
+                        org.apache.batik.bridge.DocumentLoader loader = new org.apache.batik.bridge.DocumentLoader(userAgent);
+                        org.apache.batik.bridge.BridgeContext ctx = new org.apache.batik.bridge.BridgeContext(userAgent, loader);
+                        ctx.setDynamicState(org.apache.batik.bridge.BridgeContext.DYNAMIC);
+                        
+                        org.apache.batik.bridge.GVTBuilder builder = new org.apache.batik.bridge.GVTBuilder();
+                        svgIcon = builder.build(ctx, doc);
+                        svgCache.put(tokenName, svgIcon);
+                        System.out.println("DEBUG SVG: Successfully cached " + tokenName);
+                    } else {
+                        System.out.println("DEBUG SVG: File not found in either location. Adding to missing cache.");
+                        svgNotFoundCache.add(tokenName);
+                    }
+                } catch (Exception e) {
+                    System.err.println("DEBUG SVG ERROR: Could not load SVG for " + tokenName + ": " + e.getMessage());
+                    e.printStackTrace();
+                    svgNotFoundCache.add(tokenName);
+                }
+            }
+
+            // 2. Plot the SVG if successfully loaded
+            if (svgIcon != null) {
+                java.awt.geom.AffineTransform oldTransform = g2.getTransform();
+                
+                // Scale target size with the map zoom factor 
+                double targetSize = 16 * dimensions.zoomFactor;
+                
+                java.awt.geom.Rectangle2D bounds = svgIcon.getBounds();
+                double scaleX = targetSize / bounds.getWidth();
+                double scaleY = targetSize / bounds.getHeight();
+                double scale = Math.min(scaleX, scaleY);
+
+                // Translate to center the SVG precisely on the hex origin point
+                g2.translate(origin.getX() - (bounds.getWidth() * scale) / 2.0, 
+                             origin.getY() - (bounds.getHeight() * scale) / 2.0);
+                g2.scale(scale, scale);
+                
+                svgIcon.paint(g2);
+                
+                g2.setTransform(oldTransform);
+                return; // Exit here so we don't draw the fallback text
+            }
+        }
+
+        // 3. Fallback to original text-based drawing if no SVG exists
+        GUIToken token = new GUIToken(Color.BLACK, Color.WHITE, "+" + bt.getValue(),
                 origin, 15);
         token.drawToken(g2);
     }
+
+
+
+
+
+    
 
     private HexPoint getTokenCenter(int currentToken, Stop stop) {
         // Find the correct position on the tile
