@@ -324,6 +324,8 @@ public abstract class HexMap implements MouseListener, MouseMotionListener {
                         if (!hex.getHex().isPreprintedTileCurrent()) {
                             hex.paintTile(g);
                         }
+                        // This was missing! It ensures red borders paint on top of tiles.
+                        hex.paintBars(g);
                     }
                 }
 

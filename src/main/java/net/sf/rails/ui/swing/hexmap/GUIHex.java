@@ -909,7 +909,21 @@ private static final int[] offStationTokenX = new int[] { -20, 20 };
         // Paint standard 18xx light green background for preprinted tiles
         if (getHex().isPreprintedTileCurrent() || !isTilePainted()) {
             Color oldColor = g.getColor();
-            g.setColor(new Color(180, 210, 180)); // Standard map green
+
+boolean isOpen = true; 
+            try {
+                // Try to dynamically check the open/closed state from MapHex
+                java.lang.reflect.Method method = getHex().getClass().getMethod("isOpen");
+                isOpen = (Boolean) method.invoke(getHex());
+            } catch (Exception e) {
+                // Silent fallback if the method name varies in your implementation
+            }
+
+            if (!isOpen) {
+                g.setColor(new Color(240, 230, 140)); // Pale yellowish-tan for Bosnia/Italy
+            } else {
+                g.setColor(new Color(180, 210, 180)); // Standard map green
+            }
             g.fill(dimensions.hexagon);
 
             // Draw a subtle border frame
