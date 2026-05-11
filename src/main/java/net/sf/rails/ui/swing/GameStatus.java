@@ -163,6 +163,7 @@ public class GameStatus extends GridPanel {
     protected int rightsXOffset, rightsYOffset;
     protected Field[] rights;
     protected Field[] playerCash;
+    protected boolean hasDestinations = false;
     protected ClickField[] playerCashButton;
     protected int playerCashXOffset, playerCashYOffset;
 
@@ -3368,7 +3369,7 @@ JPanel[] currentPanels = playerPrivatesPanel;
                 compRetained[i].setOpaque(true);
             }
 
-            if (compDest[i] != null) {
+            if (hasDestinations && compDest[i] != null) {
                 compDest[i].setBackground(bgRow);
                 updateCompanyDestinationDisplay(i, c, compDest[i]); 
             }
@@ -4535,6 +4536,14 @@ JPanel[] currentPanels = playerPrivatesPanel;
             np = players.getNumberOfPlayers();
             companies = gameUIManager.getAllPublicCompanies().toArray(new PublicCompany[0]);
             nc = companies.length;
+
+            hasDestinations = false;
+            for (PublicCompany c : companies) {
+                if (c.hasDestination()) {
+                    hasDestinations = true;
+                    break;
+                }
+            }
         }
 
         PublicCompany operatingComp = null;
@@ -4644,7 +4653,9 @@ JPanel[] currentPanels = playerPrivatesPanel;
 
         compRevenueXOffset = col++;
         compRetainedXOffset = col++;
-        compDestXOffset = col++;
+        if (hasDestinations) {
+            compDestXOffset = col++;
+        }
         compTokensXOffset = col++;
 
         if (compCanBuyPrivates)
@@ -4837,12 +4848,14 @@ JPanel[] currentPanels = playerPrivatesPanel;
         addField(f, compRetainedXOffset, 1, 1, 1, 0, true);
 
         // 3b. Destination Header
-        f = new Caption("Dest.");
-        f.setBorder(BORDER_THIN);
-        f.setBackground(BG_HEADER);
-        f.setOpaque(true);
-        f.setPreferredSize(dimTokens); // Reuse tokens dimension
-        addField(f, compDestXOffset, 1, 1, 1, 0, true);
+        if (hasDestinations) {
+            f = new Caption("Dest.");
+            f.setBorder(BORDER_THIN);
+            f.setBackground(BG_HEADER);
+            f.setOpaque(true);
+            f.setPreferredSize(dimTokens); // Reuse tokens dimension
+            addField(f, compDestXOffset, 1, 1, 1, 0, true);
+        }
 
         // 4. Markers Header
         f = new Caption(LocalText.getText("TOKENS"));
@@ -5262,13 +5275,15 @@ JPanel[] currentPanels = playerPrivatesPanel;
             addField(f, compRetainedXOffset, y, 1, 1, 0, visible);
 
             // 3b. DESTINATION PANEL
-            compDest[i] = new JPanel(new FlowLayout(FlowLayout.CENTER, 2, 0));
-            compDest[i].setOpaque(true);
-            compDest[i].setBackground(isOperating ? BG_OPERATING : (!c.hasFloated() ? BG_INACTIVE : BG_MAUVE));
-            compDest[i].setBorder(bDet);
-            compDest[i].setPreferredSize(dimTokens);
-            updateCompanyDestinationDisplay(i, c, compDest[i]);
-            addField(compDest[i], compDestXOffset, y, 1, 1, 0, visible);
+            if (hasDestinations) {
+                compDest[i] = new JPanel(new FlowLayout(FlowLayout.CENTER, 2, 0));
+                compDest[i].setOpaque(true);
+                compDest[i].setBackground(isOperating ? BG_OPERATING : (!c.hasFloated() ? BG_INACTIVE : BG_MAUVE));
+                compDest[i].setBorder(bDet);
+                compDest[i].setPreferredSize(dimTokens);
+                updateCompanyDestinationDisplay(i, c, compDest[i]);
+                addField(compDest[i], compDestXOffset, y, 1, 1, 0, visible);
+            }
             
             // 4. MARKERS/TOKENS PANEL (Now 5th column)
             compTokens[i] = new JPanel(new FlowLayout(FlowLayout.CENTER, 2, 0));

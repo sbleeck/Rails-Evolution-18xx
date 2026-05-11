@@ -36,8 +36,8 @@
 	<Hex name="D7" tile="0"/>
 	<Hex name="D9" tile="-1"/>
 	<Hex name="D11" tile="0"/>
-	<Hex name="D13" tile="0" cost="60" terrain="Mountain"/>
-	<Hex name="D15" tile="0" cost="60" terrain="Mountain"/>
+	<Hex name="D13" tile="0" cost="60" terrain="Hill"/>
+	<Hex name="D15" tile="0" cost="60" terrain="Hill"/>
 	<Hex name="D17" tile="-1" cost="40" terrain="River"/>
 	<Hex name="D19" tile="0"/>
 	<Hex name="D21" tile="-1"/>
@@ -47,18 +47,18 @@
 	<Hex name="E8" tile="-1"/>
 	<Hex name="E10" tile="0"/>
 	<Hex name="E12" tile="-10" cost="60" city="Springfield"/>
-	<Hex name="E14" tile="0" cost="60" terrain="Mountain"/>
-	<Hex name="E16" tile="0" cost="60" terrain="Mountain"/>
-	<Hex name="E18" tile="0" cost="60" terrain="Mountain"/>
+	<Hex name="E14" tile="0" cost="60" terrain="Hill"/>
+	<Hex name="E16" tile="0" cost="60" terrain="Hill"/>
+	<Hex name="E18" tile="0" cost="60" terrain="Hill"/>
 	<Hex name="E20" tile="-2" cost="60" terrain="River"/>
 	<Hex name="F1" tile="0"/>
 	<Hex name="F3" tile="0"/>
 	<Hex name="F5" tile="-10" city="Oklahoma City"/>
 	<Hex name="F7" tile="0"/>
 	<Hex name="F9" tile="-1"/>
-	<Hex name="F11" tile="0" cost="60" terrain="Mountain"/>
-	<Hex name="F13" tile="0" cost="60" terrain="Mountain"/>
-	<Hex name="F15" tile="0" cost="60" terrain="Mountain"/>
+	<Hex name="F11" tile="0" cost="60" terrain="Hill"/>
+	<Hex name="F13" tile="0" cost="60" terrain="Hill"/>
+	<Hex name="F15" tile="0" cost="60" terrain="Hill"/>
 	<Hex name="F17" tile="0"/>
 	<Hex name="F19" tile="0" cost="60" terrain="River"/>
 	<Hex name="F21" tile="0"/>
