@@ -465,7 +465,6 @@ public class StatusWindow extends JFrame implements ActionListener, ActionPerfor
         networkMenu.add(refreshItem);
         infoMenu.add(networkMenu);
 
-        menuBar.add(infoMenu);
 
         // moderatorMenu = new JMenu(LocalText.getText("MODERATOR"));
         // moderatorMenu.setMnemonic(KeyEvent.VK_M);
@@ -485,6 +484,9 @@ public class StatusWindow extends JFrame implements ActionListener, ActionPerfor
             developerMenu = new JMenu("Developer");
             developerMenu.setName("Developer");
             menuBar.add(developerMenu);
+            
+            developerMenu.add(infoMenu);
+            developerMenu.addSeparator();
 
             ActionMenuItem actionRunnerItem = new ActionMenuItem("Force Actions!");
             actionRunnerItem.setName("Force Actions!");

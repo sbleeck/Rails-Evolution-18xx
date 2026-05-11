@@ -1341,7 +1341,6 @@ public void paintMississippi(Graphics2D g) {
         }
 
         // DEBUG LOGGING
-        System.out.println("DEBUG SVG: Raw token name = '" + rawName + "', Resolved name = '" + tokenName + "'");
 
         if (!svgNotFoundCache.contains(tokenName)) {
             org.apache.batik.gvt.GraphicsNode svgIcon = svgCache.get(tokenName);
@@ -1349,24 +1348,20 @@ public void paintMississippi(Graphics2D g) {
             // 1. Load the SVG if it's not cached yet
             if (svgIcon == null) {
                 try {
-                    System.out.println("DEBUG SVG: Attempting to load " + tokenName + ".svg");
                     
                     // Look in the classpath first
                     String resourcePath = "/images/tokens/" + tokenName + ".svg";
                     java.net.URL url = getClass().getResource(resourcePath);
-                    System.out.println("DEBUG SVG: Classpath check for " + resourcePath + " returned: " + url);
                     
                     // Fallback to a local data folder
                     if (url == null) {
                         java.io.File f = new java.io.File("data/tokens/" + tokenName + ".svg");
-                        System.out.println("DEBUG SVG: Local file check for " + f.getPath() + " -> Absolute: " + f.getAbsolutePath() + ", Exists: " + f.exists());
                         if (f.exists()) {
                             url = f.toURI().toURL();
                         }
                     }
 
                     if (url != null) {
-                        System.out.println("DEBUG SVG: Loading SVG from URL: " + url);
                         String parser = org.apache.batik.util.XMLResourceDescriptor.getXMLParserClassName();
                         org.apache.batik.anim.dom.SAXSVGDocumentFactory f = new org.apache.batik.anim.dom.SAXSVGDocumentFactory(parser);
                         org.w3c.dom.Document doc = f.createDocument(url.toString());
@@ -1379,9 +1374,7 @@ public void paintMississippi(Graphics2D g) {
                         org.apache.batik.bridge.GVTBuilder builder = new org.apache.batik.bridge.GVTBuilder();
                         svgIcon = builder.build(ctx, doc);
                         svgCache.put(tokenName, svgIcon);
-                        System.out.println("DEBUG SVG: Successfully cached " + tokenName);
                     } else {
-                        System.out.println("DEBUG SVG: File not found in either location. Adding to missing cache.");
                         svgNotFoundCache.add(tokenName);
                     }
                 } catch (Exception e) {
