@@ -1,229 +1,185 @@
 package net.sf.rails.ui.swing;
 
-import javax.swing.*;
-import javax.swing.border.*;
 import java.awt.*;
+import java.awt.event.ActionEvent;
+import java.util.HashMap;
 import java.util.List;
-import java.util.ArrayList;
-import net.sf.rails.game.*;
-import net.sf.rails.game.financial.*;
+import java.util.Map;
 
-/**
- * GameStatus_Alt: A Modular 3-Column replacement for the monolithic GameStatus
- * grid.
- * Organized by Entity (Player/Company) rather than by Spreadsheet Coordinate.
- */
+import javax.swing.*;
+
+import net.sf.rails.game.Player;
+import net.sf.rails.game.PlayerManager;
+import net.sf.rails.game.PublicCompany;
+import net.sf.rails.game.financial.Bank;
+import net.sf.rails.ui.swing.elements.RailCard;
+import rails.game.action.BuyCertificate;
+import rails.game.action.BuyPrivate;
+import rails.game.action.BuyTrain;
+import rails.game.action.PossibleAction;
+import rails.game.action.SellShares;
+
 public class GameStatus_Alt extends GameStatus {
 
     // Layout Components
-    private JPanel playerColumn; // Col 1: The "Whos"
-    private JPanel companyColumn; // Col 2: The "Whats" (Scrollable)
-    private JPanel marketColumn; // Col 3: The "Global/Active" context
+    private JPanel playerColumn; 
+    private JPanel companyColumn; 
+    private JPanel marketColumn; 
+    private JScrollPane companyScroll;
 
-    protected GameUIManager gameUIManager;
-    protected StatusWindow parent;
+    // Parameterized Fonts
+    public static final Font FONT_CURRENCY = new Font("Monospaced", Font.BOLD, 14);
+    public static final Font FONT_SHARES = new Font("SansSerif", Font.BOLD, 12);
+    public static final Font FONT_TRAINS = new Font("SansSerif", Font.BOLD, 14);
+    public static final Font FONT_TIME = new Font("Monospaced", Font.BOLD, 12);
+    public static final Font FONT_NUMBERS = new Font("SansSerif", Font.PLAIN, 12);
 
-    // UI Constants
-    private static final Color BG_CHARTER = new Color(245, 245, 250);
-    private static final Color BG_HIGHLIGHT = new Color(255, 255, 200); // Soft Yellow
-    private static final Border CARD_BORDER = BorderFactory.createCompoundBorder(
-            BorderFactory.createLineBorder(Color.GRAY),
-            BorderFactory.createEmptyBorder(5, 5, 5, 5));
+    private final Map<Player, PlayerPanel> playerRegistry = new HashMap<>();
+    private final Map<PublicCompany, CompanyPanel> companyRegistry = new HashMap<>();
+    private BankPanel activeBankPanel;
 
+    @Override
     public void init(StatusWindow parent, GameUIManager gameUIManager) {
         this.parent = parent;
         this.gameUIManager = gameUIManager;
 
         this.setLayout(new BorderLayout(10, 0));
+        this.setBackground(new Color(235, 235, 240));
+        this.setOpaque(true);
 
-        // Column 1: Players
-        playerColumn = new JPanel();
-        playerColumn.setLayout(new BoxLayout(playerColumn, BoxLayout.Y_AXIS));
-        playerColumn.setPreferredSize(new Dimension(200, 0));
-        this.add(playerColumn, BorderLayout.WEST);
+        playerColumn = new JPanel(); playerColumn.setLayout(new BoxLayout(playerColumn, BoxLayout.Y_AXIS)); playerColumn.setOpaque(false);
+        JScrollPane pScroll = new JScrollPane(playerColumn); pScroll.setBorder(null); pScroll.setOpaque(false); pScroll.getViewport().setOpaque(false);
+        pScroll.setPreferredSize(new Dimension(280, 0)); this.add(pScroll, BorderLayout.WEST);
 
-        // Column 2: Companies (Scrollable)
-        companyColumn = new JPanel();
-        companyColumn.setLayout(new BoxLayout(companyColumn, BoxLayout.Y_AXIS));
-        JScrollPane scroll = new JScrollPane(companyColumn);
-        scroll.setBorder(null);
-        this.add(scroll, BorderLayout.CENTER);
+        companyColumn = new JPanel(); companyColumn.setLayout(new BoxLayout(companyColumn, BoxLayout.Y_AXIS)); companyColumn.setOpaque(false);
+        companyScroll = new JScrollPane(companyColumn); companyScroll.setBorder(BorderFactory.createMatteBorder(0, 1, 0, 1, Color.LIGHT_GRAY));
+        companyScroll.setOpaque(false); companyScroll.getViewport().setOpaque(false); companyScroll.getVerticalScrollBar().setUnitIncrement(16);
+        this.add(companyScroll, BorderLayout.CENTER);
 
-        // Column 3: Market/Action Context
-        marketColumn = new JPanel();
-        marketColumn.setLayout(new BoxLayout(marketColumn, BoxLayout.Y_AXIS));
-        marketColumn.setPreferredSize(new Dimension(220, 0));
-        this.add(marketColumn, BorderLayout.EAST);
+        marketColumn = new JPanel(new BorderLayout()); marketColumn.setOpaque(false);
+        marketColumn.setPreferredSize(new Dimension(250, 0)); this.add(marketColumn, BorderLayout.EAST);
 
         recreate();
     }
 
+    @Override
     public void recreate() {
-        playerColumn.removeAll();
-        companyColumn.removeAll();
-        marketColumn.removeAll();
+        playerColumn.removeAll(); companyColumn.removeAll(); marketColumn.removeAll();
+        playerRegistry.clear(); companyRegistry.clear();
 
-        renderPlayers();
-        renderCompanies();
-        renderMarket();
-
-        this.revalidate();
-        this.repaint();
+        renderPlayers(); renderCompanies(); renderMarket();
+        this.revalidate(); this.repaint();
     }
 
-    @Override
-    public boolean initCashCorrectionActions() { return false; }
-
-    @Override
-    public boolean initTrainCorrectionActions() { return false; }
-
-    @Override
-    public int[] getLastPlayerTimes() {
-        if (gameUIManager == null || gameUIManager.getPlayerManager() == null) return new int[0];
-        return new int[gameUIManager.getPlayerManager().getNumberOfPlayers()];
-    }
-
-    @Override
-    public void setLastPlayerTimes(int[] times) { }
-
-
-private void renderPlayers() {
+    private void renderPlayers() {
         PlayerManager pm = gameUIManager.getPlayerManager();
-        // Priority deal moves left of the last purchaser
-        int pdIndex = gameUIManager.getPriorityPlayer().getIndex();
-
+        int pdIndex = gameUIManager.getPriorityPlayer() != null ? gameUIManager.getPriorityPlayer().getIndex() : -1;
         for (int i = 0; i < pm.getNumberOfPlayers(); i++) {
             Player p = pm.getPlayerByPosition(i);
-
-// --- DELETE ---
-//            // Priority Deal Indicator
-//            if (i == pdIndex) {
-//                JLabel pdLabel = new JLabel(" [🚂 Priority Deal] ", JLabel.CENTER);
-//                pdLabel.setAlignmentX(Component.CENTER_ALIGNMENT);
-//                playerColumn.add(pdLabel);
-//            }
-//
-//            PlayerPanel pPanel = new PlayerPanel(p, gameUIManager);
-//            pPanel.refresh();
-// --- START FIX ---
             PlayerPanel pPanel = new PlayerPanel(p, gameUIManager);
-            pPanel.setPriorityDeal(i == pdIndex);
-            pPanel.refresh();
-// --- END FIX ---
-
-            playerColumn.add(pPanel);
-            playerColumn.add(Box.createVerticalStrut(10));
+            pPanel.setPriorityDeal(i == pdIndex); pPanel.refresh();
+            attachActionListenersRecursively(pPanel);
+            playerRegistry.put(p, pPanel); playerColumn.add(pPanel); playerColumn.add(Box.createVerticalStrut(10));
         }
     }
+
     private void renderCompanies() {
-        List<PublicCompany> comps = gameUIManager.getAllPublicCompanies();
-        // Sort by operating order or share price [cite: 938, 940]
-
-        for (PublicCompany c : comps) {
-            if (c.isClosed())
-                continue;
-
-            JPanel cCard = new JPanel(new BorderLayout());
-            cCard.setBackground(BG_CHARTER);
-            cCard.setBorder(CARD_BORDER);
-
-            // Header: ID and Price
-            JPanel header = new JPanel(new BorderLayout());
-            header.setOpaque(false);
-            JLabel idLabel = new JLabel(c.getId() + " - " + c.getId());
-            idLabel.setForeground(c.getFgColour());
-            header.setBackground(c.getBgColour());
-            header.setOpaque(true);
-
-            int price = (c.getCurrentSpace() != null) ? c.getCurrentSpace().getPrice()
-                    : (c.getStartSpace() != null ? c.getStartSpace().getPrice() : 0);
-            header.add(idLabel, BorderLayout.WEST);
-            header.add(new JLabel(gameUIManager.format(price)), BorderLayout.EAST);
-
-            // Ownership Bar: Consolidated view to assess "Dump Risk" [cite: 917, 922]
-            JPanel ownerBar = createOwnershipBar(c);
-
-            // Financials: Treasury and Trains [cite: 834, 1054]
-            JPanel stats = new JPanel(new FlowLayout(FlowLayout.LEFT));
-            stats.setOpaque(false);
-            stats.add(new JLabel("Treasury: " + gameUIManager.format(c.getCash())));
-            stats.add(new JLabel("Trains: " + c.getPortfolioModel().getTrainList().toString()));
-
-            cCard.add(header, BorderLayout.NORTH);
-            cCard.add(ownerBar, BorderLayout.CENTER);
-            cCard.add(stats, BorderLayout.SOUTH);
-
-            companyColumn.add(cCard);
-            companyColumn.add(Box.createVerticalStrut(5));
+        for (PublicCompany c : gameUIManager.getGameManager().getCompaniesInDisplayOrder(gameUIManager.getAllPublicCompanies())) {
+            if (c.isClosed()) continue;
+            CompanyPanel cPanel = new CompanyPanel(c, gameUIManager);
+            cPanel.refresh(); attachActionListenersRecursively(cPanel);
+            companyRegistry.put(c, cPanel); companyColumn.add(cPanel); companyColumn.add(Box.createVerticalStrut(10));
         }
-    }
-
-    private JPanel createOwnershipBar(PublicCompany c) {
-        JPanel bar = new JPanel(new FlowLayout(FlowLayout.LEFT));
-        bar.setOpaque(false);
-
-        // Market availability [cite: 1137]
-        int ipoPct = gameUIManager.getRoot().getBank().getIpo().getPortfolioModel().getShare(c);
-        int poolPct = gameUIManager.getRoot().getBank().getPool().getPortfolioModel().getShare(c);
-
-        if (ipoPct > 0)
-            bar.add(new JLabel("IPO: " + ipoPct + "% |"));
-        if (poolPct > 0)
-            bar.add(new JLabel("Pool: " + poolPct + "% |"));
-
-        // Shareholder distribution [cite: 912, 917]
-        for (Player p : gameUIManager.getPlayerManager().getPlayers()) {
-            int pct = p.getPortfolioModel().getShare(c);
-            if (pct > 0) {
-                boolean isPrez = p.equals(c.getPresident());
-                String label = p.getName() + " (" + pct + "%" + (isPrez ? "P" : "") + ")";
-                JLabel l = new JLabel(label);
-                if (isPrez)
-                    l.setFont(l.getFont().deriveFont(Font.BOLD));
-                bar.add(l);
-            }
-        }
-        return bar;
     }
 
     private void renderMarket() {
-        // Bank and Upcoming Trains [cite: 821, 1061]
-        JPanel bankPanel = new JPanel(new GridLayout(0, 1));
-        bankPanel.setBorder(BorderFactory.createTitledBorder("The Bank"));
-        bankPanel.add(new JLabel("Cash: " + gameUIManager.format(gameUIManager.getRoot().getBank().getCash())));
-
-        marketColumn.add(bankPanel);
-        // Additional Global context like rusted trains or phase info would go here.
+        activeBankPanel = new BankPanel(gameUIManager);
+        activeBankPanel.refresh(); attachActionListenersRecursively(activeBankPanel);
+        marketColumn.add(activeBankPanel, BorderLayout.NORTH);
     }
 
-    /**
-     * Highlights the active entity and updates buttons based on possibleActions.
-     */
+    @Override
     public void initTurn(int actorIndex, boolean myTurn) {
-        // Here we would scan the components and apply BG_HIGHLIGHT to the
-        // Player card or Company card that corresponds to the actorIndex.
-        recreate();
+        for (PlayerPanel pp : playerRegistry.values()) { pp.refresh(); attachActionListenersRecursively(pp); }
+        for (CompanyPanel cp : companyRegistry.values()) { cp.refresh(); attachActionListenersRecursively(cp); }
+        if (activeBankPanel != null) { activeBankPanel.refresh(); attachActionListenersRecursively(activeBankPanel); }
+    }
+
+    private void attachActionListenersRecursively(java.awt.Container container) {
+        for (java.awt.Component c : container.getComponents()) {
+            if (c instanceof RailCard) {
+                RailCard rc = (RailCard) c;
+                rc.removeActionListener(this); rc.addActionListener(this);
+            } else if (c instanceof java.awt.Container) attachActionListenersRecursively((java.awt.Container) c);
+        }
     }
 
     @Override
-    public void updatePlayerOrder(List<String> playerNames) {
-        recreate();
+    public void actionPerformed(ActionEvent actor) {
+        if (!(actor.getSource() instanceof RailCard)) { super.actionPerformed(actor); return; }
+
+        RailCard sourceCard = (RailCard) actor.getSource();
+        List<PossibleAction> actions = sourceCard.getPossibleActions();
+        if (actions == null || actions.isEmpty()) return;
+
+        PossibleAction chosenAction = actions.get(0); 
+        Object destinationEntity = resolveLogicalDestination(chosenAction);
+
+        if (destinationEntity != null) {
+            JComponent destPanel = resolveVisualDestination(destinationEntity);
+            if (destPanel != null) {
+                if (companyScroll != null && destPanel.getParent() == companyColumn) {
+                    companyColumn.scrollRectToVisible(destPanel.getBounds());
+                }
+                new UniversalFlightAnimator(parent, sourceCard, destPanel).execute(() -> parent.process(chosenAction));
+                return;
+            }
+        }
+        parent.process(chosenAction);
     }
 
-    @Override
-    public void refreshDashboard() {
-        recreate();
+    private Object resolveLogicalDestination(PossibleAction action) {
+        if (action instanceof BuyCertificate) return ((BuyCertificate) action).getPlayer(); 
+        else if (action instanceof SellShares) return gameUIManager.getRoot().getBank();
+        else if (action instanceof BuyTrain || action instanceof BuyPrivate) return ((net.sf.rails.game.OperatingRound) gameUIManager.getGameManager().getCurrentRound()).getOperatingCompany();
+        return null;
     }
 
-    @Override
-    public void setPriorityPlayer(int index) {
-        // Your logic to move the [🚂] icon or [👻🚂] prediction
-        recreate();
+    private JComponent resolveVisualDestination(Object entity) {
+        if (entity instanceof Player) return playerRegistry.get(entity);
+        if (entity instanceof PublicCompany) return companyRegistry.get(entity);
+        if (entity instanceof Bank) return activeBankPanel;
+        return null;
     }
 
-    @Override
-    public void highlightCurrentPlayer(int index) {
-        // Optional: Change background of the player card
-    }
+    private class UniversalFlightAnimator {
+        private final JFrame frame; private final JComponent source, destination;
+        public UniversalFlightAnimator(JFrame frame, JComponent source, JComponent destination) { this.frame = frame; this.source = source; this.destination = destination; }
+        public void execute(Runnable onComplete) {
+            if (!source.isShowing() || !destination.isShowing()) { onComplete.run(); return; }
+            JLayeredPane lp = frame.getLayeredPane();
+            Point startPt = SwingUtilities.convertPoint(source.getParent(), source.getLocation(), lp);
+            Point endPt = SwingUtilities.convertPoint(destination.getParent(), destination.getLocation(), lp);
 
+            java.awt.image.BufferedImage ghost = new java.awt.image.BufferedImage(source.getWidth(), source.getHeight(), java.awt.image.BufferedImage.TYPE_INT_ARGB);
+            Graphics2D g2 = ghost.createGraphics(); source.paint(g2); g2.dispose();
+
+            JComponent animLayer = new JComponent() { Point cur = new Point(startPt); @Override protected void paintComponent(Graphics g) { g.drawImage(ghost, cur.x, cur.y, null); } };
+            animLayer.setBounds(0, 0, lp.getWidth(), lp.getHeight()); lp.add(animLayer, JLayeredPane.DRAG_LAYER);
+
+            long startTime = System.currentTimeMillis();
+            javax.swing.Timer timer = new javax.swing.Timer(16, e -> {
+                float p = Math.min(1f, (float) (System.currentTimeMillis() - startTime) / 300f);
+                float ease = 1.0f - (1.0f - p) * (1.0f - p);
+                animLayer.setLocation(startPt.x + (int)((endPt.x - startPt.x) * ease), startPt.y + (int)((endPt.y - startPt.y) * ease));
+                if (p >= 1f) { ((javax.swing.Timer) e.getSource()).stop(); lp.remove(animLayer); lp.repaint(); onComplete.run(); }
+            });
+            timer.start();
+        }
+    }
+    
+    @Override public boolean initCashCorrectionActions() { return false; }
+    @Override public boolean initTrainCorrectionActions() { return false; }
+    @Override public int[] getLastPlayerTimes() { return new int[0]; }
+    @Override public void setLastPlayerTimes(int[] times) { }
 }
