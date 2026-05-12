@@ -81,6 +81,7 @@ public class GameUIManager implements DialogOwner {
     protected ORWindow orWindow; // TEMPORARY -- EV: Why?
     private StartRoundWindow startRoundWindow;
 
+    
     protected JDialog currentDialog = null;
 
     protected StockChartWindow stockChartWindow;

@@ -110,6 +110,10 @@ public class StatusWindow extends JFrame implements ActionListener, ActionPerfor
 
     protected JPanel buttonPanel;
     protected GameStatus gameStatus;
+    private boolean useAltStatus = false;
+    private JScrollPane jspStatus;
+
+
     protected ActionButton passButton;
     protected ActionButton autopassButton;
     protected GameUIManager gameUIManager;
@@ -122,6 +126,8 @@ public class StatusWindow extends JFrame implements ActionListener, ActionPerfor
     private JMenuBar menuBar;
     private JMenu fileMenu, optMenu, moveMenu, moderatorMenu, correctionMenu, developerMenu;
     ActionMenuItem undoItem;
+
+
 
     ActionMenuItem redoItem;
     protected static final String FONT_INCREASE_CMD = "FontIncrease";
@@ -332,6 +338,14 @@ public class StatusWindow extends JFrame implements ActionListener, ActionPerfor
         menuItem.addActionListener(this);
         optMenu.add(menuItem);
 
+// Toggle for the new modular visualization
+        JCheckBoxMenuItem toggleStatusItem = new JCheckBoxMenuItem("Modular Status", useAltStatus);
+        toggleStatusItem.addActionListener(e -> {
+            useAltStatus = toggleStatusItem.isSelected();
+            swapGameStatus();
+        });
+        optMenu.add(toggleStatusItem);
+
         optMenu.addSeparator();
 
         // Map Settings
@@ -465,7 +479,6 @@ public class StatusWindow extends JFrame implements ActionListener, ActionPerfor
         networkMenu.add(refreshItem);
         infoMenu.add(networkMenu);
 
-
         // moderatorMenu = new JMenu(LocalText.getText("MODERATOR"));
         // moderatorMenu.setMnemonic(KeyEvent.VK_M);
 
@@ -484,7 +497,7 @@ public class StatusWindow extends JFrame implements ActionListener, ActionPerfor
             developerMenu = new JMenu("Developer");
             developerMenu.setName("Developer");
             menuBar.add(developerMenu);
-            
+
             developerMenu.add(infoMenu);
             developerMenu.addSeparator();
 
@@ -979,8 +992,6 @@ public class StatusWindow extends JFrame implements ActionListener, ActionPerfor
             return false;
         }
 
-        
-        
         return gameUIManager.processAction(executedAction);
     }
 
@@ -1032,7 +1043,8 @@ public class StatusWindow extends JFrame implements ActionListener, ActionPerfor
     }
 
     public void finishRound() {
-setTitle("Rails Evolution - " + gameUIManager.getGameManager().getGameName() + " - " + LocalText.getText("GAME_STATUS_TITLE") + " - " + buildTimestamp);
+        setTitle("Rails Evolution - " + gameUIManager.getGameManager().getGameName() + " - "
+                + LocalText.getText("GAME_STATUS_TITLE") + " - " + buildTimestamp);
 
         gameStatus.recreate();
         gameStatus.initTurn(-1, true);
@@ -1041,8 +1053,8 @@ setTitle("Rails Evolution - " + gameUIManager.getGameManager().getGameName() + "
 
     public void endOfGame() {
 
-
-setTitle("Rails Evolution - " + gameUIManager.getGameManager().getGameName() + " - " + LocalText.getText("EoGTitle") + " - " + buildTimestamp);
+        setTitle("Rails Evolution - " + gameUIManager.getGameManager().getGameName() + " - "
+                + LocalText.getText("EoGTitle") + " - " + buildTimestamp);
 
         // Enable Passbutton
         passButton.setEnabled(true);
@@ -1245,7 +1257,8 @@ setTitle("Rails Evolution - " + gameUIManager.getGameManager().getGameName() + "
         }
 
         this.buildTimestamp = loadedBuildTime;
-setTitle("Rails Evolution - " + gameUIManager.getGameManager().getGameName() + " - " + LocalText.getText("GAME_STATUS_TITLE") + " - " + buildTimestamp);
+        setTitle("Rails Evolution - " + gameUIManager.getGameManager().getGameName() + " - "
+                + LocalText.getText("GAME_STATUS_TITLE") + " - " + buildTimestamp);
 
         pane.setLayout(new BorderLayout());
         initMenu();
@@ -1332,23 +1345,52 @@ setTitle("Rails Evolution - " + gameUIManager.getGameManager().getGameName() + "
      * Subclasses (like StatusWindow_1856) override this to provide custom panels.
      */
     protected GameStatus createGameStatus() {
-        // Explicitly inject the 1817 GameStatus if the game matches
-        if ("1817".equals(gameUIManager.getGameManager().getGameName())) {
-            // Use direct compile-time instantiation instead of reflection
-            return new net.sf.rails.ui.swing.gamespecific._1817.GameStatus_1817();
-        }
 
-        String gameStatusClassName = gameUIManager.getClassName(GuiDef.ClassName.GAME_STATUS);
-        try {
-            Class<? extends GameStatus> gameStatusClass = Class.forName(gameStatusClassName)
-                    .asSubclass(GameStatus.class);
-            return gameStatusClass.newInstance();
-        } catch (Exception e) {
-            log.error("Cannot instantiate class {}", gameStatusClassName, e);
-            System.exit(1);
-            return null;
+        if (useAltStatus) {
+            return new GameStatus_Alt();
+        } else {
+
+            // Explicitly inject the 1817 GameStatus if the game matches
+            if ("1817".equals(gameUIManager.getGameManager().getGameName())) {
+                // Use direct compile-time instantiation instead of reflection
+                return new net.sf.rails.ui.swing.gamespecific._1817.GameStatus_1817();
+            }
+
+            String gameStatusClassName = gameUIManager.getClassName(GuiDef.ClassName.GAME_STATUS);
+            try {
+                Class<? extends GameStatus> gameStatusClass = Class.forName(gameStatusClassName)
+                        .asSubclass(GameStatus.class);
+                return gameStatusClass.newInstance();
+            } catch (Exception e) {
+                log.error("Cannot instantiate class {}", gameStatusClassName, e);
+                System.exit(1);
+                return null;
+            }
         }
     }
+
+
+    // --- START FIX ---
+    private void swapGameStatus() {
+        // 1. Create the new component based on the useAltStatus toggle
+        gameStatus = createGameStatus();
+
+        // 2. Re-initialize the new component
+        gameStatus.init(this, gameUIManager);
+
+        // 3. Attach it to the existing scroll pane (which is named gameStatusPane)
+        if (gameStatusPane != null) {
+            gameStatusPane.setViewportView(gameStatus);
+        }
+
+        // 4. Sync the new UI with the current game data
+        gameStatus.refreshDashboard();
+
+        // 5. Force layout refresh
+        revalidate();
+        repaint();
+    }
+// --- END FIX ---
 
     /**
      * Provides GameStatus access to the panel that holds dynamic SR/IR buttons.
@@ -1385,12 +1427,15 @@ setTitle("Rails Evolution - " + gameUIManager.getGameManager().getGameName() + "
         // 4. Update Buttons
         if (buttonPanel != null) {
             updateComponentTreeFont(buttonPanel, baseFont);
-            
+
             // Make the first 3 buttons smaller so they do not get truncated
             Font smallerFont = baseFont.deriveFont(Font.BOLD, Math.max(8f, baseSize - 4f));
-            if (pauseButton != null) pauseButton.setFont(smallerFont);
-            if (undoButton != null) undoButton.setFont(smallerFont);
-            if (redoButton != null) redoButton.setFont(smallerFont);
+            if (pauseButton != null)
+                pauseButton.setFont(smallerFont);
+            if (undoButton != null)
+                undoButton.setFont(smallerFont);
+            if (redoButton != null)
+                redoButton.setFont(smallerFont);
         }
         enforceDynamicMinimumSize();
     }
@@ -1938,10 +1983,8 @@ setTitle("Rails Evolution - " + gameUIManager.getGameManager().getGameName() + "
 
                     dynamicButtonPanel.revalidate();
                     dynamicButtonPanel.repaint();
-  
 
-
-} else if (currentRound instanceof net.sf.rails.game.specific._1870.StockRound_1870) {
+                } else if (currentRound instanceof net.sf.rails.game.specific._1870.StockRound_1870) {
                     dynamicButtonPanel.setBackground(new Color(230, 240, 255));
                     dynamicButtonPanel.setOpaque(true);
                     dynamicButtonPanel.setBorder(BorderFactory.createLineBorder(SYS_BLUE, 1));
@@ -1951,7 +1994,7 @@ setTitle("Rails Evolution - " + gameUIManager.getGameManager().getGameName() + "
 
                     if (possibleActions != null && possibleActions.getList() != null) {
                         for (PossibleAction pa : possibleActions.getList()) {
-                            
+
                             if (pa instanceof net.sf.rails.game.specific._1870.StockRound_1870.ProtectShare_1870) {
                                 ActionButton btn = new ActionButton(null);
                                 btn.setText("Protect Shares");
@@ -1960,7 +2003,7 @@ setTitle("Rails Evolution - " + gameUIManager.getGameManager().getGameName() + "
                                 styleStatusButton(btn, SYS_BLUE);
                                 dynamicButtonPanel.add(btn);
                                 isProtecting = true;
-                                
+
                             } else if (pa instanceof net.sf.rails.game.specific._1870.StockRound_1870.DeclineProtection_1870) {
                                 ActionButton btn = new ActionButton(null);
                                 btn.setText("Decline Protection");
@@ -1969,52 +2012,44 @@ setTitle("Rails Evolution - " + gameUIManager.getGameManager().getGameName() + "
                                 styleStatusButton(btn, Color.RED);
                                 dynamicButtonPanel.add(btn);
                                 isProtecting = true;
-                                } else if (pa instanceof net.sf.rails.game.specific._1870.action.RedeemShare_1870) {
+                            } else if (pa instanceof net.sf.rails.game.specific._1870.action.RedeemShare_1870) {
                                 ActionButton btn = new ActionButton(null);
-                                btn.setText(pa.getButtonLabel() != null ? pa.getButtonLabel() : pa.getClass().getSimpleName());
+                                btn.setText(pa.getButtonLabel() != null ? pa.getButtonLabel()
+                                        : pa.getClass().getSimpleName());
                                 btn.setPossibleAction(pa);
                                 btn.addActionListener(this);
                                 styleStatusButton(btn, SYS_GREEN);
                                 dynamicButtonPanel.add(btn);
                             } else if (pa instanceof net.sf.rails.game.specific._1870.action.ReissueShares_1870) {
                                 ActionButton btn = new ActionButton(null);
-                                btn.setText(pa.getButtonLabel() != null ? pa.getButtonLabel() : pa.getClass().getSimpleName());
+                                btn.setText(pa.getButtonLabel() != null ? pa.getButtonLabel()
+                                        : pa.getClass().getSimpleName());
                                 btn.setPossibleAction(pa);
                                 btn.addActionListener(this);
                                 styleStatusButton(btn, SYS_RED);
                                 dynamicButtonPanel.add(btn);
                             } else if (pa instanceof net.sf.rails.game.specific._1870.action.ExchangeMKT_1870) {
                                 ActionButton btn = new ActionButton(null);
-                                btn.setText(pa.getButtonLabel() != null ? pa.getButtonLabel() : pa.getClass().getSimpleName());
+                                btn.setText(pa.getButtonLabel() != null ? pa.getButtonLabel()
+                                        : pa.getClass().getSimpleName());
                                 btn.setPossibleAction(pa);
                                 btn.addActionListener(this);
                                 styleStatusButton(btn, SYS_BLUE);
                                 dynamicButtonPanel.add(btn);
                             }
-                           
-                            
+
                         }
                     }
 
                     // Shift to alert colors if a protection decision is pending
                     if (isProtecting) {
-                        dynamicButtonPanel.setBackground(new Color(255, 230, 230)); 
+                        dynamicButtonPanel.setBackground(new Color(255, 230, 230));
                         dynamicButtonPanel.setBorder(BorderFactory.createLineBorder(Color.RED, 1));
                     }
 
                     dynamicButtonPanel.setVisible(true);
                     dynamicButtonPanel.revalidate();
                     dynamicButtonPanel.repaint();
-
-
-
-
-
-
-
-
-
-
 
                 } else if (currentRound instanceof net.sf.rails.game.specific._1817.MergerAndAcquisitionRound_1817
                         && (((net.sf.rails.game.specific._1817.MergerAndAcquisitionRound_1817) currentRound)
