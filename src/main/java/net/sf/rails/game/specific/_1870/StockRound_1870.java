@@ -77,6 +77,9 @@ public class StockRound_1870 extends StockRound {
     public StockRound_1870(net.sf.rails.game.GameManager parent, String id) {
 
         super(parent, id);
+        // 1870 Rule: Certificates cannot be mathematically split.
+        // A 20% president's certificate is indivisible and cannot be sold as a 10% share.
+        this.certificateSplitAllowed = false;
     }
 
     public void setNextPlayerAfterProtection(Player protectingPresident) {
@@ -459,10 +462,56 @@ companiesThatHaveReissued.set(companiesThatHaveReissued.value() + company.getId(
             int oldPar = company.getParPrice();
             int newPar = calculateNewPar(oldPar, currentPrice);
 
-            net.sf.rails.game.financial.StockSpace newParSpace = stockMarket.getStartSpace(newPar);
-            if (newParSpace != null) {
-                company.setParSpace(newParSpace);
+net.sf.rails.game.financial.StockSpace newParSpace = stockMarket.getStartSpace(newPar);
+
+        // If getStartSpace returns null (e.g., because spaces > $100 aren't explicitly marked as StartSpaces in the XML),
+        // we must search the stock market grid for a space matching the new par price.
+        if (newParSpace == null) {
+            int bestRow = Integer.MAX_VALUE;
+            for (int r = 0; r < 40; r++) {
+                for (int c = 0; c < 40; c++) {
+                    try {
+                        net.sf.rails.game.financial.StockSpace space = stockMarket.getSpace(r, c);
+                        if (space != null && space.getPrice() == newPar) {
+                            // Prefer the uppermost row for par spaces
+                            if (r < bestRow) {
+                                bestRow = r;
+                                newParSpace = space;
+                            }
+                        }
+                    } catch (Exception e) {
+                        // Ignore potential out of bounds exceptions
+                    }
+                }
             }
+        }
+        
+        // 1870 Rule: "If the new par value is greater than $200, the par value token should be placed 
+        // on the top row of the stock market in the square closest to the new par value."
+        // If we didn't find an exact match (e.g. target is $220), we find the closest space in the top row (row 0).
+        if (newParSpace == null && newPar > 200) {
+            int minDiff = Integer.MAX_VALUE;
+            for (int c = 0; c < 40; c++) {
+                try {
+                    net.sf.rails.game.financial.StockSpace space = stockMarket.getSpace(0, c);
+                    if (space != null) {
+                        int diff = Math.abs(space.getPrice() - newPar);
+                        if (diff < minDiff) {
+                            minDiff = diff;
+                            newParSpace = space;
+                        }
+                    }
+                } catch (Exception e) {
+                    // Ignore potential out of bounds exceptions
+                }
+            }
+        }
+
+        if (newParSpace != null) {
+            company.setParSpace(newParSpace);
+        } else {
+            log.error("Could not find a valid par space for price: " + newPar);
+        }
 
             net.sf.rails.common.ReportBuffer.add(this, company.getId() + " reissues " + sharesToReissue
                     + " share(s) to IPO. Par adjusted to " + getRoot().getBank().getCurrency().format(newPar) + ".");
