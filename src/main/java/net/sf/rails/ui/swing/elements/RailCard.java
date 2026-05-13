@@ -48,8 +48,7 @@ import org.slf4j.LoggerFactory;
  */
 public class RailCard extends ClickField {
 
-        private static final Logger log = LoggerFactory.getLogger(RailCard.class);
-
+    private static final Logger log = LoggerFactory.getLogger(RailCard.class);
 
     private static final long serialVersionUID = 1L;
 
@@ -59,7 +58,7 @@ public class RailCard extends ClickField {
     private static final int WIDTH_GAP_SHARES = 10; // Extra padding for Shares
 
     public enum State {
-PASSIVE, ACTIONABLE, SELECTED, DISABLED, HIDDEN, HIGHLIGHTED // Added HIGHLIGHTED
+        PASSIVE, ACTIONABLE, SELECTED, DISABLED, HIDDEN, HIGHLIGHTED // Added HIGHLIGHTED
     }
 
     private List<Certificate> certificates = new ArrayList<>();
@@ -79,18 +78,16 @@ PASSIVE, ACTIONABLE, SELECTED, DISABLED, HIDDEN, HIGHLIGHTED // Added HIGHLIGHTE
     private static final Color COL_SELECTED_BORDER = Color.BLUE;
 
     // Change "Cyan-ish" to pure CYAN as requested, managed centrally here.
-    private static final Color COL_HIGHLIGHT_BG = Color.CYAN; 
+    private static final Color COL_HIGHLIGHT_BG = Color.CYAN;
     private static final Color COL_HIGHLIGHT_BORDER_C = Color.BLUE;
-
-
 
     // Borders (Minimal)
     private static final Border BORDER_ACTIONABLE = BorderFactory.createRaisedBevelBorder();
     private static final Border BORDER_PASSIVE = BorderFactory.createLineBorder(Color.BLACK, 1);
     private static final Border BORDER_DISABLED = BorderFactory.createLoweredBevelBorder();
     private static final Border BORDER_SELECTED = BorderFactory.createLineBorder(COL_SELECTED_BORDER, 2);
-// NEW: Thick Blue Border for "Click Me" state
-private static final Border BORDER_HIGHLIGHT = BorderFactory.createLineBorder(COL_HIGHLIGHT_BORDER_C, 3);
+    // NEW: Thick Blue Border for "Click Me" state
+    private static final Border BORDER_HIGHLIGHT = BorderFactory.createLineBorder(COL_HIGHLIGHT_BORDER_C, 3);
 
     private double scaleFactor = 1.0;
 
@@ -109,14 +106,13 @@ private static final Border BORDER_HIGHLIGHT = BorderFactory.createLineBorder(CO
     /**
      * Assigns an action to this card, making it clickable (Blue Highlight mode).
      */
-public void setPossibleAction(PossibleAction action) {
+    public void setPossibleAction(PossibleAction action) {
         this.clearPossibleActions();
         if (action != null) {
             this.addPossibleAction(action);
         }
     }
 
-    
     public RailCard(StartItem startItem, ButtonGroup group) {
         super("", "", "", null, group);
         if (startItem != null) {
@@ -128,10 +124,10 @@ public void setPossibleAction(PossibleAction action) {
         initVisuals();
     }
 
-public net.sf.rails.game.Train getTrain() {
+    public net.sf.rails.game.Train getTrain() {
         return trains.isEmpty() ? null : trains.get(0);
     }
-    
+
     public RailCard(Certificate cert, ButtonGroup group) {
         super("", "", "", null, group);
         if (cert != null)
@@ -204,7 +200,7 @@ public net.sf.rails.game.Train getTrain() {
     }
 
     public void setCustomLabel(String label) {
-// FIX: Do not clear internal lists (trains/certificates)!
+        // FIX: Do not clear internal lists (trains/certificates)!
         // We need them to remain populated so getUniqueId() works for action matching.
         this.customLabel = label;
         updateView();
@@ -241,9 +237,9 @@ public net.sf.rails.game.Train getTrain() {
         contentPanel.removeAll();
 
         boolean isDimmed = (currentState == State.DISABLED);
-        Color fgColor = isDimmed ? COL_FG_DIMMED : Color.BLACK;
+        Color fgColor = isDimmed ? COL_FG_DIMMED : getForeground();
 
-       // 1. Determine if this card represents a Short Share
+        // 1. Determine if this card represents a Short Share
         boolean isShortShare = isShortShare();
 
         // 2. Override the base background if it is a short share
@@ -261,14 +257,14 @@ public net.sf.rails.game.Train getTrain() {
 
         } else {
             GridBagConstraints gbc = new GridBagConstraints();
-           
+
             int totalItems = certificates.size() + trains.size() + privates.size();
             boolean centerSingleItem = (totalItems == 1 && scaleFactor > 1.0);
 
             gbc.gridy = 0;
             gbc.fill = GridBagConstraints.BOTH;
             gbc.weighty = 1.0;
-            
+
             if (centerSingleItem) {
                 // 1. Left Spacer (Weight 1.0)
                 gbc.gridx = 0;
@@ -280,14 +276,13 @@ public net.sf.rails.game.Train getTrain() {
                 // To match their width exactly, we must shrink this single item by 5px too.
                 // We split the 5px (2px left, 3px right) to keep it visually centered.
                 gbc.weightx = 2.0;
-                gbc.insets = new Insets(0, 2, 0, 3); 
+                gbc.insets = new Insets(0, 2, 0, 3);
 
             } else {
                 // Standard behavior: Fill evenly with 5px gap
                 gbc.weightx = 1.0;
                 gbc.insets = new Insets(0, 0, 0, 5);
             }
-
 
             int x = centerSingleItem ? 1 : 0; // Start at 1 if centering
 
@@ -311,28 +306,28 @@ public net.sf.rails.game.Train getTrain() {
                 lbl.setBorder(new LineBorder(Color.GRAY, 1));
                 // Center text in the wider label
                 lbl.setHorizontalAlignment(SwingConstants.CENTER);
-                
+
                 gbc.gridx = x++;
                 contentPanel.add(lbl, gbc);
             }
 
             for (Train train : trains) {
                 JLabel lbl = createStyledLabel(train.getName(), null, fgColor, false);
-               lbl.setHorizontalAlignment(SwingConstants.CENTER);
+                lbl.setHorizontalAlignment(SwingConstants.CENTER);
                 gbc.gridx = x++;
                 contentPanel.add(lbl, gbc);
             }
 
             for (PrivateCompany priv : privates) {
                 JLabel lbl = createStyledLabel(priv.getId(), null, fgColor, false);
-               lbl.setHorizontalAlignment(SwingConstants.CENTER);
+                lbl.setHorizontalAlignment(SwingConstants.CENTER);
                 gbc.gridx = x++;
                 contentPanel.add(lbl, gbc);
             }
 
             if (centerSingleItem) {
                 // 3. Add Right Spacer (Weight 1.0)
-                gbc.gridx = x; 
+                gbc.gridx = x;
                 gbc.weightx = 1.2;
                 contentPanel.add(javax.swing.Box.createGlue(), gbc);
             }
@@ -340,47 +335,51 @@ public net.sf.rails.game.Train getTrain() {
         }
 
         /*
-        // Adjust content panel padding to prevent text overlapping the right-side stripe
-        int rightPadding = 0;
-        java.awt.Color stripeColor = null;
-        boolean isPresident = false;
-        
-        if (associatedCompany instanceof PublicCompany) {
-            PublicCompany pc = (PublicCompany) associatedCompany;
-            stripeColor = pc.getBgColour();
-            if (!pc.hasStockPrice()) {
-                isPresident = true;
-            } else if (customLabel != null) {
-                String plain = customLabel.replaceAll("\\<.*?\\>", "").trim();
-                if (plain.endsWith("P") || plain.equals("Owner") || plain.contains("%P")) {
-                    isPresident = true;
-                }
-            }
-        } else {
-            for (Certificate cert : certificates) {
-                if (cert instanceof PublicCertificate) {
-                    PublicCertificate pc = (PublicCertificate) cert;
-                    if (pc.getCompany() != null) {
-                        stripeColor = pc.getCompany().getBgColour();
-                        if (pc.getCompany().getPresidentsShare() != null && pc.getCompany().getPresidentsShare().equals(pc)) {
-                            isPresident = true;
-                        } else if (pc.getShare() >= 20) {
-                            isPresident = true;
-                        }
-                    }
-                    break;
-                }
-            }
-        }
-        
-        if (stripeColor != null) {
-            int baseWidth = getPreferredSize().width;
-            rightPadding = isPresident ? (int) (baseWidth * 0.20) : (int) (baseWidth * 0.10);
-            rightPadding += 2; // Add a 2px buffer so text doesn't touch the line
-        }
-        
-        contentPanel.setBorder(BorderFactory.createEmptyBorder(0, 0, 0, rightPadding));
-*/
+         * // Adjust content panel padding to prevent text overlapping the right-side
+         * stripe
+         * int rightPadding = 0;
+         * java.awt.Color stripeColor = null;
+         * boolean isPresident = false;
+         * 
+         * if (associatedCompany instanceof PublicCompany) {
+         * PublicCompany pc = (PublicCompany) associatedCompany;
+         * stripeColor = pc.getBgColour();
+         * if (!pc.hasStockPrice()) {
+         * isPresident = true;
+         * } else if (customLabel != null) {
+         * String plain = customLabel.replaceAll("\\<.*?\\>", "").trim();
+         * if (plain.endsWith("P") || plain.equals("Owner") || plain.contains("%P")) {
+         * isPresident = true;
+         * }
+         * }
+         * } else {
+         * for (Certificate cert : certificates) {
+         * if (cert instanceof PublicCertificate) {
+         * PublicCertificate pc = (PublicCertificate) cert;
+         * if (pc.getCompany() != null) {
+         * stripeColor = pc.getCompany().getBgColour();
+         * if (pc.getCompany().getPresidentsShare() != null &&
+         * pc.getCompany().getPresidentsShare().equals(pc)) {
+         * isPresident = true;
+         * } else if (pc.getShare() >= 20) {
+         * isPresident = true;
+         * }
+         * }
+         * break;
+         * }
+         * }
+         * }
+         * 
+         * if (stripeColor != null) {
+         * int baseWidth = getPreferredSize().width;
+         * rightPadding = isPresident ? (int) (baseWidth * 0.20) : (int) (baseWidth *
+         * 0.10);
+         * rightPadding += 2; // Add a 2px buffer so text doesn't touch the line
+         * }
+         * 
+         * contentPanel.setBorder(BorderFactory.createEmptyBorder(0, 0, 0,
+         * rightPadding));
+         */
 
         contentPanel.revalidate();
         contentPanel.repaint();
@@ -389,10 +388,21 @@ public net.sf.rails.game.Train getTrain() {
     }
 
     @Override
-public java.util.List<rails.game.action.PossibleAction> getPossibleActions() {
-    java.util.List<rails.game.action.PossibleAction> actions = super.getPossibleActions();
-    return (actions == null) ? java.util.Collections.emptyList() : actions;
-}
+    public java.util.List<rails.game.action.PossibleAction> getPossibleActions() {
+        java.util.List<rails.game.action.PossibleAction> actions = super.getPossibleActions();
+        return (actions == null) ? java.util.Collections.emptyList() : actions;
+    }
+
+    @Override
+    public void setForeground(Color fg) {
+        super.setForeground(fg);
+        if (contentPanel != null) {
+            for (Component c : contentPanel.getComponents()) {
+                c.setForeground(fg);
+            }
+            updateView();
+        }
+    }
 
     private JLabel createStyledLabel(String text, Color bg, Color fg, boolean isCentered) {
         JLabel l = new JLabel(text);
@@ -419,7 +429,7 @@ public java.util.List<rails.game.action.PossibleAction> getPossibleActions() {
         return "";
     }
 
-public void setState(State state) {
+    public void setState(State state) {
         this.currentState = state;
         this.setEnabled(true);
         this.setOpaque(true);
@@ -428,7 +438,7 @@ public void setState(State state) {
 
         switch (state) {
             case ACTIONABLE:
-               this.setBorder(BORDER_ACTIONABLE);
+                this.setBorder(BORDER_ACTIONABLE);
                 this.setBackground(COL_ACTIONABLE_BG);
                 break;
             case SELECTED:
@@ -453,17 +463,16 @@ public void setState(State state) {
             case HIDDEN:
                 this.setVisible(false);
                 break;
-            
+
         }
         updateView();
     }
 
-
-public boolean isShortShare() {
+    public boolean isShortShare() {
         boolean isShort = false;
         // Capture to a local variable to prevent thread race conditions
-        String safeLabel = this.customLabel; 
-        
+        String safeLabel = this.customLabel;
+
         if (safeLabel != null && (safeLabel.toLowerCase().contains("short") || safeLabel.contains("-"))) {
             isShort = true;
         } else if (certificates != null) {
@@ -479,7 +488,8 @@ public boolean isShortShare() {
 
     @Override
     public void setBackground(Color bg) {
-        // Intercept standard beige assignments if this is a Short Share to maintain the Pink color.
+        // Intercept standard beige assignments if this is a Short Share to maintain the
+        // Pink color.
         if (bg != null && bg.equals(COL_BG_BEIGE) && isShortShare()) {
             super.setBackground(Color.PINK);
             if (contentPanel != null) {
@@ -494,11 +504,13 @@ public boolean isShortShare() {
     }
 
     /**
-     * Robust Identification: Checks if this card holds the specific certificate object.
+     * Robust Identification: Checks if this card holds the specific certificate
+     * object.
      * Use this instead of comparing string IDs or labels.
      */
     public boolean holdsCertificate(Certificate target) {
-        if (target == null || certificates == null) return false;
+        if (target == null || certificates == null)
+            return false;
 
         boolean matchFound = false;
 
@@ -506,7 +518,7 @@ public boolean isShortShare() {
             // 1. Fast Path: Identity
             if (held == target) {
                 matchFound = true;
-            } 
+            }
             // 2. Slow Path: Logical Identity (Class + ID + Share%)
             else if (held.getClass().equals(target.getClass()) && held.getId().equals(target.getId())) {
                 if (held instanceof PublicCertificate && target instanceof PublicCertificate) {
@@ -518,15 +530,12 @@ public boolean isShortShare() {
                 }
             }
 
-
-            if (matchFound) return true;
+            if (matchFound)
+                return true;
         }
 
         return false;
     }
-
-
-
 
     @Override
     public void setFont(Font f) {
@@ -539,7 +548,7 @@ public boolean isShortShare() {
         }
     }
 
-public static Dimension calculateBaseSize(Font f, boolean compactMode, double scaleFactor) {
+    public static Dimension calculateBaseSize(Font f, boolean compactMode, double scaleFactor) {
         if (f == null)
             f = new Font("SansSerif", Font.BOLD, 12);
 
@@ -548,9 +557,9 @@ public static Dimension calculateBaseSize(Font f, boolean compactMode, double sc
         int height = (int) (fontHeight * HEIGHT_FACTOR * scaleFactor);
 
         // 1. Set Standard Width to "WWWW" (Narrower for GameStatus)
-        String referenceString = "WWWW"; 
+        String referenceString = "WWWW";
         int charW = (fm != null) ? fm.stringWidth(referenceString) : 40;
-        
+
         int width = (int) ((charW + WIDTH_GAP_SHARES) * scaleFactor);
 
         return new Dimension(width, height);
@@ -560,37 +569,39 @@ public static Dimension calculateBaseSize(Font f, boolean compactMode, double sc
     public Dimension getPreferredSize() {
         Dimension base = calculateBaseSize(getFont(), compactMode, scaleFactor);
 
-       if (scaleFactor == 1.0) {
+        if (scaleFactor == 1.0) {
             // Normal behavior (GameStatus, ORPanel)
-            // Compact mode condenses everything into one label, so it should only be 1 item wide.
+            // Compact mode condenses everything into one label, so it should only be 1 item
+            // wide.
             int items = compactMode ? 1 : Math.max(1, certificates.size() + trains.size() + privates.size());
-            if (items > 1) base.width *= items;
+            if (items > 1)
+                base.width *= items;
         } else {
             // Start Round Window Mode (Scaled > 1.0)
             // FORCE IDENTICAL WIDTH: Always calculate width as if there are 2 items.
-            // This ensures single-item cards (M1) are identical width to double-item cards (LD|SX).
-            int fixedItems = 2; 
+            // This ensures single-item cards (M1) are identical width to double-item cards
+            // (LD|SX).
+            int fixedItems = 2;
             int totalW = base.width * fixedItems;
-            
+
             // Add gap spacing
             totalW += (fixedItems - 1) * 5;
-            
+
             return new Dimension(totalW, base.height);
         }
         return base;
     }
 
     /**
-     * CRITICAL FIX: The "squashed" look happens because GridBagLayout 
+     * CRITICAL FIX: The "squashed" look happens because GridBagLayout
      * shrinks components to their Minimum Size when space is tight.
-     * By default, Minimum Size is often (0,0). 
+     * By default, Minimum Size is often (0,0).
      * We must override this to match Preferred Size to prevent squashing.
      */
     @Override
     public Dimension getMinimumSize() {
         return getPreferredSize();
     }
-
 
     private boolean isDark(Color c) {
         if (c == null)
@@ -602,7 +613,6 @@ public static Dimension calculateBaseSize(Font f, boolean compactMode, double sc
     public List<Certificate> getCertificates() {
         return certificates;
     }
-
 
     /**
      * Prevents the card from being stretched horizontally by BoxLayout
@@ -650,7 +660,7 @@ public static Dimension calculateBaseSize(Font f, boolean compactMode, double sc
             return;
         }
         String info = pc.getInfoText();
-if (info != null) {
+        if (info != null) {
             info = info.replaceAll("(?i)^<html>|</html>$", "");
             info = "<html><div style='width: 250px;'>" + info + "</div></html>";
         }
@@ -667,15 +677,14 @@ if (info != null) {
             return;
         }
         String info = c.getInfoText();
-if (info != null) {
+        if (info != null) {
             info = info.replaceAll("(?i)^<html>|</html>$", "");
             info = "<html><div style='width: 250px;'>" + info + "</div></html>";
         }
         setToolTipText(info);
     }
 
-
-     private boolean isShortCertificate(Certificate cert) {
+    private boolean isShortCertificate(Certificate cert) {
         if (cert == null)
             return false;
 
@@ -697,8 +706,6 @@ if (info != null) {
         return false;
     }
 
-   
-
     public String getUniqueId() {
         if (associatedCompany != null) {
             return associatedCompany.getId();
@@ -718,7 +725,7 @@ if (info != null) {
         if (!trains.isEmpty()) {
             return trains.get(0).getName();
         }
-        
+
         // Safety Fallback: Use Swing Name if manually set (e.g. by GameStatus)
         String name = getName();
         if (name != null && !name.isEmpty()) {
@@ -727,81 +734,79 @@ if (info != null) {
 
         return null;
     }
-    
-
 
     @Override
     protected void paintComponent(java.awt.Graphics g) {
         super.paintComponent(g);
 
         /*
-        java.awt.Color stripeColor = null;
-        boolean isPresident = false;
-
-        if (associatedCompany instanceof PublicCompany) {
-            PublicCompany pc = (PublicCompany) associatedCompany;
-            stripeColor = pc.getBgColour();
-
-            if (!pc.hasStockPrice()) {
-                isPresident = true;
-            } else if (customLabel != null) {
-                String plain = customLabel.replaceAll("\\<.*?\\>", "").trim();
-                if (plain.endsWith("P") || plain.equals("Owner") || plain.contains("%P")) {
-                    isPresident = true;
-                }
-            }
-        } else {
-            for (Certificate cert : certificates) {
-                if (cert instanceof PublicCertificate) {
-                    PublicCertificate pc = (PublicCertificate) cert;
-                    if (pc.getCompany() != null) {
-                        stripeColor = pc.getCompany().getBgColour();
-                        if (pc.getCompany().getPresidentsShare() != null
-                                && pc.getCompany().getPresidentsShare().equals(pc)) {
-                            isPresident = true;
-                        } else if (pc.getShare() >= 20) {
-                            isPresident = true;
-                        }
-                    }
-                    break;
-                }
-            }
-        }
-
-        if (stripeColor != null) {
-            java.awt.Insets insets = getInsets();
-            int innerY = insets.top;
-            int innerWidth = getWidth() - insets.left - insets.right;
-            int innerHeight = getHeight() - insets.top - insets.bottom;
-            
-            int stripeWidth = isPresident ? (int) (innerWidth * 0.20) : (int) (innerWidth * 0.10);
-            int stripeX = getWidth() - insets.right - stripeWidth;
-
-            g.setColor(stripeColor);
-            g.fillRect(stripeX, innerY, stripeWidth, innerHeight);
-
-            g.setColor(java.awt.Color.BLACK);
-            g.drawLine(stripeX, innerY, stripeX, innerY + innerHeight - 1);
-        }
-            */
+         * java.awt.Color stripeColor = null;
+         * boolean isPresident = false;
+         * 
+         * if (associatedCompany instanceof PublicCompany) {
+         * PublicCompany pc = (PublicCompany) associatedCompany;
+         * stripeColor = pc.getBgColour();
+         * 
+         * if (!pc.hasStockPrice()) {
+         * isPresident = true;
+         * } else if (customLabel != null) {
+         * String plain = customLabel.replaceAll("\\<.*?\\>", "").trim();
+         * if (plain.endsWith("P") || plain.equals("Owner") || plain.contains("%P")) {
+         * isPresident = true;
+         * }
+         * }
+         * } else {
+         * for (Certificate cert : certificates) {
+         * if (cert instanceof PublicCertificate) {
+         * PublicCertificate pc = (PublicCertificate) cert;
+         * if (pc.getCompany() != null) {
+         * stripeColor = pc.getCompany().getBgColour();
+         * if (pc.getCompany().getPresidentsShare() != null
+         * && pc.getCompany().getPresidentsShare().equals(pc)) {
+         * isPresident = true;
+         * } else if (pc.getShare() >= 20) {
+         * isPresident = true;
+         * }
+         * }
+         * break;
+         * }
+         * }
+         * }
+         * 
+         * if (stripeColor != null) {
+         * java.awt.Insets insets = getInsets();
+         * int innerY = insets.top;
+         * int innerWidth = getWidth() - insets.left - insets.right;
+         * int innerHeight = getHeight() - insets.top - insets.bottom;
+         * 
+         * int stripeWidth = isPresident ? (int) (innerWidth * 0.20) : (int) (innerWidth
+         * * 0.10);
+         * int stripeX = getWidth() - insets.right - stripeWidth;
+         * 
+         * g.setColor(stripeColor);
+         * g.fillRect(stripeX, innerY, stripeWidth, innerHeight);
+         * 
+         * g.setColor(java.awt.Color.BLACK);
+         * g.drawLine(stripeX, innerY, stripeX, innerY + innerHeight - 1);
+         * }
+         */
     }
 
-private Color getCertColor(Certificate cert) {
+    private Color getCertColor(Certificate cert) {
 
         if (cert != null) {
             String id = cert.getId();
             String strRep = cert.toString();
 
-           
             // Aggressive failsafe: Check ID, class name, and string representation
-            if ((id != null && id.contains("_SHORT_")) || 
-                (strRep != null && strRep.contains("Short "))) {
-                   log.info("in PINK");
+            if ((id != null && id.contains("_SHORT_")) ||
+                    (strRep != null && strRep.contains("Short "))) {
+                log.info("in PINK");
 
-                    return Color.PINK;
+                return Color.PINK;
             }
         }
-        
+
         if (cert instanceof PublicCertificate) {
             PublicCertificate pubCert = (PublicCertificate) cert;
             PublicCompany pc = pubCert.getCompany();

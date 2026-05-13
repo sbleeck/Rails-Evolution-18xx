@@ -45,7 +45,12 @@ public class PlayerPanel extends JPanel {
     private JLabel pdLabel;
     private int lastCash = Integer.MIN_VALUE;
 
-    public boolean showWorth = false; 
+    public static final Color COLOR_ACTIVE_BG = Color.WHITE;
+    public static final Color COLOR_INACTIVE_BG = new Color(245, 245, 250);
+    public static final Color COLOR_ACTIVE_BORDER = new Color(100, 150, 255);
+    public static final Color COLOR_INACTIVE_BORDER = new Color(200, 200, 200);
+
+    public boolean showWorth = false;
 
     public PlayerPanel(Player player, GameUIManager gameUIManager) {
         this.player = player;
@@ -53,10 +58,9 @@ public class PlayerPanel extends JPanel {
 
         setLayout(new BorderLayout(5, 5));
         setBorder(BorderFactory.createCompoundBorder(
-            BorderFactory.createLineBorder(new Color(200, 200, 200), 1),
-            BorderFactory.createEmptyBorder(8, 8, 8, 8)
-        ));
-        setBackground(new Color(245, 245, 250));
+                BorderFactory.createLineBorder(COLOR_INACTIVE_BORDER, 1),
+                BorderFactory.createEmptyBorder(8, 8, 8, 8)));
+        setBackground(COLOR_INACTIVE_BG);
 
         initUI();
     }
@@ -69,11 +73,11 @@ public class PlayerPanel extends JPanel {
 
         JPanel nameRow = new JPanel(new BorderLayout());
         nameRow.setOpaque(false);
-        
+
         nameLabel = new JLabel();
         nameLabel.setFont(new Font("SansSerif", Font.BOLD, 18));
         nameLabel.setForeground(new Color(20, 20, 20));
-        
+
         pdLabel = new JLabel("[🚂]");
         pdLabel.setFont(new Font("SansSerif", Font.BOLD, 14));
         pdLabel.setForeground(new Color(200, 50, 50));
@@ -84,18 +88,22 @@ public class PlayerPanel extends JPanel {
 
         JPanel statsPanel = new JPanel(new java.awt.GridLayout(2, 2, 4, 2));
         statsPanel.setOpaque(false);
-        
+
         Color statColor = new Color(50, 50, 50);
-        
+
         cashLabel = new JLabel();
-        cashLabel.setFont(GameStatus_Alt.FONT_CURRENCY); cashLabel.setForeground(statColor);
+        cashLabel.setFont(GameStatus_Alt.FONT_CURRENCY);
+        cashLabel.setForeground(statColor);
         certsLabel = new JLabel();
-        certsLabel.setFont(GameStatus_Alt.FONT_CURRENCY); certsLabel.setForeground(statColor);
+        certsLabel.setFont(GameStatus_Alt.FONT_CURRENCY);
+        certsLabel.setForeground(statColor);
         timeLabel = new JLabel();
-        timeLabel.setFont(GameStatus_Alt.FONT_CURRENCY); timeLabel.setForeground(statColor);
+        timeLabel.setFont(GameStatus_Alt.FONT_CURRENCY);
+        timeLabel.setForeground(statColor);
         worthLabel = new JLabel();
-        worthLabel.setFont(GameStatus_Alt.FONT_CURRENCY); worthLabel.setForeground(statColor);
-        
+        worthLabel.setFont(GameStatus_Alt.FONT_CURRENCY);
+        worthLabel.setForeground(statColor);
+
         statsPanel.add(cashLabel);
         statsPanel.add(certsLabel);
         statsPanel.add(timeLabel);
@@ -113,9 +121,9 @@ public class PlayerPanel extends JPanel {
     }
 
     public void setActive(boolean isActive) {
-        Color bg = isActive ? Color.WHITE : new Color(245, 245, 250);
+        Color bg = isActive ? COLOR_ACTIVE_BG : COLOR_INACTIVE_BG;
         setBackground(bg);
-        
+
         Component[] comps = getComponents();
         if (comps.length > 0 && comps[0] instanceof JPanel) {
             comps[0].setBackground(isActive ? new Color(240, 248, 255) : new Color(225, 230, 240));
@@ -149,7 +157,8 @@ public class PlayerPanel extends JPanel {
                 }
                 fixedInc += r;
             }
-        } catch (Exception e) {}
+        } catch (Exception e) {
+        }
 
         certsLabel.setText("Certs: " + certs + "/" + limit);
         timeLabel.setText("Time: " + (time < 0 ? "-" : "") + timeStr);
@@ -164,7 +173,7 @@ public class PlayerPanel extends JPanel {
 
     private void layoutCards() {
         cardArea.removeAll();
-        
+
         List<PossibleAction> actions = null;
         if (gameUIManager.getGameManager().getPossibleActions() != null) {
             actions = gameUIManager.getGameManager().getPossibleActions().getList();
@@ -173,17 +182,21 @@ public class PlayerPanel extends JPanel {
         // 1. PUBLIC COMPANIES
         List<PublicCompany> allCompanies = gameUIManager.getAllPublicCompanies();
         for (PublicCompany company : allCompanies) {
-            if (company.isClosed()) continue;
+            if (company.isClosed())
+                continue;
 
             int sharePercentage = player.getPortfolioModel().getShare(company);
-            if (sharePercentage == 0) continue;
+            if (sharePercentage == 0)
+                continue;
 
             java.util.List<net.sf.rails.game.financial.PublicCertificate> certs = new java.util.ArrayList<>();
             for (net.sf.rails.game.financial.PublicCertificate pubCert : player.getPortfolioModel().getCertificates()) {
-                if (company.equals(pubCert.getCompany())) certs.add(pubCert);
+                if (company.equals(pubCert.getCompany()))
+                    certs.add(pubCert);
             }
 
-            if (certs.isEmpty()) continue;
+            if (certs.isEmpty())
+                continue;
 
             boolean isPresident = player.equals(company.getPresident());
 
@@ -207,7 +220,8 @@ public class PlayerPanel extends JPanel {
 
             // 2. Group Certificates by share % and presidency
             certs.sort((c1, c2) -> {
-                if (c1.isPresidentShare() != c2.isPresidentShare()) return c1.isPresidentShare() ? -1 : 1;
+                if (c1.isPresidentShare() != c2.isPresidentShare())
+                    return c1.isPresidentShare() ? -1 : 1;
                 return Integer.compare(c2.getShare(), c1.getShare());
             });
 
@@ -242,8 +256,10 @@ public class PlayerPanel extends JPanel {
                     boolean isCertPrez = cert.isPresidentShare();
                     RailCard card = new RailCard(cert, new ButtonGroup());
 
-                    if (company.getBgColour() != null) card.setBackground(company.getBgColour());
-                    if (company.getFgColour() != null) card.setForeground(company.getFgColour());
+                    if (company.getBgColour() != null)
+                        card.setBackground(company.getBgColour());
+                    if (company.getFgColour() != null)
+                        card.setForeground(company.getFgColour());
 
                     // Percentage printed on all, but "P" only on the top card
                     if (i == group.size() - 1) {
@@ -252,22 +268,22 @@ public class PlayerPanel extends JPanel {
                         card.setCustomLabel(cert.getShare() + "%");
                     }
                     card.setCompactMode(true);
-                    
+
                     if (actions != null && isActivePlayer) {
                         for (PossibleAction pa : actions) {
                             if (pa instanceof SellShares && ((SellShares) pa).getCompany().equals(company)) {
                                 card.addPossibleAction(pa);
-                                card.setBorder(BorderFactory.createLineBorder(new Color(220, 20, 60), 3)); 
+                                card.setBorder(BorderFactory.createLineBorder(new Color(220, 20, 60), 3));
                                 card.setEnabled(true);
                                 break;
                             }
                         }
                     }
-                    
+
                     if (getParent() != null && getParent().getParent() instanceof ActionListener) {
                         card.addActionListener((ActionListener) getParent().getParent());
                     }
-                    
+
                     currentStack.add(card);
                 }
             }
@@ -281,7 +297,8 @@ public class PlayerPanel extends JPanel {
         }
 
         // 2. PRIVATES
-        java.util.Collection<net.sf.rails.game.PrivateCompany> privates = player.getPortfolioModel().getPrivateCompanies();
+        java.util.Collection<net.sf.rails.game.PrivateCompany> privates = player.getPortfolioModel()
+                .getPrivateCompanies();
         if (!privates.isEmpty()) {
             JLabel privLabel = new JLabel("Privates");
             privLabel.setFont(new Font("SansSerif", Font.BOLD, 12));
@@ -293,7 +310,7 @@ public class PlayerPanel extends JPanel {
             JPanel privPanel = new JPanel(new java.awt.FlowLayout(java.awt.FlowLayout.LEFT, 5, 2));
             privPanel.setAlignmentX(Component.LEFT_ALIGNMENT);
             privPanel.setOpaque(false);
-            
+
             for (net.sf.rails.game.PrivateCompany pc : privates) {
                 RailCard card = new RailCard(pc, new ButtonGroup());
                 card.setCompany(pc);
@@ -314,10 +331,13 @@ public class PlayerPanel extends JPanel {
             return;
         }
         JFrame frame = (JFrame) SwingUtilities.getWindowAncestor(this);
-        if (frame != null) new MoneySpinnerAnimator(frame, target, oldVal, newVal, gameUIManager).start();
+        if (frame != null)
+            new MoneySpinnerAnimator(frame, target, oldVal, newVal, gameUIManager).start();
     }
-    
-    public Player getPlayer() { return player; }
+
+    public Player getPlayer() {
+        return player;
+    }
 
     /**
      * DYNAMIC LAYOUT ENGINE FOR OVERLAPPING CARDS
@@ -332,40 +352,46 @@ public class PlayerPanel extends JPanel {
         @Override
         public void doLayout() {
             int count = getComponentCount();
-            if (count == 0) return;
-            
+            if (count == 0)
+                return;
+
             // Derive scalable bounds from the top card
             Component topCard = getComponent(count - 1);
             Dimension pref = topCard.getPreferredSize();
-            int baseW = pref.width > 0 ? pref.width : 50; 
+            int baseW = pref.width > 0 ? pref.width : 50;
             int baseH = pref.height > 0 ? pref.height : 35;
-            
+
             // Enforce 80% overlap (only 20% visible width for underlying cards)
             int stepX = (int) (baseW * 0.20);
-            if (stepX < 2) stepX = 2; // Failsafe minimum
+            if (stepX < 2)
+                stepX = 2; // Failsafe minimum
 
             for (int i = 0; i < count; i++) {
                 Component c = getComponent(i);
-                if (i == count - 1) {
-                    // Top Card: Full scaling size
-                    c.setBounds(i * stepX, 0, baseW, baseH);
-                } else {
-                    // Underlying Cards: Visually "shorter" vertically to emulate a physical deck depth
-                    int hShrink = (int) (baseH * 0.15); 
-                    c.setBounds(i * stepX, hShrink / 2, baseW, baseH - hShrink);
-                }
+                // Reverse visual order: top card (count-1) gets x=0, bottom gets
+                // x=(count-1)*stepX
+                int reverseIndex = (count - 1) - i;
+                int xPos = reverseIndex * stepX;
+
+                // Add slight vertical asymmetry to distinguish cards
+                int yOffset = (reverseIndex % 2 == 1) ? 2 : 0;
+
+                // Full height for all cards in the stack
+                c.setBounds(xPos, yOffset, baseW, baseH);
+
             }
         }
 
         @Override
         public Dimension getPreferredSize() {
             int count = getComponentCount();
-            if (count == 0) return new Dimension(0, 0);
+            if (count == 0)
+                return new Dimension(0, 0);
             Dimension pref = getComponent(count - 1).getPreferredSize();
             int baseW = pref.width > 0 ? pref.width : 50;
             int baseH = pref.height > 0 ? pref.height : 35;
             int stepX = (int) (baseW * 0.20);
-            return new Dimension(baseW + (count - 1) * stepX, baseH);
+return new Dimension(baseW + (count - 1) * stepX, baseH + 2);
         }
 
         @Override
@@ -382,37 +408,46 @@ public class PlayerPanel extends JPanel {
         private final GameUIManager uiManager;
         private float progress = 0f;
 
-        public MoneySpinnerAnimator(JFrame frame, JComponent target, int startVal, int endVal, GameUIManager uiManager) {
-            this.frame = frame; this.target = target;
-            this.startVal = startVal; this.endVal = endVal;
-            this.delta = endVal - startVal; this.uiManager = uiManager;
+        public MoneySpinnerAnimator(JFrame frame, JComponent target, int startVal, int endVal,
+                GameUIManager uiManager) {
+            this.frame = frame;
+            this.target = target;
+            this.startVal = startVal;
+            this.endVal = endVal;
+            this.delta = endVal - startVal;
+            this.uiManager = uiManager;
         }
 
         public void start() {
             JLayeredPane lp = frame.getLayeredPane();
             Point pt = SwingUtilities.convertPoint(target.getParent(), target.getLocation(), lp);
-            java.awt.image.BufferedImage bgImage = new java.awt.image.BufferedImage(target.getWidth(), target.getHeight(), java.awt.image.BufferedImage.TYPE_INT_ARGB);
-            Graphics2D g2d = bgImage.createGraphics(); target.paint(g2d); g2d.dispose();
-            
+            java.awt.image.BufferedImage bgImage = new java.awt.image.BufferedImage(target.getWidth(),
+                    target.getHeight(), java.awt.image.BufferedImage.TYPE_INT_ARGB);
+            Graphics2D g2d = bgImage.createGraphics();
+            target.paint(g2d);
+            g2d.dispose();
+
             Color origFg = target.getForeground();
             target.setForeground(new Color(0, 0, 0, 0));
 
             JComponent animLayer = new JComponent() {
-                @Override protected void paintComponent(Graphics g) {
+                @Override
+                protected void paintComponent(Graphics g) {
                     Graphics2D g2 = (Graphics2D) g.create();
                     g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
                     double scale = 1.0 + (0.15 * Math.sin(progress * Math.PI));
                     int w = (int) (target.getWidth() * scale), h = (int) (target.getHeight() * scale);
                     int x = pt.x - (w - target.getWidth()) / 2, y = pt.y - (h - target.getHeight()) / 2;
 
-                    g2.setColor(new Color(0, 0, 0, 50)); g2.fillRoundRect(x + 4, y + 4, w, h, 6, 6);
+                    g2.setColor(new Color(0, 0, 0, 50));
+                    g2.fillRoundRect(x + 4, y + 4, w, h, 6, 6);
                     g2.drawImage(bgImage, x, y, w, h, null);
 
                     int currentVal = (int) (startVal + delta * progress);
                     String text = ((JLabel) target).getText().replaceAll("\\d+", "") + uiManager.format(currentVal);
                     g2.setFont(target.getFont().deriveFont(Font.BOLD, (float) (target.getFont().getSize() * scale)));
                     g2.setColor(currentVal < 0 ? Color.RED : new Color(0, 0, 128));
-                    
+
                     FontMetrics fm = g2.getFontMetrics();
                     g2.drawString(text, x + 5, y + (h - fm.getHeight()) / 2 + fm.getAscent());
 
@@ -438,10 +473,13 @@ public class PlayerPanel extends JPanel {
                 progress = 1.0f - (1.0f - progress) * (1.0f - progress);
                 animLayer.repaint();
                 if (progress >= 1f) {
-                    timer.stop(); lp.remove(animLayer);
+                    timer.stop();
+                    lp.remove(animLayer);
                     target.setForeground(origFg);
-                    ((JLabel) target).setText(((JLabel) target).getText().replaceAll("\\d+", "") + uiManager.format(endVal));
-                    target.repaint(); lp.repaint();
+                    ((JLabel) target)
+                            .setText(((JLabel) target).getText().replaceAll("\\d+", "") + uiManager.format(endVal));
+                    target.repaint();
+                    lp.repaint();
                 }
             });
             timer.start();
