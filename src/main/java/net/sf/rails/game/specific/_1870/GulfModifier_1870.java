@@ -1,118 +1,62 @@
 package net.sf.rails.game.specific._1870;
 
 import net.sf.rails.algorithms.RevenueAdapter;
-import net.sf.rails.algorithms.RevenueDynamicModifier;
-import net.sf.rails.algorithms.RevenueTrainRun;
-import net.sf.rails.algorithms.NetworkEdge;
+import net.sf.rails.algorithms.RevenueBonus;
+import net.sf.rails.algorithms.RevenueStaticModifier;
 import net.sf.rails.algorithms.NetworkVertex;
 import net.sf.rails.game.MapHex;
 import net.sf.rails.game.BonusToken;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
-import java.util.List;
-import java.util.HashSet;
-import java.util.Set;
-
-public class GulfModifier_1870 implements RevenueDynamicModifier {
-
-    private static final Logger log = LoggerFactory.getLogger(GulfModifier_1870.class);
-    private int calculatedBonus = 0;
-    private net.sf.rails.game.PublicCompany operatingCompany;
+public class GulfModifier_1870 implements RevenueStaticModifier {
 
     @Override
-    public boolean prepareModifier(RevenueAdapter revenueAdapter) {
-        operatingCompany = revenueAdapter.getCompany();
-        return operatingCompany != null;
-    }
+    public boolean modifyCalculator(RevenueAdapter revenueAdapter) {
+        net.sf.rails.game.PublicCompany comp = revenueAdapter.getCompany();
+        if (comp == null) return false;
 
-    @Override
-    public int predictionValue(List<RevenueTrainRun> runs) {
-        return calculateGulfBonus(runs);
-    }
+        boolean applied = false;
+        String compIdLow = comp.getId() != null ? comp.getId().toLowerCase() : "";
 
-    @Override
-    public int evaluationValue(List<RevenueTrainRun> runs, boolean optimalRuns) {
-        int bonus = calculateGulfBonus(runs);
-        if (optimalRuns) {
-            calculatedBonus = bonus;
+        for (NetworkVertex v : revenueAdapter.getVertices()) {
+            MapHex hex = v.getHex();
+            if (hex != null && hex.getBonusTokens() != null) {
+                for (BonusToken t : hex.getBonusTokens()) {
+                    String tName = t.getName();
+                    if (tName != null) {
+                        String lowerName = tName.toLowerCase();
+                        if (lowerName.contains("gulf")) {
+                            boolean ownsGulf = !compIdLow.isEmpty() && lowerName.startsWith(compIdLow + "_");
+                            if (!ownsGulf) {
+                                for (net.sf.rails.game.PrivateCompany priv : comp.getPrivates()) {
+                                    String privId = priv.getId();
+                                    if ("Gulf".equalsIgnoreCase(privId) || (priv.getName() != null && priv.getName().toLowerCase().contains("gulf"))) {
+                                        ownsGulf = true; break;
+                                    }
+                                }
+                            }
+                            int bonusVal = 0;
+                            if (ownsGulf) {
+                                bonusVal = 20;
+                            } else if (lowerName.contains("open")) {
+                                bonusVal = 10;
+                            }
+                            
+                            if (bonusVal > 0) {
+                                RevenueBonus bonus = new RevenueBonus(bonusVal, "Gulf");
+                                bonus.addVertex(v);
+                                revenueAdapter.addRevenueBonus(bonus);
+                                applied = true;
+                            }
+                        }
+                    }
+                }
+            }
         }
-        return bonus;
-    }
-
-    @Override
-    public void adjustOptimalRun(List<RevenueTrainRun> optimalRuns) {
+        return applied;
     }
 
     @Override
     public String prettyPrint(RevenueAdapter revenueAdapter) {
-        if (calculatedBonus > 0) {
-            return "Gulf Shipping Bonus: $" + calculatedBonus;
-        }
-        return "";
-    }
-
-    private int calculateGulfBonus(List<RevenueTrainRun> runs) {
-        int totalBonus = 0;
-        if (runs == null)
-            return 0;
-
-        for (RevenueTrainRun run : runs) {
-            Set<MapHex> visitedHexes = new HashSet<>();
-
-            if (run.getRunVertices() != null) {
-                for (NetworkVertex v : run.getRunVertices()) {
-                    if (v != null && v.getHex() != null)
-                        visitedHexes.add(v.getHex());
-                }
-            }
-
-            List<NetworkEdge> edges = run.getEdges();
-            if (edges != null) {
-                for (NetworkEdge e : edges) {
-                    List<NetworkVertex> path = e.getVertexPath();
-                    if (path != null) {
-                        for (NetworkVertex v : path) {
-                            if (v != null && v.getHex() != null)
-                                visitedHexes.add(v.getHex());
-                        }
-                    }
-                }
-            }
-
-            for (MapHex hex : visitedHexes) {
-                totalBonus += getGulfTokenBonus(hex);
-            }
-        }
-        return totalBonus;
-    }
-
-    private int getGulfTokenBonus(MapHex hex) {
-        if (hex == null || hex.getBonusTokens() == null)
-            return 0;
-        for (BonusToken t : hex.getBonusTokens()) {
-            String tName = t.getName();
-            if (tName != null) {
-                String lowerName = tName.toLowerCase();
-                if (lowerName.contains("gulf")) {
-                    boolean owner = false;
-                    if (operatingCompany != null) {
-                        owner = tName.startsWith(operatingCompany.getId() + "_");
-                        if (!owner) {
-                            for (net.sf.rails.game.PrivateCompany priv : operatingCompany.getPrivates()) {
-                                if ("Gulf".equals(priv.getId()) || (priv.getName() != null && priv.getName().contains("Gulf"))) {
-                                    owner = true;
-                                    break;
-                                }
-                            }
-                        }
-                    }
-                    if (owner) return 20;
-                    if (lowerName.contains("closed")) return 0;
-                    return 10;
-                }
-            }
-        }
-        return 0;
+        return null;
     }
 }

@@ -175,9 +175,9 @@ public class OperatingRound_1870 extends OperatingRound {
     public boolean buyTrain(rails.game.action.BuyTrain action) {
         boolean success = super.buyTrain(action);
 
-        if (success) {
-            checkConnections();
-        }
+        // if (success) {
+        //     checkConnections();
+        // }
 
         return success;
     }
@@ -382,7 +382,7 @@ public class OperatingRound_1870 extends OperatingRound {
                     if (cattlePriv != null) {
                         net.sf.rails.game.BonusToken cattleToken = net.sf.rails.game.BonusToken.create(cattlePriv);
                         if (cattleToken != null) {
-                            cattleToken.setName("Cattle");
+                            cattleToken.setName(comp.getId() + "_Cattle");
                             cattleToken.setValue(10);
                             hex.layBonusToken(cattleToken, getRoot().getPhaseManager());
                             net.sf.rails.common.ReportBuffer.add(this,
@@ -502,9 +502,9 @@ String oldName = existingToken.getName();
                     for (MapHex hex : getRoot().getMapManager().getHexes()) {
                         if (hex.getBonusTokens() != null) {
                             for (net.sf.rails.game.BonusToken t : hex.getBonusTokens()) {
-                                if ("Cattle".equals(t.getName()) && t.getParent() != null
+     if (t.getName() != null && t.getName().contains("Cattle") && t.getParent() != null
                                         && id.equals(t.getParent().getId())) {
-                                    placedCount++;
+                                                                             placedCount++;
                                 }
                             }
                         }

@@ -166,29 +166,7 @@ public class ConnectionRunRound_1870 extends OperatingRound_1870 {
     public boolean process(PossibleAction action) {
         if (action instanceof SetDividend) {
 
-            if (!getRoot().getGameManager().isReloading()) {
-                SetDividend sdAction = (SetDividend) action;
-                Object input = javax.swing.JOptionPane.showInputDialog(
-                        null,
-                        "Verify or edit the connection run value:",
-                        "Connection Run Payout",
-                        javax.swing.JOptionPane.QUESTION_MESSAGE,
-                        null,
-                        null,
-                        String.valueOf(sdAction.getActualRevenue()));
-
-                if (input == null) {
-                    return false; // Abort if user cancels
-                }
-
-                try {
-                    int newRev = Integer.parseInt(input.toString());
-                    sdAction.setActualRevenue(newRev);
-                } catch (NumberFormatException e) {
-                    net.sf.rails.common.DisplayBuffer.add(this, "Invalid number entered. Aborting connection run.");
-                    return false;
-                }
-            }
+           
             boolean success = super.process(action);
 
             // CRITICAL FIX: The 1870 Connection Run consists solely of a single payout.

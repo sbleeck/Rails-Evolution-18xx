@@ -57,9 +57,8 @@ interruptStack.push((Round) getCurrentRound());
 
         // Dynamically register the Cattle Company modifier for revenue calculation
         if (getRoot().getRevenueManager() != null) {
-            getRoot().getRevenueManager()
-                    .addDynamicModifier(new net.sf.rails.game.specific._1870.CattleModifier_1870());
-            getRoot().getRevenueManager().addDynamicModifier(new net.sf.rails.game.specific._1870.GulfModifier_1870());
+            getRoot().getRevenueManager().addStaticModifier(new net.sf.rails.game.specific._1870.CattleModifier_1870());
+            getRoot().getRevenueManager().addStaticModifier(new net.sf.rails.game.specific._1870.GulfModifier_1870());
             getRoot().getRevenueManager()
                     .addDynamicModifier(new net.sf.rails.game.specific._1870.DestinationModifier_1870());
 

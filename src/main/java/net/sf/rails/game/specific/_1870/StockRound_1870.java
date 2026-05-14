@@ -471,7 +471,7 @@ net.sf.rails.game.financial.StockSpace newParSpace = stockMarket.getStartSpace(n
             for (int r = 0; r < 40; r++) {
                 for (int c = 0; c < 40; c++) {
                     try {
-                        net.sf.rails.game.financial.StockSpace space = stockMarket.getSpace(r, c);
+                        net.sf.rails.game.financial.StockSpace space = stockMarket.getStockSpace(r, c);
                         if (space != null && space.getPrice() == newPar) {
                             // Prefer the uppermost row for par spaces
                             if (r < bestRow) {
@@ -493,7 +493,7 @@ net.sf.rails.game.financial.StockSpace newParSpace = stockMarket.getStartSpace(n
             int minDiff = Integer.MAX_VALUE;
             for (int c = 0; c < 40; c++) {
                 try {
-                    net.sf.rails.game.financial.StockSpace space = stockMarket.getSpace(0, c);
+                    net.sf.rails.game.financial.StockSpace space = stockMarket.getStockSpace(0, c);
                     if (space != null) {
                         int diff = Math.abs(space.getPrice() - newPar);
                         if (diff < minDiff) {
