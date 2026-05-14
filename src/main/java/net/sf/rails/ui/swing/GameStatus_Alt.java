@@ -56,8 +56,8 @@ public class GameStatus_Alt extends GameStatus {
         companyScroll.setOpaque(false); companyScroll.getViewport().setOpaque(false); companyScroll.getVerticalScrollBar().setUnitIncrement(16);
         this.add(companyScroll, BorderLayout.CENTER);
 
-        marketColumn = new JPanel(new BorderLayout()); marketColumn.setOpaque(false);
-        marketColumn.setPreferredSize(new Dimension(250, 0)); this.add(marketColumn, BorderLayout.EAST);
+marketColumn = new JPanel(new BorderLayout()); marketColumn.setOpaque(false);
+        marketColumn.setPreferredSize(new Dimension(500, 0)); this.add(marketColumn, BorderLayout.EAST);
 
         recreate();
     }
@@ -178,8 +178,39 @@ public class GameStatus_Alt extends GameStatus {
         }
     }
     
-    @Override public boolean initCashCorrectionActions() { return false; }
-    @Override public boolean initTrainCorrectionActions() { return false; }
-    @Override public int[] getLastPlayerTimes() { return new int[0]; }
-    @Override public void setLastPlayerTimes(int[] times) { }
+@Override public boolean initCashCorrectionActions() { return false; }
+@Override public boolean initTrainCorrectionActions() { return false; }
+@Override public int[] getLastPlayerTimes() { return new int[0]; }
+@Override public void setLastPlayerTimes(int[] times) { }
+
+@Override 
+public void setPriorityPlayer(int index) { 
+    if (gameUIManager == null || gameUIManager.getPlayerManager() == null) return;
+    int pdIndex = gameUIManager.getPriorityPlayer() != null ? gameUIManager.getPriorityPlayer().getIndex() : -1;
+    for (Map.Entry<Player, PlayerPanel> entry : playerRegistry.entrySet()) {
+        entry.getValue().setPriorityDeal(entry.getKey().getIndex() == pdIndex);
+    }
+}
+
+@Override 
+public void highlightCurrentPlayer(int index) { 
+    if (gameUIManager == null || gameUIManager.getPlayerManager() == null) return;
+    Player currentPlayer = gameUIManager.getGameManager().getCurrentPlayer();
+    for (Map.Entry<Player, PlayerPanel> entry : playerRegistry.entrySet()) {
+        entry.getValue().setActive(entry.getKey().equals(currentPlayer));
+    }
+}
+
+@Override 
+public void updatePlayerOrder(java.util.List<String> playerNames) { 
+    recreate(); 
+}
+
+@Override 
+public void refreshDashboard() { 
+    // Trigger a safe top-down refresh of all active components
+    for (PlayerPanel pp : playerRegistry.values()) pp.refresh();
+    for (CompanyPanel cp : companyRegistry.values()) cp.refresh();
+    if (activeBankPanel != null) activeBankPanel.refresh();
+}
 }

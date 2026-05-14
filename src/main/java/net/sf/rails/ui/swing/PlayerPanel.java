@@ -256,10 +256,14 @@ public class PlayerPanel extends JPanel {
                     boolean isCertPrez = cert.isPresidentShare();
                     RailCard card = new RailCard(cert, new ButtonGroup());
 
-                    if (company.getBgColour() != null)
-                        card.setBackground(company.getBgColour());
-                    if (company.getFgColour() != null)
-                        card.setForeground(company.getFgColour());
+// Implement high-contrast paper cards with company-colored borders
+                    card.setBackground(new Color(255, 255, 250)); // Neutral certificate paper
+                    card.setForeground(new Color(20, 20, 20)); // High contrast text
+                    if (company.getBgColour() != null) {
+                        card.setBorder(BorderFactory.createLineBorder(company.getBgColour(), 2));
+                    } else {
+                        card.setBorder(BorderFactory.createLineBorder(Color.GRAY, 1));
+                    }
 
                     // Percentage printed on all, but "P" only on the top card
                     if (i == group.size() - 1) {
@@ -288,9 +292,15 @@ public class PlayerPanel extends JPanel {
                 }
             }
 
-            // 3. Clean Sum Label without "Sum:" string
-            JLabel summaryLabel = new JLabel(sharePercentage + "%" + (isPresident ? " (Prez)" : ""));
-            summaryLabel.setFont(GameStatus_Alt.FONT_NUMBERS);
+// 3. Distinct Total Block
+            JLabel summaryLabel = new JLabel(" " + sharePercentage + "%" + (isPresident ? " P " : " "));
+            summaryLabel.setFont(new Font("SansSerif", Font.BOLD, 13));
+            summaryLabel.setOpaque(true);
+            summaryLabel.setBackground(new Color(235, 235, 240)); // Distinct aggregate background
+            summaryLabel.setBorder(BorderFactory.createLineBorder(new Color(180, 180, 180), 1));
+            
+            // Push summary slightly right for visual separation
+            holdingPanel.add(Box.createHorizontalStrut(5));
             holdingPanel.add(summaryLabel);
 
             cardArea.add(holdingPanel);
