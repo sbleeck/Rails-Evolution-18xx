@@ -72,49 +72,30 @@ private int calculateDestinationBonus(List<RevenueTrainRun> runs) {
             NetworkVertex startNode = vertices.get(0);
             NetworkVertex endNode = vertices.get(vertices.size() - 1);
             
-boolean startsAtDest = (destHex != null && startNode.getHex() == destHex);
+            boolean startsAtDest = (destHex != null && startNode.getHex() == destHex);
             boolean endsAtDest = (destHex != null && endNode.getHex() == destHex);
 
             if (startsAtDest || (vertices.size() > 1 && endsAtDest)) {
                 int runBonus = 0;
                 MapHex targetHex = startsAtDest ? startNode.getHex() : endNode.getHex();
-                
-                // Edge vertices often return 0 value. We must scan the hex's vertices 
+
+                // Edge vertices often return 0 value. We must scan the hex's vertices
                 // within the run to find the actual station value.
 
                 for (NetworkVertex v : vertices) {
                     if (v.getHex() == targetHex) {
-// Get the base value first
+
+                        // The adapter already returns the correct value for THIS company,
+                        // including its own bonuses (Port/Cattle) and excluding others'.
+                        // Rule 822: The marker doubles the value of the city FOR THAT company.
                         int val = revenueAdapter.getVertexValue(v, run.getTrain(), phase);
-                        
-                        // Rule Check: Ensure we only double the value valid for THIS company.
-                        // We subtract any bonus tokens not belonging to us before doubling.
-                        if (targetHex.getBonusTokens() != null) {
-                            for (net.sf.rails.game.BonusToken t : targetHex.getBonusTokens()) {
-                                String tName = t.getName();
-                                boolean belongsToUs = false;
-                                
-                                if (tName != null && tName.startsWith(comp.getId())) {
-                                    belongsToUs = true;
-                                } else if (t.getParent() != null && t.getParent() instanceof net.sf.rails.game.PrivateCompany) {
-                                    if (((net.sf.rails.game.PrivateCompany) t.getParent()).getOwner() == comp) {
-                                        belongsToUs = true;
-                                    }
-                                }
-                                
-                                if (!belongsToUs && tName != null) {
-                                    val -= t.getValue(); 
-                                    // If it's an open port, others still get $10
-                                    if (tName.contains("Gulf_Open")) val += 10;
-                                }
-                            }
-                        }
+
                         if (val > runBonus) {
                             runBonus = val;
                         }
                     }
                 }
-                
+
                 totalBonus += runBonus;
                 
                 // Dynamically update the token's UI value to stop it from showing '0' on the map

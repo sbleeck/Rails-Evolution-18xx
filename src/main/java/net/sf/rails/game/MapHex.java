@@ -4,6 +4,8 @@ import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import javax.print.attribute.standard.Destination;
+
 import net.sf.rails.game.state.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -29,8 +31,6 @@ import net.sf.rails.util.Util;
 import rails.game.action.LayTile;
 import java.io.Serializable;
 
-
-
 // TODO: Rewrite the mechanisms as model
 
 /**
@@ -54,7 +54,7 @@ public class MapHex extends RailsModel implements RailsOwner, Configurable, Seri
         }
 
         public static Coordinates createFromId(String id,
-                                               MapOrientation mapOrientation) throws ConfigurationException {
+                MapOrientation mapOrientation) throws ConfigurationException {
 
             Matcher m = namePattern.matcher(id);
 
@@ -72,7 +72,8 @@ public class MapHex extends RailsModel implements RailsOwner, Configurable, Seri
             int number;
             try {
                 number = Integer.parseInt(m.group(2));
-                if (number > 90) number -= 100; // For 1825U1 column 99 (= -1)
+                if (number > 90)
+                    number -= 100; // For 1825U1 column 99 (= -1)
             } catch (NumberFormatException e) {
                 throw new ConfigurationException(
                         "Invalid number format: " + m.group(2));
@@ -134,7 +135,8 @@ public class MapHex extends RailsModel implements RailsOwner, Configurable, Seri
 
         @Override
         public boolean equals(Object other) {
-            if (!(other instanceof Coordinates)) return false;
+            if (!(other instanceof Coordinates))
+                return false;
             return row == ((Coordinates) other).row
                     && col == ((Coordinates) other).col;
         }
@@ -211,7 +213,7 @@ public class MapHex extends RailsModel implements RailsOwner, Configurable, Seri
      * that may not be hit by a train more than once. Also to be used for
      * hexes with multi-city tiles where a train may hit only once.
      */
-    //private String mutexId = null;
+    // private String mutexId = null;
 
     ////////////////////////
     // dynamic fields
@@ -220,7 +222,7 @@ public class MapHex extends RailsModel implements RailsOwner, Configurable, Seri
      * open: True (default) is the tile is accessible (for tiles, tokens, trains).
      * In some games (e.g. 1837), parts of the map are inaccessible in some phases.
      */
-    private final BooleanState open = new BooleanState (this, "isOpen", true);
+    private final BooleanState open = new BooleanState(this, "isOpen", true);
     private final GenericState<Tile> currentTile = new GenericState<>(this, "currentTile");
     private final GenericState<HexSide> currentTileRotation = new GenericState<>(this, "currentTileRotation");
 
@@ -231,16 +233,23 @@ public class MapHex extends RailsModel implements RailsOwner, Configurable, Seri
     // Remark: this was a static field in Rails1.x, causing potential undo
     // problems
     private final HashMapState<PublicCompany, Stop> homes = HashMapState.create(this, "homes");
-// Local cache to retain all historically instantiated Stops on this hex to prevent AI registry leaks
+    // Local cache to retain all historically instantiated Stops on this hex to
+    // prevent AI registry leaks
     private final Map<Integer, Stop> historicalStops = new HashMap<>();
-    private final GenericState<PrivateCompany> blockingPrivateCompany = new GenericState<>(this, "blockingPrivateCompany");
+    private final GenericState<PrivateCompany> blockingPrivateCompany = new GenericState<>(this,
+            "blockingPrivateCompany");
 
     /**
-     * Is the hex blocked for home tokens? <p> NOTE:<br> ALWAYS means: Always
+     * Is the hex blocked for home tokens?
+     * <p>
+     * NOTE:<br>
+     * ALWAYS means: Always
      * Blocked, no token lay possible (until attribute is changed) RESERVE_SLOT
      * means: Reserves slots (for multi-cities depending on
-     * isHomeBlockedForAllCities<br> NEVER means: Never blocked (unless there is
-     * not a single free slot remaining)<br> Remark: The latter is used for 1835
+     * isHomeBlockedForAllCities<br>
+     * NEVER means: Never blocked (unless there is
+     * not a single free slot remaining)<br>
+     * Remark: The latter is used for 1835
      * Berlin, which is home to PR, but the absence of a PR token does not block
      * the third slot when the green tile is laid. <br>
      * <p>
@@ -251,14 +260,15 @@ public class MapHex extends RailsModel implements RailsOwner, Configurable, Seri
         ALWAYS, RESERVE_SLOT, NEVER
     }
 
-    private final GenericState<BlockedToken> isBlockedForTokenLays
-            = new GenericState<>(this, "isBlockedForTokenLays");
+    private final GenericState<BlockedToken> isBlockedForTokenLays = new GenericState<>(this, "isBlockedForTokenLays");
 
     /**
      * OffStation BonusTokens
      */
-    private final PortfolioSet<BonusToken> bonusTokens
-            = PortfolioSet.create(this, "bonusTokens", BonusToken.class);
+private final PortfolioSet bonusTokens = PortfolioSet.create(this, "bonusTokens", BonusToken.class);
+/* 1870: Destination markers placed on the hex edge (Rule 819) */
+private final PortfolioSet edgeTokens
+= PortfolioSet.create(this, "edgeTokens", BaseToken.class);
 
     /**
      * Parameters for extra text to be printed at a specified position on the hex.
@@ -269,7 +279,6 @@ public class MapHex extends RailsModel implements RailsOwner, Configurable, Seri
     private int extraTextX = 0; // horizontal position wrt hex center
     private int extraTextY = 0; // vertical position wrt hex center
 
-
     private MapHex(MapManager parent, String id, Coordinates coordinates) {
         super(parent, id);
 
@@ -279,8 +288,7 @@ public class MapHex extends RailsModel implements RailsOwner, Configurable, Seri
     public static MapHex create(MapManager parent, Tag tag) throws ConfigurationException {
         // name serves as id
         String id = tag.getAttributeAsString("name");
-        Coordinates coordinates =
-                Coordinates.createFromId(id, parent.getMapOrientation());
+        Coordinates coordinates = Coordinates.createFromId(id, parent.getMapOrientation());
         MapHex hex = new MapHex(parent, id, coordinates);
         hex.configureFromXML(tag);
         return hex;
@@ -355,7 +363,7 @@ public class MapHex extends RailsModel implements RailsOwner, Configurable, Seri
 
         // We need completely new objects, not just references to the Tile's
         // stations.
-       if (currentTile.value() != null) {
+        if (currentTile.value() != null) {
             for (Station station : currentTile.value().getStations()) {
                 Stop stop = Stop.create(this, station);
                 stop.initStopParameters(station);
@@ -363,18 +371,21 @@ public class MapHex extends RailsModel implements RailsOwner, Configurable, Seri
                 historicalStops.put(stop.getNumber(), stop);
             }
         } else {
-            log.warn("Hex {} has a null current tile (preprintedTileId={}). Stations cannot be initialized.", getId(), preprintedTileId);
+            log.warn("Hex {} has a null current tile (preprintedTileId={}). Stations cannot be initialized.", getId(),
+                    preprintedTileId);
         }
 
         // Deprecated but retained for backwards compatibility:
         // all hexes of an off-map area use their "city name" (off-map area name)
         // as a mutexId.
         // Note: the 18xx Rules Difference List states that only 18PA is an exception.
-        // This can be accomodated by setting mutexId="" in Map.xml for all offmap hexes.
-        //if (mutexId == null && currentTile.value().getStopType() != null
-        //        && "OFFMAP".equalsIgnoreCase(currentTile.value().getStopType().getTypeName())) {
-        //    mutexId = stopName;
-        //}
+        // This can be accomodated by setting mutexId="" in Map.xml for all offmap
+        // hexes.
+        // if (mutexId == null && currentTile.value().getStopType() != null
+        // &&
+        // "OFFMAP".equalsIgnoreCase(currentTile.value().getStopType().getTypeName())) {
+        // mutexId = stopName;
+        // }
 
         impassableSides = impassableBuilder.build();
         riverSides = riverBuilder.build();
@@ -387,11 +398,11 @@ public class MapHex extends RailsModel implements RailsOwner, Configurable, Seri
         return (MapManager) super.getParent();
     }
 
-    public void setOpen (boolean open) {
-        this.open.set (open);
+    public void setOpen(boolean open) {
+        this.open.set(open);
     }
 
-    public boolean isOpen () {
+    public boolean isOpen() {
         return open.value();
     }
 
@@ -409,7 +420,7 @@ public class MapHex extends RailsModel implements RailsOwner, Configurable, Seri
         riverBuilder.set(side);
     }
 
-    public HexSidesSet getRiverSides () {
+    public HexSidesSet getRiverSides() {
         return riverSides;
     }
 
@@ -417,9 +428,11 @@ public class MapHex extends RailsModel implements RailsOwner, Configurable, Seri
         invalidBuilder.set(side);
     }
 
-    public HexSidesSet getBorderSides() { return borderSides; }
+    public HexSidesSet getBorderSides() {
+        return borderSides;
+    }
 
-    public void addBorderSide (HexSide side) {
+    public void addBorderSide(HexSide side) {
         borderBuilder.set(side);
     }
 
@@ -432,24 +445,26 @@ public class MapHex extends RailsModel implements RailsOwner, Configurable, Seri
                 && impassableTemplate.contains(neighbour.getId());
     }
 
-    public boolean isRiverNeighbour (MapHex neighbour) {
+    public boolean isRiverNeighbour(MapHex neighbour) {
         return riverTemplate != null
                 && riverTemplate.contains(neighbour.getId());
     }
 
-    public boolean isBorderNeighbour (MapHex neighbour) {
+    public boolean isBorderNeighbour(MapHex neighbour) {
         return borderTemplate != null
                 && borderTemplate.contains(neighbour.getId());
     }
 
     public boolean isValidNeighbour(MapHex neighbour, HexSide side) {
-        if (isImpassableNeighbour(neighbour)) return false;
+        if (isImpassableNeighbour(neighbour))
+            return false;
         /*
          * The preprinted tile on this hex is offmap or fixed and has no track
          * to this side.
          */
         Tile neighbourTile = neighbour.getCurrentTile();
-        if (neighbourTile.isUpgradeable()) return true;
+        if (neighbourTile.isUpgradeable())
+            return true;
         HexSide rotated = side.opposite().rotate(
                 neighbour.getCurrentTileRotation().negative());
         return neighbourTile.hasTracks(rotated);
@@ -467,11 +482,12 @@ public class MapHex extends RailsModel implements RailsOwner, Configurable, Seri
     /**
      * Get the BitSet of the sides that have tracks
      * for a given tile and rotation.
-     * @param tile The tile
+     * 
+     * @param tile     The tile
      * @param rotation A given rotation of that tile
      * @return The BitSet indicating which sides have track.
      */
-    public HexSidesSet getTrackSides (Tile tile, int rotation) {
+    public HexSidesSet getTrackSides(Tile tile, int rotation) {
         HexSide rotated;
         HexSidesSet.Builder sidesBuilder = HexSidesSet.builder();
         for (HexSide side : HexSide.all()) {
@@ -486,10 +502,11 @@ public class MapHex extends RailsModel implements RailsOwner, Configurable, Seri
     /**
      * Get the BitSet of the sides that have track
      * for the current tile on this Hex.
+     * 
      * @return the resulting bitset
      */
-    public HexSidesSet getTrackSides () {
-        return getTrackSides (currentTile.value(),
+    public HexSidesSet getTrackSides() {
+        return getTrackSides(currentTile.value(),
                 currentTileRotation.value().getTrackPointNumber());
     }
 
@@ -516,7 +533,9 @@ public class MapHex extends RailsModel implements RailsOwner, Configurable, Seri
 
     /**
      * Return the current picture ID (i.e. the tile ID to be displayed, rather
-     * than used for route determination). <p> Usually, the picture ID is equal
+     * than used for route determination).
+     * <p>
+     * Usually, the picture ID is equal
      * to the tile ID. Different values may be defined per hex or per tile.
      * Restriction: definitions per hex can apply to preprinted tiles only.
      *
@@ -563,9 +582,13 @@ public class MapHex extends RailsModel implements RailsOwner, Configurable, Seri
         return access;
     }
 
-    public String getLabel() { return label; }
+    public String getLabel() {
+        return label;
+    }
 
-    public String getTerrain() { return terrain; }
+    public String getTerrain() {
+        return terrain;
+    }
 
     /**
      * new wrapper function for the LayTile action that calls the actual upgrade
@@ -575,30 +598,26 @@ public class MapHex extends RailsModel implements RailsOwner, Configurable, Seri
      */
     public void upgrade(LayTile action) {
 
-
-
-        
         Tile newTile = action.getLaidTile();
         HexSide newRotation = action.getLaidTile().getFixedOrientation();
-        if (newRotation == null) newRotation = HexSide.get(action.getOrientation());
+        if (newRotation == null)
+            newRotation = HexSide.get(action.getOrientation());
         Map<String, Integer> relaidTokens = action.getRelaidBaseTokens();
 
         upgrade(newTile, newRotation, relaidTokens);
-    
+
     }
 
-
-
     public void upgrade(Tile newTile, HexSide newRotation,
-                        Map<String, Integer> relaidTokens) {
+            Map<String, Integer> relaidTokens) {
 
         // DIAGNOSTIC: DEEP AUDIT OF TOKEN STATE BEFORE MUTATION
         List<String> preAudit = new ArrayList<>();
         for (Stop s : stops) {
             for (BaseToken t : s.getBaseTokens()) {
-                preAudit.add("[Stop:" + System.identityHashCode(s) + 
-                             "|Token:" + System.identityHashCode(t) + 
-                             "|Co:" + t.getParent().getId() + "]");
+                preAudit.add("[Stop:" + System.identityHashCode(s) +
+                        "|Token:" + System.identityHashCode(t) +
+                        "|Co:" + t.getParent().getId() + "]");
             }
         }
 
@@ -617,7 +636,8 @@ public class MapHex extends RailsModel implements RailsOwner, Configurable, Seri
             stationMapping = rotation.getStationMapping();
         } else {
             stationMapping = null;
-           log.error("No valid rotation was found: newRotation={} currentRotation={}", newRotation, currentTileRotation.value());
+            log.error("No valid rotation was found: newRotation={} currentRotation={}", newRotation,
+                    currentTileRotation.value());
         }
 
         BiMap<Stop, Station> stopsToNewStations = HashBiMap.create();
@@ -627,7 +647,7 @@ public class MapHex extends RailsModel implements RailsOwner, Configurable, Seri
 
         if (relaidTokens != null) {
             // Check for manual handling of tokens
-            for ( Map.Entry<String, Integer> entry : relaidTokens.entrySet()) {
+            for (Map.Entry<String, Integer> entry : relaidTokens.entrySet()) {
                 PublicCompany company = getRoot().getCompanyManager().getPublicCompany(entry.getKey());
                 for (Stop stop : stops) {
                     if (stop.hasTokenOf(company)) {
@@ -652,7 +672,8 @@ public class MapHex extends RailsModel implements RailsOwner, Configurable, Seri
         } else { // default mapping routine
 
             for (Stop stop : stops) {
-                if (stopsToNewStations.containsKey(stop)) continue;
+                if (stopsToNewStations.containsKey(stop))
+                    continue;
                 Station oldStation = stop.getRelatedStation();
                 // Search stationMapping for assignments of stops to new
                 // stations
@@ -676,15 +697,15 @@ public class MapHex extends RailsModel implements RailsOwner, Configurable, Seri
                         // If the engine tries to map two distinct Old Stops to the SAME New Station,
                         // check if there is actually room on the new tile to keep them separate.
                         boolean remapped = false;
-                        
+
                         // If the new tile has enough stations to hold everyone, don't merge!
                         if (newTile.getNumStations() >= stops.size()) {
                             // Find the first station on the new tile that hasn't been assigned yet
                             for (Station candidate : newTile.getStations()) {
                                 if (!stopsToNewStations.containsValue(candidate)) {
                                     stopsToNewStations.put(stop, candidate);
-                                    log.info("Upgrade Collision Avoided: Remapped Stop {} to free Station {}", 
-                                             stop.getNumber(), candidate.getNumber());
+                                    log.info("Upgrade Collision Avoided: Remapped Stop {} to free Station {}",
+                                            stop.getNumber(), candidate.getNumber());
                                     remapped = true;
                                     break;
                                 }
@@ -695,8 +716,7 @@ public class MapHex extends RailsModel implements RailsOwner, Configurable, Seri
                             // Only merge if we really have no choice (e.g. 2 cities merging into 1)
                             // new station already assigned a stop, use that
                             // and move tokens between stops
-                            Stop otherStop =
-                                    stopsToNewStations.inverse().get(newStation);
+                            Stop otherStop = stopsToNewStations.inverse().get(newStation);
                             moveTokens(stop, otherStop);
                             droppedStops.add(stop);
                             // FIXME: Due to Rails1.x compatibility
@@ -707,20 +727,18 @@ public class MapHex extends RailsModel implements RailsOwner, Configurable, Seri
                         stopsToNewStations.put(stop, newStation);
                     }
                 }
-    
+
             }
         }
-
-       
 
         // Create a Stop for new Stations
         if (stops.size() < newTile.getNumStations()) {
 
             int stopNumber = stops.size();
             for (Station station : newTile.getStations()) {
-                if (stopsToNewStations.containsValue(station)) continue;
-                
-                
+                if (stopsToNewStations.containsValue(station))
+                    continue;
+
                 ++stopNumber;
                 Stop stop = historicalStops.get(stopNumber);
                 if (stop == null) {
@@ -729,9 +747,9 @@ public class MapHex extends RailsModel implements RailsOwner, Configurable, Seri
                 } else {
                     stop.setStation(station);
                 }
-                
+
                 stop.initStopParameters(station);
-                stops.put (station, stop);
+                stops.put(station, stop);
                 stopsToNewStations.put(stop, station);
             }
         }
@@ -754,7 +772,6 @@ public class MapHex extends RailsModel implements RailsOwner, Configurable, Seri
         for (Stop stop : stops.viewValues()) {
             Station oldStation = oldRelations.get(stop);
 
-
             // Check if home tokens are now on a different station number
             if (oldStation != null && oldStation.getNumber() != stop.getRelatedStationNumber()) {
                 for (BaseToken token : stop.getBaseTokens()) {
@@ -763,40 +780,35 @@ public class MapHex extends RailsModel implements RailsOwner, Configurable, Seri
                         // If so, update the company home station number
                         token.getParent().setHomeCityNumber(stop.getRelatedStationNumber());
 
-
                     }
                 }
             }
         }
 
-       
         // DIAGNOSTIC: DEEP AUDIT OF TOKEN STATE AFTER MUTATION
         List<String> postAudit = new ArrayList<>();
         for (Stop s : stops) {
             for (BaseToken t : s.getBaseTokens()) {
-                postAudit.add("[Stop:" + System.identityHashCode(s) + 
-                             "|Token:" + System.identityHashCode(t) + 
-                             "|Co:" + t.getParent().getId() + "]");
+                postAudit.add("[Stop:" + System.identityHashCode(s) +
+                        "|Token:" + System.identityHashCode(t) +
+                        "|Co:" + t.getParent().getId() + "]");
             }
         }
-        
+
         // CHECK FOR DUPLICATE REFERENCES
         Set<Integer> seenTokens = new HashSet<>();
         for (Stop s : stops) {
-             for (BaseToken t : s.getBaseTokens()) {
-                 int id = System.identityHashCode(t);
-                 if (seenTokens.contains(id)) {
-                     log.error("!!! CRITICAL: DUPLICATE TOKEN REFERENCE DETECTED AFTER UPGRADE !!! TokenID: " + id);
-                 }
-                 seenTokens.add(id);
-             }
+            for (BaseToken t : s.getBaseTokens()) {
+                int id = System.identityHashCode(t);
+                if (seenTokens.contains(id)) {
+                    log.error("!!! CRITICAL: DUPLICATE TOKEN REFERENCE DETECTED AFTER UPGRADE !!! TokenID: " + id);
+                }
+                seenTokens.add(id);
+            }
         }
 
     }
 
-
-
-    
     private void moveTokens(Stop origin, Stop target) {
         for (BaseToken token : origin.getBaseTokens()) {
             PublicCompany company = token.getParent();
@@ -813,23 +825,22 @@ public class MapHex extends RailsModel implements RailsOwner, Configurable, Seri
                         && !company.getHomeHexes().isEmpty()
                         && this.equals(company.getHomeHexes().get(0))
                         && origin.getRelatedStationNumber() == company.getHomeCityNumber()) {
-                    int oldvalue=company.getHomeCityNumber();
+                    int oldvalue = company.getHomeCityNumber();
                     company.setHomeCityNumber(target.getRelatedStationNumber());
                 }
             }
         }
     }
 
-
-
-// File: MapHex.java
+    // File: MapHex.java
 
     // ... (lines 720-730 approx) ...
 
     // --- START FIX ---
-    // FIX: Method signature must accept BiMap<Stop, Station> to match AIEvaluatorService calls.
+    // FIX: Method signature must accept BiMap<Stop, Station> to match
+    // AIEvaluatorService calls.
     public void executeTileLay(Tile newTile, HexSide rotation, BiMap<Stop, Station> stopsToNewStations) {
-        
+
         currentTile.set(newTile);
         currentTileRotation.set(rotation);
 
@@ -837,7 +848,8 @@ public class MapHex extends RailsModel implements RailsOwner, Configurable, Seri
 
         if (stopsToNewStations != null) {
             // RESTORE CONTEXT (AI/Undo):
-            // The input maps Stop -> Station. We need to populate our local 'stops' map (Station -> Stop).
+            // The input maps Stop -> Station. We need to populate our local 'stops' map
+            // (Station -> Stop).
             for (Map.Entry<Stop, Station> entry : stopsToNewStations.entrySet()) {
                 Stop stop = entry.getKey();
                 Station station = entry.getValue();
@@ -851,29 +863,29 @@ public class MapHex extends RailsModel implements RailsOwner, Configurable, Seri
             }
         } else {
             // STANDARD TILE LAY:
-            // Calculate new stops safely, reusing existing objects to prevent ID collisions.
+            // Calculate new stops safely, reusing existing objects to prevent ID
+            // collisions.
 
             for (Station station : newTile.getStations()) {
 
-int statNum = station.getNumber();
+                int statNum = station.getNumber();
                 Stop stop = historicalStops.get(statNum);
-                
+
                 if (stop != null) {
                     stop.setStation(station);
                 } else {
                     stop = Stop.create(this, station);
                     historicalStops.put(statNum, stop);
                 }
-                
-                
+
                 stops.put(station, stop);
             }
         }
     }
 
-
-/**
-     * AI Accessor: Restores the historical tile and rotation directly to the hex during reload.
+    /**
+     * AI Accessor: Restores the historical tile and rotation directly to the hex
+     * during reload.
      */
     public void setTile_AI(Tile newTile, int rotationInt) {
         if (newTile != null) {
@@ -883,10 +895,6 @@ int statNum = station.getNumber();
         }
     }
 
-
-
-
-
     public boolean layBaseToken(PublicCompany company, Stop stop) {
         if (stops.isEmpty()) {
             log.error("Tile {} has no station for home token of company {}", getId(), company.getId());
@@ -895,9 +903,9 @@ int statNum = station.getNumber();
 
         BaseToken token = company.getNextBaseToken();
         if (token == null) {
-           log.error("Company {} has no free token", company.getId());
+            log.error("Company {} has no free token", company.getId());
             return false;
-        } else if (stop == null) {  // Added for 18Scan, still necessary?
+        } else if (stop == null) { // Added for 18Scan, still necessary?
             return true;
         } else {
             // transfer token
@@ -921,7 +929,8 @@ int statNum = station.getNumber();
      *
      * @param token        The bonus token object to place
      * @param phaseManager The PhaseManager is also passed in case the token
-     *                     must register itself for removal when a certain phase starts.
+     *                     must register itself for removal when a certain phase
+     *                     starts.
      * @return Always true
      */
     public boolean layBonusToken(BonusToken token, PhaseManager phaseManager) {
@@ -931,11 +940,17 @@ int statNum = station.getNumber();
         return true;
     }
 
-    public ImmutableSet<BaseToken> getBaseTokens() {
+public ImmutableSet<BaseToken> getBaseTokens() {
         ImmutableSet.Builder<BaseToken> tokens = ImmutableSet.builder();
         for (Stop stop : stops) {
             tokens.addAll(stop.getBaseTokens());
         }
+        // --- START FIX ---
+        // Collect destination markers from the edge to ensure they are drawn 
+        for (Object item : edgeTokens) {
+            tokens.add((BaseToken) item);
+        }
+        // --- END FIX ---
         return tokens.build();
     }
 
@@ -951,7 +966,8 @@ int statNum = station.getNumber();
 
     public boolean hasTokenSlotsLeft() {
         for (Stop stop : stops) {
-            if (stop.hasTokenSlotsLeft()) return true;
+            if (stop.hasTokenSlotsLeft())
+                return true;
         }
         return false;
     }
@@ -959,8 +975,31 @@ int statNum = station.getNumber();
     /**
      * Check if the hex has already a token of the company in any station
      */
-    public boolean hasTokenOfCompany(PublicCompany company) {
-        return (getStopOfBaseToken(company) != null);
+public boolean hasTokenOfCompany(PublicCompany company) {
+        if (getStopOfBaseToken(company) != null) return true;
+
+        // --- START FIX ---
+        // Rule 819/830: A company is present if its destination marker is on the edge 
+        for (Object item : edgeTokens) {
+            BaseToken t = (BaseToken) item;
+            if (t.getParent() == company) return true;
+        }
+        // --- END FIX ---
+        return false;
+    }
+
+    public boolean layBaseTokenOnEdge(PublicCompany company) {
+        BaseToken token = company.getNextBaseToken();
+        if (token == null)
+            return false;
+
+        // Move to MapHex owner directly, bypassing Stop slot logic
+        token.moveTo(this);
+        edgeTokens.add(token);
+
+        // 1870 Specific: Mark the company as having reached destination
+        company.setReachedDestination(true);
+        return true;
     }
 
     /**
@@ -969,7 +1008,8 @@ int statNum = station.getNumber();
      */
     public Stop getStopOfBaseToken(PublicCompany company) {
         for (Stop stop : stops) {
-            if (stop.hasTokenOf(company)) return stop;
+            if (stop.hasTokenOf(company))
+                return stop;
         }
         return null;
     }
@@ -994,16 +1034,19 @@ int statNum = station.getNumber();
 
     public Stop getRelatedStop(int stationNb) {
 
-        /* NOTE: Apparently, the below outcommented code had replaced the original one
-           to cope with WRONG chosen station numbers for token lays on multiple-city tiles
-           in old saved files, which have been edited.
-        for (Stop stop : stops) {
-            if (stop.getRelatedStation().getNumber() == stationNb) return stop;
-        }
-        for (Stop stop : stops) {
-            if (stop.checkPreviousNumbers(stationNb)) return stop;
-        }
-        return null;*/
+        /*
+         * NOTE: Apparently, the below outcommented code had replaced the original one
+         * to cope with WRONG chosen station numbers for token lays on multiple-city
+         * tiles
+         * in old saved files, which have been edited.
+         * for (Stop stop : stops) {
+         * if (stop.getRelatedStation().getNumber() == stationNb) return stop;
+         * }
+         * for (Stop stop : stops) {
+         * if (stop.checkPreviousNumbers(stationNb)) return stop;
+         * }
+         * return null;
+         */
         return stops.get(getStation(stationNb));
     }
 
@@ -1057,7 +1100,8 @@ int statNum = station.getNumber();
     }
 
     public void addDestination(PublicCompany company) {
-        if (destinations == null) destinations = new ArrayList<>();
+        if (destinations == null)
+            destinations = new ArrayList<>();
         destinations.add(company);
     }
 
@@ -1080,7 +1124,8 @@ int statNum = station.getNumber();
     }
 
     /**
-     * @param company private company that blocks the hex (use argument null to unblock)
+     * @param company private company that blocks the hex (use argument null to
+     *                unblock)
      */
     public void setBlockingPrivateCompany(PrivateCompany company) {
         blockingPrivateCompany.set(company);
@@ -1088,31 +1133,38 @@ int statNum = station.getNumber();
 
     /**
      * @return Returns false if no base tokens may yet be laid on this hex and
-     * station.
-     * <p>
-     * NOTE: this method currently only checks for prohibitions caused by the
-     * presence of unlaid home base tokens. It does NOT (yet) check for free
-     * space.
-     * <p>
-     * <p>
-     * There are the following cases to check for each company located there
-     * <p>
-     * A) Location is decided or there is only one city => check if the city has a
-     * free slot or not (examples: NYNH in 1830 for a two city tile, NYC for a
-     * one city tile) B) Location is not decided (example: Erie in 1830) two
-     * subcases depending on isHomeBlockedForAllCities - (true): all cities of
-     * the hex have remaining slots available - (false): no city of the hex has
-     * remaining slots available C) Or the company does not block its home city
-     * at all (example:Pr in 1835) then isBlockedForTokenLays attribute is used
-     * <p>
-     * NOTE: It now deals with more than one company with a home base on the
-     * same hex.
-     * <p>
-     * Remark: This was a static field in Rails1.x causing potential undo
-     * problems.
+     *         station.
+     *         <p>
+     *         NOTE: this method currently only checks for prohibitions caused by
+     *         the
+     *         presence of unlaid home base tokens. It does NOT (yet) check for free
+     *         space.
+     *         <p>
+     *         <p>
+     *         There are the following cases to check for each company located there
+     *         <p>
+     *         A) Location is decided or there is only one city => check if the city
+     *         has a
+     *         free slot or not (examples: NYNH in 1830 for a two city tile, NYC for
+     *         a
+     *         one city tile) B) Location is not decided (example: Erie in 1830) two
+     *         subcases depending on isHomeBlockedForAllCities - (true): all cities
+     *         of
+     *         the hex have remaining slots available - (false): no city of the hex
+     *         has
+     *         remaining slots available C) Or the company does not block its home
+     *         city
+     *         at all (example:Pr in 1835) then isBlockedForTokenLays attribute is
+     *         used
+     *         <p>
+     *         NOTE: It now deals with more than one company with a home base on the
+     *         same hex.
+     *         <p>
+     *         Remark: This was a static field in Rails1.x causing potential undo
+     *         problems.
      */
     public boolean isBlockedForTokenLays(PublicCompany company,
-                                         Stop stopToLay) {
+            Stop stopToLay) {
 
         if (isHomeFor(company)) {
             // Company can always lay a home base
@@ -1142,7 +1194,8 @@ int statNum = station.getNumber();
         int anyBlockCompanies = 0;
         int cityBlockCompanies = 0;
         for (PublicCompany comp : homes.viewKeySet()) {
-            if (comp.hasLaidHomeBaseTokens() || comp.isClosed()) continue;
+            if (comp.hasLaidHomeBaseTokens() || comp.isClosed())
+                continue;
             // home base not laid yet
             Stop homeStop = homes.get(comp);
             if (homeStop == null) {
@@ -1169,7 +1222,8 @@ int statNum = station.getNumber();
             allTokenSlotsLeft += stop.getTokenSlotsLeft();
         }
         // exceeds the available slots
-        return anyBlockCompanies + cityBlockCompanies + 1 > allTokenSlotsLeft; // all located companies plus the additonal token
+        return anyBlockCompanies + cityBlockCompanies + 1 > allTokenSlotsLeft; // all located companies plus the
+                                                                               // additonal token
     }
 
     public BlockedToken getBlockedForTokenLays() {
@@ -1238,11 +1292,9 @@ int statNum = station.getNumber();
 
     @Override
     public String toString() {
-        //return super.toString() + coordinates;
+        // return super.toString() + coordinates;
         return getId();
     }
-
-
 
     public BiMap<Station, Stop> getStopsMap() {
         return stops.view();
@@ -1253,7 +1305,7 @@ int statNum = station.getNumber();
      * Extracts the integer rotation (0-5) from the State object.
      */
     public int getTileRotation() {
-if (this.currentTileRotation == null || this.currentTileRotation.value() == null) {
+        if (this.currentTileRotation == null || this.currentTileRotation.value() == null) {
             return 0;
         }
         // Use getTrackPointNumber() instead of ordinal() because HexSide is not an Enum

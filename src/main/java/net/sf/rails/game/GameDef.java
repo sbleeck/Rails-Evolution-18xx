@@ -14,7 +14,7 @@ public class GameDef {
 
         NO_SALE_IN_FIRST_SR (false),
         NO_SALE_IF_NOT_OPERATED (false),
-        STOCK_ROUND_SEQUENCE(StockRound.SELL_BUY_SELL),
+        STOCK_ROUND_SEQUENCE(StockRound.SELL_BUY_OR_BUY_SELL),
         PLAYER_SHARE_LIMIT (60),
         POOL_SHARE_LIMIT(50),
         TREASURY_SHARE_LIMIT(50), // No longer directly used, now only a default (EV 02/2023).

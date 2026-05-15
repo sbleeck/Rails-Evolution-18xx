@@ -25,11 +25,12 @@ public class LayBaseToken extends LayToken {
     public static final int HOME_CITY = 3; // If city on home hex is undefined in 1st turn
     public static final int FORCED_LAY = 4; // Lay token even if there is no free slot (18Scan)
     public static final int NON_CITY = 5; // Lay token on plain track or town (special cases)
+    public static final int HEX_EDGE = 6; // 1870: Destination marker on hex edge (does not use slot)
     public static final int CORRECTION = 99; // Correction token lays
 
-    // For logging (toString()) only
-    private static String[] typeText = new String[] {"GENERIC", "LOCATION_SPECIFIC",
-            "SPECIAL_PROPERTY", "HOME_CITY", "FORCED_LAY", "NON_CITY", "CORRECTION"};
+// For logging (toString()) only
+private static String[] typeText = new String[] {"GENERIC", "LOCATION_SPECIFIC",
+        "SPECIAL_PROPERTY", "HOME_CITY", "FORCED_LAY", "NON_CITY", "HEX_EDGE", "CORRECTION"};
 
     protected int type;
 
