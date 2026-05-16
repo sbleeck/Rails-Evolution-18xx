@@ -7,8 +7,7 @@ import net.sf.rails.game.financial.StockSpace;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Deque;
-import java.util.ArrayDeque;
+import net.sf.rails.game.state.ArrayListState;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -16,7 +15,7 @@ import org.slf4j.LoggerFactory;
 public class GameManager_1870 extends GameManager {
 
     private static final Logger log = LoggerFactory.getLogger(GameManager_1870.class);
-    private final Deque<Round> interruptStack = new ArrayDeque<>();
+private final ArrayListState<Round> interruptStack = new ArrayListState<>(this, "interruptStack");
 
     public GameManager_1870(RailsRoot parent, String id) {
         super(parent, id);
@@ -34,7 +33,7 @@ public class GameManager_1870 extends GameManager {
     public void startShareProtectionRound(Round currentRound, PublicCompany company, net.sf.rails.game.Player seller,
             int sharesSold) {
 
-interruptStack.push((Round) getCurrentRound());
+        interruptStack.add((Round) getCurrentRound());
         String roundName = "ShareProtectionRound_in_" + currentRound.getId() + "_" + System.nanoTime();
 
         ShareProtectionRound_1870 spr = (ShareProtectionRound_1870) createRound(ShareProtectionRound_1870.class,
@@ -70,7 +69,7 @@ interruptStack.push((Round) getCurrentRound());
         if (round instanceof net.sf.rails.game.specific._1870.ShareProtectionRound_1870 ||
                 round instanceof net.sf.rails.game.specific._1870.ConnectionRunRound_1870) {
             if (!interruptStack.isEmpty()) {
-                net.sf.rails.game.Round interrupted = interruptStack.pop();
+                net.sf.rails.game.Round interrupted = interruptStack.remove(interruptStack.size() - 1);
                 setRound(interrupted);
                 interrupted.resume();
                 return;
@@ -157,7 +156,7 @@ interruptStack.push((Round) getCurrentRound());
 
     public void startConnectionRunRound(Round currentRound, PublicCompany company) {
 
-interruptStack.push((Round) getCurrentRound());
+        interruptStack.add((Round) getCurrentRound());
         String roundName = "ConnectionRunRound_" + company.getId() + "_" + System.nanoTime();
 
         ConnectionRunRound_1870 crr = (ConnectionRunRound_1870) createRound(ConnectionRunRound_1870.class, roundName);

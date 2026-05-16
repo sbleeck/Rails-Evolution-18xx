@@ -737,6 +737,24 @@ public class StatusWindow extends JFrame implements ActionListener, ActionPerfor
         });
         correctionMenu.add(forceSkipItem);
 
+        if ("1870".equals(gameUIManager.getGameManager().getGameName())) {
+            JMenuItem forceDestItem = new JMenuItem("Force Connection Run (1870)");
+            forceDestItem.setToolTipText("Forces the current operating company to complete its destination run.");
+            forceDestItem.addActionListener(new ActionListener() {
+                @Override
+                public void actionPerformed(ActionEvent e) {
+                    if (gameUIManager != null && gameUIManager.getGameManager() != null) {
+                        RoundFacade currentRound = gameUIManager.getGameManager().getCurrentRound();
+                        if (currentRound instanceof net.sf.rails.game.specific._1870.OperatingRound_1870) {
+                            ((net.sf.rails.game.specific._1870.OperatingRound_1870) currentRound).forceConnectionRun();
+                            gameUIManager.updateUI();
+                        }
+                    }
+                }
+            });
+            correctionMenu.add(forceDestItem);
+        }
+
     }
 
     public boolean setupFor(RoundFacade round) {

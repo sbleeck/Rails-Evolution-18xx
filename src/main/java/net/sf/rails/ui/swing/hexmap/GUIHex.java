@@ -526,6 +526,7 @@ private static final int[] offStationTokenX = new int[] { -20, 20 };
         try {
             paintStationTokens(g);
             paintOffStationTokens(g);
+            paintEdgeTokens(g);
 
             // 1. Check the new terrain cost toggle state
             boolean displayMarkings = true;
@@ -1857,4 +1858,46 @@ public void paintMississippi(Graphics2D g) {
         }
         g2.setFont(originalFont);
     }
+
+
+
+    private void paintEdgeTokens(Graphics2D g2) {
+        try {
+            // Access edgeTokens from MapHex via reflection to avoid cross-version compilation errors
+            java.lang.reflect.Field edgeTokensField = net.sf.rails.game.MapHex.class.getDeclaredField("edgeTokens");
+            edgeTokensField.setAccessible(true);
+            Object edgeTokensObj = edgeTokensField.get(getHex());
+            
+            if (edgeTokensObj instanceof Iterable) {
+                int i = 0;
+                for (Object item : (Iterable<?>) edgeTokensObj) {
+                    if (item instanceof BaseToken) {
+                        BaseToken token = (BaseToken) item;
+                        PublicCompany company = token.getParent();
+                        
+                        // Calculate position: near the edge, slightly inset towards the center
+                        HexSide side = HexSide.get(i % 6);
+                        HexPoint sidePt = new HexPoint(getSidePoint2D(side));
+                        HexPoint centerPt = dimensions.center;
+                        
+                        double dx = sidePt.getX() - centerPt.getX();
+                        double dy = sidePt.getY() - centerPt.getY();
+                        
+                        // Inset by 20% to keep it inside the hex bounds and avoid track clipping
+                        HexPoint origin = new HexPoint(centerPt.getX() + dx * 0.8, centerPt.getY() + dy * 0.8);
+                        
+                        // Draw slightly smaller than normal tokens to distinguish it as an edge marker
+                        drawBaseToken(g2, company, origin, dimensions.tokenDiameter * 0.8);
+                        i++;
+                    }
+                }
+            }
+        } catch (Exception e) {
+            // Field not found or inaccessible; ignore
+        }
+    }
+
+
+
+
 }

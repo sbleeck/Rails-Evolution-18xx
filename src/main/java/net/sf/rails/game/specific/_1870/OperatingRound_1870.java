@@ -38,11 +38,15 @@ public class OperatingRound_1870 extends OperatingRound {
     private final net.sf.rails.game.state.BooleanState bridgeBonusUsedThisTurn = new net.sf.rails.game.state.BooleanState(
             this, "bridgeBonusUsedThisTurn", false);
 
+            private final net.sf.rails.game.state.BooleanState resumingFromConnectionRun = new net.sf.rails.game.state.BooleanState(
+            this, "resumingFromConnectionRun", false);
+
     @Override
     protected void initTurn() {
         super.initTurn();
         homeTileLaidThisTurn.set(false);
         bridgeBonusUsedThisTurn.set(false);
+        resumingFromConnectionRun.set(false);
     }
 
     @Override
@@ -239,9 +243,7 @@ public class OperatingRound_1870 extends OperatingRound {
         // 1870 Rule: Cattle Company token placement
         PublicCompany comp = getOperatingCompany();
         if (comp != null) {
-            if (comp.hasDestination() && !comp.hasReachedDestination()) {
-                possibleActions.add(new ForceConnectionRunAction(getRoot(), comp.getId()));
-            }
+
             PrivateCompany cattle = getAvailableCattleCompany(comp);
             if (cattle != null) {
                 // Add a single action with a null hex. The dialog will open when clicked.
@@ -319,18 +321,7 @@ public class OperatingRound_1870 extends OperatingRound {
 
     @Override
     public boolean processGameSpecificAction(rails.game.action.PossibleAction action) {
-        if (action instanceof ForceConnectionRunAction) {
-            ForceConnectionRunAction forceAction = (ForceConnectionRunAction) action;
-            PublicCompany comp = (PublicCompany) forceAction.getTarget();
-            if (comp != null && !comp.hasReachedDestination()) {
-                applyDestinationBonus(comp);
-                if (gameManager instanceof GameManager_1870) {
-                    ((GameManager_1870) gameManager).startConnectionRunRound(this, comp);
-                }
-                return true;
-            }
-            return false;
-        }
+
 
         if (action instanceof net.sf.rails.game.specific._1870.action.LayCattleToken_1870) {
             net.sf.rails.game.specific._1870.action.LayCattleToken_1870 cattleAction = (net.sf.rails.game.specific._1870.action.LayCattleToken_1870) action;
@@ -650,7 +641,7 @@ private net.sf.rails.game.BonusToken getGulfTokenOnMap() {
                 company.getBaseTokensModel().addBaseToken(routingToken, false);
                 if (destHex.getStops() != null && !destHex.getStops().isEmpty()) {
                     rails.game.action.LayBaseToken forceLay = new rails.game.action.LayBaseToken(getRoot(),
-                            rails.game.action.LayBaseToken.FORCED_LAY);
+                            rails.game.action.LayBaseToken.HEX_EDGE);
                     forceLay.setCompany(company);
                     forceLay.setChosenHex(destHex);
                     forceLay.setChosenStation(destHex.getStops().iterator().next().getRelatedStationNumber());
@@ -669,17 +660,26 @@ private net.sf.rails.game.BonusToken getGulfTokenOnMap() {
         }
     }
 
+
     @Override
     public boolean layBaseToken(rails.game.action.LayBaseToken action) {
-        // Intercept forced token lays for the 1870 destination run
-        if (action.getType() == rails.game.action.LayBaseToken.FORCED_LAY) {
+        // Intercept edge token lays for the 1870 destination run
+        if (action.getType() == rails.game.action.LayBaseToken.HEX_EDGE) {
+            net.sf.rails.game.PublicCompany company = action.getCompany();
+            net.sf.rails.game.MapHex hex = action.getChosenHex();
+
+            // Bypass normal slot logic and place on hex edge
+            if (hex.layBaseTokenOnEdge(company)) {
+                company.layBaseToken(hex, 0); // Execute the lay at $0 cost
+                return true;
+            }
+            return false;
+        } else if (action.getType() == rails.game.action.LayBaseToken.FORCED_LAY) {
             net.sf.rails.game.PublicCompany company = action.getCompany();
             net.sf.rails.game.MapHex hex = action.getChosenHex();
             net.sf.rails.game.Stop stop = action.getChosenStop();
 
-            // Bypass the parent class validation checks (slot capacity, already present,
-            // etc.)
-            // and forcefully lay the token to satisfy 1870 destination rules.
+            // Bypass the parent class validation checks (slot capacity, already present, etc.)
             if (hex.layBaseToken(company, stop)) {
                 company.layBaseToken(hex, 0); // Execute the lay at $0 cost
                 return true;
@@ -708,9 +708,19 @@ private net.sf.rails.game.BonusToken getGulfTokenOnMap() {
     @Override
     protected boolean finishTurnSpecials() {
         if (checkConnections()) {
+            resumingFromConnectionRun.set(true);
             return false; // Suspend the current round to let the Connection Run interrupt take over
         }
         return super.finishTurnSpecials();
+    }
+
+    @Override
+    public void resume() {
+        super.resume();
+        if (resumingFromConnectionRun.value()) {
+            resumingFromConnectionRun.set(false);
+            finishTurn();
+        }
     }
 
     private boolean checkConnections() {
@@ -789,79 +799,18 @@ private net.sf.rails.game.BonusToken getGulfTokenOnMap() {
         }
 
         return false;
-        // --- END FIX ---
     }
 
-    // --- START FIX ---
-    public static class ForceConnectionRunAction extends rails.game.action.PossibleAction
-            implements rails.game.action.GuiTargetedAction {
-        private static final long serialVersionUID = 1L;
-        private final String companyId;
-
-        public ForceConnectionRunAction(net.sf.rails.game.RailsRoot root, String companyId) {
-            super(root);
-            this.companyId = companyId;
-        }
-
-        @Override
-        public String getGroupLabel() {
-            return "CONNECTION RUN";
-        }
-
-        @Override
-        public String getButtonLabel() {
-            return "Force Connection Run";
-        }
-
-        @Override
-        public net.sf.rails.game.state.Owner getTarget() {
-            return getRoot().getCompanyManager().getPublicCompany(companyId);
-        }
-
-        @Override
-        public net.sf.rails.game.state.Owner getActor() {
-            return getRoot().getCompanyManager().getPublicCompany(companyId);
-        }
-
-        @Override
-        public java.awt.Color getHighlightBackgroundColor() {
-            return new java.awt.Color(255, 69, 0);
-        } // Red-Orange
-
-        @Override
-        public java.awt.Color getHighlightBorderColor() {
-            return java.awt.Color.BLACK;
-        }
-
-        @Override
-        public java.awt.Color getHighlightTextColor() {
-            return java.awt.Color.WHITE;
-        }
-
-        @Override
-        public java.awt.Color getButtonColor() {
-            return new java.awt.Color(255, 69, 0);
-        }
-
-        @Override
-        public int getHotkey() {
-            return 0;
-        }
-
-        @Override
-        public boolean equals(Object o) {
-            if (this == o)
-                return true;
-            if (o == null || getClass() != o.getClass())
-                return false;
-            ForceConnectionRunAction that = (ForceConnectionRunAction) o;
-            return java.util.Objects.equals(companyId, that.companyId);
-        }
-
-        @Override
-        public int hashCode() {
-            return java.util.Objects.hash(companyId);
+    public void forceConnectionRun() {
+        PublicCompany comp = getOperatingCompany();
+        if (comp != null && !comp.hasReachedDestination() && comp.getDestinationHex() != null) {
+            applyDestinationBonus(comp);
+            if (gameManager instanceof GameManager_1870) {
+                ((GameManager_1870) gameManager).startConnectionRunRound(this, comp);
+            }
+        } else if (comp != null) {
+            net.sf.rails.common.DisplayBuffer.add(this, "Cannot force connection run: " + comp.getId() + " already reached destination or has none.");
         }
     }
-    // --- END FIX ---
+    
 }
