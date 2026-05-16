@@ -1261,9 +1261,17 @@ public class ORPanel extends GridPanel
         sidebarPanel.add(Box.createVerticalStrut(5));
 
         // 3. SPECIAL CONTAINER
-        specialContainer = new JPanel(new BorderLayout());
+        specialContainer = new JPanel(new BorderLayout()) {
+            @Override
+            public Dimension getMaximumSize() {
+                Dimension pref = getPreferredSize();
+                return new Dimension(getSidebarWidth(), pref.height);
+            }
+        };
         specialContainer.setOpaque(false);
         specialContainer.setVisible(false);
+        
+    
         specialContainer.setBorder(BorderFactory.createTitledBorder(
                 BorderFactory.createLineBorder(BG_DETAILS), "",
                 TitledBorder.LEFT, TitledBorder.TOP, FONT_HEADER));
