@@ -26,8 +26,7 @@ import net.sf.rails.game.Phase;
 public class OperatingRound_1870 extends OperatingRound {
 
     private static final Logger log = LoggerFactory.getLogger(OperatingRound_1870.class);
-
-    public static final List<String> GULF_PORT_HEXES = Arrays.asList("H17", "K16", "M14", "M20", "N7");
+public static final List<String> GULF_PORT_HEXES = Arrays.asList("H17", "M14", "M20", "N7", "N17");
 
     public OperatingRound_1870(GameManager parent, String id) {
         super(parent, id);
@@ -338,9 +337,10 @@ public class OperatingRound_1870 extends OperatingRound {
                     for (MapHex h : getRoot().getMapManager().getHexes()) {
                         // Rules check: Hex must have a city/stop and cannot contain a portion of the
                         // Mississippi.
-                        if (h.getStops() != null && !h.getStops().isEmpty()
-                                && !MississippiRiverValidator.isRiverHex(h)) {
-                            options.add(h.getId());
+                       if (h.getStops() != null && !h.getStops().isEmpty()) {
+                            if (isWestOfMississippi(h.getId())) {
+                                options.add(h.getId());
+                            }
                         }
                     }
                     java.util.Collections.sort(options);
@@ -481,6 +481,39 @@ String oldName = existingToken.getName();
         return super.processGameSpecificAction(action);
     }
 
+    private boolean isWestOfMississippi(String hexId) {
+        if (hexId == null || hexId.length() < 2) return false;
+        char row = hexId.charAt(0);
+        int col;
+        try {
+            col = Integer.parseInt(hexId.substring(1));
+        } catch (NumberFormatException e) {
+            return false;
+        }
+        int missCol;
+        // Defines the column number of the Mississippi River (or eastern border) for each row
+        switch (row) {
+            case 'A': missCol = 16; break;
+            case 'B': missCol = 17; break;
+            case 'C': missCol = 18; break; // St. Louis is C18
+            case 'D': missCol = 17; break;
+            case 'E': missCol = 20; break;
+            case 'F': missCol = 19; break;
+            case 'G': missCol = 18; break;
+            case 'H': missCol = 17; break; // Memphis is H17
+            case 'I': missCol = 16; break;
+            case 'J': missCol = 15; break;
+            case 'K': missCol = 14; break;
+            case 'L': missCol = 13; break;
+            case 'M': missCol = 14; break; // Baton Rouge is M14
+            case 'N': missCol = 15; break; // New Orleans is N17
+            case 'O': missCol = 14; break;
+            default: return false;
+        }
+        // Strict less-than ensures cities exactly on the river are excluded
+        return col < missCol;
+    }
+    
     private PrivateCompany getAvailableCattleCompany(PublicCompany comp) {
         if (comp == null || comp.getPortfolioModel() == null)
             return null;
@@ -812,5 +845,5 @@ private net.sf.rails.game.BonusToken getGulfTokenOnMap() {
             net.sf.rails.common.DisplayBuffer.add(this, "Cannot force connection run: " + comp.getId() + " already reached destination or has none.");
         }
     }
-    
+
 }

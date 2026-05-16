@@ -30,7 +30,8 @@ public class CattleModifier_1870 implements RevenueStaticModifier {
 
         for (NetworkVertex v : revenueAdapter.getVertices()) {
             MapHex hex = v.getHex();
-            if (hex != null && hex.getBonusTokens() != null) {
+           // Restrict the bonus to revenue-generating stops to prevent multiple additions from track junctions
+            if (hex != null && hex.getBonusTokens() != null && (v.isMajor() || v.isMinor())) {
                 for (BonusToken t : hex.getBonusTokens()) {
                     String tName = t.getName();
                     if (tName != null) {
