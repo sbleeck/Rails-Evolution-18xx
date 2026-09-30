@@ -103,12 +103,10 @@ public class OperatingRound_1835 extends OperatingRound {
         if (!success)
             return false;
 
-        // --- START FIX: PFR TRIGGER LOGIC ---
         if (!trainsBoughtThisTurn.isEmpty() && trainsBoughtThisTurn.size() > pfrHandledTrainCount.value()) {
             TrainCardType bought = trainsBoughtThisTurn.get(trainsBoughtThisTurn.size() - 1);
             String id = bought.getId();
 
-            // Identify Trigger Trains
             boolean isFirst4 = "4".equals(id) && bought.getNumberBoughtFromIPO() == 1;
             boolean isFirst4Plus4 = "4+4".equals(id) && bought.getNumberBoughtFromIPO() == 1;
             boolean isFirst5 = "5".equals(id) && bought.getNumberBoughtFromIPO() == 1;
@@ -118,44 +116,63 @@ public class OperatingRound_1835 extends OperatingRound {
                 PublicCompany pr = companyManager.getPublicCompany(GameDef_1835.PR_ID);
                 boolean prStarted = (pr != null && pr.hasStarted());
 
-                // CRITICAL FIX: The trigger is MANDATORY if:
-                // 1. It is the 5-train (Phase 5 closing).
-                // 2. It is the 4+4 train AND Prussia hasn't started yet (Forces M2 to merge).
                 boolean isMandatory = isFirst5 || (isFirst4Plus4 && !prStarted);
 
-                // Trigger if it's the first time we ask, OR if the event is mandatory
                 if (!gm.hasPrussianFormationBeenOffered() || isMandatory) {
+                    log.info(">>> PFR Triggered by {} buying {} (Mandatory={})", action.getCompany().getId(), id, isMandatory);
 
-                    log.info(">>> PFR Triggered by {} buying {} (Mandatory={})", action.getCompany().getId(), id,
-                            isMandatory);
-
-                    // 1. Lock the OR
                     pfrHandledTrainCount.set(trainsBoughtThisTurn.size());
                     pfrTriggeredThisOR.set(true);
-
-                    // Capture the Trigger Company (M1) immediately
+                    
+                    // CRITICAL FIX: Set the flag so PFR starts AFTER phase checks and discards
+                    needPrussianFormationCall.set(true);
                     pfrTriggerId.set(action.getCompany().getId());
 
-                    // 2. Identify Starter
                     Player starter = playerManager.getCurrentPlayer();
                     PublicCompany m2 = companyManager.getPublicCompany(GameDef_1835.M2_ID);
 
-                    // If Prussia isn't open, M2 is the "Primary Target" for the forced merge
                     if (!prStarted && m2 != null && !m2.isClosed() && m2.getPresident() != null) {
                         starter = m2.getPresident();
                     } else if (prStarted && pr != null && pr.getPresident() != null) {
                         starter = pr.getPresident();
                     }
 
-                    // 3. Fire the Round Switch
                     gm.setPrussianFormationStartingPlayer(starter);
-                    gm.startPrussianFormationRound(this);
+                    
+                    // Removed gm.startPrussianFormationRound(this) here to prevent early hijack before train limits apply.
                 }
             }
         }
-        // --- END FIX ---
-
         return true;
+    }
+
+    @Override
+    public boolean process(PossibleAction action) {
+        // --- STRICT GUARD: Block double-actions if PFR is triggered ---
+        // Allow DiscardTrain to process so excess trains are resolved before PFR starts
+        if (pfrTriggeredThisOR.value() && getStep() != GameDef.OrStep.DISCARD_TRAINS && !(action instanceof DiscardTrain)) {
+            log.warn("Blocked action {} because PFR is triggered but not yet active.", action);
+            return false;
+        }
+
+        boolean result = super.process(action);
+
+        if (action instanceof BuyTrain) {
+            newPhaseChecks();
+
+            if (gameManager.getCurrentRound() instanceof PrussianFormationRound) {
+                return result;
+            }
+
+            // Launch PFR if needed, but ONLY after discards are finished
+            if (needPrussianFormationCall.value() && getStep() != GameDef.OrStep.DISCARD_TRAINS) {
+                needPrussianFormationCall.set(false);
+                if (!PrussianFormationRound.prussianIsComplete(gameManager)) {
+                    ((GameManager_1835) gameManager).startPrussianFormationRound(this);
+                }
+            }
+        }
+        return result;
     }
 
     @Override
@@ -285,104 +302,150 @@ public class OperatingRound_1835 extends OperatingRound {
         return !excessTrainCompanies.isEmpty();
     }
 
-    // --- INSERT THIS FROM OLD FILE (THE "HAMMER") ---
+
     @Override
-    public boolean discardTrain(DiscardTrain action) {
+public boolean discardTrain(DiscardTrain action) {
+    PublicCompany currentOp = operatingCompany.value();
+    Player currentPlayer = playerManager.getCurrentPlayer();
 
-        PublicCompany currentOp = operatingCompany.value();
-        Player currentPlayer = playerManager.getCurrentPlayer();
+    PublicCompany actionComp = action.getCompany();
+    Player actionPlayer =
+            (actionComp != null) ? actionComp.getPresident() : null;
 
-        PublicCompany actionComp = action.getCompany();
-        Player actionPlayer = (actionComp != null) ? actionComp.getPresident() : null;
+    /*
+     * Ensure that the company making the discard is present in the
+     * excess-train structure. This is needed for interjected discards,
+     * where a company other than the currently operating company must
+     * discard a train.
+     */
+    if (excessTrainCompanies == null) {
+        excessTrainCompanies = new HashMap<>();
+    }
 
-        // --- CRITICAL FIX: ALWAYS patch the Excess List for DiscardTrain actions ---
-        // We force the company into this list to bypass false-negative validation
-        // failures.
-        if (excessTrainCompanies == null) {
-            excessTrainCompanies = new HashMap<>();
+    if (actionPlayer != null && actionComp != null) {
+        List<PublicCompany> companies =
+                excessTrainCompanies.get(actionPlayer);
+
+        if (companies == null) {
+            companies = new ArrayList<>();
+            excessTrainCompanies.put(actionPlayer, companies);
         }
+
+        if (!companies.contains(actionComp)) {
+            companies.add(actionComp);
+        }
+    }
+
+    boolean isInterjection =
+            actionComp != null
+                    && currentOp != null
+                    && actionComp != currentOp;
+
+    /*
+     * Temporarily give control to the company that must discard.
+     */
+    if (isInterjection) {
+        operatingCompany.set(actionComp);
+
         if (actionPlayer != null) {
-            List<PublicCompany> comps = excessTrainCompanies.get(actionPlayer);
-            if (comps == null) {
-                comps = new ArrayList<>();
-                excessTrainCompanies.put(actionPlayer, comps);
-            }
-            if (!comps.contains(actionComp)) {
-                comps.add(actionComp);
-            }
+            playerManager.setCurrentPlayer(actionPlayer);
         }
-        // --------------------------------------------------------------------------
+    }
 
-        boolean isInterjection = (actionComp != null && currentOp != null && actionComp != currentOp);
+    boolean processed;
 
-        // Context Swap Logic
-        if (isInterjection) {
-            operatingCompany.set(actionComp);
-            if (actionPlayer != null) {
-                playerManager.setCurrentPlayer(actionPlayer);
-            }
+    try {
+        processed = action.process(this);
+    } catch (Exception e) {
+        log.error(
+                "Exception while processing train discard for {}",
+                actionComp != null ? actionComp.getId() : "null",
+                e);
+        processed = false;
+    }
+
+    /*
+     * Restore the company whose operating turn was interrupted.
+     */
+    if (isInterjection) {
+        operatingCompany.set(currentOp);
+
+        if (currentPlayer != null) {
+            playerManager.setCurrentPlayer(currentPlayer);
         }
+    }
 
-        // Execute Action
-        boolean processed = false;
-        try {
-            processed = action.process(this);
-        } catch (Exception e) {
-            log.error(">>> FORENSIC ERROR: Exception during action.process()", e);
-        }
+    if (!processed) {
+        return false;
+    }
 
-        // Restore Context
-        if (isInterjection) {
-            operatingCompany.set(currentOp);
-            if (currentPlayer != null) {
-                playerManager.setCurrentPlayer(currentPlayer);
-            }
-        }
+    /*
+     * IMPORTANT:
+     * Use the 1835-specific override, not
+     * super.checkForExcessTrains().
+     */
+    boolean moreDiscards = checkForExcessTrains();
 
-        if (!processed) {
-            return false;
-        }
+    /*
+     * If the first 4/4+4/5 triggered the Prussian Formation Round,
+     * start it immediately after the final required discard.
+     */
+    if (needPrussianFormationCall.value()) {
+        if (!moreDiscards) {
+            needPrussianFormationCall.set(false);
 
-        boolean moreDiscards = super.checkForExcessTrains();
+            if (!PrussianFormationRound.prussianIsComplete(gameManager)) {
+                log.info(
+                        "All required train discards completed. "
+                                + "Starting Prussian Formation Round.");
 
-        if (this.needPrussianFormationCall.value()) {
-            if (!moreDiscards) {
-                PublicCompany prussian = companyManager.getPublicCompany(GameDef_1835.PR_ID);
-                if (prussian.hasStarted()) {
-                    if (operatingCompany.value().isClosed()) {
-                        operatingCompany.set(prussian);
-                        stepObject.set(GameDef.OrStep.INITIAL);
-                    } else {
-                        stepObject.set(GameDef.OrStep.BUY_TRAIN);
-                    }
-                    playerManager.setCurrentPlayer(operatingCompany.value().getPresident());
-                } else {
-                    ((GameManager_1835) gameManager).startPrussianFormationRound(this);
-                }
-                // After PFR returns, the company that bought the train might be closed.
-                handleClosedOperatingCompany();
-            }
-        } else {
-            if (!moreDiscards) {
-                newPhaseChecks();
-                if (gameManager.getInterruptedRound() != null) {
-                    return true;
-                }
+                ((GameManager_1835) gameManager)
+                        .startPrussianFormationRound(this);
 
-                boolean companySwitched = handleClosedOperatingCompany();
-
-                if (!companySwitched) {
-                    playerManager.setCurrentPlayer(operatingCompany.value().getPresident());
-                    if (trainsBoughtThisTurn.isEmpty()) {
-                        setStep(GameDef.OrStep.INITIAL);
-                    } else {
-                        stepObject.set(GameDef.OrStep.BUY_TRAIN);
-                    }
-                }
+                /*
+                 * Do not continue modifying the interrupted Operating
+                 * Round after the PFR has been installed.
+                 */
+                return true;
             }
         }
+
         return true;
     }
+
+    /*
+     * Normal discard handling when no Prussian Formation Round
+     * is waiting.
+     */
+    if (!moreDiscards) {
+        newPhaseChecks();
+
+        if (gameManager.getInterruptedRound() != null) {
+            return true;
+        }
+
+        boolean companySwitched = handleClosedOperatingCompany();
+
+        if (!companySwitched) {
+            PublicCompany company = operatingCompany.value();
+
+            if (company != null && company.getPresident() != null) {
+                playerManager.setCurrentPlayer(company.getPresident());
+            }
+
+            if (trainsBoughtThisTurn.isEmpty()) {
+                setStep(GameDef.OrStep.INITIAL);
+            } else {
+                setStep(GameDef.OrStep.BUY_TRAIN);
+            }
+        }
+    }
+
+    return true;
+}
+
+
+
 
     public void clearPfrTriggerFlag_AI() {
         this.needPrussianFormationCall.set(false);
@@ -763,34 +826,6 @@ public class OperatingRound_1835 extends OperatingRound {
         }
     }
 
-    @Override
-    public boolean process(PossibleAction action) {
-        // --- STRICT GUARD: Block double-actions if PFR is triggered ---
-        if (pfrTriggeredThisOR.value()) {
-            log.warn("Blocked action {} because PFR is triggered but not yet active.", action);
-            return false;
-        }
-
-        boolean result = super.process(action);
-
-        if (action instanceof BuyTrain) {
-            newPhaseChecks();
-
-            // Guard: If buyTrain() already switched us to PFR, do not trigger again.
-            // This prevents the "Double PFR Start" seen in the logs.
-            if (gameManager.getCurrentRound() instanceof PrussianFormationRound) {
-                return result;
-            }
-
-            if (needPrussianFormationCall.value()) {
-                needPrussianFormationCall.set(false);
-                if (!PrussianFormationRound.prussianIsComplete(gameManager)) {
-                    ((GameManager_1835) gameManager).startPrussianFormationRound(this);
-                }
-            }
-        }
-        return result;
-    }
 
     @Override
     protected Map<MoneyOwner, Integer> countSharesPerRecipient() {
@@ -1236,11 +1271,9 @@ public class OperatingRound_1835 extends OperatingRound {
         for (PublicCompany c : newMajors)
             operatingCompanies.add(c);
 
-        // --- END FIX ---
     }
-
-    @Override
-    public boolean setPossibleActions() {
+@Override
+   public boolean setPossibleActions() {
         // --- GUARD 1: Dead Company Check ---
         PublicCompany current = operatingCompany.value();
         if (current != null && current.isClosed()) {
@@ -1250,15 +1283,19 @@ public class OperatingRound_1835 extends OperatingRound {
         }
 
         // --- GUARD 2: PFR Gatekeeper ---
-        if (pfrTriggeredThisOR.value()) {
-            GameManager_1835 gm = (GameManager_1835) gameManager;
-            if (!(gm.getCurrentRound() instanceof PrussianFormationRound)) {
-                log.warn("PFR Triggered but not active. Forcing startPrussianFormationRound().");
-                gm.startPrussianFormationRound(this);
-            }
-            possibleActions.clear();
-            return true;
-        }
+       if (pfrTriggeredThisOR.value()
+        && getStep() != GameDef.OrStep.DISCARD_TRAINS) {
+
+    GameManager_1835 gm = (GameManager_1835) gameManager;
+
+    if (!(gm.getCurrentRound() instanceof PrussianFormationRound)) {
+        log.warn("PFR Triggered but not active. Forcing startPrussianFormationRound().");
+        gm.startPrussianFormationRound(this);
+    }
+
+    return true;
+}
+
 
         // --- MASTER SEQUENCE: Baden L6 Station Selection ---
         BadenContext ctx = getBadenStatus();

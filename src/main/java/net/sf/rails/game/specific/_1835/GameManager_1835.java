@@ -296,37 +296,81 @@ public class GameManager_1835 extends GameManager {
     }
 
 
-    public void startPrussianFormationRound(Round currentRound) {
-
-        setInterruptedRound(currentRound);
-
-        String roundName;
-        if (getInterruptedRound() == null) {
-            roundName = "PrussianFormationRound_after_" + (previousRound != null ? previousRound.getId() : "Start");
-        } else {
-            roundName = "PrussianFormationRound_in_" + currentRound.getId();
-            if (getCurrentPhase() != null) {
-                roundName += "_after_" + getCurrentPhase().getId();
-            }
-        }
-        roundName += "_" + getCurrentActionCount() + "_" + System.nanoTime();
-
-        
-        // Cast is necessary because createRound returns generic Round
-        PrussianFormationRound pfr = (PrussianFormationRound) createRound(PrussianFormationRound.class, roundName);
-        
-        setRound(pfr);
-        pfr.start();
-
-        this.setPrussianFormationOffered();
-        
-// CRITICAL: Force UI to acknowledge the round switch and repaint.
-        // Fix: Pass 'pfr' (Round/RailsItem) as the source, and the text as the message.
-        net.sf.rails.common.ReportBuffer.add(pfr, LocalText.getText("PRUSSIAN_FORMATION_ROUND_STARTED"));
-        
+public void startPrussianFormationRound(Round currentRound) {
+    if (getCurrentRound() instanceof PrussianFormationRound) {
+        log.warn(
+                "Attempted to start Prussian Formation Round "
+                        + "while one is already active.");
+        return;
     }
 
+    setInterruptedRound(currentRound);
 
+    String roundName;
+
+    if (getInterruptedRound() == null) {
+        roundName =
+                "PrussianFormationRound_after_"
+                        + (previousRound != null
+                                ? previousRound.getId()
+                                : "Start");
+    } else {
+        roundName =
+                "PrussianFormationRound_in_"
+                        + currentRound.getId();
+
+        if (getCurrentPhase() != null) {
+            roundName +=
+                    "_after_" + getCurrentPhase().getId();
+        }
+    }
+
+    roundName +=
+            "_"
+                    + getCurrentActionCount()
+                    + "_"
+                    + System.nanoTime();
+
+    PrussianFormationRound pfr =
+            (PrussianFormationRound) createRound(
+                    PrussianFormationRound.class,
+                    roundName);
+
+    setRound(pfr);
+
+    /*
+     * Do not mark the PFR as offered before start().
+     * Otherwise, the optional first-4 offer immediately cancels itself.
+     */
+    pfr.start();
+
+    /*
+     * start() may return immediately to the interrupted round.
+     */
+    if (getCurrentRound() != pfr) {
+        log.info(
+                "Prussian Formation Round returned to the "
+                        + "interrupted round during start().");
+        return;
+    }
+
+    setPrussianFormationOffered();
+
+    boolean actionsCreated = pfr.setPossibleActions();
+
+    log.info(
+            "Prussian Formation Round initialized. "
+                    + "Actions created={}",
+            actionsCreated);
+
+    ReportBuffer.add(
+            pfr,
+            LocalText.getText(
+                    "PRUSSIAN_FORMATION_ROUND_STARTED"));
+}
+
+
+    
         /**
      * Helper to expose M2 company to the PrussianFormationRound.
      * Required because PFR cannot access protected CompanyManager methods of the base GameManager.
